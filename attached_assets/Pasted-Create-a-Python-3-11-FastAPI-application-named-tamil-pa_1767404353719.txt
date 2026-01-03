@@ -1,0 +1,170 @@
+Create a Python 3.11 FastAPI application named
+“tamil-panchangam-engine”.
+
+ARCHITECTURE INTENT (IMPORTANT)
+- This is a Tamil Panchangam–based astrology system (Drik Ganita).
+- Lahiri Ayanamsa (sidereal zodiac) must be used.
+- South Indian square-style charts only.
+- The app must have TWO SERVICES under ONE APP:
+  1) Base Chart Service (immutable, computed once per birth)
+  2) Prediction Service (temporal, recomputed for future months)
+
+The Base Chart Service must NEVER be recomputed.
+The Prediction Service must ALWAYS consume stored base chart data.
+
+Do NOT implement astrology logic yet — only structure and stubs.
+
+--------------------------------------------------
+PROJECT STRUCTURE (CREATE EXACTLY)
+--------------------------------------------------
+
+tamil_panchangam_engine/
+│
+├── app/
+│   ├── main.py
+│   │
+│   ├── api/
+│   │   ├── base_chart.py
+│   │   └── prediction.py
+│   │
+│   ├── engines/
+│   │   ├── ephemeris.py
+│   │   ├── panchangam.py
+│   │   ├── divisional.py
+│   │   ├── dasha_vimshottari.py
+│   │   ├── transits.py
+│   │   └── pancha_pakshi.py
+│   │
+│   ├── charts/
+│   │   └── south_indian_svg.py
+│   │
+│   ├── pdf/
+│   │   └── report_builder.py
+│   │
+│   ├── models/
+│   │   └── schema.py
+│   │
+│   └── utils/
+│       └── time_utils.py
+│
+├── data/
+├── reports/
+├── requirements.txt
+└── README.md
+
+--------------------------------------------------
+REQUIREMENTS.TXT (PASTE EXACTLY)
+--------------------------------------------------
+
+fastapi
+uvicorn
+pyswisseph
+pytz
+timezonefinder
+svgwrite
+reportlab
+pydantic
+
+--------------------------------------------------
+MAIN APPLICATION (app/main.py)
+--------------------------------------------------
+
+from fastapi import FastAPI
+from app.api.base_chart import router as base_chart_router
+from app.api.prediction import router as prediction_router
+
+app = FastAPI(
+    title="Tamil Panchangam Astrology Engine",
+    description="Drik Ganita based Tamil astrology with Lahiri ayanamsa",
+    version="0.1.0"
+)
+
+app.include_router(base_chart_router, prefix="/base-chart", tags=["Base Chart"])
+app.include_router(prediction_router, prefix="/prediction", tags=["Prediction"])
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "service": "Tamil Panchangam Engine"
+    }
+
+--------------------------------------------------
+BASE CHART SERVICE (app/api/base_chart.py)
+--------------------------------------------------
+
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.post("/create")
+def create_base_chart(payload: dict):
+    """
+    This endpoint will:
+    - Compute immutable birth chart data
+    - Store sidereal Moon, Nakshatra, Pada, D1/D9, Dashas
+    - Return a base_chart_id
+
+    Astrology logic NOT implemented yet.
+    """
+    return {
+        "message": "Base chart service initialized",
+        "note": "Birth chart computation will live here",
+        "status": "stub"
+    }
+
+--------------------------------------------------
+PREDICTION SERVICE (app/api/prediction.py)
+--------------------------------------------------
+
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.post("/monthly")
+def generate_monthly_prediction(payload: dict):
+    """
+    This endpoint will:
+    - Accept base_chart_id
+    - Accept target month(s)
+    - Compute transits, gochara, pancha pakshi daily
+    - Generate monthly predictions
+
+    Astrology logic NOT implemented yet.
+    """
+    return {
+        "message": "Prediction service initialized",
+        "note": "Transit and monthly prediction logic will live here",
+        "status": "stub"
+    }
+
+--------------------------------------------------
+ENGINE STUBS (example: app/engines/ephemeris.py)
+--------------------------------------------------
+
+"""
+This module will compute:
+- Sidereal planetary longitudes
+- Moon longitude (critical for Nakshatra)
+- Lagna
+Using Swiss Ephemeris + Lahiri ayanamsa
+
+DO NOT implement logic yet.
+"""
+
+def compute_sidereal_positions():
+    pass
+
+--------------------------------------------------
+README.md (MINIMAL)
+--------------------------------------------------
+
+Tamil Panchangam Astrology Engine
+
+- Drik Ganita
+- Lahiri Ayanamsa
+- South Indian charts
+- Base chart service (immutable)
+- Prediction service (temporal)
+
+This project separates astronomical truth from interpretive predictions.
