@@ -67,3 +67,41 @@ def utc_to_local(utc_dt: datetime, timezone_str: str) -> datetime:
     """Convert UTC datetime to local"""
     tz = pytz.timezone(timezone_str)
     return utc_dt.astimezone(tz)
+
+
+def normalize_birth_time_to_utc(
+    birth_date: str,
+    birth_time: str,
+    latitude: float,
+    longitude: float,
+    timezone_str: str | None = None
+) -> datetime:
+    """
+    Canonical entry point for birth-time normalization.
+
+    Rules:
+    - Accept HH:MM or HH:MM:SS
+    - If timezone_str is provided, use it
+    - Else derive timezone from lat/long
+    - Return UTC-aware datetime
+    """
+
+    if not timezone_str:
+        timezone_str = get_timezone_from_coordinates(latitude, longitude)
+
+    # 🔑 EPIC-5 FIX: tolerate seconds
+    time_format = "%H:%M:%S" if birth_time.count(":") == 2 else "%H:%M"
+
+    local_dt = datetime.strptime(
+        f"{birth_date} {birth_time}",
+        f"%Y-%m-%d {time_format}"
+    )
+
+    return local_to_utc(local_dt, timezone_str)
+
+def get_month_reference_date_utc(year: int, month: int) -> datetime:
+    """
+    Use mid-month UTC reference to avoid edge effects.
+    """
+    return datetime(year, month, 15, 12, 0, 0, tzinfo=timezone.utc)
+

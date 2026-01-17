@@ -1,135 +1,271 @@
+import { useParams, Link } from "wouter";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+import { MonthlyPredictionView } from "@/components/prediction/MonthlyPredictionView";
+import { PredictionTimeline } from "@/components/prediction/PredictionTimeline";
+import { ExplainabilityDrawer } from "@/components/prediction/ExplainabilityDrawer";
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Calendar, Loader2, Sparkles } from "lucide-react";
-import type { BaseChart, MonthlyPrediction } from "@shared/schema";
 
-const predictionSchema = z.object({
-  chartId: z.string().min(1, "Select a chart"),
-  year: z.string().refine((val) => !isNaN(parseInt(val)) && parseInt(val) >= 1900 && parseInt(val) <= 2100, "Valid year required"),
-  month: z.string().refine((val) => !isNaN(parseInt(val)) && parseInt(val) >= 1 && parseInt(val) <= 12, "Valid month required"),
-});
+import {
+  Calendar,
+  Loader2,
+  Sparkles,
+  ArrowLeft,
+} from "lucide-react";
 
-type PredictionFormValues = z.infer<typeof predictionSchema>;
+/* -----------------------------------------------------
+   Constants
+----------------------------------------------------- */
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December"
 ];
 
-export default function Predictions() {
-  const { toast } = useToast();
-  const [prediction, setPrediction] = useState<MonthlyPrediction | null>(null);
+/* -----------------------------------------------------
+   Validation
+----------------------------------------------------- */
 
-  const { data: charts, isLoading: chartsLoading } = useQuery<BaseChart[]>({
-    queryKey: ["/api/base-chart/list"],
+const schema = z.object({
+  year: z.string().refine(v => !isNaN(+v) && +v >= 1900 && +v <= 2100),
+  month: z.string().refine(v => !isNaN(+v) && +v >= 1 && +v <= 12),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+/* -----------------------------------------------------
+   Types
+----------------------------------------------------- */
+
+interface BaseChartResponse {
+  id: string;
+  locked: boolean;
+  data: {
+    birth_details: {
+      name?: string;
+      date_of_birth: string;
+      time_of_birth: string;
+      place_of_birth: string;
+      latitude: number;
+      longitude: number;
+      timezone: string;
+    };
+  };
+}
+
+/* -----------------------------------------------------
+   Prediction Request Builder (EPIC-10)
+----------------------------------------------------- */
+
+function buildPredictionRequest(
+  baseChartId: string,
+  year: number,
+  month: number
+) {
+  return {
+    base_chart_id: baseChartId,
+    timeframe: { mode: "monthly", year, month },
+    triggers: { transits: true, dasha: true, nakshatra: true },
+    levers: {
+      houses: true,
+      planets: true,
+      nakshatras: true,
+      aspects: false,
+    },
+    focus_areas: [
+      "career",
+      "finance",
+      "relationships",
+      "health",
+      "personal_growth",
+    ],
+    constraints: {
+      tone: "balanced",
+      confidence_threshold: 0.6,
+    },
+    output: {
+      detail_level: "standard",
+      include_timing: true,
+      include_remedies: false,
+      format: "ui",
+    },
+  };
+}
+
+/* -----------------------------------------------------
+   Page
+----------------------------------------------------- */
+
+export default function Predictions() {
+  const { id: baseChartId } = useParams<{ id: string }>();
+  const { toast } = useToast();
+  const [prediction, setPrediction] = useState<any | null>(null);
+  const predictionData = prediction?.data ?? null;
+
+
+  const now = new Date();
+  const timelineMonths = Array.from({ length: 6 }).map((_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 2 + i, 1);
+    return {
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      available: predictionData
+      ? predictionData.available_periods?.some(
+          (p: any) =>
+            p.year === d.getFullYear() &&
+            p.month === d.getMonth() + 1
+        )
+      : false,
+
+    };
   });
 
-  const form = useForm<PredictionFormValues>({
-    resolver: zodResolver(predictionSchema),
+  const { data: chart, isLoading, error } = useQuery<BaseChartResponse>({
+    queryKey: ["/api/base-chart", baseChartId],
+    enabled: !!baseChartId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/base-chart/${baseChartId}`);
+      if (!res.ok) throw new Error("Birth chart not found");
+      return res.json();
+    },
+  });
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
     defaultValues: {
-      chartId: "",
       year: new Date().getFullYear().toString(),
       month: (new Date().getMonth() + 1).toString(),
     },
   });
 
-  const generateMutation = useMutation({
-    mutationFn: async (values: PredictionFormValues) => {
-      const payload = {
-        base_chart_id: values.chartId,
-        year: parseInt(values.year),
-        months: [parseInt(values.month)],
-      };
-      const response = await apiRequest("POST", "/api/prediction/monthly", payload);
-      return response.json();
+  const handleTimelineSelect = (year: number, month: number) => {
+    form.setValue("year", year.toString());
+    form.setValue("month", month.toString());
+  };
+
+  const mutation = useMutation({
+    mutationFn: async (v: FormValues) => {
+      const payload = buildPredictionRequest(
+        baseChartId!,
+        Number(v.year),
+        Number(v.month)
+      );
+      const res = await apiRequest("POST", "/api/prediction/request", payload);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: data => {
       setPrediction(data);
-      toast({
-        title: "Prediction Generated",
-        description: `Monthly prediction for ${MONTHS[parseInt(form.getValues("month")) - 1]} ${form.getValues("year")} created.`,
-      });
+      toast({ title: "Prediction Generated", description: "Monthly prediction ready" });
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to generate prediction",
-        variant: "destructive",
-      });
+    onError: (e: Error) => {
+      toast({ title: "Prediction failed", description: e.message, variant: "destructive" });
     },
   });
 
-  const onSubmit = (values: PredictionFormValues) => {
-    generateMutation.mutate(values);
-  };
+  if (isLoading) {
+    return (
+      <div className="container max-w-6xl mx-auto px-4 py-12">
+        <Skeleton className="h-8 w-64 mb-6" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (error || !chart) {
+    return (
+      <div className="container max-w-4xl mx-auto px-4 py-12">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground mb-4">Birth chart not found</p>
+            <Link href="/">
+              <Button variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Home
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const name = chart.data.birth_details.name || "Birth Chart";
 
   return (
     <div className="container max-w-7xl mx-auto px-4 py-8">
-      <div className="space-y-2 mb-8">
-        <h1 className="text-3xl font-serif font-bold flex items-center gap-3">
-          <Calendar className="h-8 w-8 text-primary" />
-          Monthly Predictions
-        </h1>
-        <p className="text-muted-foreground">
-          Generate transit-based predictions for any month using stored birth chart data.
-        </p>
+      <div className="flex items-center gap-4 mb-4">
+        <Link href={`/chart/${baseChartId}`}>
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <div className="flex-1">
+          <h1 className="text-3xl font-serif font-bold flex items-center gap-3">
+            <Sparkles className="h-8 w-8 text-primary" />
+            Monthly Predictions
+          </h1>
+          <p className="text-muted-foreground">
+            Explicit intent · deterministic engine
+          </p>
+        </div>
+        <StatusBadge status="ok" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <PredictionTimeline
+        months={timelineMonths}
+        selectedYear={Number(form.watch("year"))}
+        selectedMonth={Number(form.watch("month"))}
+        onSelect={handleTimelineSelect}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
+        {/* FORM */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Generate Prediction
-            </CardTitle>
+            <CardTitle>{name}</CardTitle>
             <CardDescription>
-              Select a birth chart and target month for prediction analysis
+              Immutable chart → explicit prediction request
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="chartId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Birth Chart</FormLabel>
-                      {chartsLoading ? (
-                        <Skeleton className="h-10 w-full" />
-                      ) : (
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-chart">
-                              <SelectValue placeholder="Select a birth chart" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {charts?.map((chart) => (
-                              <SelectItem key={chart.id} value={chart.id}>
-                                {chart.name} - {chart.date_of_birth}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
+              <form
+                onSubmit={form.handleSubmit(v => mutation.mutate(v))}
+                className="space-y-6"
+              >
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -138,33 +274,28 @@ export default function Predictions() {
                       <FormItem>
                         <FormLabel>Year</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            {...field} 
-                            data-testid="input-prediction-year"
-                          />
+                          <Input type="number" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-
                   <FormField
                     control={form.control}
                     name="month"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Month</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-month">
+                            <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {MONTHS.map((month, index) => (
-                              <SelectItem key={index} value={(index + 1).toString()}>
-                                {month}
+                            {MONTHS.map((m, i) => (
+                              <SelectItem key={i} value={(i + 1).toString()}>
+                                {m}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -175,16 +306,11 @@ export default function Predictions() {
                   />
                 </div>
 
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={generateMutation.isPending || !charts?.length}
-                  data-testid="button-generate-prediction"
-                >
-                  {generateMutation.isPending ? (
+                <Button type="submit" className="w-full" disabled={mutation.isPending}>
+                  {mutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
+                      Generating…
                     </>
                   ) : (
                     <>
@@ -198,42 +324,27 @@ export default function Predictions() {
           </CardContent>
         </Card>
 
+        {/* RESULT */}
         <Card>
           <CardHeader>
             <CardTitle>Prediction Result</CardTitle>
-            <CardDescription>
-              Transit analysis and monthly forecast
-            </CardDescription>
+            <CardDescription>UI-ready prediction snapshot</CardDescription>
           </CardHeader>
           <CardContent>
-            {prediction ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Status</span>
-                  <StatusBadge status={prediction.status === "stub" ? "stub" : "ok"} />
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">Chart ID</span>
-                    <span className="font-mono">{prediction.base_chart_id.substring(0, 12)}...</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">Period</span>
-                    <span>{MONTHS[prediction.months[0] - 1]} {prediction.year}</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">Generated</span>
-                    <span className="font-mono text-xs">{new Date(prediction.generated_at).toLocaleString()}</span>
-                  </div>
-                </div>
-                <div className="p-4 bg-muted/50 rounded-md">
-                  <p className="text-sm text-muted-foreground">{prediction.message}</p>
-                </div>
+            {predictionData ? (
+              <div className="space-y-6">
+                <MonthlyPredictionView prediction={predictionData} />
+
+                {predictionData.explainability && (
+                  <ExplainabilityDrawer
+                    explainability={predictionData.explainability}
+                  />
+                )}
               </div>
             ) : (
               <div className="py-12 text-center text-muted-foreground">
                 <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <p>Generate a prediction to see results here</p>
+                Generate a prediction to see results
               </div>
             )}
           </CardContent>

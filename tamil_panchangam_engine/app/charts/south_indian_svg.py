@@ -5,35 +5,71 @@ This module will generate South Indian style chart SVG:
 - Aspect lines (optional)
 - D1 (Rasi) and D9 (Navamsa) layouts
 
-DO NOT implement logic yet.
 """
 
 import svgwrite
+from typing import Dict, List
 
-HOUSE_POSITIONS = [
-    (1, 0), (2, 0), (3, 0), (3, 1),  # Top row + right top
-    (3, 2), (3, 3), (2, 3), (1, 3),  # Right bottom + bottom row
-    (0, 3), (0, 2), (0, 1), (0, 0)   # Left column
+BOX_SIZE = 120
+FONT_SIZE = 14
+
+RASI_GRID = [
+    ["Mesham", "Rishabam", "Mithunam", "Kadakam"],
+    ["Simmam", "Kanni", "Thulam", "Vrischikam"],
+    ["Dhanusu", "Makaram", "Kumbham", "Meenam"]
 ]
 
-SIGN_NAMES = [
-    "Mesha", "Vrishabha", "Mithuna", "Kataka",
-    "Simha", "Kanya", "Tula", "Vrischika",
-    "Dhanus", "Makara", "Kumbha", "Meena"
-]
+def generate_south_indian_chart_svg(
+    chart_data: Dict[str, List[str]],
+    title: str = "Rasi Chart"
+) -> svgwrite.Drawing:
+    """
+    Generate South Indian square-style Rasi chart as SVG.
+    """
 
-def create_south_indian_chart(planetary_positions: dict, chart_type: str = "D1") -> str:
-    """Generate South Indian chart SVG"""
-    pass
+    width = BOX_SIZE * 4
+    height = BOX_SIZE * 3
+    dwg = svgwrite.Drawing(size=(width, height))
 
-def draw_house_grid(dwg, size: int = 400) -> None:
-    """Draw the 4x4 grid for South Indian chart"""
-    pass
+    # Title
+    dwg.add(dwg.text(
+        title,
+        insert=(width / 2, 20),
+        text_anchor="middle",
+        font_size=16,
+        font_weight="bold"
+    ))
 
-def place_planets(dwg, house: int, planets: list) -> None:
-    """Place planet symbols in a house"""
-    pass
+    y_offset = 30
 
-def get_chart_svg(chart_data: dict) -> str:
-    """Main function to generate complete chart SVG"""
-    pass
+    for row_idx, row in enumerate(RASI_GRID):
+        for col_idx, rasi in enumerate(row):
+            x = col_idx * BOX_SIZE
+            y = row_idx * BOX_SIZE + y_offset
+
+            # Draw box
+            dwg.add(dwg.rect(
+                insert=(x, y),
+                size=(BOX_SIZE, BOX_SIZE),
+                fill="white",
+                stroke="black"
+            ))
+
+            # Rasi name
+            dwg.add(dwg.text(
+                rasi,
+                insert=(x + 5, y + 15),
+                font_size=10,
+                font_weight="bold"
+            ))
+
+            # Planets
+            planets = chart_data.get(rasi, [])
+            for idx, planet in enumerate(planets):
+                dwg.add(dwg.text(
+                    planet,
+                    insert=(x + 10, y + 35 + idx * FONT_SIZE),
+                    font_size=FONT_SIZE
+                ))
+
+    return dwg

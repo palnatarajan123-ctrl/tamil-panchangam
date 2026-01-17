@@ -9,21 +9,33 @@ This module will compute Divisional Charts (Varga Charts):
 - D12 (Dwadasamsa) - Parents
 - D60 (Shashtiamsa) - Overall destiny
 
-DO NOT implement logic yet.
 """
 
-def compute_d1_rasi(longitude: float) -> int:
-    """Compute D1 Rasi chart position"""
-    pass
+from typing import Dict, List
 
-def compute_d9_navamsa(longitude: float) -> int:
-    """Compute D9 Navamsa chart position"""
-    pass
+# Fixed South Indian Rasi order
+RASI_ORDER = [
+    "Mesham", "Rishabam", "Mithunam", "Kadakam",
+    "Simmam", "Kanni", "Thulam", "Vrischikam",
+    "Dhanusu", "Makaram", "Kumbham", "Meenam"
+]
 
-def compute_divisional_chart(longitude: float, division: int) -> int:
-    """Generic divisional chart computation"""
-    pass
+def build_d1_chart(
+    lagna_rasi: str,
+    planets: Dict[str, Dict]
+) -> Dict[str, List[str]]:
+    """
+    Build D1 (Rasi) chart structure.
+    Returns a dict of rasi -> list of planet symbols.
+    """
 
-def get_all_divisional_positions(planetary_longitudes: dict) -> dict:
-    """Get positions for all planets in all divisional charts"""
-    pass
+    chart = {rasi: [] for rasi in RASI_ORDER}
+
+    # Mark Lagna
+    chart[lagna_rasi].append("La")
+
+    for planet, data in planets.items():
+        rasi = data["rasi"]
+        chart[rasi].append(planet)
+
+    return chart

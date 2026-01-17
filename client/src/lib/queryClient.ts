@@ -10,7 +10,7 @@ async function throwIfResNotOk(res: Response) {
 export async function apiRequest(
   method: string,
   url: string,
-  data?: unknown | undefined,
+  data?: unknown,
 ): Promise<Response> {
   const res = await fetch(url, {
     method,
@@ -24,21 +24,37 @@ export async function apiRequest(
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
+
+/**
+ * 🔒 GLOBAL QUERY NORMALIZATION LAYER
+ * This guarantees consistent shapes across the app.
+ */
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
+  ({ on401 }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey.join("/") as string;
+
+    const res = await fetch(url, {
       credentials: "include",
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    if (on401 === "returnNull" && res.status === 401) {
+      return null as T;
     }
 
     await throwIfResNotOk(res);
-    return await res.json();
+    const json = await res.json();
+
+    // ✅ FIX: Normalize base-chart list response
+    if (url === "/api/base-chart/list") {
+      if (Array.isArray(json)) return json as T;
+      if (Array.isArray(json?.charts)) return json.charts as T;
+      return [] as T;
+    }
+
+    return json as T;
   };
 
 export const queryClient = new QueryClient({

@@ -1,78 +1,213 @@
+# app/api/base_chart.py
+
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Optional
 from datetime import datetime
-import uuid
+from typing import List
 
-router = APIRouter()
+from app.models.schema import (
+    BASE_CHART_STORE,
+    generate_base_chart_id,
+    BaseChartCreateRequest,
+    BaseChartCreateResponse,
+    BaseChartSummary,
+    BaseChartDetail,
+)
 
-class BirthDetails(BaseModel):
-    name: str
-    date_of_birth: str
-    time_of_birth: str
-    place_of_birth: str
-    latitude: float
-    longitude: float
-    timezone: str
+from app.engines.ephemeris import compute_sidereal_positions
+from app.engines.panchangam import compute_panchangam
+from app.engines.dasha_vimshottari import compute_vimshottari_dasha
+from app.engines.pancha_pakshi import get_birth_pakshi
 
-class BaseChartResponse(BaseModel):
-    id: str
-    name: str
-    date_of_birth: str
-    time_of_birth: str
-    place_of_birth: str
-    latitude: float
-    longitude: float
-    timezone: str
-    status: str
-    message: str
-    created_at: str
+from app.utils.time_utils import (
+    normalize_birth_time_to_utc,
+    get_timezone_from_coordinates,
+)
+from app.utils.checksum import compute_chart_checksum
+from app.services.birth_chart_builder import build_birth_chart_view_model
+from app.db.duckdb import get_conn
+from app.repositories.base_chart_repo import insert_base_chart
 
-base_charts_storage = {}
+router = APIRouter(prefix="/api/base-chart", tags=["Base Chart"])
 
-@router.post("/create", response_model=BaseChartResponse)
-def create_base_chart(details: BirthDetails):
+
+# ============================================================
+# UI VIEW (D1 + Panchangam)
+# ============================================================
+
+@router.get("/birth-chart")
+def get_birth_chart_ui(base_chart_id: str):
+    chart = BASE_CHART_STORE.get(base_chart_id)
+    if not chart:
+        raise HTTPException(404, "Base chart not found")
+
+    ui_view = build_birth_chart_view_model(chart["data"])
+    return {"view": ui_view}
+
+
+# ============================================================
+# CREATE BASE CHART (EPIC-5 / 6.3)
+# ============================================================
+
+@router.post("/create", response_model=BaseChartCreateResponse)
+def create_base_chart(payload: BaseChartCreateRequest):
     """
-    This endpoint will:
-    - Compute immutable birth chart data
-    - Store sidereal Moon, Nakshatra, Pada, D1/D9, Dashas
-    - Return a base_chart_id
+    Immutable birth chart creation.
 
-    Astrology logic NOT implemented yet.
+    Guarantees:
+    - Deterministic
+    - Contract-safe
+    - In-memory (by design)
     """
-    chart_id = str(uuid.uuid4())
-    created_at = datetime.now().isoformat()
-    
-    chart_data = {
-        "id": chart_id,
-        "name": details.name,
-        "date_of_birth": details.date_of_birth,
-        "time_of_birth": details.time_of_birth,
-        "place_of_birth": details.place_of_birth,
-        "latitude": details.latitude,
-        "longitude": details.longitude,
-        "timezone": details.timezone,
-        "status": "stub",
-        "message": "Base chart created. Astrology calculations pending implementation.",
-        "created_at": created_at
+
+    # -------------------------------------------------
+    # 1. Resolve timezone
+    # -------------------------------------------------
+    timezone = payload.timezone
+    if not timezone:
+        timezone = get_timezone_from_coordinates(
+            payload.latitude,
+            payload.longitude,
+        )
+
+    # -------------------------------------------------
+    # 2. Normalize birth datetime → UTC
+    # -------------------------------------------------
+    try:
+        birth_utc = normalize_birth_time_to_utc(
+            birth_date=payload.date_of_birth.isoformat(),
+            birth_time=payload.time_of_birth.strftime("%H:%M:%S"),
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            timezone_str=timezone,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Birth time normalization failed: {str(e)}",
+        )
+
+    # -------------------------------------------------
+    # 3. Ephemeris (Sidereal – Lahiri)
+    # -------------------------------------------------
+    ephemeris = compute_sidereal_positions(
+        birth_utc,
+        payload.latitude,
+        payload.longitude,
+    )
+
+    # -------------------------------------------------
+    # 4. Panchangam at birth
+    # -------------------------------------------------
+    panchangam = compute_panchangam(
+        dt_local=birth_utc,
+        sun_lon=ephemeris["planets"]["Sun"]["longitude_deg"],
+        moon_lon=ephemeris["moon"]["longitude_deg"],
+        nakshatra=ephemeris["moon"]["nakshatra"],
+    )
+
+    # -------------------------------------------------
+    # 5. Vimshottari Dasha
+    # -------------------------------------------------
+    dasha = compute_vimshottari_dasha(
+        birth_datetime_utc=birth_utc,
+        moon_longitude=ephemeris["moon"]["longitude_deg"],
+        nakshatra_index=ephemeris["moon"]["nakshatra"]["index"],
+    )
+
+    # -------------------------------------------------
+    # 6. Pancha Pakshi
+    # -------------------------------------------------
+    pakshi = get_birth_pakshi(
+        ephemeris["moon"]["nakshatra"]["name"]
+    )
+
+    # -------------------------------------------------
+    # 7. Assemble immutable base chart
+    # -------------------------------------------------
+    base_chart = {
+        "birth_details": {
+            "name": payload.name,
+            "place_of_birth": payload.place_of_birth,
+            "latitude": payload.latitude,
+            "longitude": payload.longitude,
+            "timezone": timezone,
+            "date_of_birth": payload.date_of_birth.isoformat(),
+            "time_of_birth": payload.time_of_birth.strftime("%H:%M:%S"),
+        },
+        "birth_utc": birth_utc.isoformat(),
+        "ephemeris": ephemeris,
+        "panchangam_birth": panchangam,
+        "charts": {},
+        "dashas": {
+            "vimshottari": dasha,
+        },
+        "pancha_pakshi_birth": pakshi,
     }
-    
-    base_charts_storage[chart_id] = chart_data
-    
-    return chart_data
 
-@router.get("/list")
+    # -------------------------------------------------
+    # 8. Persist (DuckDB = source of truth)
+    # -------------------------------------------------
+    base_chart_id = generate_base_chart_id()
+    checksum = compute_chart_checksum(base_chart)
+
+    with get_conn() as conn:
+        insert_base_chart(
+            conn,
+            chart_id=base_chart_id,
+            payload=base_chart,
+            locked=True,
+        )
+
+    # Optional: keep in-memory copy for UI endpoints
+    BASE_CHART_STORE[base_chart_id] = {
+        "id": base_chart_id,
+        "checksum": checksum,
+        "locked": True,
+        "created_at": datetime.utcnow(),
+        "data": base_chart,
+    }
+
+    return BaseChartCreateResponse(
+        base_chart_id=base_chart_id,
+        checksum=checksum,
+        locked=True,
+    )
+
+
+# ============================================================
+# LIST BASE CHARTS
+# ============================================================
+
+@router.get("/list", response_model=List[BaseChartSummary])
 def list_base_charts():
-    """
-    List all stored base charts
-    """
-    return list(base_charts_storage.values())
+    return [
+        BaseChartSummary(
+            base_chart_id=chart["id"],
+            checksum=chart["checksum"],
+            locked=chart["locked"],
+        )
+        for chart in BASE_CHART_STORE.values()
+    ]
 
-@router.get("/{chart_id}")
-def get_base_chart(chart_id: str):
-    """
-    Get a specific base chart by ID
-    """
-    if chart_id not in base_charts_storage:
-        raise HTTPException(status_code=404, detail="Chart not found")
-    return base_charts_storage[chart_id]
+
+# ============================================================
+# FETCH BASE CHART (FULL)
+# ============================================================
+
+@router.get("/{base_chart_id}", response_model=BaseChartDetail)
+def get_base_chart(base_chart_id: str):
+    chart = BASE_CHART_STORE.get(base_chart_id)
+
+    if chart is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Base chart not found: {base_chart_id}",
+        )
+
+    return BaseChartDetail(
+        id=chart["id"],
+        checksum=chart["checksum"],
+        locked=chart["locked"],
+        created_at=chart["created_at"],
+        data=chart["data"],
+    )

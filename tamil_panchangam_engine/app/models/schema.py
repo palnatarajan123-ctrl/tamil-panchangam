@@ -1,74 +1,208 @@
 """
-Pydantic models for Tamil Panchangam Engine
+Pydantic schemas for API I/O validation only.
+Astrological truth lives in engines, not here.
+
+EPIC-5 NOTE:
+- Legacy schemas are preserved for backward compatibility
+- New canonical contracts are STRICT and UI-agnostic
 """
 
-from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime
+from __future__ import annotations
 
-class PlanetaryPosition(BaseModel):
-    planet: str
-    longitude: float
-    sign: int
-    sign_name: str
-    degree_in_sign: float
-    nakshatra: str
-    nakshatra_pada: int
-    nakshatra_lord: str
-    retrograde: bool = False
+from pydantic import BaseModel, Field, validator
+from typing import Dict, Any, Optional, Literal, List
+from datetime import date, time, datetime
+import uuid
 
-class DivisionalPosition(BaseModel):
-    planet: str
-    d1_sign: int
-    d9_sign: int
 
-class DashaPeriod(BaseModel):
-    lord: str
-    start_date: datetime
-    end_date: datetime
-    is_current: bool = False
+# ============================================================
+# In-memory store (v1 – temporary, EPIC-6 will replace)
+# ============================================================
 
-class Panchangam(BaseModel):
-    tithi: str
-    tithi_number: int
-    nakshatra: str
-    nakshatra_pada: int
-    yoga: str
-    karana: str
-    vara: str
-    sunrise: str
-    sunset: str
+BASE_CHART_STORE: Dict[str, Dict[str, Any]] = {}
 
-class BaseChart(BaseModel):
-    id: str
+def generate_base_chart_id() -> str:
+    return str(uuid.uuid4())
+
+
+# ============================================================
+# -----------------------------
+# LEGACY INPUT SCHEMAS (v0)
+# -----------------------------
+# ❗ DO NOT EXTEND. WILL BE DEPRECATED AFTER EPIC-5
+# ============================================================
+
+class BirthInput(BaseModel):
     name: str
-    date_of_birth: str
-    time_of_birth: str
-    place_of_birth: str
+    sex: Optional[str] = None
+    birth_date: str           # YYYY-MM-DD (legacy)
+    birth_time: str           # HH:MM (legacy)
     latitude: float
     longitude: float
-    timezone: str
-    lagna: int
-    lagna_degree: float
-    moon_sign: int
-    sun_sign: int
-    planetary_positions: List[PlanetaryPosition]
-    panchangam: Panchangam
-    current_dasha: DashaPeriod
+    timezone: Optional[str] = None
+    place_name: Optional[str] = None
+
+
+class PredictionRequest(BaseModel):
+    base_chart_id: str
+    target_month: str         # YYYY-MM (legacy)
+
+
+# ============================================================
+# -----------------------------
+# LEGACY OUTPUT SCHEMAS (v0)
+# -----------------------------
+# ❗ WILL BE REMOVED AFTER UI MIGRATION
+# ============================================================
+
+class BaseChartResponse(BaseModel):
+    base_chart_id: str
+    base_chart: Dict[str, Any]
+
+
+class PredictionResponse(BaseModel):
+    base_chart_id: str
+    prediction: Dict[str, Any]
+
+
+# ============================================================
+# ============================================================
+# EPIC-5 — CANONICAL BASE CHART CONTRACTS (NEW)
+# ============================================================
+# ============================================================
+
+class BaseChartCreateRequest(BaseModel):
+    """
+    Canonical input for base chart creation.
+    This REPLACES BirthInput for all new endpoints.
+    """
+
+    name: Optional[str] = Field(default=None)
+
+    date_of_birth: date = Field(
+        ..., description="Date of birth (YYYY-MM-DD)"
+    )
+
+    time_of_birth: time = Field(
+        ..., description="Time of birth (HH:MM:SS)"
+    )
+
+    place_of_birth: str = Field(
+        ..., min_length=1, description="Place name (non-empty)"
+    )
+
+    latitude: float = Field(..., ge=-90.0, le=90.0)
+    longitude: float = Field(..., ge=-180.0, le=180.0)
+
+    timezone: Optional[str] = Field(
+        default=None, description="IANA timezone (e.g., Asia/Kolkata)"
+    )
+
+
+class BaseChartCreateResponse(BaseModel):
+    base_chart_id: str
+    checksum: str
+    locked: bool
+
+
+class BaseChartSummary(BaseModel):
+    base_chart_id: str
+    checksum: str
+    locked: bool
+
+
+class BaseChartDetail(BaseModel):
+    id: str
+    checksum: str
+    locked: bool
     created_at: datetime
+    data: Dict[str, Any]
 
-class TransitPosition(BaseModel):
-    planet: str
-    current_sign: int
-    current_degree: float
-    from_moon: int
-    effect: str
 
-class MonthlyPrediction(BaseModel):
+# ============================================================
+# EPIC-5 — MONTHLY PREDICTION (NEW CANONICAL)
+# ============================================================
+
+class MonthlyPredictionRequest(BaseModel):
+    """
+    Canonical monthly prediction request.
+    REPLACES target_month string.
+    """
+
+    base_chart_id: str
+
+    year: int = Field(..., ge=1900, le=2100)
+    month: int = Field(..., ge=1, le=12)
+
+    @validator("month")
+    def validate_month(cls, v: int) -> int:
+        if not 1 <= v <= 12:
+            raise ValueError("month must be between 1 and 12")
+        return v
+
+
+class MonthlyPredictionResponse(BaseModel):
+    """
+    Thin orchestration response.
+    Interpretation lives in EPIC-4 schemas below.
+    """
+
+    id: str
     base_chart_id: str
     year: int
     month: int
-    transits: List[TransitPosition]
-    pancha_pakshi: dict
-    auspicious_dates: List[str]
-    general_forecast: str
+    generated_at: datetime
+
+    status: Literal["ok", "stub"]
+    summary: str
+    details: Dict[str, Any]
+
+
+# ============================================================
+# ============================================================
+# EPIC-4 — PREDICTION INTERPRETATION (FROZEN)
+# ============================================================
+# ============================================================
+
+class PredictionEnvironment(BaseModel):
+    transits: Dict[str, Any]
+
+
+class PredictionTimeRuler(BaseModel):
+    vimshottari_dasha: Dict[str, Any]
+
+
+class PredictionBiologicalRhythm(BaseModel):
+    pancha_pakshi_daily: Dict[str, Any]
+
+
+class MonthlyPrediction(BaseModel):
+    reference_month: str
+    environment: PredictionEnvironment
+    time_ruler: PredictionTimeRuler
+    biological_rhythm: PredictionBiologicalRhythm
+    note: str
+    schema_version: str = "prediction-v1"
+
+
+class LifeAreaSynthesis(BaseModel):
+    raw_score: float
+    score: float
+    confidence: float
+
+
+class MonthlySynthesis(BaseModel):
+    life_areas: Dict[str, LifeAreaSynthesis]
+    engine_version: str
+    generated_at: str
+
+
+class MonthlyPredictionV1Response(BaseModel):
+    """
+    EPIC-4 FINAL OUTPUT (DO NOT MODIFY)
+    """
+
+    base_chart_id: str
+    checksum: str
+    prediction: MonthlyPrediction
+    synthesis: MonthlySynthesis

@@ -1,0 +1,489 @@
+app/api/ui_reports.py:1:# REMOVED: from fastapi import APIRouter, HTTPException, Depends
+app/api/ui_reports.py:2:# REMOVED: from sqlmodel import Session
+app/api/ui_reports.py:3:# REMOVED: 
+app/api/ui_reports.py:4:# REMOVED: from app.db.session import get_db
+app/api/ui_reports.py:5:# REMOVED: from app.services.prediction_aggregation_service import (
+app/api/ui_reports.py:6:# REMOVED:     build_prediction_report_snapshot,
+app/api/ui_reports.py:7:# REMOVED: )
+app/api/ui_reports.py:8:# REMOVED: from app.services.prediction_ui_mapper import (
+app/api/ui_reports.py:9:# REMOVED:     map_snapshot_to_ui_read_model,
+app/api/ui_reports.py:10:# REMOVED: )
+app/api/ui_reports.py:11:# REMOVED: 
+app/api/ui_reports.py:12:# REMOVED: router = APIRouter(prefix="/api/ui", tags=["UI Reports"])
+app/api/ui_reports.py:13:# REMOVED: 
+app/api/ui_reports.py:14:# REMOVED: 
+app/api/ui_reports.py:15:# REMOVED: @router.get("/monthly-report")
+app/api/ui_reports.py:16:# REMOVED: def get_monthly_ui_report(
+app/api/ui_reports.py:17:# REMOVED:     base_chart_id: str,
+app/api/ui_reports.py:18:# REMOVED:     year: int,
+app/api/ui_reports.py:19:# REMOVED:     month: int,
+app/api/ui_reports.py:20:# REMOVED:     db: Session = Depends(get_db),
+app/api/ui_reports.py:21:# REMOVED: ):
+app/api/ui_reports.py:22:# REMOVED:     """
+app/api/ui_reports.py:23:# REMOVED:     EPIC-7.3
+app/api/ui_reports.py:24:# REMOVED:     UI Read-Only Monthly Report Endpoint
+app/api/ui_reports.py:25:# REMOVED: 
+app/api/ui_reports.py:26:# REMOVED:     - Loads persisted snapshot
+app/api/ui_reports.py:27:# REMOVED:     - Maps to UI read model
+app/api/ui_reports.py:28:# REMOVED:     - No computation or mutation
+app/api/ui_reports.py:29:# REMOVED:     """
+app/api/ui_reports.py:30:# REMOVED: 
+app/api/ui_reports.py:31:# REMOVED:     try:
+app/api/ui_reports.py:32:# REMOVED:         snapshot = build_prediction_report_snapshot(
+app/api/ui_reports.py:33:# REMOVED:             db=db,
+app/api/ui_reports.py:34:# REMOVED:             base_chart_id=base_chart_id,
+app/api/ui_reports.py:35:# REMOVED:             year=year,
+app/api/ui_reports.py:36:# REMOVED:             month=month,
+app/api/ui_reports.py:37:# REMOVED:         )
+app/api/ui_reports.py:38:# REMOVED:     except Exception as e:
+app/api/ui_reports.py:39:# REMOVED:         raise HTTPException(
+app/api/ui_reports.py:40:# REMOVED:             status_code=404,
+app/api/ui_reports.py:41:# REMOVED:             detail=str(e),
+app/api/ui_reports.py:42:# REMOVED:         )
+app/api/ui_reports.py:43:# REMOVED: 
+app/api/ui_reports.py:44:# REMOVED:     ui_model = map_snapshot_to_ui_read_model(snapshot)
+app/api/ui_reports.py:45:# REMOVED: 
+app/api/ui_reports.py:46:# REMOVED:     return ui_model
+app/api/report_exports.py:1:# REMOVED: from fastapi import APIRouter, Depends, HTTPException
+app/api/report_exports.py:2:# REMOVED: from fastapi.responses import Response
+app/api/report_exports.py:3:# REMOVED: from sqlmodel import Session
+app/api/report_exports.py:4:# REMOVED: 
+app/api/report_exports.py:5:# REMOVED: from app.db.session import get_db
+app/api/report_exports.py:6:# REMOVED: from app.services.prediction_aggregation_service import (
+app/api/report_exports.py:7:# REMOVED:     build_prediction_report_snapshot,
+app/api/report_exports.py:8:# REMOVED: )
+app/api/report_exports.py:9:# REMOVED: from app.pdf.report_builder import build_monthly_prediction_pdf
+app/api/report_exports.py:10:# REMOVED: 
+app/api/report_exports.py:11:# REMOVED: router = APIRouter(prefix="/api/reports", tags=["Reports"])
+app/api/report_exports.py:12:# REMOVED: 
+app/api/report_exports.py:13:# REMOVED: 
+app/api/report_exports.py:14:# REMOVED: @router.get("/monthly/pdf")
+app/api/report_exports.py:15:# REMOVED: def get_monthly_prediction_pdf(
+app/api/report_exports.py:16:# REMOVED:     base_chart_id: str,
+app/api/report_exports.py:17:# REMOVED:     year: int,
+app/api/report_exports.py:18:# REMOVED:     month: int,
+app/api/report_exports.py:19:# REMOVED:     db: Session = Depends(get_db),
+app/api/report_exports.py:20:# REMOVED: ):
+app/api/report_exports.py:21:# REMOVED:     """
+app/api/report_exports.py:22:# REMOVED:     EPIC-7.5.5
+app/api/report_exports.py:23:# REMOVED:     Generate Monthly Prediction PDF
+app/api/report_exports.py:24:# REMOVED: 
+app/api/report_exports.py:25:# REMOVED:     - Loads persisted snapshot
+app/api/report_exports.py:26:# REMOVED:     - Renders PDF
+app/api/report_exports.py:27:# REMOVED:     - Streams bytes directly
+app/api/report_exports.py:28:# REMOVED:     """
+app/api/report_exports.py:29:# REMOVED: 
+app/api/report_exports.py:30:# REMOVED:     try:
+app/api/report_exports.py:31:# REMOVED:         snapshot = build_prediction_report_snapshot(
+app/api/report_exports.py:32:# REMOVED:             db=db,
+app/api/report_exports.py:33:# REMOVED:             base_chart_id=base_chart_id,
+app/api/report_exports.py:34:# REMOVED:             year=year,
+app/api/report_exports.py:35:# REMOVED:             month=month,
+app/api/report_exports.py:36:# REMOVED:         )
+app/api/report_exports.py:37:# REMOVED:     except Exception as e:
+app/api/report_exports.py:38:# REMOVED:         raise HTTPException(status_code=404, detail=str(e))
+app/api/report_exports.py:39:# REMOVED: 
+app/api/report_exports.py:40:# REMOVED:     # ✅ Builder returns bytes
+app/api/report_exports.py:41:# REMOVED:     pdf_bytes = build_monthly_prediction_pdf(snapshot)
+app/api/report_exports.py:42:# REMOVED: 
+app/api/report_exports.py:43:# REMOVED:     filename = f"{base_chart_id}-{year}-{month:02d}.pdf"
+app/api/report_exports.py:44:# REMOVED: 
+app/api/report_exports.py:45:# REMOVED:     return Response(
+app/api/report_exports.py:46:# REMOVED:         content=pdf_bytes,
+app/api/report_exports.py:47:# REMOVED:         media_type="application/pdf",
+app/api/report_exports.py:48:# REMOVED:         headers={
+app/api/report_exports.py:49:# REMOVED:             "Content-Disposition": f'inline; filename="{filename}"'
+app/api/report_exports.py:50:# REMOVED:         },
+app/api/report_exports.py:51:# REMOVED:     )
+app/api/prediction_request.py:1:# REMOVED: from fastapi import APIRouter, Depends, HTTPException
+app/api/prediction_request.py:2:# REMOVED: from sqlmodel import Session
+app/api/prediction_request.py:3:# REMOVED: 
+app/api/prediction_request.py:4:# REMOVED: from app.db.session import get_db
+app/api/prediction_request.py:5:# REMOVED: from app.schemas.prediction_input import PredictionRequest
+app/api/prediction_request.py:6:# REMOVED: from app.services.prediction_request_service import (
+app/api/prediction_request.py:7:# REMOVED:     normalize_prediction_request,
+app/api/prediction_request.py:8:# REMOVED:     UnsupportedPredictionMode,
+app/api/prediction_request.py:9:# REMOVED: )
+app/api/prediction_request.py:10:# REMOVED: from app.services.prediction_aggregation_service import (
+app/api/prediction_request.py:11:# REMOVED:     build_prediction_report_snapshot,
+app/api/prediction_request.py:12:# REMOVED: )
+app/api/prediction_request.py:13:# REMOVED: 
+app/api/prediction_request.py:14:# REMOVED: router = APIRouter(prefix="/api/prediction", tags=["Prediction"])
+app/api/prediction_request.py:15:# REMOVED: 
+app/api/prediction_request.py:16:# REMOVED: 
+app/api/prediction_request.py:17:# REMOVED: @router.post("/request")
+app/api/prediction_request.py:18:# REMOVED: def request_prediction(
+app/api/prediction_request.py:19:# REMOVED:     req: PredictionRequest,
+app/api/prediction_request.py:20:# REMOVED:     db: Session = Depends(get_db),
+app/api/prediction_request.py:21:# REMOVED: ):
+app/api/prediction_request.py:22:# REMOVED:     """
+app/api/prediction_request.py:23:# REMOVED:     EPIC-10.3
+app/api/prediction_request.py:24:# REMOVED:     Accepts structured prediction request.
+app/api/prediction_request.py:25:# REMOVED:     """
+app/api/prediction_request.py:26:# REMOVED: 
+app/api/prediction_request.py:27:# REMOVED:     try:
+app/api/prediction_request.py:28:# REMOVED:         normalized = normalize_prediction_request(req)
+app/api/prediction_request.py:29:# REMOVED:     except UnsupportedPredictionMode as e:
+app/api/prediction_request.py:30:# REMOVED:         raise HTTPException(status_code=400, detail=str(e))
+app/api/prediction_request.py:31:# REMOVED:     except Exception as e:
+app/api/prediction_request.py:32:# REMOVED:         raise HTTPException(status_code=422, detail=str(e))
+app/api/prediction_request.py:33:# REMOVED: 
+app/api/prediction_request.py:34:# REMOVED:     # TEMP: delegate to existing monthly pipeline
+app/api/prediction_request.py:35:# REMOVED:     snapshot = build_prediction_report_snapshot(
+app/api/prediction_request.py:36:# REMOVED:         db=db,
+app/api/prediction_request.py:37:# REMOVED:         base_chart_id=normalized["base_chart_id"],
+app/api/prediction_request.py:38:# REMOVED:         year=normalized["year"],
+app/api/prediction_request.py:39:# REMOVED:         month=normalized["month"],
+app/api/prediction_request.py:40:# REMOVED:     )
+app/api/prediction_request.py:41:# REMOVED: 
+app/api/prediction_request.py:42:# REMOVED:     return snapshot
+app/api/ui_birth_chart.py:1:# REMOVED: from fastapi import APIRouter, Query, HTTPException
+app/api/ui_birth_chart.py:2:# REMOVED: from sqlmodel import Session, select
+app/api/ui_birth_chart.py:3:# REMOVED: 
+app/api/ui_birth_chart.py:4:# REMOVED: from app.db.session import engine
+app/api/ui_birth_chart.py:5:# REMOVED: from app.db.models import BaseChartRow
+app/api/ui_birth_chart.py:6:# REMOVED: from app.services.birth_chart_builder import build_birth_chart_view_model
+app/api/ui_birth_chart.py:7:# REMOVED: 
+app/api/ui_birth_chart.py:8:# REMOVED: router = APIRouter(prefix="/api/ui", tags=["ui"])
+app/api/ui_birth_chart.py:9:# REMOVED: 
+app/api/ui_birth_chart.py:10:# REMOVED: 
+app/api/ui_birth_chart.py:11:# REMOVED: @router.get("/birth-chart")
+app/api/ui_birth_chart.py:12:# REMOVED: def get_birth_chart_ui(
+app/api/ui_birth_chart.py:13:# REMOVED:     base_chart_id: str = Query(...),
+app/api/ui_birth_chart.py:14:# REMOVED: ):
+app/api/ui_birth_chart.py:15:# REMOVED:     """
+app/api/ui_birth_chart.py:16:# REMOVED:     UI-safe birth chart endpoint.
+app/api/ui_birth_chart.py:17:# REMOVED: 
+app/api/ui_birth_chart.py:18:# REMOVED:     IMPORTANT:
+app/api/ui_birth_chart.py:19:# REMOVED:     - Always returns the DERIVED VIEW MODEL
+app/api/ui_birth_chart.py:20:# REMOVED:     - Never returns raw base chart payload
+app/api/ui_birth_chart.py:21:# REMOVED:     """
+app/api/ui_birth_chart.py:22:# REMOVED: 
+app/api/ui_birth_chart.py:23:# REMOVED:     with Session(engine) as db:
+app/api/ui_birth_chart.py:24:# REMOVED:         base = db.exec(
+app/api/ui_birth_chart.py:25:# REMOVED:             select(BaseChartRow)
+app/api/ui_birth_chart.py:26:# REMOVED:             .where(BaseChartRow.id == base_chart_id)
+app/api/ui_birth_chart.py:27:# REMOVED:         ).first()
+app/api/ui_birth_chart.py:28:# REMOVED: 
+app/api/ui_birth_chart.py:29:# REMOVED:         if not base:
+app/api/ui_birth_chart.py:30:# REMOVED:             raise HTTPException(
+app/api/ui_birth_chart.py:31:# REMOVED:                 status_code=404,
+app/api/ui_birth_chart.py:32:# REMOVED:                 detail="Base chart not found",
+app/api/ui_birth_chart.py:33:# REMOVED:             )
+app/api/ui_birth_chart.py:34:# REMOVED: 
+app/api/ui_birth_chart.py:35:# REMOVED:         # Parse stored payload
+app/api/ui_birth_chart.py:36:# REMOVED:         base_payload = (
+app/api/ui_birth_chart.py:37:# REMOVED:             base.payload
+app/api/ui_birth_chart.py:38:# REMOVED:             if isinstance(base.payload, dict)
+app/api/ui_birth_chart.py:39:# REMOVED:             else __import__("json").loads(base.payload)
+app/api/ui_birth_chart.py:40:# REMOVED:         )
+app/api/ui_birth_chart.py:41:# REMOVED: 
+app/api/ui_birth_chart.py:42:# REMOVED:         # 🔑 THIS IS THE CRITICAL LINE (WAS MISSING / BYPASSED)
+app/api/ui_birth_chart.py:43:# REMOVED:         view = build_birth_chart_view_model(base_payload)
+app/api/ui_birth_chart.py:44:# REMOVED: 
+app/api/ui_birth_chart.py:45:# REMOVED:         return {
+app/api/ui_birth_chart.py:46:# REMOVED:             "base_chart_id": base.id,
+app/api/ui_birth_chart.py:47:# REMOVED:             "view": view,
+app/api/ui_birth_chart.py:48:# REMOVED:         }
+app/api/prediction_yearly.py:1:# REMOVED: from fastapi import APIRouter, Depends
+app/api/prediction_yearly.py:2:# REMOVED: from datetime import datetime
+app/api/prediction_yearly.py:3:# REMOVED: from sqlmodel import Session
+app/api/prediction_yearly.py:4:# REMOVED: 
+app/api/prediction_yearly.py:5:# REMOVED: from app.db.session import get_db
+app/api/prediction_yearly.py:6:# REMOVED: from app.repositories.base_chart_repo import get_base_chart_by_id
+app/api/prediction_yearly.py:7:# REMOVED: from app.engines.yearly_prediction_envelope import build_yearly_prediction_envelope
+app/api/prediction_yearly.py:8:# REMOVED: from app.engines.synthesis_engine import synthesize_from_envelope
+app/api/prediction_yearly.py:9:# REMOVED: from app.engines.interpretation_engine import build_interpretation_from_synthesis
+app/api/prediction_yearly.py:10:# REMOVED: from app.engines.explainability_engine import build_explainability
+app/api/prediction_yearly.py:11:# REMOVED: 
+app/api/prediction_yearly.py:12:# REMOVED: router = APIRouter(prefix="/api/prediction", tags=["Prediction"])
+app/api/prediction_yearly.py:13:# REMOVED: 
+app/api/prediction_yearly.py:14:# REMOVED: 
+app/api/prediction_yearly.py:15:# REMOVED: @router.post("/yearly")
+app/api/prediction_yearly.py:16:# REMOVED: def generate_yearly_prediction(payload: dict, db: Session = Depends(get_db)):
+app/api/prediction_yearly.py:17:# REMOVED:     base_chart = get_base_chart_by_id(db, payload["base_chart_id"])
+app/api/prediction_yearly.py:18:# REMOVED: 
+app/api/prediction_yearly.py:19:# REMOVED:     envelope = build_yearly_prediction_envelope(
+app/api/prediction_yearly.py:20:# REMOVED:         base_chart=base_chart.payload,
+app/api/prediction_yearly.py:21:# REMOVED:         year=payload["year"],
+app/api/prediction_yearly.py:22:# REMOVED:     )
+app/api/prediction_yearly.py:23:# REMOVED: 
+app/api/prediction_yearly.py:24:# REMOVED:     synthesis = synthesize_from_envelope(envelope)
+app/api/prediction_yearly.py:25:# REMOVED:     interpretation = build_interpretation_from_synthesis(envelope, synthesis)
+app/api/prediction_yearly.py:26:# REMOVED: 
+app/api/prediction_yearly.py:27:# REMOVED:     explainability = build_explainability(
+app/api/prediction_yearly.py:28:# REMOVED:         dasha_context=envelope["dasha_context"],
+app/api/prediction_yearly.py:29:# REMOVED:         confidence=synthesis["confidence"],
+app/api/prediction_yearly.py:30:# REMOVED:         period_type="yearly",
+app/api/prediction_yearly.py:31:# REMOVED:     )
+app/api/prediction_yearly.py:32:# REMOVED: 
+app/api/prediction_yearly.py:33:# REMOVED:     return {
+app/api/prediction_yearly.py:34:# REMOVED:         "generated_at": datetime.utcnow(),
+app/api/prediction_yearly.py:35:# REMOVED:         "envelope": envelope,
+app/api/prediction_yearly.py:36:# REMOVED:         "synthesis": synthesis,
+app/api/prediction_yearly.py:37:# REMOVED:         "interpretation": interpretation,
+app/api/prediction_yearly.py:38:# REMOVED:         "explainability": explainability.model_dump(),
+app/api/prediction_yearly.py:39:# REMOVED:     }
+app/api/prediction_weekly.py:1:# REMOVED: from fastapi import APIRouter, Depends
+app/api/prediction_weekly.py:2:# REMOVED: from datetime import datetime
+app/api/prediction_weekly.py:3:# REMOVED: from sqlmodel import Session
+app/api/prediction_weekly.py:4:# REMOVED: 
+app/api/prediction_weekly.py:5:# REMOVED: from app.db.session import get_db
+app/api/prediction_weekly.py:6:# REMOVED: from app.repositories.base_chart_repo import get_base_chart_by_id
+app/api/prediction_weekly.py:7:# REMOVED: from app.engines.weekly_prediction_envelope import build_weekly_prediction_envelope
+app/api/prediction_weekly.py:8:# REMOVED: from app.engines.synthesis_engine import synthesize_from_envelope
+app/api/prediction_weekly.py:9:# REMOVED: from app.engines.interpretation_engine import build_interpretation_from_synthesis
+app/api/prediction_weekly.py:10:# REMOVED: from app.engines.explainability_engine import build_explainability
+app/api/prediction_weekly.py:11:# REMOVED: 
+app/api/prediction_weekly.py:12:# REMOVED: router = APIRouter(prefix="/api/prediction", tags=["Prediction"])
+app/api/prediction_weekly.py:13:# REMOVED: 
+app/api/prediction_weekly.py:14:# REMOVED: 
+app/api/prediction_weekly.py:15:# REMOVED: @router.post("/weekly")
+app/api/prediction_weekly.py:16:# REMOVED: def generate_weekly_prediction(payload: dict, db: Session = Depends(get_db)):
+app/api/prediction_weekly.py:17:# REMOVED:     base_chart = get_base_chart_by_id(db, payload["base_chart_id"])
+app/api/prediction_weekly.py:18:# REMOVED: 
+app/api/prediction_weekly.py:19:# REMOVED:     envelope = build_weekly_prediction_envelope(
+app/api/prediction_weekly.py:20:# REMOVED:         base_chart=base_chart.payload,
+app/api/prediction_weekly.py:21:# REMOVED:         year=payload["year"],
+app/api/prediction_weekly.py:22:# REMOVED:         week=payload["week"],
+app/api/prediction_weekly.py:23:# REMOVED:     )
+app/api/prediction_weekly.py:24:# REMOVED: 
+app/api/prediction_weekly.py:25:# REMOVED:     synthesis = synthesize_from_envelope(envelope)
+app/api/prediction_weekly.py:26:# REMOVED:     interpretation = build_interpretation_from_synthesis(envelope, synthesis)
+app/api/prediction_weekly.py:27:# REMOVED: 
+app/api/prediction_weekly.py:28:# REMOVED:     explainability = build_explainability(
+app/api/prediction_weekly.py:29:# REMOVED:         dasha_context=envelope["dasha_context"],
+app/api/prediction_weekly.py:30:# REMOVED:         confidence=synthesis["confidence"],
+app/api/prediction_weekly.py:31:# REMOVED:         period_type="weekly",
+app/api/prediction_weekly.py:32:# REMOVED:     )
+app/api/prediction_weekly.py:33:# REMOVED: 
+app/api/prediction_weekly.py:34:# REMOVED:     return {
+app/api/prediction_weekly.py:35:# REMOVED:         "generated_at": datetime.utcnow(),
+app/api/prediction_weekly.py:36:# REMOVED:         "envelope": envelope,
+app/api/prediction_weekly.py:37:# REMOVED:         "synthesis": synthesis,
+app/api/prediction_weekly.py:38:# REMOVED:         "interpretation": interpretation,
+app/api/prediction_weekly.py:39:# REMOVED:         "explainability": explainability.model_dump(),
+app/api/prediction_weekly.py:40:# REMOVED:     }
+app/db/models.py:1:# REMOVED: from sqlmodel import SQLModel, Field
+app/db/models.py:2:# REMOVED: from typing import Optional
+app/db/models.py:3:# REMOVED: from datetime import datetime
+app/db/models.py:4:# REMOVED: 
+app/db/models.py:5:# REMOVED: 
+app/db/models.py:6:# REMOVED: # =====================================================
+app/db/models.py:7:# REMOVED: # BASE CHARTS (IMMUTABLE TRUTH)
+app/db/models.py:8:# REMOVED: # =====================================================
+app/db/models.py:9:# REMOVED: 
+app/db/models.py:10:# REMOVED: class BaseChartRow(SQLModel, table=True):
+app/db/models.py:11:# REMOVED:     __tablename__ = "base_charts"
+app/db/models.py:12:# REMOVED: 
+app/db/models.py:13:# REMOVED:     id: str = Field(primary_key=True)
+app/db/models.py:14:# REMOVED:     checksum: str
+app/db/models.py:15:# REMOVED:     locked: bool
+app/db/models.py:16:# REMOVED:     created_at: datetime
+app/db/models.py:17:# REMOVED:     payload: str              # JSON stored as TEXT
+app/db/models.py:18:# REMOVED:     engine_version: str
+app/db/models.py:19:# REMOVED: 
+app/db/models.py:20:# REMOVED: 
+app/db/models.py:21:# REMOVED: # =====================================================
+app/db/models.py:22:# REMOVED: # CHART ARTIFACTS (D1, PANCHANGAM, ETC.)
+app/db/models.py:23:# REMOVED: # =====================================================
+app/db/models.py:24:# REMOVED: 
+app/db/models.py:25:# REMOVED: class ChartArtifactRow(SQLModel, table=True):
+app/db/models.py:26:# REMOVED:     __tablename__ = "chart_artifacts"
+app/db/models.py:27:# REMOVED: 
+app/db/models.py:28:# REMOVED:     id: str = Field(primary_key=True)
+app/db/models.py:29:# REMOVED:     base_chart_id: str = Field(foreign_key="base_charts.id")
+app/db/models.py:30:# REMOVED:     chart_type: str
+app/db/models.py:31:# REMOVED:     chart_name: Optional[str] = None
+app/db/models.py:32:# REMOVED:     payload: str              # JSON
+app/db/models.py:33:# REMOVED:     engine_version: str
+app/db/models.py:34:# REMOVED:     created_at: datetime
+app/db/models.py:35:# REMOVED: 
+app/db/models.py:36:# REMOVED: 
+app/db/models.py:37:# REMOVED: # =====================================================
+app/db/models.py:38:# REMOVED: # MONTHLY PREDICTIONS
+app/db/models.py:39:# REMOVED: # =====================================================
+app/db/models.py:40:# REMOVED: 
+app/db/models.py:41:# REMOVED: class MonthlyPredictionRow(SQLModel, table=True):
+app/db/models.py:42:# REMOVED:     __tablename__ = "monthly_predictions"
+app/db/models.py:43:# REMOVED: 
+app/db/models.py:44:# REMOVED:     id: str = Field(primary_key=True)
+app/db/models.py:45:# REMOVED:     base_chart_id: str = Field(foreign_key="base_charts.id")
+app/db/models.py:46:# REMOVED:     year: int
+app/db/models.py:47:# REMOVED:     month: int
+app/db/models.py:48:# REMOVED:     status: str
+app/db/models.py:49:# REMOVED:     created_at: datetime
+app/db/models.py:50:# REMOVED: 
+app/db/models.py:51:# REMOVED:     envelope: str             # JSON
+app/db/models.py:52:# REMOVED:     synthesis: str             # JSON
+app/db/models.py:53:# REMOVED:     interpretation: Optional[str] = None
+app/db/models.py:54:# REMOVED: 
+app/db/models.py:55:# REMOVED:     engine_version: str
+app/db/models.py:56:# REMOVED: 
+app/db/models.py:57:# REMOVED: 
+app/db/models.py:58:# REMOVED: # =====================================================
+app/db/models.py:59:# REMOVED: # ENGINE RUNS (OPTIONAL)
+app/db/models.py:60:# REMOVED: # =====================================================
+app/db/models.py:61:# REMOVED: 
+app/db/models.py:62:# REMOVED: class EngineRunRow(SQLModel, table=True):
+app/db/models.py:63:# REMOVED:     __tablename__ = "engine_runs"
+app/db/models.py:64:# REMOVED: 
+app/db/models.py:65:# REMOVED:     id: Optional[int] = Field(default=None, primary_key=True)
+app/db/models.py:66:# REMOVED:     engine: str
+app/db/models.py:67:# REMOVED:     version: str
+app/db/models.py:68:# REMOVED:     run_at: datetime
+app/db/models.py:69:# REMOVED:     notes: Optional[str] = None
+app/repositories/chart_artifact_repo.py:1:# REMOVED: import json
+app/repositories/chart_artifact_repo.py:2:# REMOVED: import uuid
+app/repositories/chart_artifact_repo.py:3:# REMOVED: from datetime import datetime
+app/repositories/chart_artifact_repo.py:4:# REMOVED: from sqlmodel import Session
+app/repositories/chart_artifact_repo.py:5:# REMOVED: 
+app/repositories/chart_artifact_repo.py:6:# REMOVED: from app.db.models import ChartArtifactRow
+app/repositories/chart_artifact_repo.py:7:# REMOVED: 
+app/repositories/chart_artifact_repo.py:8:# REMOVED: 
+app/repositories/chart_artifact_repo.py:9:# REMOVED: def save_chart_artifact(
+app/repositories/chart_artifact_repo.py:10:# REMOVED:     db: Session,
+app/repositories/chart_artifact_repo.py:11:# REMOVED:     base_chart_id: str,
+app/repositories/chart_artifact_repo.py:12:# REMOVED:     chart_type: str,
+app/repositories/chart_artifact_repo.py:13:# REMOVED:     payload: dict,
+app/repositories/chart_artifact_repo.py:14:# REMOVED:     engine_version: str,
+app/repositories/chart_artifact_repo.py:15:# REMOVED:     chart_name: str | None = None,
+app/repositories/chart_artifact_repo.py:16:# REMOVED: ):
+app/repositories/chart_artifact_repo.py:17:# REMOVED:     """
+app/repositories/chart_artifact_repo.py:18:# REMOVED:     Persist a render-ready chart artifact (D1, Panchangam, etc.)
+app/repositories/chart_artifact_repo.py:19:# REMOVED:     """
+app/repositories/chart_artifact_repo.py:20:# REMOVED: 
+app/repositories/chart_artifact_repo.py:21:# REMOVED:     row = ChartArtifactRow(
+app/repositories/chart_artifact_repo.py:22:# REMOVED:         id=str(uuid.uuid4()),
+app/repositories/chart_artifact_repo.py:23:# REMOVED:         base_chart_id=base_chart_id,
+app/repositories/chart_artifact_repo.py:24:# REMOVED:         chart_type=chart_type,
+app/repositories/chart_artifact_repo.py:25:# REMOVED:         chart_name=chart_name,
+app/repositories/chart_artifact_repo.py:26:# REMOVED:         payload=json.dumps(payload),
+app/repositories/chart_artifact_repo.py:27:# REMOVED:         engine_version=engine_version,
+app/repositories/chart_artifact_repo.py:28:# REMOVED:         created_at=datetime.utcnow(),
+app/repositories/chart_artifact_repo.py:29:# REMOVED:     )
+app/repositories/chart_artifact_repo.py:30:# REMOVED: 
+app/repositories/chart_artifact_repo.py:31:# REMOVED:     db.add(row)
+app/repositories/chart_artifact_repo.py:32:# REMOVED:     db.commit()
+app/repositories/chart_artifact_repo.py:33:# REMOVED:     return row
+app/services/prediction_aggregation_service.py:1:# REMOVED: import json
+app/services/prediction_aggregation_service.py:2:# REMOVED: from sqlmodel import Session, select
+app/services/prediction_aggregation_service.py:3:# REMOVED: from datetime import datetime
+app/services/prediction_aggregation_service.py:4:# REMOVED: 
+app/services/prediction_aggregation_service.py:5:# REMOVED: from app.db.models import (
+app/services/prediction_aggregation_service.py:6:# REMOVED:     BaseChartRow,
+app/services/prediction_aggregation_service.py:7:# REMOVED:     ChartArtifactRow,
+app/services/prediction_aggregation_service.py:8:# REMOVED:     MonthlyPredictionRow,
+app/services/prediction_aggregation_service.py:9:# REMOVED: )
+app/services/prediction_aggregation_service.py:10:# REMOVED: 
+app/services/prediction_aggregation_service.py:11:# REMOVED: from app.models.report_schema import (
+app/services/prediction_aggregation_service.py:12:# REMOVED:     PredictionReportSnapshot,
+app/services/prediction_aggregation_service.py:13:# REMOVED:     ReportMetadata,
+app/services/prediction_aggregation_service.py:14:# REMOVED: )
+app/services/prediction_aggregation_service.py:15:# REMOVED: 
+app/services/prediction_aggregation_service.py:16:# REMOVED: def build_prediction_report_snapshot(
+app/services/prediction_aggregation_service.py:17:# REMOVED:     db: Session,
+app/services/prediction_aggregation_service.py:18:# REMOVED:     base_chart_id: str,
+app/services/prediction_aggregation_service.py:19:# REMOVED:     year: int,
+app/services/prediction_aggregation_service.py:20:# REMOVED:     month: int,
+app/services/prediction_aggregation_service.py:21:# REMOVED: ) -> PredictionReportSnapshot:
+app/services/prediction_aggregation_service.py:22:# REMOVED:     """
+app/services/prediction_aggregation_service.py:23:# REMOVED:     Read-only aggregation.
+app/services/prediction_aggregation_service.py:24:# REMOVED:     No computation. No mutation.
+app/services/prediction_aggregation_service.py:25:# REMOVED:     """
+app/services/prediction_aggregation_service.py:26:# REMOVED: 
+app/services/prediction_aggregation_service.py:27:# REMOVED:     # ----------------------------
+app/services/prediction_aggregation_service.py:28:# REMOVED:     # 1. Base chart (immutable)
+app/services/prediction_aggregation_service.py:29:# REMOVED:     # ----------------------------
+app/services/prediction_aggregation_service.py:30:# REMOVED:     base_chart = db.get(BaseChartRow, base_chart_id)
+app/services/prediction_aggregation_service.py:31:# REMOVED:     if not base_chart:
+app/services/prediction_aggregation_service.py:32:# REMOVED:         raise ValueError("Base chart not found")
+app/services/prediction_aggregation_service.py:33:# REMOVED: 
+app/services/prediction_aggregation_service.py:34:# REMOVED:     # ----------------------------
+app/services/prediction_aggregation_service.py:35:# REMOVED:     # 2. Artifacts
+app/services/prediction_aggregation_service.py:36:# REMOVED:     # ----------------------------
+app/services/prediction_aggregation_service.py:37:# REMOVED:     artifacts = db.exec(
+app/services/prediction_aggregation_service.py:38:# REMOVED:         ChartArtifactRow.__table__.select()
+app/services/prediction_aggregation_service.py:39:# REMOVED:         .where(ChartArtifactRow.base_chart_id == base_chart_id)
+app/services/prediction_aggregation_service.py:40:# REMOVED:     ).all()
+app/services/prediction_aggregation_service.py:41:# REMOVED: 
+app/services/prediction_aggregation_service.py:42:# REMOVED:     artifact_map = {
+app/services/prediction_aggregation_service.py:43:# REMOVED:         a.chart_type: json.loads(a.payload)
+app/services/prediction_aggregation_service.py:44:# REMOVED:         for a in artifacts
+app/services/prediction_aggregation_service.py:45:# REMOVED:     }
+app/services/prediction_aggregation_service.py:46:# REMOVED: 
+app/services/prediction_aggregation_service.py:47:# REMOVED:     # ----------------------------
+app/services/prediction_aggregation_service.py:48:# REMOVED:     # 3. Monthly prediction
+app/services/prediction_aggregation_service.py:49:# REMOVED:     # ----------------------------
+app/services/prediction_aggregation_service.py:50:# REMOVED:     pid = f"{base_chart_id}:{year}:{month}"
+app/services/prediction_aggregation_service.py:51:# REMOVED:     prediction = db.get(MonthlyPredictionRow, pid)
+app/services/prediction_aggregation_service.py:52:# REMOVED: 
+app/services/prediction_aggregation_service.py:53:# REMOVED:     if not prediction:
+app/services/prediction_aggregation_service.py:54:# REMOVED:         raise ValueError("Monthly prediction not found")
+app/services/prediction_aggregation_service.py:55:# REMOVED: 
+app/services/prediction_aggregation_service.py:56:# REMOVED:     # ----------------------------
+app/services/prediction_aggregation_service.py:57:# REMOVED:     # 4. Assemble snapshot
+app/services/prediction_aggregation_service.py:58:# REMOVED:     # ----------------------------
+app/services/prediction_aggregation_service.py:59:# REMOVED: 
+app/services/prediction_aggregation_service.py:60:# REMOVED:     return PredictionReportSnapshot(
+app/services/prediction_aggregation_service.py:61:# REMOVED:         metadata=ReportMetadata(
+app/services/prediction_aggregation_service.py:62:# REMOVED:             base_chart_id=base_chart_id,
+app/services/prediction_aggregation_service.py:63:# REMOVED:             prediction_id=pid,
+app/services/prediction_aggregation_service.py:64:# REMOVED:             generated_at=datetime.utcnow(),
+app/services/prediction_aggregation_service.py:65:# REMOVED:             engine_versions={
+app/services/prediction_aggregation_service.py:66:# REMOVED:                 "base_chart": base_chart.engine_version,
+app/services/prediction_aggregation_service.py:67:# REMOVED:                 "prediction": prediction.engine_version,
+app/services/prediction_aggregation_service.py:68:# REMOVED:             },
+app/services/prediction_aggregation_service.py:69:# REMOVED:         ),
+app/services/prediction_aggregation_service.py:70:# REMOVED:         base_chart=json.loads(base_chart.payload),
+app/services/prediction_aggregation_service.py:71:# REMOVED:         chart_artifacts=artifact_map,
+app/services/prediction_aggregation_service.py:72:# REMOVED:         monthly_prediction={
+app/services/prediction_aggregation_service.py:73:# REMOVED:             "year": prediction.year,
+app/services/prediction_aggregation_service.py:74:# REMOVED:             "month": prediction.month,
+app/services/prediction_aggregation_service.py:75:# REMOVED:             "status": prediction.status,
+app/services/prediction_aggregation_service.py:76:# REMOVED:             "envelope": json.loads(prediction.envelope),
+app/services/prediction_aggregation_service.py:77:# REMOVED:             "synthesis": json.loads(prediction.synthesis),
+app/services/prediction_aggregation_service.py:78:# REMOVED:             "interpretation": (
+app/services/prediction_aggregation_service.py:79:# REMOVED:                 json.loads(prediction.interpretation)
+app/services/prediction_aggregation_service.py:80:# REMOVED:                 if prediction.interpretation else None
+app/services/prediction_aggregation_service.py:81:# REMOVED:             ),
+app/services/prediction_aggregation_service.py:82:# REMOVED:         },
+app/services/prediction_aggregation_service.py:83:# REMOVED:     )
+app/services/prediction_aggregation_service.py:84:# REMOVED: 
+app/services/prediction_aggregation_service.py:85:# REMOVED: 
+app/services/prediction_aggregation_service.py:86:# REMOVED: def load_base_chart_snapshot(
+app/services/prediction_aggregation_service.py:87:# REMOVED:     db: Session,
+app/services/prediction_aggregation_service.py:88:# REMOVED:     base_chart_id: str,
+app/services/prediction_aggregation_service.py:89:# REMOVED: ) -> dict:
+app/services/prediction_aggregation_service.py:90:# REMOVED:     base = db.exec(
+app/services/prediction_aggregation_service.py:91:# REMOVED:         select(BaseChartRow).where(BaseChartRow.id == base_chart_id)
+app/services/prediction_aggregation_service.py:92:# REMOVED:     ).first()
+app/services/prediction_aggregation_service.py:93:# REMOVED: 
+app/services/prediction_aggregation_service.py:94:# REMOVED:     if not base:
+app/services/prediction_aggregation_service.py:95:# REMOVED:         raise ValueError("Base chart not found")
+app/services/prediction_aggregation_service.py:96:# REMOVED: 
+app/services/prediction_aggregation_service.py:97:# REMOVED:     base_payload = json.loads(base.payload)
+app/services/prediction_aggregation_service.py:98:# REMOVED: 
+app/services/prediction_aggregation_service.py:99:# REMOVED:     artifacts = db.exec(
+app/services/prediction_aggregation_service.py:100:# REMOVED:         select(ChartArtifactRow)
+app/services/prediction_aggregation_service.py:101:# REMOVED:         .where(ChartArtifactRow.base_chart_id == base_chart_id)
+app/services/prediction_aggregation_service.py:102:# REMOVED:     ).all()
+app/services/prediction_aggregation_service.py:103:# REMOVED: 
+app/services/prediction_aggregation_service.py:104:# REMOVED:     artifact_map = {}
+app/services/prediction_aggregation_service.py:105:# REMOVED:     for a in artifacts:
+app/services/prediction_aggregation_service.py:106:# REMOVED:         artifact_map[a.chart_type] = json.loads(a.payload)
+app/services/prediction_aggregation_service.py:107:# REMOVED: 
+app/services/prediction_aggregation_service.py:108:# REMOVED:     return {
+app/services/prediction_aggregation_service.py:109:# REMOVED:         "identity": {
+app/services/prediction_aggregation_service.py:110:# REMOVED:             "name": base.name,
+app/services/prediction_aggregation_service.py:111:# REMOVED:             "gender": base.gender,
+app/services/prediction_aggregation_service.py:112:# REMOVED:             "date_of_birth": base.date_of_birth,
+app/services/prediction_aggregation_service.py:113:# REMOVED:             "time_of_birth": base.time_of_birth,
+app/services/prediction_aggregation_service.py:114:# REMOVED:             "place_of_birth": base.place_of_birth,
+app/services/prediction_aggregation_service.py:115:# REMOVED:             "latitude": base.latitude,
+app/services/prediction_aggregation_service.py:116:# REMOVED:             "longitude": base.longitude,
+app/services/prediction_aggregation_service.py:117:# REMOVED:             "timezone": base.timezone,
+app/services/prediction_aggregation_service.py:118:# REMOVED:         },
+app/services/prediction_aggregation_service.py:119:# REMOVED:         "base_payload": base_payload,      # 🔑 NEW
+app/services/prediction_aggregation_service.py:120:# REMOVED:         "artifacts": artifact_map,
+app/services/prediction_aggregation_service.py:121:# REMOVED:     }
