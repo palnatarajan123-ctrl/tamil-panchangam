@@ -92,15 +92,26 @@ A traditional Tamil Panchangam-based astrology system using Drik Ganita calculat
 
 ## Running the Application
 
-The main application runs on port 5000 via `npm run dev`.
+Press the **green Run button** to start both services automatically.
 
-For the Python FastAPI engine (optional):
-```bash
-cd tamil_panchangam_engine
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
+**Architecture:**
+- **Frontend (Vite)**: Port 5000 (exposed as external port 80)
+- **Backend (Uvicorn)**: Port 8000
+
+**Startup Script:** `scripts/start-dev.sh` runs both servers in parallel.
+
+**Full Configuration Details:** See `docs/STARTUP_CONFIGURATION.md`
+
+### Critical Configuration Notes
+
+1. **vite.config.ts** must have `allowedHosts: true` for Replit proxy
+2. **API Proxy**: Frontend `/api/*` requests are proxied to backend port 8000
+3. **Production**: Uvicorn serves both API and static frontend on port 5000
 
 ## Recent Changes
+- 2026-01-22: Fixed startup configuration - dual server setup with Vite + Uvicorn
+- 2026-01-22: Added `allowedHosts: true` to fix Replit proxy blocking
+- 2026-01-22: Created `scripts/start-dev.sh` for parallel server startup
 - Initial project setup with complete structure
 - Frontend with all pages and components
 - Backend API endpoints (stubs)
