@@ -23,13 +23,20 @@ from app.models.schema import (
     MonthlyPredictionResponse,
 )
 
+# NOTE:
+# build_pdf_context is intentionally imported here
+# but MUST NOT be executed at module scope.
+# It will be used only inside PDF/report endpoints.
+from app.pdf.pdf_context_builder import build_pdf_context
+
+
 router = APIRouter(prefix="/api/prediction", tags=["Prediction"])
 
 
 @router.post("/monthly", response_model=MonthlyPredictionResponse)
 def generate_monthly_prediction(payload: MonthlyPredictionRequest):
     """
-    EPIC-4 + EPIC-6 + EPIC-8
+    EPIC-4 + EPIC-6 + EPIC-8 + EPIC-3
 
     Monthly prediction with:
     - Envelope (facts only)
@@ -85,17 +92,17 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
         )
 
         # -------------------------------------------------
-        # Backward compatibility: synthesis
+        # Backward compatibility: synthesis confidence
         # -------------------------------------------------
         if "confidence" not in synthesis:
             synthesis["confidence"] = {
-                "level": "medium",
-                "reason": "Confidence not computed in legacy prediction",
-                "source": "system-default",
+                "overall": 0.6,
+                "variance": 0.0,
+                "source": "legacy-prediction",
             }
 
         # -------------------------------------------------
-        # Backward compatibility: envelope
+        # Backward compatibility: dasha_context
         # -------------------------------------------------
         if "dasha_context" not in envelope:
             active_dasha = envelope.get("time_ruler", {}).get(
@@ -110,14 +117,18 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             envelope["dasha_context"] = {
                 "maha_lord": active_dasha["lord"],
                 "antar_lord": None,
-                "is_maha_active": True,
-                "confidence": "high",
                 "active_lords": [active_dasha["lord"]],
+                "lord_weights": {active_dasha["lord"]: 1.0},
+                "active": {
+                    "maha": active_dasha,
+                    "antar": None,
+                },
+                "timeline": [],
             }
 
     else:
         # -------------------------------------------------
-        # 3. Build monthly prediction envelope (EPIC-6)
+        # 3. Build monthly prediction envelope (EPIC-6 + EPIC-3)
         # -------------------------------------------------
         envelope = build_monthly_prediction_envelope(
             base_chart=base_chart_payload,
@@ -131,17 +142,17 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
         synthesis = synthesize_from_envelope(envelope)
 
         # -------------------------------------------------
-        # 🔒 Synthesis normalization (EPIC-6 guard)
+        # Synthesis guard (locked contract)
         # -------------------------------------------------
         if "confidence" not in synthesis:
             synthesis["confidence"] = {
-                "level": "medium",
-                "reason": "Confidence not computed by synthesis engine",
+                "overall": 0.6,
+                "variance": 0.0,
                 "source": "system-default",
             }
 
         # -------------------------------------------------
-        # 5. Interpretation
+        # 5. Interpretation (EPIC-3 aware)
         # -------------------------------------------------
         interpretation = build_interpretation_from_synthesis(
             envelope=envelope,
@@ -149,7 +160,7 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
         )
 
         # -------------------------------------------------
-        # 6. Optional paraphrasing
+        # 6. Optional paraphrasing (presentation only)
         # -------------------------------------------------
         interpretation = paraphrase_interpretation(
             interpretation,
@@ -169,9 +180,8 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
                 envelope=envelope,
                 synthesis=synthesis,
                 interpretation=interpretation,
-                engine_version="monthly-prediction-v1",
+                engine_version="monthly-prediction-v2",
             )
-
 
     # -------------------------------------------------
     # 8. Explainability (derived, EPIC-8)

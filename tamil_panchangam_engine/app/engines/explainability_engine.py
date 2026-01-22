@@ -1,4 +1,5 @@
 from typing import List
+
 from app.schemas.explainability import (
     ExplainabilityBlock,
     ExplainabilityDriver,
@@ -10,17 +11,22 @@ def build_explainability(
     dasha_context: dict,
     confidence: dict,
     period_type: str,
+    navamsa: dict | None = None,
 ) -> ExplainabilityBlock:
     """
-    EPIC-8 explainability builder.
+    EPIC-8 + EPIC-3 (Explainability layer)
 
-    Deterministic.
-    No astrology interpretation.
-    No life areas.
+    Deterministic explainability builder.
+    - No astrology interpretation
+    - No life areas
+    - Evidence-only drivers
     """
 
     drivers: List[ExplainabilityDriver] = []
 
+    # -------------------------------------------------
+    # Dasha overlap metrics
+    # -------------------------------------------------
     overlap = dasha_context.get("overlap", {})
     coverage_ratio = overlap.get("coverage_ratio", 0.0)
     dominant_segment = overlap.get("dominant_segment")
@@ -30,15 +36,15 @@ def build_explainability(
     dominant_dasha = "–".join(
         [
             active.get("maha", {}).get("lord", ""),
-            active.get("antara", {}).get("lord", ""),
-            active.get("pratyantara", {}).get("lord", ""),
+            active.get("antar", {}).get("lord", ""),
+            active.get("pratyantar", {}).get("lord", ""),
         ]
     ).strip("–")
 
-    # ---------------------------------------------
+    # -------------------------------------------------
     # DRIVER: Dasha overlap dominance
-    # ---------------------------------------------
-    if coverage_ratio >= 0.7:
+    # -------------------------------------------------
+    if coverage_ratio >= 0.7 and dominant_segment:
         drivers.append(
             ExplainabilityDriver(
                 type="DASHA_OVERLAP",
@@ -50,11 +56,11 @@ def build_explainability(
             )
         )
 
-    # ---------------------------------------------
-    # DRIVER: Stability (no transitions)
-    # ---------------------------------------------
+    # -------------------------------------------------
+    # DRIVER: Dasha stability (no transitions)
+    # -------------------------------------------------
     transitions = dasha_context.get("transitions", {})
-    if not any(transitions.values()):
+    if transitions and not any(transitions.values()):
         drivers.append(
             ExplainabilityDriver(
                 type="DASHA_STABILITY",
@@ -63,9 +69,9 @@ def build_explainability(
             )
         )
 
-    # ---------------------------------------------
+    # -------------------------------------------------
     # DRIVER: Period granularity
-    # ---------------------------------------------
+    # -------------------------------------------------
     drivers.append(
         ExplainabilityDriver(
             type="PERIOD_GRANULARITY",
@@ -74,17 +80,61 @@ def build_explainability(
         )
     )
 
-    # ---------------------------------------------
-    # SUMMARY (deterministic template)
-    # ---------------------------------------------
-    score = confidence.get("score", 0.0)
+    # -------------------------------------------------
+    # EPIC-3 ADDITIVE DRIVER: Navamsa (D9) dignity
+    # -------------------------------------------------
+    if navamsa:
+        dignity = navamsa.get("dignity", {})
+        active_maha = active.get("maha", {}).get("lord")
 
-    if score >= 0.75:
-        summary = "High confidence period driven by stable and dominant dasha overlap."
-    elif score >= 0.55:
-        summary = "Moderate confidence period with mixed dasha influence."
-    else:
-        summary = "Lower confidence period due to competing or shifting dasha influences."
+        if active_maha and active_maha in dignity:
+            drivers.append(
+                ExplainabilityDriver(
+                    type="NAVAMSA_DIGNITY",
+                    label=f"Navamsa dignity of active dasha lord: {dignity[active_maha]}",
+                    evidence={
+                        "planet": active_maha,
+                        "dignity": dignity[active_maha],
+                    },
+                )
+            )
+
+    # -------------------------------------------------
+    # SUMMARY (period-aware, deterministic)
+    # -------------------------------------------------
+    score = confidence.get("overall", confidence.get("score", 0.0))
+
+    if period_type == "yearly":
+        if score >= 0.65:
+            summary = (
+                "Higher confidence period driven by stable long-term dasha influences. "
+                "Yearly predictions reflect broad themes rather than short-term events."
+            )
+        else:
+            summary = (
+                "Moderate confidence year with evolving dasha influences. "
+                "Use this prediction to guide long-term direction rather than timing."
+            )
+
+    elif period_type == "weekly":
+        summary = (
+            "Lower confidence due to short-term planetary and dasha fluctuations. "
+            "Weekly predictions emphasize timing and momentum rather than outcomes."
+        )
+
+    else:  # monthly (default)
+        if score >= 0.75:
+            summary = (
+                "High confidence month driven by stable and dominant dasha overlap."
+            )
+        elif score >= 0.55:
+            summary = (
+                "Moderate confidence month with mixed dasha influences shaping outcomes."
+            )
+        else:
+            summary = (
+                "Lower confidence month due to competing or shifting dasha influences."
+            )
 
     return ExplainabilityBlock(
         summary=summary,

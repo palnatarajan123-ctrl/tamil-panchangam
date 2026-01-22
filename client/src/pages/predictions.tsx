@@ -6,8 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 import { MonthlyPredictionView } from "@/components/prediction/MonthlyPredictionView";
-import { PredictionTimeline } from "@/components/prediction/PredictionTimeline";
 import { ExplainabilityDrawer } from "@/components/prediction/ExplainabilityDrawer";
+import { adaptMonthlyPrediction } from "@/adapters/predictionAdapter";
 
 import {
   Card,
@@ -36,7 +36,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 
 import {
   Calendar,
@@ -50,150 +49,133 @@ import {
 ----------------------------------------------------- */
 
 const MONTHS = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December"
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
 /* -----------------------------------------------------
-   Validation
+   Validation (dynamic per type)
 ----------------------------------------------------- */
 
-const schema = z.object({
-  year: z.string().refine(v => !isNaN(+v) && +v >= 1900 && +v <= 2100),
-  month: z.string().refine(v => !isNaN(+v) && +v >= 1 && +v <= 12),
+const monthlySchema = z.object({
+  year: z.string(),
+  month: z.string(),
 });
 
-type FormValues = z.infer<typeof schema>;
+const weeklySchema = z.object({
+  year: z.string(),
+  week: z.string(),
+});
 
-/* -----------------------------------------------------
-   Types
------------------------------------------------------ */
-
-interface BaseChartResponse {
-  id: string;
-  locked: boolean;
-  data: {
-    birth_details: {
-      name?: string;
-      date_of_birth: string;
-      time_of_birth: string;
-      place_of_birth: string;
-      latitude: number;
-      longitude: number;
-      timezone: string;
-    };
-  };
-}
-
-/* -----------------------------------------------------
-   Prediction Request Builder (EPIC-10)
------------------------------------------------------ */
-
-function buildPredictionRequest(
-  baseChartId: string,
-  year: number,
-  month: number
-) {
-  return {
-    base_chart_id: baseChartId,
-    timeframe: { mode: "monthly", year, month },
-    triggers: { transits: true, dasha: true, nakshatra: true },
-    levers: {
-      houses: true,
-      planets: true,
-      nakshatras: true,
-      aspects: false,
-    },
-    focus_areas: [
-      "career",
-      "finance",
-      "relationships",
-      "health",
-      "personal_growth",
-    ],
-    constraints: {
-      tone: "balanced",
-      confidence_threshold: 0.6,
-    },
-    output: {
-      detail_level: "standard",
-      include_timing: true,
-      include_remedies: false,
-      format: "ui",
-    },
-  };
-}
+const yearlySchema = z.object({
+  year: z.string(),
+});
 
 /* -----------------------------------------------------
    Page
 ----------------------------------------------------- */
 
 export default function Predictions() {
-  const { id: baseChartId } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
+  const baseChartId = id;
+
   const { toast } = useToast();
+
   const [prediction, setPrediction] = useState<any | null>(null);
-  const predictionData = prediction?.data ?? null;
+  const [predictionType, setPredictionType] = useState<
+    "monthly" | "weekly" | "yearly"
+  >("monthly");
 
+  /* ---------------- Guard ---------------- */
 
-  const now = new Date();
-  const timelineMonths = Array.from({ length: 6 }).map((_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - 2 + i, 1);
-    return {
-      year: d.getFullYear(),
-      month: d.getMonth() + 1,
-      available: predictionData
-      ? predictionData.available_periods?.some(
-          (p: any) =>
-            p.year === d.getFullYear() &&
-            p.month === d.getMonth() + 1
-        )
-      : false,
+  if (!baseChartId) {
+    return (
+      <div className="container max-w-4xl mx-auto px-4 py-12 text-muted-foreground">
+        Select a birth chart
+      </div>
+    );
+  }
 
-    };
-  });
+  /* ---------------- Fetch Birth Chart ---------------- */
 
-  const { data: chart, isLoading, error } = useQuery<BaseChartResponse>({
+  const { data: chart, isLoading, error } = useQuery({
     queryKey: ["/api/base-chart", baseChartId],
-    enabled: !!baseChartId,
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/base-chart/${baseChartId}`);
+      const res = await fetch(`/api/base-chart/${baseChartId}`);
       if (!res.ok) throw new Error("Birth chart not found");
       return res.json();
     },
   });
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  /* ---------------- Form ---------------- */
+
+  const form = useForm<any>({
+    resolver: zodResolver(
+      predictionType === "monthly"
+        ? monthlySchema
+        : predictionType === "weekly"
+        ? weeklySchema
+        : yearlySchema
+    ),
     defaultValues: {
       year: new Date().getFullYear().toString(),
       month: (new Date().getMonth() + 1).toString(),
+      week: "1",
     },
   });
 
-  const handleTimelineSelect = (year: number, month: number) => {
-    form.setValue("year", year.toString());
-    form.setValue("month", month.toString());
-  };
+  /* ---------------- Mutation ---------------- */
 
   const mutation = useMutation({
-    mutationFn: async (v: FormValues) => {
-      const payload = buildPredictionRequest(
-        baseChartId!,
-        Number(v.year),
-        Number(v.month)
-      );
-      const res = await apiRequest("POST", "/api/prediction/request", payload);
-      if (!res.ok) throw new Error(await res.text());
+    mutationFn: async (v: any) => {
+      const basePayload = {
+        base_chart_id: baseChartId,
+        year: Number(v.year),
+      };
+
+      let endpoint = "/api/prediction/monthly";
+      let payload: any = basePayload;
+
+      if (predictionType === "monthly") {
+        payload.month = Number(v.month);
+      } else if (predictionType === "weekly") {
+        endpoint = "/api/prediction/weekly";
+        payload.week = Number(v.week);
+      } else {
+        endpoint = "/api/prediction/yearly";
+      }
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
       return res.json();
     },
+
     onSuccess: data => {
-      setPrediction(data);
-      toast({ title: "Prediction Generated", description: "Monthly prediction ready" });
+      setPrediction(adaptMonthlyPrediction(data.details));
+      toast({
+        title: "Prediction Generated",
+        description: `${predictionType} prediction ready`,
+      });
     },
+
     onError: (e: Error) => {
-      toast({ title: "Prediction failed", description: e.message, variant: "destructive" });
+      toast({
+        title: "Prediction failed",
+        description: e.message,
+        variant: "destructive",
+      });
     },
   });
+
+  /* ---------------- Loading ---------------- */
 
   if (isLoading) {
     return (
@@ -207,149 +189,137 @@ export default function Predictions() {
   if (error || !chart) {
     return (
       <div className="container max-w-4xl mx-auto px-4 py-12">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground mb-4">Birth chart not found</p>
-            <Link href="/">
-              <Button variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Home
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+        Birth chart not found
       </div>
     );
   }
 
-  const name = chart.data.birth_details.name || "Birth Chart";
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="container max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-4 mb-4">
+
+      {/* HEADER */}
+      <div className="flex items-center gap-4 mb-6">
         <Link href={`/chart/${baseChartId}`}>
           <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft />
           </Button>
         </Link>
-        <div className="flex-1">
-          <h1 className="text-3xl font-serif font-bold flex items-center gap-3">
-            <Sparkles className="h-8 w-8 text-primary" />
-            Monthly Predictions
-          </h1>
-          <p className="text-muted-foreground">
-            Explicit intent · deterministic engine
-          </p>
-        </div>
+
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Sparkles /> Predictions
+        </h1>
+
         <StatusBadge status="ok" />
       </div>
 
-      <PredictionTimeline
-        months={timelineMonths}
-        selectedYear={Number(form.watch("year"))}
-        selectedMonth={Number(form.watch("month"))}
-        onSelect={handleTimelineSelect}
-      />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
-        {/* FORM */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{name}</CardTitle>
-            <CardDescription>
-              Immutable chart → explicit prediction request
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(v => mutation.mutate(v))}
-                className="space-y-6"
-              >
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="year"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Year</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="month"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Month</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {MONTHS.map((m, i) => (
-                              <SelectItem key={i} value={(i + 1).toString()}>
-                                {m}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <Button type="submit" className="w-full" disabled={mutation.isPending}>
-                  {mutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <Calendar className="mr-2 h-4 w-4" />
-                      Generate Prediction
-                    </>
-                  )}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-
-        {/* RESULT */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Prediction Result</CardTitle>
-            <CardDescription>UI-ready prediction snapshot</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {predictionData ? (
-              <div className="space-y-6">
-                <MonthlyPredictionView prediction={predictionData} />
-
-                {predictionData.explainability && (
-                  <ExplainabilityDrawer
-                    explainability={predictionData.explainability}
-                  />
-                )}
-              </div>
-            ) : (
-              <div className="py-12 text-center text-muted-foreground">
-                <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                Generate a prediction to see results
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* TABS */}
+      <div className="flex gap-2 mb-6">
+        {["monthly", "weekly", "yearly"].map(t => (
+          <Button
+            key={t}
+            variant={predictionType === t ? "default" : "outline"}
+            onClick={() => {
+              setPredictionType(t as any);
+              setPrediction(null);
+            }}
+          >
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </Button>
+        ))}
       </div>
+
+      {/* FORM */}
+      <Card className="mb-8">
+        <CardContent className="pt-6">
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(v => mutation.mutate(v))}
+              className="grid grid-cols-1 md:grid-cols-3 gap-4"
+            >
+              <FormField
+                control={form.control}
+                name="year"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Year</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {predictionType === "monthly" && (
+                <FormField
+                  control={form.control}
+                  name="month"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Month</FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger />
+                        </FormControl>
+                        <SelectContent>
+                          {MONTHS.map((m, i) => (
+                            <SelectItem key={i} value={(i + 1).toString()}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {predictionType === "weekly" && (
+                <FormField
+                  control={form.control}
+                  name="week"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ISO Week</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <Button
+                type="submit"
+                className="md:col-span-3"
+                disabled={mutation.isPending}
+              >
+                {mutation.isPending ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <>
+                    <Calendar className="mr-2" />
+                    Generate
+                  </>
+                )}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      {/* RESULT */}
+      {prediction && (
+        <MonthlyPredictionView prediction={prediction} />
+      )}
+
+      {prediction?.disclaimers && (
+        <ExplainabilityDrawer explainability={prediction} />
+      )}
     </div>
   );
 }

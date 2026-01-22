@@ -33,14 +33,6 @@ interface MonthlyPredictionUIModel {
     period_label?: string;
   };
 
-  identity?: {
-    name?: string;
-    place_of_birth?: string;
-    birth_date?: string;
-    moon_sign?: string;
-    lagna?: string;
-  };
-
   overview?: {
     headline?: string;
     confidence?: number;
@@ -62,11 +54,11 @@ interface MonthlyPredictionUIModel {
     dominant_pakshi?: string;
     recommended?: string[];
     avoid?: string[];
+    note?: string;
   };
 
   disclaimers?: string[];
 }
-
 
 /* -----------------------------------------------------
    Component
@@ -77,9 +69,6 @@ export function MonthlyPredictionView({
 }: {
   prediction: MonthlyPredictionUIModel | null;
 }) {
-  /* -----------------------------------------------------
-     NORMALIZATION LAYER (CRITICAL)
-  ----------------------------------------------------- */
   console.log("MONTHLY VIEW RENDER", prediction);
 
   const lifeAreas = Array.isArray(prediction?.life_areas)
@@ -87,13 +76,14 @@ export function MonthlyPredictionView({
     : [];
 
   const timing = {
-    dominant_pakshi: prediction?.timing?.dominant_pakshi ?? "—",
+    dominant_pakshi: prediction?.timing?.dominant_pakshi,
     recommended: Array.isArray(prediction?.timing?.recommended)
       ? prediction!.timing!.recommended
       : [],
     avoid: Array.isArray(prediction?.timing?.avoid)
       ? prediction!.timing!.avoid
       : [],
+    note: prediction?.timing?.note,
   };
 
   const disclaimers = Array.isArray(prediction?.disclaimers)
@@ -210,34 +200,49 @@ export function MonthlyPredictionView({
             Pancha Pakshi influence
           </CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-4 text-sm">
-          <div>
-            <strong>Dominant Pakshi:</strong>{" "}
-            {timing.dominant_pakshi}
-          </div>
-
-          <Separator />
-
-          {timing.recommended.length > 0 && (
+          {/* Daily / Weekly Pakshi */}
+          {timing.dominant_pakshi && (
             <div>
-              <strong>Recommended:</strong>
-              <ul className="list-disc ml-5 mt-1">
-                {timing.recommended.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
+              <strong>Dominant Pakshi:</strong>{" "}
+              {timing.dominant_pakshi}
             </div>
           )}
 
-          {timing.avoid.length > 0 && (
-            <div>
-              <strong>Avoid:</strong>
-              <ul className="list-disc ml-5 mt-1">
-                {timing.avoid.map((a, i) => (
-                  <li key={i}>{a}</li>
-                ))}
-              </ul>
+          {/* Monthly explanation */}
+          {!timing.dominant_pakshi && timing.note && (
+            <div className="text-muted-foreground leading-relaxed">
+              {timing.note}
             </div>
+          )}
+
+          {timing.recommended.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <strong>Recommended:</strong>
+                <ul className="list-disc ml-5 mt-1">
+                  {timing.recommended.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+
+          {timing.avoid.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <strong>Avoid:</strong>
+                <ul className="list-disc ml-5 mt-1">
+                  {timing.avoid.map((a, i) => (
+                    <li key={i}>{a}</li>
+                  ))}
+                </ul>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

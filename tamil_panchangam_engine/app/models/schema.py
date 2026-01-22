@@ -157,6 +157,9 @@ class MonthlyPredictionResponse(BaseModel):
     summary: str
     details: Dict[str, Any]
 
+    # EPIC-8 — derived explainability (not persisted)
+    explainability: Optional[Dict[str, Any]] = None
+
 
 # ============================================================
 # ============================================================

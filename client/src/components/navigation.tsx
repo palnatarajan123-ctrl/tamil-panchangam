@@ -8,10 +8,11 @@ export function Navigation() {
 
   const navItems = [
     { href: "/", label: "Generate Chart", icon: Sparkles },
-    { href: "/predictions", label: "Monthly Predictions", icon: Calendar },
+/*    { href: "/predictions", label: "Monthly Predictions", icon: Calendar }, */
     { href: "/reports", label: "Reports", icon: FileText },
   ];
 
+  
   const utilityItems = [
     { href: "/health", label: "Health Status", icon: Activity },
     { href: "/docs", label: "Documentation", icon: BookOpen },

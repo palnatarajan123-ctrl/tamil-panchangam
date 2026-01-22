@@ -24,19 +24,15 @@ import { Link } from "wouter";
    ROUTER (ALL ROUTES LIVE HERE)
 -------------------------------------------------- */
 
-<Route path="/predictions/:id" component={PredictionScreen} />
-
 function Router() {
   return (
     <Switch>
-      {/* Home */}
-      <Route path="/" component={Home} />
-
       {/* ---------------------------------
          Legacy Predictions (DO NOT TOUCH)
          --------------------------------- */}
-      <Route path="/predictions/:id" component={Predictions} />
-
+      {/* LEGACY PREDICTIONS — DO NOT USE FOR EPIC-6 *
+        <Route path="/predictions/:id" component={Predictions} />
+*/}
       <Route path="/predictions">
         <div className="container max-w-2xl mx-auto py-12">
           <Card>
@@ -65,9 +61,15 @@ function Router() {
       {/* ---------------------------------
          EPIC-6 Predictions (DERIVED)
          --------------------------------- */}
-      <Route path="/chart/:id/predictions">
-        <PredictionScreen />
-      </Route>
+      <Route
+        path="/chart/:id/predictions"
+        component={PredictionScreen}
+      />
+
+      {/* ---------------------------------
+         Home (MUST BE LAST)
+         --------------------------------- */}
+      <Route path="/" component={Home} />
 
       {/* Fallback */}
       <Route component={NotFound} />

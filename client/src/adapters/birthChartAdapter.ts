@@ -1,5 +1,9 @@
 // client/src/adapters/birthChartAdapter.ts
 
+/* ============================================================
+   Canonical Rāsi Order (Tamil — matches backend D1 keys)
+   ============================================================ */
+
 const RASI_ORDER = [
   "Mesham",
   "Rishabam",
@@ -21,6 +25,10 @@ function rasiToIndex(rasi?: string): number {
   return idx >= 0 ? idx : 0;
 }
 
+/* ============================================================
+   UI Model Contracts
+   ============================================================ */
+
 export interface BirthChartUIModel {
   identity: {
     name: string;
@@ -34,7 +42,13 @@ export interface BirthChartUIModel {
 
   southIndianChart: {
     lagna: number;
-    planets: Record<string, number>; // planet → rasi index
+    planets: Record<string, number>;
+  };
+
+  navamsaChart: {
+    lagna: number;
+    planets: Record<string, number>;
+    dignity: Record<string, "exalted" | "debilitated" | "neutral">;
   };
 
   rasi: Array<{
@@ -56,22 +70,105 @@ export interface BirthChartUIModel {
   }>;
 
   vimshottari: {
-    current: string | null;
     timeline: {
+      mahadasha: string;
+      start: string;
+      end: string;
+      is_partial: boolean;
+      antar_dashas?: any[];
+    }[];
+    current: {
       lord: string;
       start: string;
       end: string;
-      partial: boolean;
-    }[];
+      is_partial: boolean;
+      antar?: {
+        lord: string;
+        start: string;
+        end: string;
+        confidence_weight?: number;
+      } | null;
+    } | null;
   };
 }
+
+/* ============================================================
+   Helpers
+   ============================================================ */
+
+/**
+ * Convert D1/D9 chart objects → planet → rasiIndex
+ */
+function mapChartToPlanets(chart: Record<string, any>) {
+  const out: Record<string, number> = {};
+
+  Object.entries(chart ?? {}).forEach(([rasi, planets]) => {
+    if (!Array.isArray(planets)) return;
+
+    const rasiIndex = rasiToIndex(rasi);
+    planets.forEach((planet) => {
+      out[planet] = rasiIndex;
+    });
+  });
+
+  return out;
+}
+
+/**
+ * Convert Navamsa structure → usable UI maps
+ */
+function adaptNavamsa(divisionalCharts: any) {
+  const d9 = divisionalCharts?.D9 ?? {};
+
+  const planets: Record<string, number> = {};
+  const dignity: Record<
+    string,
+    "exalted" | "debilitated" | "neutral"
+  > = {};
+
+  Object.entries(d9).forEach(([planet, data]: any) => {
+    const sign = data?.navamsa_sign;
+    if (!sign) return;
+
+    // Convert English Navamsa sign → Tamil index order
+    // (UI chart still uses Tamil order)
+    const tamilIndex = rasiToIndex(
+      ({
+        Aries: "Mesham",
+        Taurus: "Rishabam",
+        Gemini: "Mithunam",
+        Cancer: "Kadakam",
+        Leo: "Simmam",
+        Virgo: "Kanni",
+        Libra: "Thulam",
+        Scorpio: "Vrischikam",
+        Sagittarius: "Dhanusu",
+        Capricorn: "Makaram",
+        Aquarius: "Kumbham",
+        Pisces: "Meenam",
+      } as Record<string, string>)[sign]
+    );
+
+    planets[planet] = tamilIndex;
+    dignity[planet] = data?.dignity ?? "neutral";
+  });
+
+  return {
+    lagna: 0, // Navamsa lagna derivation is optional & future EPIC
+    planets,
+    dignity,
+  };
+}
+
+/* ============================================================
+   Adapter Entry Point
+   ============================================================ */
 
 export function adaptBirthChart(raw: any): BirthChartUIModel {
   const view = raw.view ?? raw;
 
-  /**
-   * 🔑 Build planet → rasiIndex map from charts.D1
-   */
+  /* ---------------- D1: Planet → Rāsi Index ---------------- */
+
   const planetsByRasiIndex: Record<string, number> = {};
 
   Object.entries(view.charts?.D1 ?? {}).forEach(
@@ -82,6 +179,14 @@ export function adaptBirthChart(raw: any): BirthChartUIModel {
       });
     }
   );
+
+  /* ---------------- Navamsa (D9) ---------------- */
+
+  const navamsaChart = adaptNavamsa(
+    view.divisional_charts ?? view.charts
+  );
+
+  /* ---------------- Final UI Model ---------------- */
 
   return {
     identity: {
@@ -98,6 +203,8 @@ export function adaptBirthChart(raw: any): BirthChartUIModel {
       lagna: rasiToIndex(view.lagna_details?.rasi),
       planets: planetsByRasiIndex,
     },
+
+    navamsaChart,
 
     rasi: (view.rasi_view ?? []).map((r: any) => ({
       name: r.rasi,
@@ -118,14 +225,8 @@ export function adaptBirthChart(raw: any): BirthChartUIModel {
     })),
 
     vimshottari: {
-      current: view.dashas?.vimshottari?.current?.lord ?? null,
-      timeline:
-        view.dashas?.vimshottari?.timeline?.map((d: any) => ({
-          lord: d.mahadasha,
-          start: d.start,
-          end: d.end,
-          partial: d.is_partial,
-        })) ?? [],
+      timeline: view.dashas?.vimshottari?.timeline ?? [],
+      current: view.dashas?.vimshottari?.current ?? null,
     },
   };
 }

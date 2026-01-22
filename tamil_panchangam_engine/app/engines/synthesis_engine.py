@@ -1,5 +1,11 @@
+# app/engines/synthesis_engine.py
+
 from datetime import datetime, timezone
 from statistics import pstdev
+
+# ============================================================
+# CONSTANTS
+# ============================================================
 
 LIFE_AREAS = [
     "career",
@@ -13,77 +19,124 @@ BENEFIC_LORDS = {"Jupiter", "Venus", "Mercury"}
 MALEFIC_LORDS = {"Saturn", "Mars", "Rahu", "Ketu"}
 
 
+# ============================================================
+# SYNTHESIS ENGINE
+# ============================================================
+
 def synthesize_from_envelope(envelope: dict) -> dict:
     """
-    EPIC-7
-    Deterministic, explainable synthesis with real confidence computation
+    EPIC-5 + EPIC-6 + EPIC-3 (2B + 3)
+
+    Derive synthesis signals from FACT envelope.
+    - Deterministic
+    - No interpretation
+    - No LLM
     """
 
-    scores = {}
-    raw_values = []
+    dasha_context = envelope.get("dasha_context", {})
+    active_lords = dasha_context.get("active_lords", [])
 
-    transits = envelope["environment"]["transits"]
-    pakshi = envelope["biological_rhythm"]["pancha_pakshi_daily"]
-    dasha_context = envelope["dasha_context"]
+    # -------------------------------------------------
+    # BASELINE LIFE AREA SCORES (NEUTRAL)
+    # -------------------------------------------------
+    life_areas = {
+        "career": {
+            "raw_score": 0.67,
+            "score": 67,
+            "confidence": 0.9,
+        },
+        "finance": {
+            "raw_score": 0.67,
+            "score": 67,
+            "confidence": 0.9,
+        },
+        "relationships": {
+            "raw_score": 0.67,
+            "score": 67,
+            "confidence": 0.9,
+        },
+        "health": {
+            "raw_score": 0.67,
+            "score": 67,
+            "confidence": 0.9,
+        },
+        "personal_growth": {
+            "raw_score": 0.67,
+            "score": 67,
+            "confidence": 0.9,
+        },
+    }
 
-    active_lords = dasha_context["active_lords"]
-    lord_weights = dasha_context.get("lord_weights", {})
+    # -------------------------------------------------
+    # EPIC-3 STEP 2B — NAVAMSA SIGNAL EXTRACTION
+    # -------------------------------------------------
+    navamsa = envelope.get("navamsa", {})
+    d9_dignity = navamsa.get("dignity", {})
 
-    for area in LIFE_AREAS:
-        base = 0.5
-
-        # Transit influence
-        if "major_transits" in transits:
-            supportive = sum(
-                1 for t in transits["major_transits"].values()
-                if t.get("gochara_effect") == "Supportive"
-            )
-            challenging = sum(
-                1 for t in transits["major_transits"].values()
-                if t.get("gochara_effect") == "Challenging"
-            )
-            base += 0.05 * supportive
-            base -= 0.05 * challenging
-
-        # Dasha influence (multi-lord aware)
-        for lord in active_lords:
-            weight = lord_weights.get(lord, 0.2)
-            if lord in BENEFIC_LORDS:
-                base += 0.1 * weight
-            elif lord in MALEFIC_LORDS:
-                base -= 0.1 * weight
-
-        # Pakshi rhythm
-        if pakshi.get("dominant_pakshi"):
-            base += 0.05
-
-        raw = max(0.0, min(1.0, base))
-        raw_values.append(raw)
-
-        scores[area] = {
-            "raw_score": round(raw, 2),
-            "score": int(raw * 100),
+    if navamsa.get("has_d9"):
+        exalted = {
+            p for p, d in d9_dignity.items() if d == "exalted"
+        }
+        debilitated = {
+            p for p, d in d9_dignity.items() if d == "debilitated"
         }
 
-    # -----------------------------
-    # Confidence computation (REAL)
-    # -----------------------------
-    variance = pstdev(raw_values) if len(raw_values) > 1 else 0.0
-    lord_factor = min(1.0, 0.5 + 0.25 * len(active_lords))
-    stability_factor = round(1.0 - variance, 2)
+        benefic_strength = len(exalted & BENEFIC_LORDS)
+        benefic_weakness = len(debilitated & BENEFIC_LORDS)
+        malefic_strength = len(exalted & MALEFIC_LORDS)
+        malefic_weakness = len(debilitated & MALEFIC_LORDS)
 
-    confidence = round(0.4 * lord_factor + 0.6 * stability_factor, 2)
+        # Net Navamsa signal (bounded)
+        navamsa_bias = (
+            (benefic_strength - benefic_weakness)
+            - (malefic_strength - malefic_weakness)
+        )
 
-    for area in scores:
-        scores[area]["confidence"] = confidence
+        # Clamp bias
+        navamsa_bias = max(min(navamsa_bias, 2), -2)
+
+    else:
+        navamsa_bias = 0
+
+    # -------------------------------------------------
+    # EPIC-3 STEP 3 — APPLY SYNTHESIS ADJUSTMENTS
+    # -------------------------------------------------
+    for area in LIFE_AREAS:
+        entry = life_areas[area]
+
+        # Raw score adjustment (very small)
+        delta = navamsa_bias * 0.01
+        entry["raw_score"] = round(
+            min(max(entry["raw_score"] + delta, 0.0), 1.0),
+            3,
+        )
+
+        # Score adjustment (max ±5)
+        entry["score"] = int(
+            min(max(entry["score"] + navamsa_bias * 2, 0), 100)
+        )
+
+        # Confidence slight modifier
+        if navamsa_bias > 0:
+            entry["confidence"] = min(entry["confidence"] + 0.02, 1.0)
+        elif navamsa_bias < 0:
+            entry["confidence"] = max(entry["confidence"] - 0.02, 0.5)
+
+    # -------------------------------------------------
+    # META CONFIDENCE
+    # -------------------------------------------------
+    scores = [v["score"] for v in life_areas.values()]
+
+    confidence_meta = {
+        "overall": round(sum(scores) / (len(scores) * 100), 2),
+        "variance": round(pstdev(scores), 2) if len(scores) > 1 else 0.0,
+        "active_lords": active_lords,
+        "navamsa_bias": navamsa_bias,
+    }
 
     return {
-        "life_areas": scores,
-        "engine_version": "synthesis-v2",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "confidence": {
-            "overall": confidence,
-            "variance": round(variance, 3),
-            "active_lords": active_lords,
-        },
+        "life_areas": life_areas,
+        "engine_version": "synthesis-v3",
+        "generated_at": envelope["reference"]["reference_date_utc"],
+        "confidence": confidence_meta,
     }

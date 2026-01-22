@@ -1,0 +1,7 @@
+cat > package.json <<'EOF'
+{
+  "name": "panchangam",
+  "version": "1.0.0",
+  "private": true
+}
+EOF

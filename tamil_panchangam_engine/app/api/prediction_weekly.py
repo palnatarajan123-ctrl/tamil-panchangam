@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime, timezone
 from typing import Any, Dict
+import json
 
 from app.db.session import get_db
 from app.repositories.base_chart_repo import get_base_chart_by_id
@@ -11,7 +12,6 @@ from app.engines.interpretation_engine import build_interpretation_from_synthesi
 from app.engines.explainability_engine import build_explainability
 
 # OPTIONAL (recommended): persist weekly predictions like monthly
-# If you don't have this repo yet, add it in EPIC-9 persistence step.
 try:
     from app.repositories.weekly_prediction_repo import save_weekly_prediction
 except Exception:  # pragma: no cover
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/prediction", tags=["Prediction"])
 def _normalize_confidence(synthesis: Dict[str, Any]) -> Dict[str, Any]:
     """
     EPIC-7 guardrail: ensure confidence exists even if engines omit it.
-    Do NOT move into engines. API layer only.
+    API layer only — do not move into engines.
     """
     if "confidence" not in synthesis or synthesis["confidence"] is None:
         synthesis["confidence"] = {
@@ -60,15 +60,40 @@ def generate_weekly_prediction(payload: dict, db=Depends(get_db)):
     week = payload.get("week")
 
     if not base_chart_id or year is None or week is None:
-        raise HTTPException(status_code=400, detail="Missing base_chart_id, year, or week")
+        raise HTTPException(
+            status_code=400,
+            detail="Missing base_chart_id, year, or week"
+        )
 
-    # Fetch chart from DuckDB via repo (source of truth)
-    base_chart = get_base_chart_by_id(db, base_chart_id)
-    if not base_chart:
+    # --------------------------------------------------
+    # Fetch base chart (DuckDB source of truth)
+    # --------------------------------------------------
+    base_chart_record = get_base_chart_by_id(db, base_chart_id)
+
+    if not base_chart_record:
         raise HTTPException(status_code=404, detail="Birth chart not found")
 
+    # --------------------------------------------------
+    # 🔑 CRITICAL FIX (matches monthly behavior)
+    # DuckDB stores payload as TEXT → must JSON-decode
+    # --------------------------------------------------
+    raw_payload = (
+        base_chart_record["payload"]
+        if isinstance(base_chart_record, dict)
+        else base_chart_record.payload
+    )
+
+    base_chart_payload = (
+        json.loads(raw_payload)
+        if isinstance(raw_payload, str)
+        else raw_payload
+    )
+
+    # --------------------------------------------------
+    # Build weekly envelope
+    # --------------------------------------------------
     envelope = build_weekly_prediction_envelope(
-        base_chart=base_chart.payload,
+        base_chart=base_chart_payload,
         year=int(year),
         week=int(week),
     )
@@ -76,9 +101,11 @@ def generate_weekly_prediction(payload: dict, db=Depends(get_db)):
     synthesis = synthesize_from_envelope(envelope)
     synthesis = _normalize_confidence(synthesis)
 
-    interpretation = build_interpretation_from_synthesis(envelope, synthesis)
+    interpretation = build_interpretation_from_synthesis(
+        envelope=envelope,
+        synthesis=synthesis,
+    )
 
-    # Derived only (never persisted)
     explainability = build_explainability(
         dasha_context=envelope["dasha_context"],
         confidence=synthesis.get("confidence"),
@@ -87,31 +114,20 @@ def generate_weekly_prediction(payload: dict, db=Depends(get_db)):
 
     generated_at = datetime.now(timezone.utc).isoformat()
 
-    # Persist weekly prediction (recommended; aligns with locked truth)
-    # If repo is not present yet, we still return response without persistence.
     prediction_id = f"weekly:{base_chart_id}:{int(year)}:{int(week)}"
-    if save_weekly_prediction:
-        try:
-            save_weekly_prediction(
-                db=db,
-                base_chart_id=base_chart_id,
-                year=int(year),
-                week=int(week),
-                status="success",
-                envelope=envelope,
-                synthesis=synthesis,
-                interpretation=interpretation,
-                engine_version=synthesis.get("engine_version", "unknown"),
-            )
-        except Exception as e:
-            # Persistence failure should be explicit
-            raise HTTPException(status_code=500, detail=f"Failed to persist weekly prediction: {str(e)}")
 
-    # Summary: keep minimal + deterministic.
-    # If your interpretation engine already returns a summary field, prefer it.
+    # --------------------------------------------------
+    # Weekly persistence intentionally disabled
+    # Monthly remains system of record
+    # --------------------------------------------------
+    pass
+
     summary = None
     if isinstance(interpretation, dict):
-        summary = interpretation.get("summary") or interpretation.get("headline")
+        summary = (
+            interpretation.get("summary")
+            or interpretation.get("headline")
+        )
 
     return {
         "id": prediction_id,
@@ -126,5 +142,9 @@ def generate_weekly_prediction(payload: dict, db=Depends(get_db)):
             "synthesis": synthesis,
             "interpretation": interpretation,
         },
-        "explainability": explainability.model_dump() if hasattr(explainability, "model_dump") else explainability,
+        "explainability": (
+            explainability.model_dump()
+            if hasattr(explainability, "model_dump")
+            else explainability
+        ),
     }

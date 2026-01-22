@@ -79,22 +79,11 @@ NAKSHATRA_ORDER = [
 def build_d1_from_planetary_positions(
     planetary_positions: dict,
 ) -> Dict[str, List[str]]:
-    """
-    Canonical D1 (Rasi) chart builder for UI.
-    Output shape:
-    {
-      "Mesham": ["Saturn"],
-      "Rishabam": ["Moon"],
-      ...
-    }
-    """
     chart = {r: [] for r in ZODIAC_ORDER}
-
     for planet, data in planetary_positions.items():
         rasi = data.get("rasi")
         if rasi in chart:
             chart[rasi].append(planet)
-
     return chart
 
 
@@ -174,11 +163,6 @@ def build_nakshatra_view(planetary_positions: dict) -> list:
 # -------------------------------------------------
 
 def extract_active_dasha_lords(dashas: dict) -> dict:
-    """
-    EPIC-5 / EPIC-6 SAFE
-    Current engine exposes only `current` maha dasha.
-    Antar/pratyantar will be added later.
-    """
     vim = dashas.get("vimshottari", {})
     current = vim.get("current") or {}
 
@@ -269,9 +253,6 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
     eph = base_chart["ephemeris"]
     lagna_rasi = eph["lagna"]["rasi"]
 
-    # -----------------------------
-    # Planetary positions
-    # -----------------------------
     planetary_positions = {}
 
     for planet, data in eph["planets"].items():
@@ -292,17 +273,11 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
         "pada": moon_nak.get("pada") if moon_nak else None,
     }
 
-    # -----------------------------
-    # Houses
-    # -----------------------------
     houses = attach_house_lords(
         group_planets_by_house(planetary_positions),
         lagna_rasi,
     )
 
-    # -----------------------------
-    # Dashas
-    # -----------------------------
     dashas = base_chart.get("dashas", {})
     dasha_lords = extract_active_dasha_lords(dashas)
 
@@ -312,17 +287,14 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
     )
     houses = overlay_dasha_on_house_lords(houses, dasha_lords)
 
-    # -----------------------------
-    # Views
-    # -----------------------------
     rasi_view = build_rasi_view(planetary_positions)
     nakshatra_view = build_nakshatra_view(planetary_positions)
     dasha_timeline = build_dasha_timeline(dashas)
     prediction_gates = derive_prediction_gates(dasha_lords)
 
-    # -----------------------------
-    # Final payload
-    # -----------------------------
+    # ✅ SAFE — Navamsa surfaced if present
+    navamsa = base_chart.get("divisional_charts", {}).get("D9")
+
     return {
         "identity": {
             "name": birth.get("name"),
@@ -337,22 +309,52 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
             "birth_utc": base_chart.get("birth_utc"),
         },
         "panchangam": base_chart.get("panchangam_birth", {}),
+    
+        # -----------------------------
+        # Canonical planetary data
+        # -----------------------------
         "planetary_positions": planetary_positions,
         "lagna_details": eph["lagna"],
+    
+        # -----------------------------
+        # UI-ready charts ONLY
+        # -----------------------------
         "charts": {
-            "D1": build_d1_from_planetary_positions(planetary_positions)
+            "D1": build_d1_from_planetary_positions(planetary_positions),
+            "D9": navamsa,  # UI-friendly mapping (planet → rasi_index)
         },
+    
+        # -----------------------------
+        # Canonical divisional charts
+        # -----------------------------
+        "divisional_charts": base_chart.get("divisional_charts", {}),
+        # Example:
+        # {
+        #   "D9": {
+        #     "Venus": { "navamsa_sign": "Meenam", "rasi_index": 11, "dignity": "exalted" }
+        #   }
+        # }
+    
+        # -----------------------------
+        # Dashas & gates
+        # -----------------------------
         "dashas": dashas,
         "dasha_timeline": dasha_timeline,
         "prediction_gates": prediction_gates,
+    
+        # -----------------------------
+        # Contextual layers
+        # -----------------------------
         "pakshi": base_chart.get("pancha_pakshi_birth", {}),
         "houses": houses,
         "rasi_view": rasi_view,
         "nakshatra_view": nakshatra_view,
+    
         "notes": [
             "Birth chart is computed using sidereal (Lahiri) calculations.",
             "All values are immutable and derived from stored ephemeris only.",
             "Dasha overlays indicate currently active planetary periods.",
-            "Prediction confidence is gated by active dashas only.",
+            "Navamsa (D9) reflects dharma and relational strength.",
         ],
     }
+    

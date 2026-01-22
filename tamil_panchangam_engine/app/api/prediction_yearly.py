@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime, timezone
 from typing import Any, Dict
+import json
 
 from app.db.session import get_db
 from app.repositories.base_chart_repo import get_base_chart_by_id
@@ -10,18 +11,13 @@ from app.engines.synthesis_engine import synthesize_from_envelope
 from app.engines.interpretation_engine import build_interpretation_from_synthesis
 from app.engines.explainability_engine import build_explainability
 
-try:
-    from app.repositories.yearly_prediction_repo import save_yearly_prediction
-except Exception:  # pragma: no cover
-    save_yearly_prediction = None
-
-
 router = APIRouter(prefix="/api/prediction", tags=["Prediction"])
 
 
 def _normalize_confidence(synthesis: Dict[str, Any]) -> Dict[str, Any]:
     """
-    EPIC-7 API-layer guardrail.
+    EPIC-7 guardrail: ensure confidence exists even if engines omit it.
+    API layer only — do not move into engines.
     """
     if "confidence" not in synthesis or synthesis["confidence"] is None:
         synthesis["confidence"] = {
@@ -41,34 +37,64 @@ def _normalize_confidence(synthesis: Dict[str, Any]) -> Dict[str, Any]:
 @router.post("/yearly")
 def generate_yearly_prediction(payload: dict, db=Depends(get_db)):
     """
-    EPIC-9.1 / EPIC-10-ready
+    EPIC-9
     Yearly prediction endpoint.
 
     Rules:
-    - Reuse envelope + synthesis
     - No astrology in API
+    - Reuse envelope + synthesis + interpretation
     - Explainability derived only
+    - Response shape mirrors MonthlyPredictionResponse (yearly variant)
     """
 
     base_chart_id = payload.get("base_chart_id")
     year = payload.get("year")
 
     if not base_chart_id or year is None:
-        raise HTTPException(status_code=400, detail="Missing base_chart_id or year")
+        raise HTTPException(
+            status_code=400,
+            detail="Missing base_chart_id or year"
+        )
 
-    base_chart = get_base_chart_by_id(db, base_chart_id)
-    if not base_chart:
+    # --------------------------------------------------
+    # Fetch base chart (DuckDB source of truth)
+    # --------------------------------------------------
+    base_chart_record = get_base_chart_by_id(db, base_chart_id)
+
+    if not base_chart_record:
         raise HTTPException(status_code=404, detail="Birth chart not found")
 
+    # --------------------------------------------------
+    # 🔑 CRITICAL FIX (matches monthly + weekly behavior)
+    # DuckDB stores payload as TEXT → must JSON-decode
+    # --------------------------------------------------
+    raw_payload = (
+        base_chart_record["payload"]
+        if isinstance(base_chart_record, dict)
+        else base_chart_record.payload
+    )
+
+    base_chart_payload = (
+        json.loads(raw_payload)
+        if isinstance(raw_payload, str)
+        else raw_payload
+    )
+
+    # --------------------------------------------------
+    # Build yearly envelope
+    # --------------------------------------------------
     envelope = build_yearly_prediction_envelope(
-        base_chart=base_chart.payload,
+        base_chart=base_chart_payload,
         year=int(year),
     )
 
     synthesis = synthesize_from_envelope(envelope)
     synthesis = _normalize_confidence(synthesis)
 
-    interpretation = build_interpretation_from_synthesis(envelope, synthesis)
+    interpretation = build_interpretation_from_synthesis(
+        envelope=envelope,
+        synthesis=synthesis,
+    )
 
     explainability = build_explainability(
         dasha_context=envelope["dasha_context"],
@@ -79,20 +105,12 @@ def generate_yearly_prediction(payload: dict, db=Depends(get_db)):
     generated_at = datetime.now(timezone.utc).isoformat()
     prediction_id = f"yearly:{base_chart_id}:{int(year)}"
 
-    if save_yearly_prediction:
-        save_yearly_prediction(
-            base_chart_id=base_chart_id,
-            year=int(year),
-            status="success",
-            envelope=envelope,
-            synthesis=synthesis,
-            interpretation=interpretation,
-            engine_version=synthesis.get("engine_version", "unknown"),
-        )
-
     summary = None
     if isinstance(interpretation, dict):
-        summary = interpretation.get("summary") or interpretation.get("headline")
+        summary = (
+            interpretation.get("summary")
+            or interpretation.get("headline")
+        )
 
     return {
         "id": prediction_id,
@@ -106,7 +124,9 @@ def generate_yearly_prediction(payload: dict, db=Depends(get_db)):
             "synthesis": synthesis,
             "interpretation": interpretation,
         },
-        "explainability": explainability.model_dump()
-        if hasattr(explainability, "model_dump")
-        else explainability,
+        "explainability": (
+            explainability.model_dump()
+            if hasattr(explainability, "model_dump")
+            else explainability
+        ),
     }

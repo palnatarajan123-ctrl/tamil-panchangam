@@ -1,53 +1,104 @@
 // client/src/adapters/predictionAdapter.ts
 
 import { PredictionUIModel } from "@/models/prediction";
+import { PredictionResponse } from "@/types/prediction";
 
+/* =====================================================
+   FUTURE / GENERIC PREDICTION ADAPTER (NOT WIRED YET)
+===================================================== */
 export function adaptPrediction(raw: any): PredictionUIModel {
-  if (!raw) {
-    throw new Error("Invalid prediction response");
+  throw new Error(
+    "adaptPrediction is not wired to the current backend schema. " +
+    "Use adaptMonthlyPrediction(details) instead."
+  );
+}
+
+/* =====================================================
+   PASS-THROUGH (LEGACY SAFE)
+===================================================== */
+export function adaptPredictionResponse(
+  data: any
+): PredictionResponse {
+  return data;
+}
+
+/* =====================================================
+   MONTHLY PREDICTION → UI READ MODEL (EPIC-10 FINAL)
+===================================================== */
+export function adaptMonthlyPrediction(details: any) {
+  if (!details) {
+    throw new Error("Missing prediction details");
   }
 
+  /* ---------- LIFE AREAS ---------- */
+
+  const synthesis = details?.synthesis?.life_areas ?? {};
+  const interpretation = details?.interpretation?.by_life_area ?? {};
+
+  const life_areas = Object.keys(synthesis).map((key) => {
+    const synth = synthesis[key];
+    const interp = interpretation[key];
+
+    return {
+      key,
+      label: key
+        .replace("_", " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase()),
+
+      score: synth.score,
+      confidence: synth.confidence,
+
+      sentiment:
+        synth.score >= 65 ? "Positive" :
+        synth.score >= 45 ? "Mixed" :
+        "Challenging",
+
+      summary: interp?.text
+        ? interp.text.split(".")[0].trim() + "."
+        : "No summary available.",
+
+      detail: interp?.text ?? "Detailed interpretation not available.",
+    };
+  });
+
+  /* ---------- MONTHLY PANCHA PAKSHI (EXPLANATORY ONLY) ---------- */
+
   return {
-    baseChartId: raw.base_chart_id,
-    asOf: raw.as_of,
-
-    period: {
-      type: raw.period.type,
-      startDate: raw.period.start_date,
-      endDate: raw.period.end_date,
-      label: raw.period.label,
+    meta: {
+      generated_at: details.generated_at,
+      engine_version: details.synthesis?.engine_version,
+      period_label: "Monthly Prediction",
     },
 
-    dashaContext: {
-      system: raw.dasha_context.system,
-      active: {
-        maha: raw.dasha_context.active.maha,
-        antara: raw.dasha_context.active.antara,
-        pratyantara: raw.dasha_context.active.pratyantara ?? undefined,
-      },
-      overlap: {
-        coverageRatio: raw.dasha_context.overlap.coverage_ratio,
-        dominantSegment: raw.dasha_context.overlap.dominant_segment,
-      },
+    overview: {
+      headline: "Overall monthly influence summary",
+      overall_score:
+        life_areas.length > 0
+          ? Math.round(
+              life_areas.reduce((a, b) => a + b.score, 0) /
+                life_areas.length
+            )
+          : undefined,
+
+      confidence: details.synthesis?.confidence?.overall,
+      tone: "Balanced",
     },
 
-    gates: {
-      eligible: raw.prediction.gates.eligible,
-      reasons: raw.prediction.gates.reasons ?? [],
+    life_areas,
+
+    timing: {
+      dominant_pakshi: undefined, // ✅ intentionally absent for monthly
+      recommended: [],
+      avoid: [],
+      note:
+        "Pancha Pakshi influence is calculated on a daily basis. " +
+        "Monthly predictions describe overall rhythm rather than a single Pakshi. " +
+        "Please refer to Daily or Weekly predictions for favorable days and precise timing.",
     },
 
-    confidence: {
-      score: raw.prediction.confidence.score,
-      band: raw.prediction.confidence.band,
-      signals: raw.prediction.confidence.signals ?? [],
-      notes: raw.prediction.confidence.notes ?? [],
-    },
-
-    timeline: (raw.prediction.timeline ?? []).map((t: any) => ({
-      start: t.start,
-      end: t.end,
-      strength: t.strength,
-      tags: t.tags ?? [],
-    })),
+    disclaimers: [
+      details.interpretation?.note,
+      "Astrological guidance is indicative, not deterministic.",
+    ].filter(Boolean),
   };
 }

@@ -39,3 +39,35 @@ export interface MonthlyPredictionResponse {
   prediction: any; // we’ll visualize this later
   synthesis: MonthlySynthesis;
 }
+
+export type PeriodType = "monthly" | "weekly" | "yearly";
+
+export interface LifeAreaScore {
+  raw_score: number;
+  score: number;
+  confidence: number;
+}
+
+export interface PredictionResponse {
+  id: string;
+  base_chart_id: string;
+  year: number;
+  month?: number;
+  week?: number;
+  generated_at: string;
+  status: string;
+  summary?: string;
+  details: {
+    envelope: any;
+    synthesis: {
+      life_areas: Record<string, LifeAreaScore>;
+      confidence?: {
+        overall: number;
+        variance: number;
+        active_lords: string[];
+      };
+    };
+    interpretation: any;
+  };
+  explainability: any;
+}

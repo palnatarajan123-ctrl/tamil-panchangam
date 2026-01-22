@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Birth Chart Report</title>
+
+  <style>
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+      margin: 40px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    h2 {
+      text-align: center;
+      margin-top: 40px;
+      margin-bottom: 20px;
+    }
+
+    .chart {
+      margin: 0 auto 40px auto;
+      width: 520px;
+      page-break-inside: avoid;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Birth Chart Report</h1>
+
+  <h2>Rāsi Chart (D1)</h2>
+  <div class="chart">
+    {{ charts.d1_svg | safe }}
+  </div>
+
+  <h2>Navāṁśa Chart (D9)</h2>
+  <div class="chart">
+    {{ charts.d9_svg | safe }}
+  </div>
+
+</body>
+</html>

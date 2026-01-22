@@ -10,25 +10,36 @@ import { Info } from "lucide-react";
 
 interface ExplainabilityDrawerProps {
   explainability?: {
-    summary?: string;
-    dominant_dasha?: string;
-    transit_highlights?: string[];
+    active_lords?: string[];
+    maha_lord?: string;
+    antar_lord?: string | null;
+    confidence?: {
+      overall?: number;
+      variance?: number;
+    };
   };
+}
+
+function confidenceLabel(v?: number) {
+  if (v === undefined) return "moderate";
+  if (v >= 0.75) return "high";
+  if (v >= 0.55) return "moderate";
+  return "low";
 }
 
 export function ExplainabilityDrawer({
   explainability,
 }: ExplainabilityDrawerProps) {
-  // 🔒 HARD GUARD — prevents eager execution
-  if (
-    !explainability ||
-    (!explainability.summary &&
-      !explainability.dominant_dasha &&
-      (!explainability.transit_highlights ||
-        explainability.transit_highlights.length === 0))
-  ) {
-    return null;
-  }
+  if (!explainability) return null;
+
+  const {
+    maha_lord,
+    antar_lord,
+    active_lords,
+    confidence,
+  } = explainability;
+
+  const confidenceText = confidenceLabel(confidence?.overall);
 
   return (
     <Drawer>
@@ -41,39 +52,49 @@ export function ExplainabilityDrawer({
 
       <DrawerContent>
         <DrawerHeader>
-          <DrawerTitle>Prediction Explainability</DrawerTitle>
+          <DrawerTitle>Why this prediction</DrawerTitle>
         </DrawerHeader>
 
-        <div className="p-6 space-y-4 text-sm">
-          {explainability.summary && (
-            <div>
-              <div className="font-medium mb-1">Overview</div>
-              <p className="text-muted-foreground">
-                {explainability.summary}
-              </p>
-            </div>
+        <div className="p-6 space-y-4 text-sm text-muted-foreground">
+          {/* Dasha explanation */}
+          {maha_lord && (
+            <p>
+              This period is primarily influenced by{" "}
+              <span className="font-medium text-foreground">
+                {maha_lord}
+              </span>
+              {antar_lord && (
+                <>
+                  , with a secondary influence from{" "}
+                  <span className="font-medium text-foreground">
+                    {antar_lord}
+                  </span>
+                </>
+              )}
+              .
+            </p>
           )}
 
-          {explainability.dominant_dasha && (
-            <div>
-              <div className="font-medium mb-1">Dominant Dasha</div>
-              <p className="text-muted-foreground">
-                {explainability.dominant_dasha}
-              </p>
-            </div>
+          {/* Active lords */}
+          {active_lords && active_lords.length > 0 && (
+            <p>
+              Active planetary influences this period include{" "}
+              <span className="font-medium text-foreground">
+                {active_lords.join(", ")}
+              </span>
+              .
+            </p>
           )}
 
-          {explainability.transit_highlights &&
-            explainability.transit_highlights.length > 0 && (
-              <div>
-                <div className="font-medium mb-1">Key Transits</div>
-                <ul className="list-disc pl-5 text-muted-foreground space-y-1">
-                  {explainability.transit_highlights.map((t, i) => (
-                    <li key={i}>{t}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+          {/* Confidence */}
+          <p>
+            Overall confidence in this prediction is{" "}
+            <span className="font-medium text-foreground">
+              {confidenceText}
+            </span>
+            , based on the stability and consistency of signals across life
+            areas.
+          </p>
         </div>
       </DrawerContent>
     </Drawer>

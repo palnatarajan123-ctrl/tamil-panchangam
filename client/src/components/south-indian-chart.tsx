@@ -1,11 +1,18 @@
 // client/src/components/south-indian-chart.tsx
 
 interface ChartProps {
-  lagna: number;                         // 0–11 (MANDATORY)
-  planets: Record<string, number>;       // planet → rasi index
+  lagna: number; // 0–11
+  planets: Record<string, number>; // planet → rasi index
+  dignity?: Record<string, "exalted" | "debilitated" | "neutral">;
+  title?: string;
+  subtitle?: string;
   size?: number;
   className?: string;
 }
+
+/* ============================================================
+   Canonical Tamil Rāsi Names (UI Order)
+   ============================================================ */
 
 const SIGN_NAMES = [
   "Mesham",
@@ -22,6 +29,10 @@ const SIGN_NAMES = [
   "Meenam",
 ];
 
+/* ============================================================
+   South Indian Grid Coordinates
+   ============================================================ */
+
 const HOUSE_COORDS: [number, number][] = [
   [1, 0],
   [2, 0],
@@ -37,23 +48,17 @@ const HOUSE_COORDS: [number, number][] = [
   [0, 0],
 ];
 
-// Planet abbreviations
-const PLANET_ABBR: Record<string, string> = {
-  Sun: "Su",
-  Moon: "Mo",
-  Mars: "Ma",
-  Mercury: "Me",
-  Jupiter: "Ju",
-  Venus: "Ve",
-  Saturn: "Sa",
-  Rahu: "Ra",
-  Ketu: "Ke",
-};
+/* ============================================================
+   Component
+   ============================================================ */
 
 export function SouthIndianChart({
   lagna,
   planets,
-  size = 320,
+  dignity = {},
+  title = "Rāsi Chart (D1)",
+  subtitle = "South Indian",
+  size = 360,
   className = "",
 }: ChartProps) {
   const cellSize = size / 4;
@@ -62,15 +67,27 @@ export function SouthIndianChart({
   const textColor = "hsl(var(--foreground))";
   const mutedColor = "hsl(var(--muted-foreground))";
   const primaryColor = "hsl(var(--primary))";
+  const exaltedColor = "hsl(142 72% 45%)";
+  const debilitatedColor = "hsl(0 72% 55%)";
 
-  /**
-   * 🔑 Canonical lookup:
-   * For a given rasi index, return all planets in it
-   */
+  /* ------------------------------------------------------------
+     Helpers
+     ------------------------------------------------------------ */
+
   const planetsInRasi = (rasiIndex: number): string[] =>
     Object.entries(planets)
       .filter(([_, idx]) => idx === rasiIndex)
-      .map(([planet]) => PLANET_ABBR[planet] ?? planet);
+      .map(([planet]) => planet);
+
+  const planetColor = (planet: string) => {
+    if (dignity[planet] === "exalted") return exaltedColor;
+    if (dignity[planet] === "debilitated") return debilitatedColor;
+    return textColor;
+  };
+
+  /* ------------------------------------------------------------
+     Render
+     ------------------------------------------------------------ */
 
   return (
     <svg
@@ -80,7 +97,7 @@ export function SouthIndianChart({
       className={className}
       data-testid="chart-south-indian"
     >
-      {/* Outer frame */}
+      {/* Outer Frame */}
       <rect
         x="0"
         y="0"
@@ -97,7 +114,7 @@ export function SouthIndianChart({
         <line
           key={`v${i}`}
           x1={cellSize * i}
-          y1="0"
+          y1={0}
           x2={cellSize * i}
           y2={size}
           stroke={strokeColor}
@@ -106,7 +123,7 @@ export function SouthIndianChart({
       {[1, 2, 3].map((i) => (
         <line
           key={`h${i}`}
-          x1="0"
+          x1={0}
           y1={cellSize * i}
           x2={size}
           y2={cellSize * i}
@@ -135,14 +152,14 @@ export function SouthIndianChart({
         const rasiIndex = (index + lagna) % 12;
         const signName = SIGN_NAMES[rasiIndex];
         const planetsHere = planetsInRasi(rasiIndex);
+        const isLagna = rasiIndex === lagna;
 
         const x = col * cellSize;
         const y = row * cellSize;
-        const isLagna = rasiIndex === lagna;
 
         return (
           <g key={index}>
-            {/* Sign label */}
+            {/* Sign Label */}
             <text
               x={x + cellSize / 2}
               y={y + 12}
@@ -179,7 +196,7 @@ export function SouthIndianChart({
                   textAnchor="middle"
                   fontSize="11"
                   fontWeight="500"
-                  fill={textColor}
+                  fill={planetColor(planet)}
                 >
                   {planet}
                 </text>
@@ -189,31 +206,35 @@ export function SouthIndianChart({
         );
       })}
 
-      {/* Center */}
+      {/* Center Panel */}
       <rect
         x={cellSize}
         y={cellSize}
         width={cellSize * 2}
         height={cellSize * 2}
-        fill="hsl(var(--muted) / 0.25)"
+        fill="hsl(var(--background) / 0.55)"
+        rx="4"
       />
+
       <text
         x={size / 2}
-        y={size / 2 - 8}
+        y={size / 2 - 6}
         textAnchor="middle"
-        fontSize="12"
-        fontWeight="600"
+        fontSize="13"
+        fontWeight="700"
+        fill="hsl(var(--foreground))"
       >
-        D1 Rāsi
+        {title}
       </text>
+
       <text
         x={size / 2}
-        y={size / 2 + 10}
+        y={size / 2 + 12}
         textAnchor="middle"
-        fontSize="9"
-        fill={mutedColor}
+        fontSize="10"
+        fill="hsl(var(--muted-foreground))"
       >
-        South Indian
+        {subtitle}
       </text>
     </svg>
   );

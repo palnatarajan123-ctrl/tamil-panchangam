@@ -18,6 +18,9 @@ from app.engines.panchangam import compute_panchangam
 from app.engines.dasha_vimshottari import compute_vimshottari_dasha
 from app.engines.pancha_pakshi import get_birth_pakshi
 
+# ✅ Navamsa engine
+from app.engines.navamsa_engine import build_navamsa_chart
+
 from app.utils.time_utils import (
     normalize_birth_time_to_utc,
     get_timezone_from_coordinates,
@@ -122,7 +125,12 @@ def create_base_chart(payload: BaseChartCreateRequest):
     )
 
     # -------------------------------------------------
-    # 7. Assemble immutable base chart
+    # 7. Navamsa (D9) — IMMUTABLE
+    # -------------------------------------------------
+    navamsa = build_navamsa_chart(ephemeris)
+
+    # -------------------------------------------------
+    # 8. Assemble immutable base chart
     # -------------------------------------------------
     base_chart = {
         "birth_details": {
@@ -137,7 +145,18 @@ def create_base_chart(payload: BaseChartCreateRequest):
         "birth_utc": birth_utc.isoformat(),
         "ephemeris": ephemeris,
         "panchangam_birth": panchangam,
-        "charts": {},
+
+        # ✅ Non-breaking: keep the existing key
+        "charts": {
+            # Future-proof: you can also store D1 here later if desired
+            "D9": navamsa,
+        },
+
+        # ✅ Additive alias: safe for future expansion, but don't rely on it yet
+        "divisional_charts": {
+            "D9": navamsa,
+        },
+
         "dashas": {
             "vimshottari": dasha,
         },
@@ -145,7 +164,7 @@ def create_base_chart(payload: BaseChartCreateRequest):
     }
 
     # -------------------------------------------------
-    # 8. Persist (DuckDB = source of truth)
+    # 9. Persist (DuckDB = source of truth)
     # -------------------------------------------------
     base_chart_id = generate_base_chart_id()
     checksum = compute_chart_checksum(base_chart)

@@ -1,10 +1,11 @@
+// client/src/pages/chart-detail.tsx
+
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -12,9 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { SouthIndianChart } from "@/components/south-indian-chart";
 import { StatusBadge } from "@/components/status-badge";
 import { DashaTimeline } from "@/components/DashaTimeline";
+import { ChartPair } from "@/components/ChartPair";
 
 import {
   ArrowLeft,
@@ -23,14 +24,11 @@ import {
   MapPin,
   User,
   Sparkles,
+  Download,
 } from "lucide-react";
 
 import { apiRequest } from "@/lib/queryClient";
 import { adaptBirthChart } from "@/adapters/birthChartAdapter";
-
-<Link href={`/charts/${baseChartId}/predictions`}>
-  <Button variant="outline">Predictions</Button>
-</Link>
 
 export default function ChartDetail() {
   const { id: chartId } = useParams<{ id: string }>();
@@ -47,19 +45,14 @@ export default function ChartDetail() {
         "GET",
         `/api/ui/birth-chart?base_chart_id=${chartId}`
       );
-
       const json = await res.json();
       if (!res.ok) throw new Error("Birth chart not found");
-
       if (json?.data?.view) return json.data.view;
       if (json?.view) return json.view;
       if (json?.identity) return json;
-
       throw new Error("Invalid birth chart response shape");
     },
   });
-
-  /* ---------------- Loading ---------------- */
 
   if (isLoading) {
     return (
@@ -91,19 +84,8 @@ export default function ChartDetail() {
     );
   }
 
-  /* ---------------- Adapter ---------------- */
-
   const ui = adaptBirthChart({ view: rawView });
-
-  console.log("🪐 South Indian Chart – lagna:", ui.southIndianChart?.lagna);
-  console.log("🪐 South Indian Chart – planets:", ui.southIndianChart?.planets);
-
-
-  if (!ui || !ui.identity || !ui.southIndianChart) {
-    return null;
-  }
-
-  /* ---------------- UI ---------------- */
+  if (!ui || !ui.identity || !ui.southIndianChart) return null;
 
   return (
     <div className="container max-w-7xl mx-auto px-4 py-8">
@@ -129,23 +111,19 @@ export default function ChartDetail() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Chart */}
+        {/* Charts */}
         <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-muted/30 border-muted">
-            <CardHeader>
-              <CardTitle>Rāsi Chart (D1)</CardTitle>
-              <CardDescription>
-                Planetary positions at birth
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex justify-center bg-muted/40 rounded-lg py-8">
-              <SouthIndianChart
-                lagna={ui.southIndianChart.lagna}
-                planets={ui.southIndianChart.planets}
-                size={400}
-              />
-            </CardContent>
-          </Card>
+          <ChartPair
+            d1={{
+              lagna: ui.southIndianChart.lagna,
+              planets: ui.southIndianChart.planets,
+            }}
+            d9={{
+              lagna: ui.navamsaChart.lagna,
+              planets: ui.navamsaChart.planets,
+              dignity: ui.navamsaChart.dignity,
+            }}
+          />
 
           <Tabs defaultValue="rasi">
             <TabsList className="inline-grid grid-cols-3 w-fit bg-muted/50">
@@ -172,23 +150,10 @@ export default function ChartDetail() {
             <TabsContent value="nakshatra">
               <Card className="border-muted">
                 <CardContent className="py-6 space-y-6">
-                  {(() => {
-                    // Nakshatras that actually contain planets
-                    const occupied = ui.nakshatra.filter(
-                      (n) => n.planets && n.planets.length > 0
-                    );
-
-                    if (occupied.length === 0) {
-                      return (
-                        <div className="text-sm text-muted-foreground">
-                          No planetary Nakshatra data available.
-                        </div>
-                      );
-                    }
-
-                    return occupied.map((n) => {
+                  {ui.nakshatra
+                    .filter((n) => n.planets.length > 0)
+                    .map((n) => {
                       const isJanma = n.planets.includes("Moon");
-
                       return (
                         <div
                           key={n.name}
@@ -202,37 +167,21 @@ export default function ChartDetail() {
                             <div className="font-medium text-lg">
                               {n.name}
                             </div>
-
                             {isJanma && (
                               <span className="text-xs font-semibold text-primary">
                                 Janma Nakshatra
                               </span>
                             )}
                           </div>
-
                           <div className="text-sm">
                             Planets:{" "}
                             <span className="font-medium">
                               {n.planets.join(", ")}
                             </span>
                           </div>
-
-                          {/* Optional: Pada display if present */}
-                          {n.padas && n.padas.length > 0 && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Pada: {n.padas.join(", ")}
-                            </div>
-                          )}
                         </div>
                       );
-                    });
-                  })()}
-
-                  {/* Explanation */}
-                  <div className="text-xs text-muted-foreground pt-4 border-t border-muted">
-                    Nakshatra analysis is Moon-centric in Vedic astrology.  
-                    Janma Nakshatra (Moon’s Nakshatra) carries primary interpretive weight.
-                  </div>
+                    })}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -265,13 +214,13 @@ export default function ChartDetail() {
             timeline={ui.vimshottari.timeline}
             current={
               ui.vimshottari.current
-                ? { lord: ui.vimshottari.current }
+                ? { lord: ui.vimshottari.current.lord }
                 : undefined
             }
           />
         </div>
 
-        {/* Birth Details */}
+        {/* Sidebar */}
         <div className="space-y-6 lg:sticky lg:top-24">
           <Card className="border-muted">
             <CardHeader>
@@ -285,7 +234,7 @@ export default function ChartDetail() {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <div className="font-medium">Date</div>
-                  <div className="text-muted-foreground">{ui.birth?.date}</div>
+                  <div className="text-muted-foreground">{ui.birth.date}</div>
                 </div>
               </div>
 
@@ -293,7 +242,7 @@ export default function ChartDetail() {
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <div className="font-medium">Time</div>
-                  <div className="text-muted-foreground">{ui.birth?.time}</div>
+                  <div className="text-muted-foreground">{ui.birth.time}</div>
                 </div>
               </div>
 
@@ -309,7 +258,22 @@ export default function ChartDetail() {
             </CardContent>
           </Card>
 
-          <Link href={`/predictions/${chartId}`}>
+          {/* PDF + Prediction Actions */}
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() =>
+              window.open(
+                `/api/reports/charts/${chartId}/pdf`,
+                "_blank"
+              )
+            }
+          >
+            <Download className="h-4 w-4" />
+            Download Birth Chart PDF
+          </Button>
+
+          <Link href={`/chart/${chartId}/predictions`}>
             <Button className="w-full gap-2 mt-2">
               <Calendar className="h-4 w-4" />
               Generate Predictions

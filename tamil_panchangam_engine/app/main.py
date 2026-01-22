@@ -12,6 +12,10 @@ from app.api.interpretation import router as interpretation_router
 from app.api.ui_reports import router as ui_reports_router
 from app.api.report_exports import router as report_exports_router
 from app.api.ui_birth_chart import router as ui_birth_chart_router
+from app.api.prediction_weekly import router as prediction_weekly_router
+from app.api.prediction_yearly import router as prediction_yearly_router
+from app.api.reports import router as reports_router
+
 
 
 # =====================================================
@@ -56,10 +60,14 @@ app.include_router(interpretation_router)
 app.include_router(ui_reports_router)
 app.include_router(ui_birth_chart_router)
 app.include_router(report_exports_router)
+app.include_router(prediction_weekly_router)
+app.include_router(prediction_yearly_router)
+
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+app.include_router(reports_router)
 
 # =====================================================
 # FRONTEND SERVING (SAFE, MINIMAL)
