@@ -20,4 +20,4 @@ args = "npm run build && cd tamil_panchangam_engine && python -m uvicorn app.mai
 waitForPort = 8000
 
 [nix]
-packages = ["lsof", "mailutils", "sqlite", "duckdb"]
+packages = ["lsof", "mailutils", "sqlite", "duckdb", "zip"]
