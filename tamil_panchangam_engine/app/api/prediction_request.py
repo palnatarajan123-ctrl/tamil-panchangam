@@ -11,7 +11,7 @@ from app.services.prediction_aggregation_service import (
     build_prediction_report_snapshot,
 )
 
-router = APIRouter(prefix="/api/prediction", tags=["Prediction"])
+router = APIRouter(prefix="/prediction", tags=["Prediction"])
 
 
 @router.post("/request")

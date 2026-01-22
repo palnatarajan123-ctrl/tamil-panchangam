@@ -11,7 +11,7 @@ from app.engines.synthesis_engine import synthesize_from_envelope
 from app.engines.interpretation_engine import build_interpretation_from_synthesis
 from app.engines.explainability_engine import build_explainability
 
-router = APIRouter(prefix="/api/prediction", tags=["Prediction"])
+router = APIRouter(prefix="/prediction", tags=["Prediction"])
 
 
 def _normalize_confidence(synthesis: Dict[str, Any]) -> Dict[str, Any]:

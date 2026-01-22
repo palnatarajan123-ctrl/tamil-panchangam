@@ -4,7 +4,7 @@ import json
 from app.db.duckdb import get_conn
 from app.services.birth_chart_builder import build_birth_chart_view_model
 
-router = APIRouter(prefix="/api/ui", tags=["ui"])
+router = APIRouter(prefix="/ui", tags=["ui"])
 
 
 @router.get("/birth-chart")

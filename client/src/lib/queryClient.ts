@@ -1,3 +1,5 @@
+export const API_BASE = "/api";
+
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
@@ -12,7 +14,11 @@ export async function apiRequest(
   url: string,
   data?: unknown,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const fullUrl = url.startsWith("/api")
+    ? url
+    : `/api${url.startsWith("/") ? url : `/${url}`}`;
+
+  const res = await fetch(fullUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,

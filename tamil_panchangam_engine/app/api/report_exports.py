@@ -8,7 +8,7 @@ from app.services.prediction_aggregation_service import (
 )
 from app.pdf.report_builder import build_monthly_prediction_pdf
 
-router = APIRouter(prefix="/api/reports", tags=["Reports"])
+router = APIRouter(prefix="/reports", tags=["Reports"])
 
 
 @router.get("/monthly/pdf")

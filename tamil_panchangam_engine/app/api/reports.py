@@ -27,7 +27,7 @@ from app.pdf.prediction_full_pdf_generator import (
     generate_prediction_full_pdf,
 )
 
-router = APIRouter(prefix="/api/reports", tags=["Reports"])
+router = APIRouter(prefix="/reports", tags=["Reports"])
 
 
 # -----------------------------

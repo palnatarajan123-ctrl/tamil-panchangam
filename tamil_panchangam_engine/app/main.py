@@ -93,6 +93,6 @@ def serve_root():
 # SPA fallback (non-asset, non-API)
 @app.get("/{path:path}")
 def spa_fallback(path: str):
-    if path.startswith("api/") or "." in path:
+    if "." in path:
         raise HTTPException(status_code=404)
     return FileResponse(STATIC_DIR / "index.html")

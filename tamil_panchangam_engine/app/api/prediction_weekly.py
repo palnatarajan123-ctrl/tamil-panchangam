@@ -18,7 +18,7 @@ except Exception:  # pragma: no cover
     save_weekly_prediction = None
 
 
-router = APIRouter(prefix="/api/prediction", tags=["Prediction"])
+router = APIRouter(prefix="/prediction", tags=["Prediction"])
 
 
 def _normalize_confidence(synthesis: Dict[str, Any]) -> Dict[str, Any]:

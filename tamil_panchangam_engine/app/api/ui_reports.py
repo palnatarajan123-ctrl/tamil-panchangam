@@ -9,7 +9,7 @@ from app.services.prediction_ui_mapper import (
     map_snapshot_to_ui_read_model,
 )
 
-router = APIRouter(prefix="/api/ui", tags=["UI Reports"])
+router = APIRouter(prefix="/ui", tags=["UI Reports"])
 
 
 @router.get("/monthly-report")

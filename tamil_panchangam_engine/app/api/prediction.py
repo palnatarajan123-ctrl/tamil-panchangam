@@ -30,7 +30,7 @@ from app.models.schema import (
 from app.pdf.pdf_context_builder import build_pdf_context
 
 
-router = APIRouter(prefix="/api/prediction", tags=["Prediction"])
+router = APIRouter(prefix="/prediction", tags=["Prediction"])
 
 
 @router.post("/monthly", response_model=MonthlyPredictionResponse)

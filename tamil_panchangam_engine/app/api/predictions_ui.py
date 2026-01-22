@@ -13,7 +13,7 @@ from app.services.prediction_engine import (
     Epic6PredictionContext,
 )
 
-router = APIRouter(prefix="/api/ui", tags=["ui-predictions"])
+router = APIRouter(prefix="/ui", tags=["ui-predictions"])
 
 
 # -------------------------------------------------

@@ -140,14 +140,28 @@ def build_rasi_view(planetary_positions: dict) -> list:
 
 
 def build_nakshatra_view(planetary_positions: dict) -> list:
+    # Canonical Nakshatra grid
     nak_map = {n: {"nakshatra": n, "planets": []} for n in NAKSHATRA_ORDER}
+
+    # Known alias normalization (ephemeris → canonical)
+    NAKSHATRA_ALIASES = {
+        "Uttara Ashada": "Uttara Ashadha",
+        "Purva Ashada": "Purva Ashadha",
+    }
 
     for planet, data in planetary_positions.items():
         nak = data.get("nakshatra")
         if not nak:
             continue
 
-        nak_map[nak]["planets"].append({
+        # Normalize to canonical spelling
+        canonical_nak = NAKSHATRA_ALIASES.get(nak, nak)
+
+        # Safety guard (never crash UI)
+        if canonical_nak not in nak_map:
+            continue
+
+        nak_map[canonical_nak]["planets"].append({
             "planet": planet,
             "pada": data["pada"],
             "rasi": data["rasi"],
@@ -155,6 +169,7 @@ def build_nakshatra_view(planetary_positions: dict) -> list:
             "dasha": data.get("dasha"),
         })
 
+    # Preserve canonical order for UI
     return [nak_map[n] for n in NAKSHATRA_ORDER]
 
 

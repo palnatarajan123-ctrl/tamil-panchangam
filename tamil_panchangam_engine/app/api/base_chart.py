@@ -29,8 +29,10 @@ from app.utils.checksum import compute_chart_checksum
 from app.services.birth_chart_builder import build_birth_chart_view_model
 from app.db.duckdb import get_conn
 from app.repositories.base_chart_repo import insert_base_chart
+from app.repositories.base_chart_repo import get_base_chart_by_id
 
-router = APIRouter(prefix="/api/base-chart", tags=["Base Chart"])
+
+router = APIRouter(prefix="/base-chart", tags=["Base Chart"])
 
 
 # ============================================================
@@ -39,11 +41,16 @@ router = APIRouter(prefix="/api/base-chart", tags=["Base Chart"])
 
 @router.get("/birth-chart")
 def get_birth_chart_ui(base_chart_id: str):
-    chart = BASE_CHART_STORE.get(base_chart_id)
-    if not chart:
+    with get_conn() as conn:
+        record = get_base_chart_by_id(conn, base_chart_id)
+
+    if not record:
         raise HTTPException(404, "Base chart not found")
 
-    ui_view = build_birth_chart_view_model(chart["data"])
+    import json
+    payload = json.loads(record["payload"])
+
+    ui_view = build_birth_chart_view_model(payload)
     return {"view": ui_view}
 
 
