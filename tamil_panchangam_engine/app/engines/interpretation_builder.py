@@ -18,63 +18,74 @@ def _tone_from_score(score: float) -> str:
     return "neutral"
 
 
-def _base_summary(area: str, tone: str) -> str:
-    if tone == "positive":
-        return (
-            f"{area.capitalize()} matters are supported this month. "
-            "Conditions favor progress when effort is applied consistently."
-        )
-    if tone == "caution":
-        return (
-            f"{area.capitalize()} requires patience this month. "
-            "Avoid forcing outcomes; steady handling reduces friction."
-        )
-    return (
-        f"{area.capitalize()} remains stable this month. "
-        "Neither major acceleration nor obstruction is indicated."
-    )
+def _area_lens(area: str) -> str:
+    """
+    Deterministic, non-astrological framing for each life area.
+    """
+    return {
+        "career": "professional direction, responsibility, and role clarity",
+        "finance": "income stability, spending discipline, and financial timing",
+        "relationships": "communication, expectations, and emotional balance",
+        "health": "physical vitality, mental resilience, and recovery",
+        "personal_growth": "learning, self-awareness, and value alignment",
+    }.get(area, "general life circumstances")
 
 
 def _variant_summary(area: str, tone: str, style: str) -> str:
-    """
-    style: short | practical | reflective
-    """
+    lens = _area_lens(area)
+
     if style == "short":
-        return _base_summary(area, tone)
+        if tone == "positive":
+            return (
+                f"{area.capitalize()} matters are supported this month. "
+                f"Conditions favor progress related to {lens}."
+            )
+        if tone == "caution":
+            return (
+                f"{area.capitalize()} requires patience this month. "
+                f"Attention to {lens} helps reduce friction."
+            )
+        return (
+            f"{area.capitalize()} remains stable this month. "
+            f"Focus on maintaining balance around {lens}."
+        )
 
     if style == "practical":
         if tone == "positive":
             return (
-                f"Focus on concrete actions in {area}. "
-                "This is a month where effort produces visible results."
+                f"Take practical steps in {area} related to {lens}. "
+                "Effort is likely to produce tangible results."
             )
         if tone == "caution":
             return (
-                f"Proceed carefully in {area}. "
-                "Minimize risk and prioritize stability."
+                f"Proceed conservatively in {area}. "
+                f"Stability improves when managing {lens} carefully."
             )
         return (
-            f"Maintain current momentum in {area}. "
-            "Routine actions are sufficient."
+            f"Maintain existing routines in {area}. "
+            f"Consistency around {lens} is sufficient."
         )
 
     if style == "reflective":
         if tone == "positive":
             return (
-                f"{area.capitalize()} presents growth opportunities. "
-                "Awareness and intention amplify favorable conditions."
+                f"{area.capitalize()} offers growth opportunities. "
+                f"Awareness around {lens} amplifies favorable conditions."
             )
         if tone == "caution":
             return (
                 f"{area.capitalize()} invites reflection. "
-                "Slower pacing helps align with underlying rhythms."
+                f"Slower pacing helps realign {lens}."
             )
         return (
-            f"{area.capitalize()} offers equilibrium. "
-            "Observe patterns before initiating change."
+            f"{area.capitalize()} is in a holding phase. "
+            f"Observe patterns connected to {lens} before initiating change."
         )
 
-    return _base_summary(area, tone)
+    return (
+        f"{area.capitalize()} is steady this month. "
+        f"Maintain awareness around {lens}."
+    )
 
 
 def build_interpretation(
@@ -82,8 +93,10 @@ def build_interpretation(
     narrative_style: str = "short"
 ) -> Dict:
     """
-    Step 13B + 13C
-    Deterministic interpretation builder with narrative variants.
+    Deterministic interpretation builder.
+    NO astrology logic.
+    NO scoring.
+    TEXT ONLY.
     """
 
     life_areas = synthesis.get("life_areas", {})
@@ -100,11 +113,11 @@ def build_interpretation(
             "summary": summary,
             "tone": tone,
             "confidence": confidence,
-            "confidence_explanation": CONFIDENCE_EXPLANATION
+            "confidence_explanation": CONFIDENCE_EXPLANATION,
         }
 
     return {
         "interpretation": interpretation,
         "narrative_style": narrative_style,
-        "engine_version": "interpretation-builder-v2"
+        "engine_version": "interpretation-builder-v3",
     }

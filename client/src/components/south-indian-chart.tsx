@@ -4,8 +4,8 @@ interface ChartProps {
   lagna: number; // 0–11
   planets: Record<string, number>; // planet → rasi index
   dignity?: Record<string, "exalted" | "debilitated" | "neutral">;
-  title?: string;
-  subtitle?: string;
+  title?: string;     // ⬅️ IMPORTANT: passed by caller (D1 / D9 / etc)
+  subtitle?: string;  // ⬅️ IMPORTANT: passed by caller
   size?: number;
   className?: string;
 }
@@ -30,7 +30,7 @@ const SIGN_NAMES = [
 ];
 
 /* ============================================================
-   South Indian Grid Coordinates
+   South Indian Grid Coordinates (4×4 with hollow center)
    ============================================================ */
 
 const HOUSE_COORDS: [number, number][] = [
@@ -56,7 +56,7 @@ export function SouthIndianChart({
   lagna,
   planets,
   dignity = {},
-  title = "Rāsi Chart (D1)",
+  title = "Rāsi Chart (D1)",      // ⬅️ default ONLY if caller forgets
   subtitle = "South Indian",
   size = 360,
   className = "",
@@ -172,7 +172,7 @@ export function SouthIndianChart({
               {signName.substring(0, 3).toUpperCase()}
             </text>
 
-            {/* Lagna */}
+            {/* Lagna marker */}
             {isLagna && (
               <text
                 x={x + cellSize / 2}
@@ -216,6 +216,7 @@ export function SouthIndianChart({
         rx="4"
       />
 
+      {/* ✅ CENTER LABEL — caller-controlled */}
       <text
         x={size / 2}
         y={size / 2 - 6}

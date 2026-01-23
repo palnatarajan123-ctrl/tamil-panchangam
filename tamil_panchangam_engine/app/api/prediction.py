@@ -23,10 +23,6 @@ from app.models.schema import (
     MonthlyPredictionResponse,
 )
 
-# NOTE:
-# build_pdf_context is intentionally imported here
-# but MUST NOT be executed at module scope.
-# It will be used only inside PDF/report endpoints.
 from app.pdf.pdf_context_builder import build_pdf_context
 
 
@@ -37,16 +33,10 @@ router = APIRouter(prefix="/prediction", tags=["Prediction"])
 def generate_monthly_prediction(payload: MonthlyPredictionRequest):
     """
     EPIC-4 + EPIC-6 + EPIC-8 + EPIC-3
-
-    Monthly prediction with:
-    - Envelope (facts only)
-    - Synthesis
-    - Interpretation
-    - Explainability (derived, not persisted)
     """
 
     # -------------------------------------------------
-    # 1. Load immutable base chart (DuckDB)
+    # 1. Load immutable base chart
     # -------------------------------------------------
     with get_conn() as conn:
         base_chart = get_base_chart_by_id(
@@ -66,7 +56,6 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             detail="Base chart is not locked",
         )
 
-    # Normalize base chart payload
     base_chart_payload = (
         base_chart["payload"]
         if isinstance(base_chart["payload"], dict)
@@ -74,7 +63,7 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
     )
 
     # -------------------------------------------------
-    # 2. Check for persisted monthly prediction
+    # 2. Check for persisted prediction
     # -------------------------------------------------
     existing = get_monthly_prediction(
         base_chart_id=payload.base_chart_id,
@@ -91,9 +80,6 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             else None
         )
 
-        # -------------------------------------------------
-        # Backward compatibility: synthesis confidence
-        # -------------------------------------------------
         if "confidence" not in synthesis:
             synthesis["confidence"] = {
                 "overall": 0.6,
@@ -101,14 +87,10 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
                 "source": "legacy-prediction",
             }
 
-        # -------------------------------------------------
-        # Backward compatibility: dasha_context
-        # -------------------------------------------------
         if "dasha_context" not in envelope:
             active_dasha = envelope.get("time_ruler", {}).get(
                 "vimshottari_dasha"
             )
-
             if not active_dasha:
                 raise RuntimeError(
                     "Persisted envelope missing vimshottari dasha"
@@ -128,7 +110,7 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
 
     else:
         # -------------------------------------------------
-        # 3. Build monthly prediction envelope (EPIC-6 + EPIC-3)
+        # 3. Envelope
         # -------------------------------------------------
         envelope = build_monthly_prediction_envelope(
             base_chart=base_chart_payload,
@@ -141,9 +123,6 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
         # -------------------------------------------------
         synthesis = synthesize_from_envelope(envelope)
 
-        # -------------------------------------------------
-        # Synthesis guard (locked contract)
-        # -------------------------------------------------
         if "confidence" not in synthesis:
             synthesis["confidence"] = {
                 "overall": 0.6,
@@ -152,23 +131,53 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             }
 
         # -------------------------------------------------
-        # 5. Interpretation (EPIC-3 aware)
+        # 🔧 CRITICAL FIX: normalize life_areas
+        # -------------------------------------------------
+        life_areas = synthesis.get("life_areas")
+
+        if isinstance(life_areas, dict) and "scores" in life_areas:
+            synthesis = {
+                **synthesis,
+                "life_areas": life_areas["scores"],
+            }
+
+        print(
+            "DEBUG normalized synthesis life areas =",
+            synthesis.get("life_areas", {}).keys()
+        )
+
+        # -------------------------------------------------
+        # 5. Interpretation
         # -------------------------------------------------
         interpretation = build_interpretation_from_synthesis(
             envelope=envelope,
             synthesis=synthesis,
         )
 
-        # -------------------------------------------------
-        # 6. Optional paraphrasing (presentation only)
-        # -------------------------------------------------
-        interpretation = paraphrase_interpretation(
-            interpretation,
-            enabled=True,
+        print(
+            "DEBUG interpretation BEFORE paraphrase life areas =",
+            interpretation.get("interpretation", {}).keys()
         )
 
         # -------------------------------------------------
-        # 7. Persist monthly prediction (NO explainability)
+        # 6. Paraphrasing
+        # -------------------------------------------------
+        interpretation = paraphrase_interpretation(
+            interpretation
+        )
+
+        print(
+            "DEBUG interpretation AFTER paraphrase life areas =",
+            interpretation.get("interpretation", {}).keys()
+        )
+
+        if "interpretation" not in interpretation:
+            raise RuntimeError(
+                "Interpretation schema violation after paraphrasing"
+            )
+
+        # -------------------------------------------------
+        # 7. Persist
         # -------------------------------------------------
         with get_conn() as conn:
             save_monthly_prediction(
@@ -184,7 +193,7 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             )
 
     # -------------------------------------------------
-    # 8. Explainability (derived, EPIC-8)
+    # 8. Explainability
     # -------------------------------------------------
     explainability = build_explainability(
         dasha_context=envelope["dasha_context"],
@@ -197,7 +206,7 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
     )
 
     # -------------------------------------------------
-    # 9. Final response
+    # 9. Response
     # -------------------------------------------------
     return MonthlyPredictionResponse(
         id=prediction_id,

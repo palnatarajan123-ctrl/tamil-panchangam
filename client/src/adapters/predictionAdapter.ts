@@ -30,10 +30,22 @@ export function adaptMonthlyPrediction(details: any) {
     throw new Error("Missing prediction details");
   }
 
+  /* ---------- 🔍 DEBUG START ---------- */
+  console.log("🧠 PREDICTION DETAILS:", details);
+  console.log("🧠 DETAILS.INTERPRETATION:", details?.interpretation);
+  console.log(
+    "🧠 DETAILS.INTERPRETATION.INTERPRETATION:",
+    details?.interpretation?.interpretation
+  );
+  /* ---------- 🔍 DEBUG END ---------- */
+
+  /* ---------- LIFE AREAS ---------- */
+
   /* ---------- LIFE AREAS ---------- */
 
   const synthesis = details?.synthesis?.life_areas ?? {};
-  const interpretation = details?.interpretation?.by_life_area ?? {};
+  const interpretation =
+    details?.interpretation?.interpretation ?? {};
 
   const life_areas = Object.keys(synthesis).map((key) => {
     const synth = synthesis[key];
@@ -53,12 +65,14 @@ export function adaptMonthlyPrediction(details: any) {
         synth.score >= 45 ? "Mixed" :
         "Challenging",
 
-      summary: interp?.text
-        ? interp.text.split(".")[0].trim() + "."
-        : "No summary available.",
-
-      detail: interp?.text ?? "Detailed interpretation not available.",
-    };
+      // ✅ FIXED: aligned with backend schema (summary, confidence_explanation)
+      summary: interp?.summary ?? "No summary available.",
+  
+      detail:
+        interp?.confidence_explanation ??
+        interp?.summary ??
+        "Detailed interpretation not available.",
+      };
   });
 
   /* ---------- MONTHLY PANCHA PAKSHI (EXPLANATORY ONLY) ---------- */

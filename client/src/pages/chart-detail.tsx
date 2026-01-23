@@ -117,11 +117,15 @@ export default function ChartDetail() {
             d1={{
               lagna: ui.southIndianChart.lagna,
               planets: ui.southIndianChart.planets,
+              title: "Rāsi Chart (D1)",          // ✅ explicit
+              subtitle: "South Indian",
             }}
             d9={{
               lagna: ui.navamsaChart.lagna,
               planets: ui.navamsaChart.planets,
               dignity: ui.navamsaChart.dignity,
+              title: "Navamsa Chart (D9)",       // ✅ FIXED
+              subtitle: "South Indian",
             }}
           />
 
@@ -258,7 +262,6 @@ export default function ChartDetail() {
             </CardContent>
           </Card>
 
-          {/* PDF + Prediction Actions */}
           <Button
             variant="outline"
             className="w-full gap-2"

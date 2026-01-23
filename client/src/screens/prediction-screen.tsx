@@ -1,26 +1,19 @@
-// client/src/pages/prediction-screen.tsx
-
 import { useParams } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePrediction } from "@/hooks/usePrediction";
 
 import { MonthlyPredictionView } from "@/components/prediction/MonthlyPredictionView";
 import { ExplainabilityDrawer } from "@/components/prediction/ExplainabilityDrawer";
 import { AntarExplanationCard } from "@/components/prediction/AntarExplanationCard";
 import { AntarRemediesCard } from "@/components/prediction/AntarRemediesCard";
+import { NarrativeCard } from "@/components/prediction/NarrativeCard";
 import { DashaTimeline } from "@/components/DashaTimeline";
+
+import { PredictionTimelineControl } from "@/components/prediction/PredictionTimelineControl";
 
 import { adaptMonthlyPrediction } from "@/adapters/predictionAdapter";
 
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
 import {
   Card,
   CardHeader,
@@ -28,10 +21,23 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-
 import { Separator } from "@/components/ui/separator";
-import { NarrativeCard } from "@/components/prediction/NarrativeCard";
 import { Download } from "lucide-react";
+
+/* -------------------------------------------------
+   Helpers
+-------------------------------------------------- */
+
+// ISO week number (UTC-safe, deterministic)
+function getCurrentISOWeek(): number {
+  const d = new Date();
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(
+    (((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7
+  );
+}
 
 /* -------------------------------------------------
    Screen
@@ -46,32 +52,45 @@ export default function PredictionScreen() {
 
   const [period, setPeriod] = useState<"monthly" | "weekly" | "yearly">("monthly");
   const [year, setYear] = useState(baseYear);
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [week, setWeek] = useState(
-    (() => {
-      const d = new Date();
-      const day = d.getUTCDay() || 7;
-      d.setUTCDate(d.getUTCDate() + 4 - day);
-      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-      return Math.ceil(
-        (((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7
-      );
-    })()
-  );
+
+  /**
+   * Unified cursor:
+   * - monthly → month (1–12)
+   * - weekly  → ISO week (1–53)
+   * - yearly  → always 1
+   */
+  const [index, setIndex] = useState<number>(now.getMonth() + 1);
+
+  /* -------------------------------------------------
+     Keep cursor aligned when period changes
+  -------------------------------------------------- */
+  useEffect(() => {
+    if (period === "monthly") {
+      setIndex(now.getMonth() + 1);
+    } else if (period === "weekly") {
+      setIndex(getCurrentISOWeek());
+    } else {
+      setIndex(1);
+    }
+    setYear(baseYear);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period]);
 
   const { data, isLoading, error } = usePrediction({
     baseChartId: id,
     period,
     year,
-    month: period === "monthly" ? month : undefined,
-    week: period === "weekly" ? week : undefined,
+    month: period === "monthly" ? index : undefined,
+    week: period === "weekly" ? index : undefined,
   });
 
   const dashaContext = data?.details?.envelope?.dasha_context;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* -------------------------------------------------
+          Header
+      -------------------------------------------------- */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold capitalize">
           {period} Predictions
@@ -90,46 +109,27 @@ export default function PredictionScreen() {
         </div>
       </div>
 
-      {/* Time Controls */}
-      <div className="flex gap-2">
-        {period === "monthly" && (
-          <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 12 }).map((_, i) => (
-                <SelectItem key={i + 1} value={String(i + 1)}>
-                  {new Date(0, i).toLocaleString("default", { month: "short" })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-          <SelectTrigger className="w-[90px]">
-            <SelectValue placeholder="Year" />
-          </SelectTrigger>
-          <SelectContent>
-            {Array.from({ length: 10 }).map((_, i) => {
-              const y = baseYear + i;
-              return (
-                <SelectItem key={y} value={String(y)}>
-                  {y}
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-      </div>
+      {/* -------------------------------------------------
+          Unified Timeline Control
+      -------------------------------------------------- */}
+      <PredictionTimelineControl
+        period={period}
+        year={year}
+        index={index}
+        onChange={({ year, index }) => {
+          setYear(year);
+          setIndex(index);
+        }}
+      />
 
       {isLoading && <div>Computing prediction…</div>}
       {error && <div className="text-red-600">{error.message}</div>}
 
       {data && (
         <>
-          {/* Download Full Report */}
+          {/* -------------------------------------------------
+              Download
+          -------------------------------------------------- */}
           <Button
             variant="outline"
             className="gap-2"
@@ -146,8 +146,12 @@ export default function PredictionScreen() {
 
           <Separator className="my-4" />
 
+          {/* -------------------------------------------------
+              Prediction Body
+          -------------------------------------------------- */}
           <MonthlyPredictionView
             prediction={adaptMonthlyPrediction(data.details)}
+            period={period}
           />
 
           {dashaContext?.active?.antar && (

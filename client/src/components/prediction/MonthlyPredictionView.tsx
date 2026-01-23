@@ -30,11 +30,9 @@ interface MonthlyPredictionUIModel {
   meta?: {
     generated_at?: string;
     engine_version?: string;
-    period_label?: string;
   };
 
   overview?: {
-    headline?: string;
     confidence?: number;
     overall_score?: number;
     tone?: string;
@@ -60,39 +58,37 @@ interface MonthlyPredictionUIModel {
   disclaimers?: string[];
 }
 
+type PredictionPeriod = "weekly" | "monthly" | "yearly";
+
 /* -----------------------------------------------------
    Component
 ----------------------------------------------------- */
 
 export function MonthlyPredictionView({
   prediction,
+  period,
 }: {
   prediction: MonthlyPredictionUIModel | null;
+  period: PredictionPeriod;
 }) {
-  console.log("MONTHLY VIEW RENDER", prediction);
-
   const lifeAreas = Array.isArray(prediction?.life_areas)
-    ? prediction!.life_areas
+    ? prediction.life_areas
     : [];
 
   const timing = {
     dominant_pakshi: prediction?.timing?.dominant_pakshi,
     recommended: Array.isArray(prediction?.timing?.recommended)
-      ? prediction!.timing!.recommended
+      ? prediction.timing.recommended
       : [],
     avoid: Array.isArray(prediction?.timing?.avoid)
-      ? prediction!.timing!.avoid
+      ? prediction.timing.avoid
       : [],
     note: prediction?.timing?.note,
   };
 
   const disclaimers = Array.isArray(prediction?.disclaimers)
-    ? prediction!.disclaimers
+    ? prediction.disclaimers
     : [];
-
-  /* -----------------------------------------------------
-     EMPTY STATE
-  ----------------------------------------------------- */
 
   if (!prediction || lifeAreas.length === 0) {
     return (
@@ -103,27 +99,46 @@ export function MonthlyPredictionView({
   }
 
   /* -----------------------------------------------------
+     Period-aware labels (AUTHORITATIVE)
+  ----------------------------------------------------- */
+
+  const periodLabel =
+    period === "weekly"
+      ? "Weekly Prediction"
+      : period === "yearly"
+      ? "Yearly Prediction"
+      : "Monthly Prediction";
+
+  const overviewHeadline =
+    period === "weekly"
+      ? "Overall weekly influence summary"
+      : period === "yearly"
+      ? "Overall yearly influence summary"
+      : "Overall monthly influence summary";
+
+  /* -----------------------------------------------------
      UI
   ----------------------------------------------------- */
 
   return (
     <div className="space-y-6">
 
-      {/* OVERVIEW */}
+      {/* ================= OVERVIEW ================= */}
       {prediction.overview && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Monthly Overview
+              Prediction Overview
             </CardTitle>
-            <CardDescription>
-              {prediction.meta?.period_label}
-            </CardDescription>
+
+            {/* Single, clean period label */}
+            <CardDescription>{periodLabel}</CardDescription>
           </CardHeader>
+
           <CardContent className="space-y-3">
             <p className="text-lg font-medium">
-              {prediction.overview.headline}
+              {overviewHeadline}
             </p>
 
             <div className="flex items-center gap-3 text-sm">
@@ -132,12 +147,14 @@ export function MonthlyPredictionView({
                   {prediction.overview.tone}
                 </Badge>
               )}
+
               {prediction.overview.overall_score !== undefined && (
                 <span>
                   Overall Score:{" "}
                   <strong>{prediction.overview.overall_score}</strong>
                 </span>
               )}
+
               {prediction.overview.confidence !== undefined && (
                 <span className="text-muted-foreground">
                   Confidence{" "}
@@ -149,7 +166,7 @@ export function MonthlyPredictionView({
         </Card>
       )}
 
-      {/* LIFE AREAS */}
+      {/* ================= LIFE AREAS ================= */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -160,6 +177,7 @@ export function MonthlyPredictionView({
             Area-wise influence and interpretation
           </CardDescription>
         </CardHeader>
+
         <CardContent>
           <Accordion type="single" collapsible className="w-full">
             {lifeAreas.map(area => (
@@ -175,13 +193,10 @@ export function MonthlyPredictionView({
                     </span>
                   </div>
                 </AccordionTrigger>
+
                 <AccordionContent className="space-y-2 text-sm">
-                  <p className="font-medium">
-                    {area.summary}
-                  </p>
-                  <p className="text-muted-foreground">
-                    {area.detail}
-                  </p>
+                  <p className="font-medium">{area.summary}</p>
+                  <p className="text-muted-foreground">{area.detail}</p>
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -189,7 +204,7 @@ export function MonthlyPredictionView({
         </CardContent>
       </Card>
 
-      {/* TIMING */}
+      {/* ================= TIMING ================= */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -202,7 +217,6 @@ export function MonthlyPredictionView({
         </CardHeader>
 
         <CardContent className="space-y-4 text-sm">
-          {/* Daily / Weekly Pakshi */}
           {timing.dominant_pakshi && (
             <div>
               <strong>Dominant Pakshi:</strong>{" "}
@@ -210,7 +224,6 @@ export function MonthlyPredictionView({
             </div>
           )}
 
-          {/* Monthly explanation */}
           {!timing.dominant_pakshi && timing.note && (
             <div className="text-muted-foreground leading-relaxed">
               {timing.note}
@@ -247,7 +260,7 @@ export function MonthlyPredictionView({
         </CardContent>
       </Card>
 
-      {/* DISCLAIMERS */}
+      {/* ================= DISCLAIMERS ================= */}
       {disclaimers.length > 0 && (
         <Card>
           <CardContent className="text-xs text-muted-foreground space-y-1">

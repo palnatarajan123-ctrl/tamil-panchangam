@@ -6,6 +6,8 @@ from app.utils.time_utils import get_month_reference_date_utc
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.antar_explanation_engine import build_antar_explanation
 from app.engines.narrative_engine import build_narrative
+from app.services.birth_chart_builder import build_birth_chart_view_model
+
 
 
 # ============================================================
@@ -63,6 +65,17 @@ def build_monthly_prediction_envelope(
     latitude = birth_details["latitude"]
     longitude = birth_details["longitude"]
     natal_moon_rasi = ephemeris["moon"]["rasi"]
+
+    # -------------------------------------------------
+    # 🔑 DERIVE HOUSES (SINGLE SOURCE OF TRUTH)
+    # -------------------------------------------------
+    birth_chart_view = build_birth_chart_view_model(base_chart)
+
+    # 🔒 Normalize houses → dict keyed by house number (REQUIRED)
+    houses = {
+        h["house"]: h
+        for h in (birth_chart_view.get("houses") or [])
+    }
 
     # -------------------------------------------------
     # 1. Transits
@@ -129,13 +142,11 @@ def build_monthly_prediction_envelope(
     )
 
     dasha_context = {
-        # Legacy-safe fields
         "maha_lord": active_maha["lord"],
         "antar_lord": antar["lord"] if antar else None,
         "active_lords": active_lords,
         "lord_weights": lord_weights,
 
-        # UI contract (DO NOT BREAK)
         "active": {
             "maha": {
                 "lord": active_maha["lord"],
@@ -155,15 +166,12 @@ def build_monthly_prediction_envelope(
             ),
         },
 
-        # Lifetime reference
         "timeline": timeline,
-
-        # EPIC-6.3 — additive
         "antar_explanation": antar_explanation,
     }
 
     # -------------------------------------------------
-    # 6. EPIC-14 — Narrative (optional, safe)
+    # 6. Narrative (optional, safe)
     # -------------------------------------------------
     narrative = build_narrative(
         period_label="Monthly",
@@ -192,7 +200,7 @@ def build_monthly_prediction_envelope(
     )
 
     # -------------------------------------------------
-    # 6A. EPIC-3 STEP 2A — NAVAMSA (D9) CONTEXT (FACTUAL)
+    # 6A. NAVAMSA (D9) CONTEXT (FACTUAL)
     # -------------------------------------------------
     d9_raw = (
         base_chart
@@ -223,18 +231,27 @@ def build_monthly_prediction_envelope(
             "month": month,
             "reference_date_utc": reference_date_utc.isoformat(),
         },
+
+        # ✅ CRITICAL: DERIVED HOUSES (NOT FROM DB)
+        "houses": houses,
+
+        "ephemeris": base_chart.get("ephemeris", {}),
+
         "environment": {
             "transits": transits,
         },
+
         "time_ruler": {
             "vimshottari_dasha": active_maha,
             "antar_dasha": antar,
         },
+
         "dasha_context": dasha_context,
         "narrative": narrative,
+
         "biological_rhythm": {
             "pancha_pakshi_daily": pakshi_daily,
         },
-        # EPIC-3 ADDITIVE (NON-BREAKING)
+
         "navamsa": d9_context,
     }

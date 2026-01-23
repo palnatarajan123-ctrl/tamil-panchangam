@@ -88,13 +88,22 @@ def build_explainability(
         active_maha = active.get("maha", {}).get("lord")
 
         if active_maha and active_maha in dignity:
+            dignity_value = dignity[active_maha]
+
+            confidence_effect = (
+                "reinforced" if dignity_value == "exalted"
+                else "reduced" if dignity_value == "debilitated"
+                else "neutral"
+            )
+
             drivers.append(
                 ExplainabilityDriver(
                     type="NAVAMSA_DIGNITY",
-                    label=f"Navamsa dignity of active dasha lord: {dignity[active_maha]}",
+                    label=f"Navamsa dignity of active dasha lord: {dignity_value}",
                     evidence={
                         "planet": active_maha,
-                        "dignity": dignity[active_maha],
+                        "dignity": dignity_value,
+                        "confidence_effect": confidence_effect,
                     },
                 )
             )

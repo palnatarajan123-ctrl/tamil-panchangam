@@ -1,7 +1,7 @@
 # app/engines/synthesis_engine.py
 
-from datetime import datetime, timezone
 from statistics import pstdev
+from app.engines.life_area_scorer import LifeAreaScorer
 
 # ============================================================
 # CONSTANTS
@@ -25,102 +25,125 @@ MALEFIC_LORDS = {"Saturn", "Mars", "Rahu", "Ketu"}
 
 def synthesize_from_envelope(envelope: dict) -> dict:
     """
-    EPIC-5 + EPIC-6 + EPIC-3 (2B + 3)
+    Deterministic synthesis layer.
 
-    Derive synthesis signals from FACT envelope.
-    - Deterministic
-    - No interpretation
-    - No LLM
+    Emits:
+    - base score
+    - base confidence
+    - normalized signals (NO interpretation)
     """
+
+    # -------------------------------------------------
+    # 🔥 ABSOLUTE PROOF THIS FUNCTION IS EXECUTING
+    # -------------------------------------------------
+    print("\n🔥🔥🔥 SYNTHESIS v4.1 EXECUTING 🔥🔥🔥")
+
+    # -------------------------------------------------
+    # BASIC ENVELOPE SANITY
+    # -------------------------------------------------
+    print("DEBUG: envelope keys =", list(envelope.keys()))
+    print("DEBUG: has houses =", "houses" in envelope)
+    print("DEBUG: has dasha_context =", "dasha_context" in envelope)
 
     dasha_context = envelope.get("dasha_context", {})
     active_lords = dasha_context.get("active_lords", [])
 
-    # -------------------------------------------------
-    # BASELINE LIFE AREA SCORES (NEUTRAL)
-    # -------------------------------------------------
-    life_areas = {
-        "career": {
-            "raw_score": 0.67,
-            "score": 67,
-            "confidence": 0.9,
-        },
-        "finance": {
-            "raw_score": 0.67,
-            "score": 67,
-            "confidence": 0.9,
-        },
-        "relationships": {
-            "raw_score": 0.67,
-            "score": 67,
-            "confidence": 0.9,
-        },
-        "health": {
-            "raw_score": 0.67,
-            "score": 67,
-            "confidence": 0.9,
-        },
-        "personal_growth": {
-            "raw_score": 0.67,
-            "score": 67,
-            "confidence": 0.9,
-        },
-    }
+    print("DEBUG: active_lords =", active_lords)
 
     # -------------------------------------------------
-    # EPIC-3 STEP 2B — NAVAMSA SIGNAL EXTRACTION
+    # BASELINE
+    # -------------------------------------------------
+    base_score = 67
+    base_confidence = 0.90
+    signals = []
+
+    # -------------------------------------------------
+    # BUILD PLANET → HOUSE MAP
+    # -------------------------------------------------
+    houses = envelope.get("houses", {})
+    print("DEBUG: envelope.houses keys =", list(houses.keys()))
+
+    house_lords = {}
+    for house, hdata in houses.items():
+        lord = hdata.get("lord")
+        if lord:
+            house_lords.setdefault(lord, []).append(int(house))
+
+    print("DEBUG: house_lords =", house_lords)
+
+    # -------------------------------------------------
+    # NAVAMSA SIGNAL
     # -------------------------------------------------
     navamsa = envelope.get("navamsa", {})
     d9_dignity = navamsa.get("dignity", {})
 
+    navamsa_bias = 0
     if navamsa.get("has_d9"):
-        exalted = {
-            p for p, d in d9_dignity.items() if d == "exalted"
-        }
-        debilitated = {
-            p for p, d in d9_dignity.items() if d == "debilitated"
-        }
+        exalted = {p for p, d in d9_dignity.items() if d == "exalted"}
+        debilitated = {p for p, d in d9_dignity.items() if d == "debilitated"}
 
         benefic_strength = len(exalted & BENEFIC_LORDS)
         benefic_weakness = len(debilitated & BENEFIC_LORDS)
         malefic_strength = len(exalted & MALEFIC_LORDS)
         malefic_weakness = len(debilitated & MALEFIC_LORDS)
 
-        # Net Navamsa signal (bounded)
         navamsa_bias = (
             (benefic_strength - benefic_weakness)
             - (malefic_strength - malefic_weakness)
         )
-
-        # Clamp bias
         navamsa_bias = max(min(navamsa_bias, 2), -2)
 
-    else:
-        navamsa_bias = 0
+        signals.append({
+            "key": "NAVAMSA_DIGNITY",
+            "source": "derived",
+            "kind": "score",
+            "valence": (
+                "pos" if navamsa_bias > 0
+                else "neg" if navamsa_bias < 0
+                else "mix"
+            ),
+            "strength": abs(navamsa_bias) / 2,
+            "confidence": 0.75,
+            "rationale": f"Navamsa dignity bias: {navamsa_bias}",
+        })
 
     # -------------------------------------------------
-    # EPIC-3 STEP 3 — APPLY SYNTHESIS ADJUSTMENTS
+    # ACTIVE DASHA LORD SIGNALS (HOUSE-AWARE)
     # -------------------------------------------------
-    for area in LIFE_AREAS:
-        entry = life_areas[area]
+    for lord in active_lords:
+        owned_houses = house_lords.get(lord, [])
+        print(f"DEBUG: {lord} owns houses {owned_houses}")
 
-        # Raw score adjustment (very small)
-        delta = navamsa_bias * 0.01
-        entry["raw_score"] = round(
-            min(max(entry["raw_score"] + delta, 0.0), 1.0),
-            3,
-        )
+        for house in owned_houses:
+            signals.append({
+                "key": f"DASHA_{lord}_H{house}",
+                "source": "dasha",
+                "kind": "planet",
+                "planet": lord,
+                "house": house,
+                "valence": "pos" if lord in BENEFIC_LORDS else "neg",
+                "strength": 0.75,
+                "confidence": 0.85,
+                "rationale": f"{lord} dasha activating house {house}",
+            })
 
-        # Score adjustment (max ±5)
-        entry["score"] = int(
-            min(max(entry["score"] + navamsa_bias * 2, 0), 100)
-        )
+    # -------------------------------------------------
+    # FINAL SIGNAL AUDIT
+    # -------------------------------------------------
+    print("DEBUG: FINAL SIGNALS (count =", len(signals), ")")
+    for s in signals:
+        print("  ", s)
 
-        # Confidence slight modifier
-        if navamsa_bias > 0:
-            entry["confidence"] = min(entry["confidence"] + 0.02, 1.0)
-        elif navamsa_bias < 0:
-            entry["confidence"] = max(entry["confidence"] - 0.02, 0.5)
+    # -------------------------------------------------
+    # LIFE AREA SCORING
+    # -------------------------------------------------
+    scorer = LifeAreaScorer()
+
+    life_areas = scorer.score_all(
+        base_score_0_100=base_score,
+        base_confidence_0_1=base_confidence,
+        signals=signals,
+    )
 
     # -------------------------------------------------
     # META CONFIDENCE
@@ -136,7 +159,7 @@ def synthesize_from_envelope(envelope: dict) -> dict:
 
     return {
         "life_areas": life_areas,
-        "engine_version": "synthesis-v3",
+        "engine_version": "synthesis-v4.1-debug",
         "generated_at": envelope["reference"]["reference_date_utc"],
         "confidence": confidence_meta,
     }

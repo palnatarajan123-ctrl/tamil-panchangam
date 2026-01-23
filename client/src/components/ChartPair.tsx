@@ -1,5 +1,3 @@
-// client/src/components/ChartPair.tsx
-
 import { SouthIndianChart } from "@/components/south-indian-chart";
 import {
   Card,
@@ -31,7 +29,10 @@ export function ChartPair({ d1, d9 }: ChartPairProps) {
           <SouthIndianChart
             lagna={d1.lagna}
             planets={d1.planets}
+            dignity={d1.dignity}
             size={360}
+            title="Rāsi Chart (D1)"
+            subtitle="South Indian"
           />
         </CardContent>
       </Card>
@@ -47,6 +48,8 @@ export function ChartPair({ d1, d9 }: ChartPairProps) {
             planets={d9.planets}
             dignity={d9.dignity}
             size={360}
+            title="Navamsa Chart (D9)"
+            subtitle="D9 · Marriage & Dharma"
           />
         </CardContent>
       </Card>
