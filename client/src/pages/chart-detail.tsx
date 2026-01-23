@@ -109,7 +109,7 @@ export default function ChartDetail() {
       return res.json();
     },
     onSuccess: (data) => {
-      const aiInterpretation = data?.interpretation?.ai_interpretation;
+      const aiInterpretation = data?.details?.interpretation?.ai_interpretation;
       if (aiInterpretation) {
         setRawInterpretation(aiInterpretation);
       }
