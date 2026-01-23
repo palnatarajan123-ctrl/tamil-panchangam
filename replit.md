@@ -126,7 +126,15 @@ Press the **green Run button** to start both services automatically.
 - `app/engines/explainability_filter.py` - Post-processing visibility filter
 - `app/engines/synthesis_engine.py` - Signal synthesis
 
+### Frontend Adapter
+- `client/src/adapters/aiInterpretationAdapter.ts` - Maps AI Interpretation v1.0 → UI View Model
+- Strict field omission (no defaults/fallbacks)
+- Visibility gating respects `_visibility` metadata or explicit level parameter
+
 ## Recent Changes
+- 2026-01-23: Refactored Prediction UI to use AI Interpretation v1.0 as single source of truth
+- 2026-01-23: Created aiInterpretationAdapter.ts with strict field omission (no fallbacks)
+- 2026-01-23: Deprecated legacy predictionAdapter.ts
 - 2026-01-23: Added AI Interpretation Engine governance with JSON Schema contract
 - 2026-01-23: Created explainability filter (minimal/standard/full modes)
 - 2026-01-23: Added schema validation with fail-fast enforcement
