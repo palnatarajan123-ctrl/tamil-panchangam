@@ -1,0 +1,144 @@
+Prediction UI + Adapter Refactor
+Context:
+This project is a Tamil Panchangam Astrology Engine deployed on Replit.
+Astrological computation and AI Interpretation Engine are complete and correct.
+The goal is to refactor the Prediction UI to consume the AI Interpretation output as the single source of truth, without modifying astrology logic or scores.
+ 
+🎯 Objective
+Refactor the Prediction UI to use the AI Interpretation Engine v1.0 output exclusively, via a clean adapter, while keeping the Birth Chart UI unchanged.
+ 
+🚫 Hard Constraints (Do NOT violate)
+1.	❌ Do NOT change:
+o	Any astrology engines
+o	Synthesis engine
+o	Scores or signals
+o	AI Interpretation Engine logic or schema
+2.	❌ Do NOT add fallback text like:
+o	“No summary available”
+o	“Detailed interpretation not available”
+3.	❌ Do NOT generate or infer new text in the UI
+4.	❌ Do NOT modify Birth Chart UI
+5.	✅ UI must render only what the AI Interpretation Engine returns
+ 
+🧱 Architecture Rule (Non-Negotiable)
+Text ownership hierarchy:
+Astrology Engines → Synthesis → AI Interpretation Engine → UI
+The UI:
+•	Renders
+•	Filters
+•	Displays
+But never invents interpretation text
+ 
+🧩 Step 1 — Create a Dedicated Interpretation Adapter (NEW FILE)
+Create:
+client/src/adapters/aiInterpretationAdapter.ts
+Responsibilities
+•	Accept AIInterpretationV1 output
+•	Apply explainability mode (minimal | standard | full)
+•	Map interpretation → UI-ready read model
+•	No defaults, no fallbacks, no text generation
+Input
+AIInterpretationV1
+Output (example shape)
+PredictionViewModel {
+  windowSummary: {
+    momentum
+    overview
+    outcomeMode
+    dominantForces[]
+    timingGuidance?
+  }
+  lifeAreas: Array<{
+    key
+    label
+    score
+    outlook
+    summary
+    deeperExplanation?
+    attribution?
+  }>
+}
+If a field is missing → omit it, do not replace it.
+ 
+🔌 Step 2 — Wire API → Adapter (Prediction Only)
+Locate prediction fetch logic (monthly / weekly / yearly).
+Replace all legacy interpretation usage with:
+details.interpretation.ai_interpretation
+Immediately pass this into aiInterpretationAdapter.
+Remove ALL references to:
+•	details.interpretation.interpretation
+•	interp.text
+•	confidence_explanation
+•	Legacy life-area summaries
+ 
+🎨 Step 3 — Refactor Prediction UI (ONLY Prediction Pages)
+DO NOT TOUCH:
+•	Birth Chart components
+•	Rasi / Navamsa charts
+•	Dasha timelines
+Prediction Page Structure (Target)
+1️⃣ Window Summary (Top of page)
+Driven by:
+viewModel.windowSummary
+Render:
+•	Overview paragraph
+•	Momentum badge
+•	Outcome mode badge
+•	Dominant forces list (text only)
+ 
+2️⃣ Life Areas (Primary Content)
+For each life area:
+•	Score visualization (existing component)
+•	Outlook indicator
+•	Summary (always visible)
+•	Expand → Deeper explanation
+•	Expand further → Attribution (planets, dasha, engines, signals)
+Life areas must render only if present.
+ 
+3️⃣ Timing Section (Optional)
+If present:
+•	Render favorable / challenging windows
+•	Dates + labels only
+•	No narrative text
+ 
+4️⃣ Remedies (Optional)
+Render only if provided by interpretation.
+ 
+🧼 Step 4 — Delete Legacy UI Logic
+Remove:
+•	All fallback strings
+•	Conditional summary generation
+•	Score-based text branching
+•	“Temporary” UI explanations
+UI should fail visibly if interpretation is missing — this is intentional.
+ 
+🧪 Step 5 — Validation Checklist (MANDATORY)
+After refactor, verify:
+•	No “No summary available” anywhere
+•	No repeated text across months unless interpretation truly identical
+•	Changing explainability mode changes visibility, not content
+•	Birth Chart UI unchanged
+•	Prediction UI renders with only AI Interpretation text
+ 
+🧠 Design Principle (Why this matters)
+This refactor ensures:
+•	Interpretation intelligence lives in one place
+•	UI becomes stable and dumb
+•	PDF, API, and UI share the same contract
+•	No future regressions when engines expand
+ 
+📦 Final Deliverables
+Replit should produce:
+1.	aiInterpretationAdapter.ts
+2.	Updated prediction fetch wiring
+3.	Simplified Prediction UI consuming the adapter
+4.	Zero changes outside Prediction UI
+5.	Updated documentation
+ 
+✅ Completion Definition
+The task is complete when:
+•	Prediction UI renders window summary + life areas entirely from AI Interpretation
+•	No legacy interpretation paths exist
+•	No fallback text remains
+•	Birth Chart UI is untouched
+

@@ -6,15 +6,17 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 import { MonthlyPredictionView } from "@/components/prediction/MonthlyPredictionView";
-import { ExplainabilityDrawer } from "@/components/prediction/ExplainabilityDrawer";
-import { adaptMonthlyPrediction } from "@/adapters/predictionAdapter";
+import {
+  adaptAIInterpretation,
+  extractAIInterpretation,
+  hasValidAIInterpretation,
+  type PredictionViewModel,
+  type ExplainabilityLevel,
+} from "@/adapters/aiInterpretationAdapter";
 
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +26,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from "@/components/ui/form";
 import {
   Select,
@@ -42,20 +43,13 @@ import {
   Loader2,
   Sparkles,
   ArrowLeft,
+  AlertCircle,
 } from "lucide-react";
-
-/* -----------------------------------------------------
-   Constants
------------------------------------------------------ */
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-
-/* -----------------------------------------------------
-   Validation (dynamic per type)
------------------------------------------------------ */
 
 const monthlySchema = z.object({
   year: z.string(),
@@ -71,32 +65,26 @@ const yearlySchema = z.object({
   year: z.string(),
 });
 
-/* -----------------------------------------------------
-   Page
------------------------------------------------------ */
-
 export default function Predictions() {
   const { id } = useParams<{ id: string }>();
   const baseChartId = id;
 
   const { toast } = useToast();
 
-  const [prediction, setPrediction] = useState<any | null>(null);
+  const [prediction, setPrediction] = useState<PredictionViewModel | null>(null);
+  const [predictionError, setPredictionError] = useState<string | null>(null);
   const [predictionType, setPredictionType] = useState<
     "monthly" | "weekly" | "yearly"
   >("monthly");
-
-  /* ---------------- Guard ---------------- */
+  const [explainabilityLevel] = useState<ExplainabilityLevel>("full");
 
   if (!baseChartId) {
     return (
-      <div className="container max-w-4xl mx-auto px-4 py-12 text-muted-foreground">
+      <div className="container max-w-4xl mx-auto px-4 py-12 text-muted-foreground" data-testid="text-no-chart">
         Select a birth chart
       </div>
     );
   }
-
-  /* ---------------- Fetch Birth Chart ---------------- */
 
   const { data: chart, isLoading, error } = useQuery({
     queryKey: ["/api/base-chart", baseChartId],
@@ -106,8 +94,6 @@ export default function Predictions() {
       return res.json();
     },
   });
-
-  /* ---------------- Form ---------------- */
 
   const form = useForm<any>({
     resolver: zodResolver(
@@ -123,8 +109,6 @@ export default function Predictions() {
       week: "1",
     },
   });
-
-  /* ---------------- Mutation ---------------- */
 
   const mutation = useMutation({
     mutationFn: async (v: any) => {
@@ -159,7 +143,29 @@ export default function Predictions() {
     },
 
     onSuccess: data => {
-      setPrediction(adaptMonthlyPrediction(data.details));
+      setPredictionError(null);
+
+      if (!hasValidAIInterpretation(data.details)) {
+        setPrediction(null);
+        setPredictionError("AI Interpretation data is missing or invalid.");
+        toast({
+          title: "Prediction Error",
+          description: "AI Interpretation data is missing from the response.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const aiInterpretation = extractAIInterpretation(data.details);
+      if (!aiInterpretation) {
+        setPrediction(null);
+        setPredictionError("Failed to extract AI Interpretation.");
+        return;
+      }
+
+      const viewModel = adaptAIInterpretation(aiInterpretation, explainabilityLevel);
+      setPrediction(viewModel);
+
       toast({
         title: "Prediction Generated",
         description: `${predictionType} prediction ready`,
@@ -167,6 +173,8 @@ export default function Predictions() {
     },
 
     onError: (e: Error) => {
+      setPrediction(null);
+      setPredictionError(e.message);
       toast({
         title: "Prediction failed",
         description: e.message,
@@ -174,8 +182,6 @@ export default function Predictions() {
       });
     },
   });
-
-  /* ---------------- Loading ---------------- */
 
   if (isLoading) {
     return (
@@ -188,13 +194,11 @@ export default function Predictions() {
 
   if (error || !chart) {
     return (
-      <div className="container max-w-4xl mx-auto px-4 py-12">
+      <div className="container max-w-4xl mx-auto px-4 py-12" data-testid="text-chart-error">
         Birth chart not found
       </div>
     );
   }
-
-  /* ---------------- UI ---------------- */
 
   return (
     <div className="container max-w-7xl mx-auto px-4 py-8">
@@ -202,12 +206,12 @@ export default function Predictions() {
       {/* HEADER */}
       <div className="flex items-center gap-4 mb-6">
         <Link href={`/chart/${baseChartId}`}>
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft />
           </Button>
         </Link>
 
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="heading-predictions">
           <Sparkles /> Predictions
         </h1>
 
@@ -223,7 +227,9 @@ export default function Predictions() {
             onClick={() => {
               setPredictionType(t as any);
               setPrediction(null);
+              setPredictionError(null);
             }}
+            data-testid={`button-tab-${t}`}
           >
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </Button>
@@ -231,7 +237,7 @@ export default function Predictions() {
       </div>
 
       {/* FORM */}
-      <Card className="mb-8">
+      <Card className="mb-8" data-testid="card-form">
         <CardContent className="pt-6">
           <Form {...form}>
             <form
@@ -245,7 +251,7 @@ export default function Predictions() {
                   <FormItem>
                     <FormLabel>Year</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input type="number" {...field} data-testid="input-year" />
                     </FormControl>
                   </FormItem>
                 )}
@@ -263,11 +269,13 @@ export default function Predictions() {
                         onValueChange={field.onChange}
                       >
                         <FormControl>
-                          <SelectTrigger />
+                          <SelectTrigger data-testid="select-month">
+                            <SelectValue />
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {MONTHS.map((m, i) => (
-                            <SelectItem key={i} value={(i + 1).toString()}>
+                            <SelectItem key={i} value={(i + 1).toString()} data-testid={`select-item-month-${i + 1}`}>
                               {m}
                             </SelectItem>
                           ))}
@@ -286,7 +294,7 @@ export default function Predictions() {
                     <FormItem>
                       <FormLabel>ISO Week</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input type="number" {...field} data-testid="input-week" />
                       </FormControl>
                     </FormItem>
                   )}
@@ -297,6 +305,7 @@ export default function Predictions() {
                 type="submit"
                 className="md:col-span-3"
                 disabled={mutation.isPending}
+                data-testid="button-generate"
               >
                 {mutation.isPending ? (
                   <Loader2 className="animate-spin" />
@@ -312,13 +321,19 @@ export default function Predictions() {
         </CardContent>
       </Card>
 
-      {/* RESULT */}
-      {prediction && (
-        <MonthlyPredictionView prediction={prediction} />
+      {/* ERROR STATE */}
+      {predictionError && !prediction && (
+        <Card className="mb-8 border-destructive" data-testid="card-error">
+          <CardContent className="pt-6 flex items-center gap-3 text-destructive">
+            <AlertCircle className="h-5 w-5" />
+            <span>{predictionError}</span>
+          </CardContent>
+        </Card>
       )}
 
-      {prediction?.disclaimers && (
-        <ExplainabilityDrawer explainability={prediction} />
+      {/* RESULT */}
+      {prediction && (
+        <MonthlyPredictionView prediction={prediction} period={predictionType} />
       )}
     </div>
   );
