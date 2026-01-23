@@ -72,6 +72,128 @@ def synthesize_from_envelope(envelope: dict) -> dict:
     print("DEBUG: house_lords =", house_lords)
 
     # -------------------------------------------------
+    # GOCHARA (TRANSIT) SIGNALS - EPIC Signal Expansion
+    # -------------------------------------------------
+    gochara = envelope.get("gochara", {})
+    print("DEBUG: gochara =", gochara.get("jupiter", {}).get("effect"), gochara.get("saturn", {}).get("phase"))
+    
+    # Jupiter Gochara Signal
+    jup_gochara = gochara.get("jupiter", {})
+    jup_effect = jup_gochara.get("effect", "neutral")
+    jup_house = jup_gochara.get("from_moon_house", 0)
+    if jup_effect != "neutral":
+        signals.append({
+            "key": "GOCHARA_JUPITER",
+            "source": "gochara",
+            "kind": "transit",
+            "planet": "Jupiter",
+            "house": jup_house,
+            "valence": "pos" if jup_effect == "favorable" else "neg",
+            "strength": 0.8 if jup_effect == "favorable" else 0.6,
+            "confidence": 0.85,
+            "rationale": f"Jupiter transiting house {jup_house} from Moon ({jup_effect})",
+        })
+    
+    # Saturn Gochara Signal
+    sat_gochara = gochara.get("saturn", {})
+    sat_phase = sat_gochara.get("phase", "neutral")
+    sat_effect = sat_gochara.get("effect", "neutral")
+    sat_house = sat_gochara.get("from_moon_house", 0)
+    if sat_phase != "neutral":
+        signals.append({
+            "key": f"GOCHARA_SATURN_{sat_phase.upper()}",
+            "source": "gochara",
+            "kind": "transit",
+            "planet": "Saturn",
+            "house": sat_house,
+            "valence": "neg" if sat_effect == "challenging" else "pos",
+            "strength": 0.9 if sat_phase in ["janma_sani", "ashtama_sani", "kantaka_sani"] else 0.5,
+            "confidence": 0.90,
+            "rationale": f"Saturn {sat_phase} phase, house {sat_house} from Moon",
+        })
+    
+    # Rahu-Ketu Gochara Signal
+    rahu_ketu = gochara.get("rahu_ketu", {})
+    rahu_effect = rahu_ketu.get("effect", "neutral")
+    if rahu_effect != "neutral":
+        signals.append({
+            "key": "GOCHARA_RAHU_KETU",
+            "source": "gochara",
+            "kind": "transit",
+            "planet": "Rahu",
+            "house": rahu_ketu.get("rahu_from_moon_house", 0),
+            "valence": "neg" if rahu_effect == "disruptive" else "pos",
+            "strength": 0.7,
+            "confidence": 0.75,
+            "rationale": f"Rahu-Ketu axis {rahu_ketu.get('axis', 'unknown')} ({rahu_effect})",
+        })
+    
+    # -------------------------------------------------
+    # NAKSHATRA + TARA BALA SIGNALS - EPIC Signal Expansion
+    # -------------------------------------------------
+    nakshatra_ctx = envelope.get("nakshatra_context", {})
+    tara_quality = nakshatra_ctx.get("quality", "neutral")
+    print("DEBUG: nakshatra =", nakshatra_ctx.get("tara_bala"), tara_quality)
+    
+    if tara_quality != "neutral":
+        signals.append({
+            "key": f"TARA_BALA_{nakshatra_ctx.get('tara_bala', 'unknown').upper()}",
+            "source": "nakshatra",
+            "kind": "quality",
+            "valence": "pos" if tara_quality == "favorable" else "neg",
+            "strength": 0.65,
+            "confidence": 0.80,
+            "rationale": f"Tara Bala: {nakshatra_ctx.get('tara_name', 'Unknown')}",
+        })
+    
+    # -------------------------------------------------
+    # ASHTAKAVARGA VALIDATION SIGNALS - EPIC Signal Expansion
+    # -------------------------------------------------
+    ashtakavarga = envelope.get("ashtakavarga", {})
+    overall_support = ashtakavarga.get("overall_support", "balanced")
+    print("DEBUG: ashtakavarga =", overall_support)
+    
+    if overall_support != "balanced":
+        av_valence = "pos" if overall_support in ["strong_support", "partial_support"] else "neg"
+        signals.append({
+            "key": f"ASHTAKAVARGA_{overall_support.upper()}",
+            "source": "ashtakavarga",
+            "kind": "validation",
+            "valence": av_valence,
+            "strength": 0.6 if overall_support == "strong_support" else 0.4,
+            "confidence": 0.70,
+            "rationale": f"Ashtakavarga validation: {overall_support}",
+        })
+    
+    # -------------------------------------------------
+    # CHANDRA GATI (Moon Rhythm) SIGNALS - EPIC Signal Expansion
+    # -------------------------------------------------
+    chandra_gati = envelope.get("chandra_gati", {})
+    dominant_moods = chandra_gati.get("dominant_moods", [])
+    print("DEBUG: chandra_gati moods =", dominant_moods)
+    
+    positive_moods = {"stable", "harmonious", "optimistic", "confident"}
+    negative_moods = {"restless", "intense", "detached", "emotional"}
+    
+    mood_balance = 0
+    for mood in dominant_moods[:2]:
+        if mood in positive_moods:
+            mood_balance += 1
+        elif mood in negative_moods:
+            mood_balance -= 1
+    
+    if mood_balance != 0:
+        signals.append({
+            "key": "CHANDRA_GATI_RHYTHM",
+            "source": "chandra_gati",
+            "kind": "rhythm",
+            "valence": "pos" if mood_balance > 0 else "neg",
+            "strength": 0.5,
+            "confidence": 0.65,
+            "rationale": f"Moon emotional rhythm: {', '.join(dominant_moods[:2])}",
+        })
+    
+    # -------------------------------------------------
     # NAVAMSA SIGNAL
     # -------------------------------------------------
     navamsa = envelope.get("navamsa", {})

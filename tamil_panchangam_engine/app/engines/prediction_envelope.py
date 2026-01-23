@@ -1,5 +1,6 @@
 # app/engines/prediction_envelope.py
 
+import logging
 from app.engines.transits import compute_monthly_transits
 from app.engines.pancha_pakshi import get_daily_pakshi_guidance
 from app.utils.time_utils import get_month_reference_date_utc
@@ -7,6 +8,13 @@ from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.antar_explanation_engine import build_antar_explanation
 from app.engines.narrative_engine import build_narrative
 from app.services.birth_chart_builder import build_birth_chart_view_model
+from app.engines.gochara_engine import compute_gochara
+from app.engines.moon_transit_engine import compute_chandra_gati
+from app.engines.nakshatra_engine import compute_nakshatra_context
+from app.engines.ashtakavarga_engine import compute_ashtakavarga_validation
+from app.engines.remedy_engine import compute_remedies
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -223,8 +231,65 @@ def build_monthly_prediction_envelope(
     }
 
     # -------------------------------------------------
-    # 7. Final Envelope (FACTS FIRST)
+    # 7. GOCHARA (TRANSIT) ENGINE - EPIC Signal Expansion
     # -------------------------------------------------
+    logger.debug("DEBUG: Computing Gochara signals")
+    gochara = compute_gochara(
+        reference_date_utc=reference_date_utc,
+        latitude=latitude,
+        longitude=longitude,
+        natal_moon_rasi=natal_moon_rasi,
+    )
+
+    # -------------------------------------------------
+    # 8. CHANDRA GATI (Moon Transit Rhythm) - EPIC Signal Expansion
+    # -------------------------------------------------
+    logger.debug("DEBUG: Computing Chandra Gati signals")
+    chandra_gati = compute_chandra_gati(
+        year=year,
+        month=month,
+        natal_moon_rasi=natal_moon_rasi,
+        latitude=latitude,
+        longitude=longitude,
+    )
+
+    # -------------------------------------------------
+    # 9. NAKSHATRA CONTEXT + TARA BALA - EPIC Signal Expansion
+    # -------------------------------------------------
+    logger.debug("DEBUG: Computing Nakshatra context")
+    birth_moon_longitude = ephemeris.get("moon", {}).get("longitude_deg", 0.0)
+    nakshatra_context = compute_nakshatra_context(
+        reference_date_utc=reference_date_utc,
+        birth_moon_longitude=birth_moon_longitude,
+        latitude=latitude,
+        longitude=longitude,
+    )
+
+    # -------------------------------------------------
+    # 10. ASHTAKAVARGA VALIDATION - EPIC Signal Expansion
+    # -------------------------------------------------
+    logger.debug("DEBUG: Computing Ashtakavarga validation")
+    ashtakavarga = compute_ashtakavarga_validation(
+        saturn_transit_rasi=gochara.get("saturn", {}).get("transit_rasi", "Aries"),
+        jupiter_transit_rasi=gochara.get("jupiter", {}).get("transit_rasi", "Aries"),
+        birth_moon_rasi=natal_moon_rasi,
+    )
+
+    # -------------------------------------------------
+    # 11. REMEDY ENGINE - EPIC Signal Expansion
+    # -------------------------------------------------
+    logger.debug("DEBUG: Computing Remedies")
+    remedies = compute_remedies(
+        gochara=gochara,
+        nakshatra_context=nakshatra_context,
+        ashtakavarga=ashtakavarga,
+    )
+
+    # -------------------------------------------------
+    # 12. Final Envelope (FACTS FIRST)
+    # -------------------------------------------------
+    logger.debug(f"DEBUG: Envelope keys: gochara={bool(gochara)}, chandra_gati={bool(chandra_gati)}, nakshatra={bool(nakshatra_context)}, ashtakavarga={bool(ashtakavarga)}, remedies={bool(remedies)}")
+    
     return {
         "reference": {
             "year": year,
@@ -254,4 +319,11 @@ def build_monthly_prediction_envelope(
         },
 
         "navamsa": d9_context,
+
+        # ===== EPIC SIGNAL EXPANSION =====
+        "gochara": gochara,
+        "chandra_gati": chandra_gati,
+        "nakshatra_context": nakshatra_context,
+        "ashtakavarga": ashtakavarga,
+        "remedies": remedies,
     }
