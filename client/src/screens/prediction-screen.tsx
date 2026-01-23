@@ -154,9 +154,9 @@ export default function PredictionScreen() {
           {/* -------------------------------------------------
               Prediction Body
           -------------------------------------------------- */}
-          {hasValidAIInterpretation(data) && (
+          {hasValidAIInterpretation(data.details) && (
             <MonthlyPredictionView
-              prediction={adaptAIInterpretation(extractAIInterpretation(data)!)}
+              prediction={adaptAIInterpretation(extractAIInterpretation(data.details)!)}
               period={period}
             />
           )}
