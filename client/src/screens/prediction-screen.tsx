@@ -11,7 +11,12 @@ import { DashaTimeline } from "@/components/DashaTimeline";
 
 import { PredictionTimelineControl } from "@/components/prediction/PredictionTimelineControl";
 
-import { adaptMonthlyPrediction } from "@/adapters/predictionAdapter";
+import {
+  adaptAIInterpretation,
+  extractAIInterpretation,
+  hasValidAIInterpretation,
+  type PredictionViewModel,
+} from "@/adapters/aiInterpretationAdapter";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -149,10 +154,12 @@ export default function PredictionScreen() {
           {/* -------------------------------------------------
               Prediction Body
           -------------------------------------------------- */}
-          <MonthlyPredictionView
-            prediction={adaptMonthlyPrediction(data.details)}
-            period={period}
-          />
+          {hasValidAIInterpretation(data) && (
+            <MonthlyPredictionView
+              prediction={adaptAIInterpretation(extractAIInterpretation(data)!)}
+              period={period}
+            />
+          )}
 
           {dashaContext?.active?.antar && (
             <>
