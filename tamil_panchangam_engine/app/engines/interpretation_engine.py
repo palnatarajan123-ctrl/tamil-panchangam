@@ -17,10 +17,11 @@ def build_interpretation_from_synthesis(
     - MUST NOT generate narrative prose
     """
 
-    # Always use the builder - it handles both minimal and full structures
+    # Always use the builder - pass envelope for dasha context
     interpretation = build_interpretation(
         synthesis=synthesis,
-        narrative_style="short"
+        narrative_style="short",
+        envelope=envelope,
     )
 
     return {
