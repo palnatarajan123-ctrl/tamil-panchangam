@@ -28,11 +28,9 @@ function Router() {
   return (
     <Switch>
       {/* ---------------------------------
-         Legacy Predictions (DO NOT TOUCH)
+         Predictions Routes
          --------------------------------- */}
-      {/* LEGACY PREDICTIONS — DO NOT USE FOR EPIC-6 *
-        <Route path="/predictions/:id" component={Predictions} />
-*/}
+      <Route path="/predictions/:id" component={Predictions} />
       <Route path="/predictions">
         <div className="container max-w-2xl mx-auto py-12">
           <Card>
