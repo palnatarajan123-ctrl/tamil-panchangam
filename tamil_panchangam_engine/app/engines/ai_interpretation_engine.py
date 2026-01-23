@@ -9,11 +9,77 @@ Three-level structure:
 - Level 1: Window Summary (overall momentum, dominant forces)
 - Level 2: Life Area Interpretations (signal interaction)
 - Level 3: Astrological Attribution (planets, dasha, engines)
+
+Contract: docs/contracts/ai_interpretation_v1.schema.json
 """
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import random
+import json
+import os
+from pathlib import Path
+
+JSONSCHEMA_AVAILABLE = False
+jsonschema = None
+try:
+    import jsonschema as _jsonschema
+    jsonschema = _jsonschema
+    JSONSCHEMA_AVAILABLE = True
+except ImportError:
+    print("WARNING: jsonschema not installed, schema validation disabled")
+
+_SCHEMA_CACHE: Dict[str, Any] = {}
+
+def _load_schema() -> Optional[Dict[str, Any]]:
+    """Load the AI interpretation v1.0 schema."""
+    if "v1" in _SCHEMA_CACHE:
+        return _SCHEMA_CACHE["v1"]
+    
+    schema_paths = [
+        Path(__file__).parent.parent.parent / "docs" / "contracts" / "ai_interpretation_v1.schema.json",
+        Path("tamil_panchangam_engine/docs/contracts/ai_interpretation_v1.schema.json"),
+        Path("docs/contracts/ai_interpretation_v1.schema.json"),
+    ]
+    
+    for schema_path in schema_paths:
+        if schema_path.exists():
+            try:
+                with open(schema_path, "r") as f:
+                    schema = json.load(f)
+                _SCHEMA_CACHE["v1"] = schema
+                return schema
+            except Exception as e:
+                print(f"WARNING: Failed to load schema from {schema_path}: {e}")
+    
+    print("WARNING: Schema file not found, validation disabled")
+    return None
+
+
+def _validate_interpretation(interpretation: Dict[str, Any]) -> bool:
+    """
+    Validate interpretation against v1.0 schema.
+    
+    Returns True if valid, raises ValueError if invalid.
+    """
+    if not JSONSCHEMA_AVAILABLE:
+        print("VALIDATION SKIPPED: jsonschema not available")
+        return True
+    
+    schema = _load_schema()
+    if schema is None:
+        print("VALIDATION SKIPPED: schema not loaded")
+        return True
+    
+    try:
+        jsonschema.validate(instance=interpretation, schema=schema)
+        print("✓ Schema validation passed")
+        return True
+    except jsonschema.ValidationError as e:
+        error_path = " -> ".join(str(p) for p in e.absolute_path)
+        error_msg = f"Schema validation failed at '{error_path}': {e.message}"
+        print(f"✗ {error_msg}")
+        raise ValueError(error_msg) from e
 
 LIFE_AREAS = ["career", "finance", "relationships", "health", "personal_growth"]
 
@@ -563,6 +629,8 @@ def generate_interpretation(
         "window_summary": window_summary,
         "life_areas": life_area_interpretations
     }
+    
+    _validate_interpretation(result)
     
     print(f"DEBUG: Interpretation complete")
     return result

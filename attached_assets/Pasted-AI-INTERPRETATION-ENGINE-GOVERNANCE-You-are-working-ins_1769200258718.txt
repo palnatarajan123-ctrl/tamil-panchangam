@@ -1,0 +1,101 @@
+AI INTERPRETATION ENGINE GOVERNANCE
+You are working inside an existing Python FastAPI project called Tamil Panchangam Astrology Engine.
+The synthesis engine is complete and stable.
+An AI Interpretation Engine v1.0 already exists and produces structured interpretations.
+Your task is to LOCK the interpretation contract and then add explainability toggles, without changing astrology logic, synthesis logic, or scores.
+ 
+🔹 PART A — Lock AI Interpretation Contract (v1.0)
+Objective
+Create a strict, versioned output contract for the AI Interpretation Engine so UI, PDF, and future AI layers never break again.
+Requirements
+1.	Create a JSON Schema
+o	File path:
+o	docs/contracts/ai_interpretation_v1.schema.json
+o	Schema must:
+	Disallow additional properties
+	Enforce required fields
+	Enforce enums for momentum, outcome_mode, life areas
+	Enforce max word/length limits
+	Require attribution grounding for every life area
+2.	Schema Must Enforce 3-Level Structure
+o	Window Summary (prediction-level)
+o	Life Area Blocks (career, finance, relationships, health, personal_growth)
+o	Astrological Attribution (signals, engines, planets, dasha)
+3.	Update AI Interpretation Engine
+o	File:
+o	app/engines/ai_interpretation_engine.py
+o	After generating interpretation:
+	Validate output using jsonschema.validate
+	Fail fast if schema is violated
+	Log clear validation errors
+o	Do NOT:
+	Recompute astrology
+	Modify synthesis scores
+	Change envelope structure
+4.	Versioning
+o	Hard-code:
+o	"engine_version": "ai-interpretation-v1.0"
+o	Future versions must be additive only
+ 
+🔹 PART B — Explainability Toggles (v1.1, Backward-Compatible)
+Objective
+Allow UI and PDF layers to toggle how much explanation is visible, without regenerating interpretation.
+Requirements
+1.	Add Explainability Modes
+o	Supported modes:
+	"minimal" → summary only
+	"standard" → summary + explanation
+	"full" → summary + explanation + attribution
+2.	Implementation Rules
+o	Do NOT change interpretation generation
+o	Do NOT create a new engine
+o	Implement as a post-processing filter
+o	Location:
+o	app/engines/explainability_filter.py
+3.	Function Signature
+4.	def apply_explainability(
+5.	    interpretation: dict,
+6.	    level: Literal["minimal", "standard", "full"]
+7.	) -> dict:
+8.	Behavior
+o	minimal:
+	Return window_summary.overview
+	Return life_area.summary only
+o	standard:
+	Include explanation
+	Exclude attribution
+o	full:
+	Return full schema-compliant output
+9.	Guarantees
+o	Output must remain schema-valid
+o	No keys should be invented or removed incorrectly
+o	Same interpretation instance → different visibility only
+ 
+🔹 NON-NEGOTIABLE CONSTRAINTS
+•	❌ No changes to synthesis engine
+•	❌ No astrology recalculation
+•	❌ No random text generation
+•	❌ No UI assumptions
+•	❌ No breaking changes
+•	✅ Deterministic output
+•	✅ Strict schema enforcement
+•	✅ Clear logging
+•	✅ Version-safe design
+ 
+🔹 DELIVERABLES
+When finished, provide:
+1.	ai_interpretation_v1.schema.json
+2.	Updated ai_interpretation_engine.py with validation
+3.	New explainability_filter.py
+4.	A short docs/INTERPRETATION_CONTRACT.md explaining:
+o	v1.0 purpose
+o	explainability modes
+o	upgrade path to v1.1+
+ 
+🔹 SUCCESS CRITERIA
+•	UI can trust interpretation shape permanently
+•	No more “No summary available” regressions
+•	Interpretation verbosity becomes configurable
+•	AI layer is now governed, explainable, and future-proof
+Proceed carefully. Preserve existing logic. Validate everything.
+

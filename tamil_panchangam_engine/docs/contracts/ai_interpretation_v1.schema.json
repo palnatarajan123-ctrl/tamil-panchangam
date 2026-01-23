@@ -1,0 +1,210 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ai_interpretation_v1.schema.json",
+  "title": "AI Interpretation Engine v1.0 Contract",
+  "description": "Strict versioned output contract for Tamil Panchangam AI Interpretation Engine",
+  "type": "object",
+  "required": ["engine_version", "generated_at", "window_summary", "life_areas"],
+  "additionalProperties": false,
+  "properties": {
+    "engine_version": {
+      "type": "string",
+      "const": "ai-interpretation-v1.0",
+      "description": "Engine version identifier"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of generation"
+    },
+    "window_summary": {
+      "$ref": "#/$defs/WindowSummary"
+    },
+    "life_areas": {
+      "type": "object",
+      "required": ["career", "finance", "relationships", "health", "personal_growth"],
+      "additionalProperties": false,
+      "properties": {
+        "career": { "$ref": "#/$defs/LifeAreaBlock" },
+        "finance": { "$ref": "#/$defs/LifeAreaBlock" },
+        "relationships": { "$ref": "#/$defs/LifeAreaBlock" },
+        "health": { "$ref": "#/$defs/LifeAreaBlock" },
+        "personal_growth": { "$ref": "#/$defs/LifeAreaBlock" }
+      }
+    },
+    "_visibility": {
+      "$ref": "#/$defs/VisibilityMetadata",
+      "description": "Optional visibility metadata added by explainability filter (v1.1)"
+    }
+  },
+  "$defs": {
+    "WindowSummary": {
+      "type": "object",
+      "required": ["momentum", "overview", "dominant_forces", "outcome_mode"],
+      "additionalProperties": false,
+      "properties": {
+        "momentum": {
+          "type": "string",
+          "enum": ["growth", "consolidation", "pressure", "transition"],
+          "description": "Overall momentum of the prediction window"
+        },
+        "momentum_description": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Short momentum description"
+        },
+        "overview": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 500,
+          "description": "High-level prediction summary"
+        },
+        "dominant_forces": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/DominantForce" }
+        },
+        "outcome_mode": {
+          "type": "string",
+          "enum": ["ease", "effort", "delay"],
+          "description": "How outcomes will manifest"
+        },
+        "timing_guidance": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "period": {
+          "$ref": "#/$defs/Period"
+        }
+      }
+    },
+    "Period": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "year": { "type": "integer" },
+        "month": { "type": "integer", "minimum": 1, "maximum": 12 }
+      }
+    },
+    "VisibilityMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Visibility flags for explainability filtering",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["minimal", "standard", "full"]
+        },
+        "show_dominant_forces": { "type": "boolean" },
+        "show_timing_guidance": { "type": "boolean" },
+        "show_deeper_explanation": { "type": "boolean" },
+        "show_attribution": { "type": "boolean" },
+        "show_signals_used": { "type": "boolean" }
+      }
+    },
+    "DominantForce": {
+      "type": "object",
+      "required": ["type", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["dasha", "yoga", "transit", "aspect"]
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "planet": { "type": "string" },
+        "sub_planet": { "type": ["string", "null"] },
+        "name": { "type": "string" },
+        "house": { "type": ["integer", "null"] },
+        "phase": { "type": "string" }
+      }
+    },
+    "LifeAreaBlock": {
+      "type": "object",
+      "required": ["score", "outlook", "summary", "deeper_explanation", "attribution"],
+      "additionalProperties": false,
+      "properties": {
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Life area score from synthesis"
+        },
+        "outlook": {
+          "type": "string",
+          "enum": ["positive", "neutral", "challenging"],
+          "description": "Life area outlook"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 300,
+          "description": "Brief life area summary"
+        },
+        "deeper_explanation": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 800,
+          "description": "Detailed interpretation with signal interaction"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "word_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "Attribution": {
+      "type": "object",
+      "required": ["planets", "dasha", "engines"],
+      "additionalProperties": false,
+      "properties": {
+        "planets": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Planets involved in this life area"
+        },
+        "dasha": {
+          "type": "string",
+          "description": "Current dasha period (e.g., 'Jupiter/Saturn')"
+        },
+        "engines": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Engines contributing signals"
+        },
+        "signals_used": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SignalReference" }
+        }
+      }
+    },
+    "SignalReference": {
+      "type": "object",
+      "required": ["key", "valence"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Signal identifier"
+        },
+        "valence": {
+          "type": ["string", "null"],
+          "enum": ["pos", "neg", "mix", null],
+          "description": "Signal valence"
+        },
+        "strength": {
+          "type": ["number", "null"]
+        },
+        "rationale": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}
