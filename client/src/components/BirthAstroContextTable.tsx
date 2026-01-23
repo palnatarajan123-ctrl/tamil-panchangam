@@ -173,9 +173,28 @@ export function BirthAstroContextTable({ data }: Props) {
   );
 }
 
+export interface RealtimeContextData {
+  transit_context?: {
+    jupiter_transit?: string | null;
+    saturn_transit?: string | null;
+    rahu_ketu_axis?: string | null;
+  };
+  nakshatra_timing_context?: {
+    current_moon_nakshatra?: string | null;
+    tara_bala?: string | null;
+    chandra_gati?: string | null;
+    favorable_window?: string | null;
+  };
+  pakshi_context?: {
+    dominant_pakshi?: string | null;
+    activity_phase?: string | null;
+  };
+}
+
 export function adaptBirthChartToAstroContext(
   birthChartUI: any,
-  predictionEnvelope?: any
+  predictionEnvelope?: any,
+  realtimeContext?: RealtimeContextData
 ): BirthAstroContextData {
   const moonNakshatra = findMoonNakshatra(birthChartUI.nakshatra);
   const moonRasi = findMoonRasi(birthChartUI.rasi);
@@ -194,18 +213,41 @@ export function adaptBirthChartToAstroContext(
     predictionEnvelope?.dasha_context
   );
 
-  const transitContext: TransitContext = extractTransitContext(
-    predictionEnvelope?.transits
-  );
+  let transitContext: TransitContext;
+  if (realtimeContext?.transit_context) {
+    transitContext = {
+      jupiterTransit: realtimeContext.transit_context.jupiter_transit ?? null,
+      saturnTransit: realtimeContext.transit_context.saturn_transit ?? null,
+      rahuKetuAxis: realtimeContext.transit_context.rahu_ketu_axis ?? null,
+    };
+  } else {
+    transitContext = extractTransitContext(predictionEnvelope?.transits);
+  }
 
-  const nakshatraTimingContext: NakshatraTimingContext = extractNakshatraContext(
-    predictionEnvelope?.nakshatra_context,
-    predictionEnvelope?.chandra_gati
-  );
+  let nakshatraTimingContext: NakshatraTimingContext;
+  if (realtimeContext?.nakshatra_timing_context) {
+    nakshatraTimingContext = {
+      currentMoonNakshatra: realtimeContext.nakshatra_timing_context.current_moon_nakshatra ?? null,
+      taraBala: realtimeContext.nakshatra_timing_context.tara_bala ?? null,
+      chandraGati: realtimeContext.nakshatra_timing_context.chandra_gati ?? null,
+      favorableWindow: realtimeContext.nakshatra_timing_context.favorable_window ?? null,
+    };
+  } else {
+    nakshatraTimingContext = extractNakshatraContext(
+      predictionEnvelope?.nakshatra_context,
+      predictionEnvelope?.chandra_gati
+    );
+  }
 
-  const pakshiContext: PakshiContext = extractPakshiContext(
-    predictionEnvelope?.pakshi
-  );
+  let pakshiContext: PakshiContext;
+  if (realtimeContext?.pakshi_context) {
+    pakshiContext = {
+      dominantPakshi: realtimeContext.pakshi_context.dominant_pakshi ?? null,
+      activityPhase: realtimeContext.pakshi_context.activity_phase ?? null,
+    };
+  } else {
+    pakshiContext = extractPakshiContext(predictionEnvelope?.pakshi);
+  }
 
   return {
     birthReference,

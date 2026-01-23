@@ -30,7 +30,8 @@ import { DashaTimeline } from "@/components/DashaTimeline";
 import { ChartPair } from "@/components/ChartPair";
 import { 
   BirthAstroContextTable, 
-  adaptBirthChartToAstroContext 
+  adaptBirthChartToAstroContext,
+  type RealtimeContextData,
 } from "@/components/BirthAstroContextTable";
 
 import {
@@ -96,6 +97,21 @@ export default function ChartDetail() {
       if (json?.identity) return json;
       throw new Error("Invalid birth chart response shape");
     },
+  });
+
+  const { data: realtimeContextData } = useQuery({
+    queryKey: ["/api/realtime/context", chartId],
+    enabled: !!chartId,
+    queryFn: async () => {
+      const res = await apiRequest(
+        "GET",
+        `/api/realtime/context/${chartId}`
+      );
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json?.context as RealtimeContextData | null;
+    },
+    staleTime: 60000,
   });
 
   const generatePrediction = useMutation({
@@ -192,7 +208,7 @@ export default function ChartDetail() {
           />
 
           <BirthAstroContextTable 
-            data={adaptBirthChartToAstroContext(ui)} 
+            data={adaptBirthChartToAstroContext(ui, undefined, realtimeContextData ?? undefined)} 
           />
 
           <DashaTimeline

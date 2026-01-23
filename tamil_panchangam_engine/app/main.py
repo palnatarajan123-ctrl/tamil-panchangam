@@ -15,6 +15,7 @@ from app.api.ui_birth_chart import router as ui_birth_chart_router
 from app.api.prediction_weekly import router as prediction_weekly_router
 from app.api.prediction_yearly import router as prediction_yearly_router
 from app.api.reports import router as reports_router
+from app.api.realtime_context import router as realtime_context_router
 
 
 
@@ -68,6 +69,7 @@ app.include_router(prediction_yearly_router)
 def health_check():
     return {"status": "ok"}
 app.include_router(reports_router)
+app.include_router(realtime_context_router)
 
 # =====================================================
 # FRONTEND SERVING (SAFE, MINIMAL)

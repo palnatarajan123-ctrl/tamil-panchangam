@@ -172,9 +172,10 @@ export function adaptBirthChart(raw: any): BirthChartUIModel {
   const planetsByRasiIndex: Record<string, number> = {};
 
   Object.entries(view.charts?.D1 ?? {}).forEach(
-    ([rasi, planets]: [string, string[]]) => {
+    ([rasi, planets]) => {
+      if (!Array.isArray(planets)) return;
       const rasiIndex = rasiToIndex(rasi);
-      planets.forEach((planet) => {
+      (planets as string[]).forEach((planet) => {
         planetsByRasiIndex[planet] = rasiIndex;
       });
     }
