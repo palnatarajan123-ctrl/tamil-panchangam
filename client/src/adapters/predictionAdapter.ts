@@ -65,13 +65,10 @@ export function adaptMonthlyPrediction(details: any) {
         synth.score >= 45 ? "Mixed" :
         "Challenging",
 
-      // ✅ FIXED: aligned with backend schema (summary, confidence_explanation)
+      // ✅ FIXED: aligned with backend schema (summary only, no duplicate detail)
       summary: interp?.summary ?? "No summary available.",
   
-      detail:
-        interp?.confidence_explanation ??
-        interp?.summary ??
-        "Detailed interpretation not available.",
+      detail: null,
       };
   });
 

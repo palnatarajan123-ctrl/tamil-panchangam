@@ -195,8 +195,10 @@ export function MonthlyPredictionView({
                 </AccordionTrigger>
 
                 <AccordionContent className="space-y-2 text-sm">
-                  <p className="font-medium">{area.summary}</p>
-                  <p className="text-muted-foreground">{area.detail}</p>
+                  <p>{area.summary}</p>
+                  {area.detail && (
+                    <p className="text-muted-foreground">{area.detail}</p>
+                  )}
                 </AccordionContent>
               </AccordionItem>
             ))}
