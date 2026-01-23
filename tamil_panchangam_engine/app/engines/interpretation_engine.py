@@ -17,40 +17,11 @@ def build_interpretation_from_synthesis(
     - MUST NOT generate narrative prose
     """
 
-    life_areas = synthesis.get("life_areas", {})
-
-    # -------------------------------------------------
-    # 🔧 SAFETY: if life areas only have score/confidence,
-    # allow interpretation builder to proceed anyway
-    # -------------------------------------------------
-    minimal = True
-    for v in life_areas.values():
-        if isinstance(v, dict) and (
-            "signals" in v or "contributors" in v
-        ):
-            minimal = False
-            break
-
-    if minimal:
-        # Pass through minimal structure
-        interpretation = {
-            "interpretation": {
-                area: {
-                    "summary": None,  # builder will generate
-                    "tone": None,
-                    "confidence": data.get("confidence", 0.5),
-                    "confidence_explanation": None,
-                }
-                for area, data in life_areas.items()
-            },
-            "narrative_style": "short",
-            "engine_version": "interpretation-engine-fallback-v1",
-        }
-    else:
-        interpretation = build_interpretation(
-            synthesis=synthesis,
-            narrative_style="short"
-        )
+    # Always use the builder - it handles both minimal and full structures
+    interpretation = build_interpretation(
+        synthesis=synthesis,
+        narrative_style="short"
+    )
 
     return {
         **interpretation,
