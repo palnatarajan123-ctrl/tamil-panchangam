@@ -132,6 +132,9 @@ Press the **green Run button** to start both services automatically.
 - Visibility gating respects `_visibility` metadata or explicit level parameter
 
 ## Recent Changes
+- 2026-01-23: Added explainability toggle UI to prediction screen (minimal/standard/full)
+- 2026-01-23: Extended AI Interpretation to weekly and yearly prediction endpoints
+- 2026-01-23: Removed redundant NarrativeCard and AntarRemediesCard (content now in AI Interpretation)
 - 2026-01-23: Refactored Prediction UI to use AI Interpretation v1.0 as single source of truth
 - 2026-01-23: Created aiInterpretationAdapter.ts with strict field omission (no fallbacks)
 - 2026-01-23: Deprecated legacy predictionAdapter.ts
