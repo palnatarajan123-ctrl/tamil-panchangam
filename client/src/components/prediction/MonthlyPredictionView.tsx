@@ -118,7 +118,7 @@ function LifeAreaCard({ area, showAttribution }: LifeAreaCardProps) {
                       className="text-xs"
                       data-testid={`badge-signal-${area.key}-${idx}`}
                     >
-                      {signal.engine} ({signal.valence}, {signal.weight.toFixed(2)})
+                      {signal.engine} ({signal.valence}{signal.weight != null ? `, ${signal.weight.toFixed(2)}` : ""})
                     </Badge>
                   ))}
                 </div>
