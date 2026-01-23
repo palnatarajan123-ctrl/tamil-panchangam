@@ -1,0 +1,163 @@
+You are working on the Tamil Panchangam Astrology Engine (FastAPI backend + React/TS frontend with shadcn/ui).
+
+GOAL:
+Refactor the Birth Chart + Prediction UI to align with the new AI Interpretation Engine (ai-interpretation-v1.0), without changing astrology computation or breaking existing charts.
+
+========================
+HARD CONSTRAINTS
+========================
+- DO NOT modify any astrology engines or synthesis logic
+- DO NOT remove Rāsi (D1) or Navamsa (D9) chart components
+- DO NOT change backend prediction APIs
+- DO NOT remove PDF generation or Generate Prediction functionality
+- DO NOT reintroduce tabbed clutter (Rasi / Nakshatra / Houses)
+- This is a UI + adapter refactor ONLY
+
+========================
+KEEP AS-IS (NO CHANGES)
+========================
+1. Rāsi Chart (D1) — visual component unchanged
+2. Navamsa Chart (D9) — visual component unchanged
+3. Birth Details card (date, time, place)
+4. Lifetime Vimshottari Mahadasha timeline (reference context)
+5. "Download Birth Chart PDF" button
+6. "Generate Predictions" button
+   - Must generate prediction for *current date/time* using locked birth chart
+
+========================
+REMOVE / DEPRECATE
+========================
+- Rasi / Nakshatra / Houses tab switcher in the middle section
+- Any duplicated textual astrology explanations tied to those tabs
+
+========================
+NEW MIDDLE SECTION (REPLACE ENTIRELY)
+========================
+Create a single unified component:
+
+📌 Component name:
+`BirthAstroContextTable`
+
+📌 Purpose:
+Provide a deterministic, readable snapshot of *birth + current astrological context* used for prediction.
+
+📌 Layout:
+A single table (or card-table hybrid) with grouped rows.
+
+📌 Sections (in this exact order):
+
+1️⃣ Birth Reference
+- Janma Nakshatra
+- Janma Rasi
+- Lagna
+- Moon Sign
+- Nakshatra Lord
+- Birth Dasha (Mahadasha / Antardasha at birth)
+
+2️⃣ Active Dasha Context (NOW)
+- Current Mahadasha
+- Current Antardasha
+- Dasha balance (% remaining)
+- Active functional role planets (Yogakaraka / Maraka if any)
+
+3️⃣ Transit / Gochara Context
+- Jupiter transit (from Moon house + effect)
+- Saturn transit (phase + effect)
+- Rahu–Ketu axis + theme
+
+4️⃣ Nakshatra & Timing Context
+- Current Moon Nakshatra
+- Tara Bala classification
+- Chandra Gati dominant mood
+- Favorable / sensitive window summary
+
+5️⃣ Pakshi / Rhythm Context (if available)
+- Dominant Pakshi
+- Activity phase
+(If unavailable, render “—” safely)
+
+📌 Rendering rules:
+- No paragraphs
+- No astrology prose
+- Deterministic values only
+- Safe defaults if any signal missing
+
+========================
+AI INTERPRETATION INTEGRATION
+========================
+Below the table, render the AI Interpretation Engine output:
+
+📌 Use ONLY:
+`ai_interpretation.engine_version === "ai-interpretation-v1.0"`
+
+📌 Structure:
+1. Window Summary (Level 1)
+   - Momentum
+   - Overview text
+   - Outcome mode
+   - Timing guidance (if present)
+
+2. Life Area Cards (Level 2)
+   - career
+   - finance
+   - relationships
+   - health
+   - personal_growth
+
+Each card shows:
+- Score
+- Outlook
+- Summary
+- Deeper explanation
+
+📌 Explainability Mode:
+- UI uses `standard` mode by default
+- Add a small toggle (Minimal / Standard / Full)
+- Toggle must apply `apply_explainability()` WITHOUT regenerating content
+
+========================
+ADAPTER WORK (CRITICAL)
+========================
+Create a new adapter:
+
+📁 client/src/adapters/aiInterpretationAdapter.ts
+
+Responsibilities:
+- Accept backend `ai_interpretation` object
+- Validate engine_version
+- Normalize fields for UI
+- Never fallback to "No summary available"
+- Throw explicit error if schema mismatch
+
+Update prediction page to:
+- Use this adapter instead of legacy interpretation adapters
+- Remove all legacy interpretation wiring
+
+========================
+STATE & ERROR HANDLING
+========================
+- Loading: skeletons only
+- Error: show schema error message (not astrology fallback text)
+- Never display repeated or placeholder astrology text
+
+========================
+INVENTORY UPDATE
+========================
+After implementation, update:
+`docs/prediction_signal_inventory.md`
+
+Add:
+- UI Context Table (BirthAstroContextTable)
+- AI Interpretation Engine v1.0 consumption
+- Explainability mode support
+
+========================
+FINAL CHECK
+========================
+- UI has fewer sections but more clarity
+- Charts remain untouched
+- Predictions vary by date
+- No repeated interpretation text
+- AI interpretation is the single source of narrative truth
+
+Proceed caref

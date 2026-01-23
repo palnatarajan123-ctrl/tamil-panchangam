@@ -1,6 +1,7 @@
 // client/src/pages/chart-detail.tsx
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 
 import {
@@ -8,14 +9,29 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 import { StatusBadge } from "@/components/status-badge";
 import { DashaTimeline } from "@/components/DashaTimeline";
 import { ChartPair } from "@/components/ChartPair";
+import { 
+  BirthAstroContextTable, 
+  adaptBirthChartToAstroContext 
+} from "@/components/BirthAstroContextTable";
 
 import {
   ArrowLeft,
@@ -25,13 +41,41 @@ import {
   User,
   Sparkles,
   Download,
+  Loader2,
+  TrendingUp,
+  Activity,
+  Eye,
 } from "lucide-react";
 
 import { apiRequest } from "@/lib/queryClient";
 import { adaptBirthChart } from "@/adapters/birthChartAdapter";
+import { 
+  adaptAIInterpretation, 
+  type PredictionViewModel,
+  type ExplainabilityLevel,
+} from "@/adapters/aiInterpretationAdapter";
+
+const OUTLOOK_COLORS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  positive: "default",
+  favorable: "default",
+  neutral: "secondary",
+  challenging: "destructive",
+};
+
+function getScoreColor(score: number): string {
+  if (score >= 70) return "text-green-600 dark:text-green-400";
+  if (score >= 50) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400";
+}
 
 export default function ChartDetail() {
   const { id: chartId } = useParams<{ id: string }>();
+  const [explainabilityLevel, setExplainabilityLevel] = useState<ExplainabilityLevel>("standard");
+  const [rawInterpretation, setRawInterpretation] = useState<any>(null);
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
 
   const {
     data: rawView,
@@ -53,6 +97,28 @@ export default function ChartDetail() {
       throw new Error("Invalid birth chart response shape");
     },
   });
+
+  const generatePrediction = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/prediction/monthly", {
+        base_chart_id: chartId,
+        year: currentYear,
+        month: currentMonth,
+      });
+      if (!res.ok) throw new Error("Failed to generate prediction");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const aiInterpretation = data?.interpretation?.ai_interpretation;
+      if (aiInterpretation) {
+        setRawInterpretation(aiInterpretation);
+      }
+    },
+  });
+
+  const prediction = rawInterpretation
+    ? adaptAIInterpretation(rawInterpretation, explainabilityLevel)
+    : null;
 
   if (isLoading) {
     return (
@@ -117,111 +183,189 @@ export default function ChartDetail() {
             d1={{
               lagna: ui.southIndianChart.lagna,
               planets: ui.southIndianChart.planets,
-              title: "Rāsi Chart (D1)",          // ✅ explicit
-              subtitle: "South Indian",
             }}
             d9={{
               lagna: ui.navamsaChart.lagna,
               planets: ui.navamsaChart.planets,
               dignity: ui.navamsaChart.dignity,
-              title: "Navamsa Chart (D9)",       // ✅ FIXED
-              subtitle: "South Indian",
             }}
           />
 
-          <Tabs defaultValue="rasi">
-            <TabsList className="inline-grid grid-cols-3 w-fit bg-muted/50">
-              <TabsTrigger value="rasi">Rāsi</TabsTrigger>
-              <TabsTrigger value="nakshatra">Nakshatra</TabsTrigger>
-              <TabsTrigger value="houses">Houses</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="rasi">
-              <Card className="border-muted">
-                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 py-6">
-                  {ui.rasi.map((r) => (
-                    <div key={r.name}>
-                      <div className="font-medium mb-1">{r.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {r.planets.join(", ") || "—"}
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="nakshatra">
-              <Card className="border-muted">
-                <CardContent className="py-6 space-y-6">
-                  {ui.nakshatra
-                    .filter((n) => n.planets.length > 0)
-                    .map((n) => {
-                      const isJanma = n.planets.includes("Moon");
-                      return (
-                        <div
-                          key={n.name}
-                          className={`rounded-lg border p-4 ${
-                            isJanma
-                              ? "border-primary bg-primary/5"
-                              : "border-muted bg-muted/20"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="font-medium text-lg">
-                              {n.name}
-                            </div>
-                            {isJanma && (
-                              <span className="text-xs font-semibold text-primary">
-                                Janma Nakshatra
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm">
-                            Planets:{" "}
-                            <span className="font-medium">
-                              {n.planets.join(", ")}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="houses">
-              <Card className="border-muted">
-                <CardContent className="space-y-4 py-6">
-                  {ui.houses.map((h) => (
-                    <div
-                      key={h.number}
-                      className="border-l-2 border-muted pl-4 py-3"
-                    >
-                      <div className="font-medium mb-1">
-                        House {h.number} · {h.rasi}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Lord: {h.lord} · {h.significations}
-                      </div>
-                      <div className="text-sm">
-                        Planets: {h.planets.join(", ") || "—"}
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          <BirthAstroContextTable 
+            data={adaptBirthChartToAstroContext(ui)} 
+          />
 
           <DashaTimeline
             timeline={ui.vimshottari.timeline}
             current={
               ui.vimshottari.current
-                ? { lord: ui.vimshottari.current.lord }
+                ? {
+                    maha: {
+                      lord: ui.vimshottari.current.lord,
+                      start: ui.vimshottari.current.start,
+                      end: ui.vimshottari.current.end,
+                      is_partial: ui.vimshottari.current.is_partial,
+                    },
+                    antar: ui.vimshottari.current.antar ?? null,
+                  }
                 : undefined
             }
           />
+
+          {/* AI Interpretation Section */}
+          <Card className="border-muted" data-testid="card-ai-interpretation">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    AI Interpretation
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    {prediction 
+                      ? `${new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long', year: 'numeric' })} outlook`
+                      : "Generate a prediction to see personalized insights"
+                    }
+                  </CardDescription>
+                </div>
+
+                {prediction && (
+                  <ToggleGroup
+                    type="single"
+                    value={explainabilityLevel}
+                    onValueChange={(val) => {
+                      if (val) {
+                        setExplainabilityLevel(val as ExplainabilityLevel);
+                      }
+                    }}
+                    className="border rounded-md"
+                    data-testid="toggle-explainability"
+                  >
+                    <ToggleGroupItem value="minimal" size="sm" data-testid="toggle-minimal">
+                      <Eye className="h-3 w-3 mr-1" />
+                      Minimal
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="standard" size="sm" data-testid="toggle-standard">
+                      Standard
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="full" size="sm" data-testid="toggle-full">
+                      Full
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                )}
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              {!prediction ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">
+                    Generate a prediction for this month to see AI-powered insights
+                  </p>
+                  <Button
+                    onClick={() => generatePrediction.mutate()}
+                    disabled={generatePrediction.isPending}
+                    data-testid="button-generate-interpretation"
+                  >
+                    {generatePrediction.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate This Month's Prediction
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Window Summary */}
+                  {prediction.windowSummary && (
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-3" data-testid="card-window-summary">
+                      <div className="flex items-center gap-2">
+                        {prediction.windowSummary.momentum === "growth" ? (
+                          <TrendingUp className="h-5 w-5 text-green-500" />
+                        ) : (
+                          <Activity className="h-5 w-5 text-amber-500" />
+                        )}
+                        <Badge variant="outline">
+                          {prediction.windowSummary.momentum}
+                        </Badge>
+                        {prediction.windowSummary.outcomeMode && (
+                          <Badge variant="secondary">
+                            {prediction.windowSummary.outcomeMode}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm" data-testid="text-overview">
+                        {prediction.windowSummary.overview}
+                      </p>
+                      {prediction.windowSummary.timingGuidance && (
+                        <p className="text-xs text-muted-foreground" data-testid="text-timing">
+                          {prediction.windowSummary.timingGuidance}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Life Areas */}
+                  {prediction.lifeAreas && prediction.lifeAreas.length > 0 && (
+                    <div>
+                      <h4 className="font-medium mb-3 flex items-center gap-2">
+                        Life Areas
+                      </h4>
+                      <Accordion type="single" collapsible className="space-y-2">
+                        {prediction.lifeAreas.map((area) => (
+                          <AccordionItem 
+                            key={area.key} 
+                            value={area.key}
+                            className="border rounded-lg px-4"
+                            data-testid={`accordion-item-${area.key}`}
+                          >
+                            <AccordionTrigger data-testid={`accordion-trigger-${area.key}`}>
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <span className="font-medium">{area.label}</span>
+                                <Badge 
+                                  variant={OUTLOOK_COLORS[area.outlook] ?? "secondary"}
+                                  data-testid={`badge-outlook-${area.key}`}
+                                >
+                                  {area.outlook}
+                                </Badge>
+                                <span 
+                                  className={`text-sm font-mono ${getScoreColor(area.score)}`}
+                                  data-testid={`text-score-${area.key}`}
+                                >
+                                  {area.score}
+                                </span>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="space-y-3 text-sm pb-4">
+                              <p data-testid={`text-summary-${area.key}`}>
+                                {area.summary}
+                              </p>
+                              {explainabilityLevel !== "minimal" && area.deeperExplanation && (
+                                <div 
+                                  className="bg-muted/50 p-3 rounded-md"
+                                  data-testid={`text-explanation-${area.key}`}
+                                >
+                                  <p className="text-muted-foreground">
+                                    {area.deeperExplanation}
+                                  </p>
+                                </div>
+                              )}
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Sidebar */}

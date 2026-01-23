@@ -132,6 +132,10 @@ Press the **green Run button** to start both services automatically.
 - Visibility gating respects `_visibility` metadata or explicit level parameter
 
 ## Recent Changes
+- 2026-01-23: Refactored Birth Chart UI with BirthAstroContextTable (5 grouped sections)
+- 2026-01-23: Removed Rasi/Nakshatra/Houses tab switcher from chart detail page
+- 2026-01-23: Added AI Interpretation section with explainability toggle on chart detail page
+- 2026-01-23: Created prediction_signal_inventory.md documentation
 - 2026-01-23: Added explainability toggle UI to prediction screen (minimal/standard/full)
 - 2026-01-23: Extended AI Interpretation to weekly and yearly prediction endpoints
 - 2026-01-23: Removed redundant NarrativeCard and AntarRemediesCard (content now in AI Interpretation)
