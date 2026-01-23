@@ -57,8 +57,9 @@ def get_realtime_context(base_chart_id: str):
         else json.loads(base_chart["payload"])
     )
     
-    moon_data = payload.get("moon", {})
-    birth_moon_longitude = moon_data.get("longitude", 0.0)
+    ephemeris = payload.get("ephemeris", {})
+    moon_data = ephemeris.get("moon", {})
+    birth_moon_longitude = moon_data.get("longitude_deg", 0.0)
     birth_moon_rasi = moon_data.get("rasi", "Aries")
     
     if birth_moon_rasi in ENGLISH_TO_TAMIL_RASI.values():
@@ -67,12 +68,14 @@ def get_realtime_context(base_chart_id: str):
                 birth_moon_rasi = eng
                 break
     
-    nakshatra_data = payload.get("nakshatra", {})
+    panchangam = payload.get("panchangam_birth", {})
+    nakshatra_data = panchangam.get("nakshatra", {})
     birth_nakshatra = nakshatra_data.get("name", "Ashwini")
     if not birth_nakshatra:
-        birth_nakshatra = moon_data.get("nakshatra", "Ashwini")
+        moon_nak = moon_data.get("nakshatra", {})
+        birth_nakshatra = moon_nak.get("name", "Ashwini") if isinstance(moon_nak, dict) else "Ashwini"
     
-    lagna = payload.get("lagna", {})
+    lagna = ephemeris.get("lagna", {})
     birth_lagna_rasi = lagna.get("rasi", None)
     if birth_lagna_rasi in ENGLISH_TO_TAMIL_RASI.values():
         for eng, tam in ENGLISH_TO_TAMIL_RASI.items():
@@ -80,9 +83,9 @@ def get_realtime_context(base_chart_id: str):
                 birth_lagna_rasi = eng
                 break
     
-    coords = payload.get("coordinates", {})
-    latitude = coords.get("latitude", 13.0827)
-    longitude = coords.get("longitude", 80.2707)
+    birth_details = payload.get("birth_details", {})
+    latitude = birth_details.get("latitude", 13.0827)
+    longitude = birth_details.get("longitude", 80.2707)
     
     context = compute_realtime_context(
         birth_moon_longitude=birth_moon_longitude,

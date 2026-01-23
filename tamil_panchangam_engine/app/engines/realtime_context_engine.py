@@ -49,6 +49,7 @@ def compute_realtime_context(
     now_utc = reference_time_utc or datetime.now(timezone.utc)
     
     logger.debug(f"Computing realtime context for {now_utc}")
+    logger.debug(f"Inputs: moon_long={birth_moon_longitude}, moon_rasi={birth_moon_rasi}, nakshatra={birth_nakshatra}, lagna={birth_lagna_rasi}")
     
     result = {
         "computed_at": now_utc.isoformat(),
@@ -58,6 +59,7 @@ def compute_realtime_context(
     }
     
     try:
+        logger.debug(f"Calling gochara with natal_moon_rasi={birth_moon_rasi}, natal_lagna_rasi={birth_lagna_rasi}")
         gochara = compute_gochara(
             reference_date_utc=now_utc,
             latitude=latitude,
@@ -65,10 +67,11 @@ def compute_realtime_context(
             natal_moon_rasi=birth_moon_rasi,
             natal_lagna_rasi=birth_lagna_rasi,
         )
+        logger.debug(f"Gochara result: {gochara}")
         
         jupiter_transit = gochara.get("jupiter", {})
         saturn_transit = gochara.get("saturn", {})
-        rahu_ketu = gochara.get("rahu_ketu_axis", {})
+        rahu_ketu = gochara.get("rahu_ketu", {})
         
         result["transit_context"] = {
             "jupiter_transit": _format_transit(jupiter_transit, "Jupiter"),
@@ -77,7 +80,7 @@ def compute_realtime_context(
         }
         
     except Exception as e:
-        logger.warning(f"Gochara computation failed: {e}")
+        logger.warning(f"Gochara computation failed: {e}", exc_info=True)
         result["transit_context"] = {
             "jupiter_transit": None,
             "saturn_transit": None,
@@ -92,14 +95,33 @@ def compute_realtime_context(
             longitude=longitude,
         )
         
-        tara_bala = nakshatra_ctx.get("tara_bala", {})
         current_nak = nakshatra_ctx.get("current_nakshatra", "")
+        tara_name = nakshatra_ctx.get("tara_name", "")
+        quality = nakshatra_ctx.get("quality", "neutral")
+        
+        tara_bala_display = f"{tara_name}" if tara_name else None
+        if tara_bala_display and quality:
+            quality_label = {
+                "favorable": "Favorable",
+                "challenging": "Caution",
+                "neutral": "Neutral",
+            }.get(quality, "")
+            if quality_label:
+                tara_bala_display = f"{tara_name} ({quality_label})"
+        
+        favorable_window = None
+        if quality == "favorable":
+            favorable_window = "Yes - Auspicious period"
+        elif quality == "challenging":
+            favorable_window = "Caution advised"
+        else:
+            favorable_window = "Neutral"
         
         result["nakshatra_timing_context"] = {
             "current_moon_nakshatra": current_nak,
-            "tara_bala": _format_tara_bala(tara_bala),
+            "tara_bala": tara_bala_display,
             "chandra_gati": None,
-            "favorable_window": _compute_favorable_window(tara_bala),
+            "favorable_window": favorable_window,
         }
         
     except Exception as e:
@@ -119,7 +141,9 @@ def compute_realtime_context(
             latitude=latitude,
             longitude=longitude,
         )
-        result["nakshatra_timing_context"]["chandra_gati"] = chandra_gati.get("summary", {}).get("overall_mood", None)
+        dominant_moods = chandra_gati.get("dominant_moods", [])
+        if dominant_moods:
+            result["nakshatra_timing_context"]["chandra_gati"] = ", ".join(dominant_moods[:2]).capitalize() if len(dominant_moods) > 1 else dominant_moods[0].capitalize()
         
     except Exception as e:
         logger.warning(f"Chandra Gati computation failed: {e}")
@@ -155,8 +179,8 @@ def _format_transit(transit: Dict, planet: str) -> Optional[str]:
     if not transit:
         return None
     
-    rasi = transit.get("rasi", "")
-    house = transit.get("house_from_moon", "")
+    rasi = transit.get("transit_rasi", "") or transit.get("rasi", "")
+    house = transit.get("from_moon_house", "") or transit.get("house_from_moon", "")
     effect = transit.get("effect", "neutral")
     
     if rasi and house:
@@ -176,8 +200,8 @@ def _format_saturn_transit(transit: Dict) -> Optional[str]:
     if not transit:
         return None
     
-    rasi = transit.get("rasi", "")
-    house = transit.get("house_from_moon", "")
+    rasi = transit.get("transit_rasi", "") or transit.get("rasi", "")
+    house = transit.get("from_moon_house", "") or transit.get("house_from_moon", "")
     phase = transit.get("phase", "neutral")
     
     if rasi and house:
@@ -200,8 +224,8 @@ def _format_rahu_ketu(axis: Dict) -> Optional[str]:
     if not axis:
         return None
     
-    rahu_house = axis.get("rahu_house", "")
-    ketu_house = axis.get("ketu_house", "")
+    rahu_house = axis.get("rahu_from_moon_house", "") or axis.get("rahu_house", "")
+    ketu_house = axis.get("ketu_from_moon_house", "") or axis.get("ketu_house", "")
     theme = axis.get("theme", "")
     
     if rahu_house and ketu_house:
