@@ -9,7 +9,9 @@ from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.engines.weekly_prediction_envelope import build_weekly_prediction_envelope
 from app.engines.synthesis_engine import synthesize_from_envelope
 from app.engines.interpretation_engine import build_interpretation_from_synthesis
+from app.engines.paraphrasing_engine import paraphrase_interpretation
 from app.engines.explainability_engine import build_explainability
+from app.engines.ai_interpretation_engine import generate_interpretation as generate_ai_interpretation
 
 # OPTIONAL (recommended): persist weekly predictions like monthly
 try:
@@ -105,6 +107,17 @@ def generate_weekly_prediction(payload: dict, db=Depends(get_db)):
         envelope=envelope,
         synthesis=synthesis,
     )
+
+    approx_month = min(12, max(1, (int(week) - 1) // 4 + 1))
+    ai_interpretation = generate_ai_interpretation(
+        envelope=envelope,
+        synthesis=synthesis,
+        year=int(year),
+        month=approx_month,
+    )
+
+    interpretation = paraphrase_interpretation(interpretation)
+    interpretation["ai_interpretation"] = ai_interpretation
 
     explainability = build_explainability(
         dasha_context=envelope["dasha_context"],

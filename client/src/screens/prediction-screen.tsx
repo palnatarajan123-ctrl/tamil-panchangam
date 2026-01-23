@@ -5,8 +5,6 @@ import { usePrediction } from "@/hooks/usePrediction";
 import { MonthlyPredictionView } from "@/components/prediction/MonthlyPredictionView";
 import { ExplainabilityDrawer } from "@/components/prediction/ExplainabilityDrawer";
 import { AntarExplanationCard } from "@/components/prediction/AntarExplanationCard";
-import { AntarRemediesCard } from "@/components/prediction/AntarRemediesCard";
-import { NarrativeCard } from "@/components/prediction/NarrativeCard";
 import { DashaTimeline } from "@/components/DashaTimeline";
 
 import { PredictionTimelineControl } from "@/components/prediction/PredictionTimelineControl";
@@ -15,7 +13,7 @@ import {
   adaptAIInterpretation,
   extractAIInterpretation,
   hasValidAIInterpretation,
-  type PredictionViewModel,
+  type ExplainabilityLevel,
 } from "@/adapters/aiInterpretationAdapter";
 
 import { Button } from "@/components/ui/button";
@@ -27,7 +25,14 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Download } from "lucide-react";
+import { Download, Eye, EyeOff, Layers } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /* -------------------------------------------------
    Helpers
@@ -57,6 +62,7 @@ export default function PredictionScreen() {
 
   const [period, setPeriod] = useState<"monthly" | "weekly" | "yearly">("monthly");
   const [year, setYear] = useState(baseYear);
+  const [explainabilityLevel, setExplainabilityLevel] = useState<ExplainabilityLevel>("standard");
 
   /**
    * Unified cursor:
@@ -135,19 +141,55 @@ export default function PredictionScreen() {
           {/* -------------------------------------------------
               Download
           -------------------------------------------------- */}
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() =>
-              window.open(
-                `/api/reports/prediction/${id}/${year}/full-report/pdf`,
-                "_blank"
-              )
-            }
-          >
-            <Download className="h-4 w-4" />
-            Download Full Report (PDF)
-          </Button>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() =>
+                window.open(
+                  `/api/reports/prediction/${id}/${year}/full-report/pdf`,
+                  "_blank"
+                )
+              }
+              data-testid="button-download-pdf"
+            >
+              <Download className="h-4 w-4" />
+              Download Full Report (PDF)
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Detail Level:</span>
+              <Select
+                value={explainabilityLevel}
+                onValueChange={(v) => setExplainabilityLevel(v as ExplainabilityLevel)}
+              >
+                <SelectTrigger className="w-32" data-testid="select-explainability">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="minimal" data-testid="option-minimal">
+                    <div className="flex items-center gap-2">
+                      <EyeOff className="h-3 w-3" />
+                      Minimal
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="standard" data-testid="option-standard">
+                    <div className="flex items-center gap-2">
+                      <Eye className="h-3 w-3" />
+                      Standard
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="full" data-testid="option-full">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-3 w-3" />
+                      Full
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           <Separator className="my-4" />
 
@@ -156,7 +198,7 @@ export default function PredictionScreen() {
           -------------------------------------------------- */}
           {hasValidAIInterpretation(data.details) && (
             <MonthlyPredictionView
-              prediction={adaptAIInterpretation(extractAIInterpretation(data.details)!)}
+              prediction={adaptAIInterpretation(extractAIInterpretation(data.details)!, explainabilityLevel)}
               period={period}
             />
           )}
@@ -165,23 +207,6 @@ export default function PredictionScreen() {
             <>
               <Separator className="my-6" />
               <AntarExplanationCard antar={dashaContext.active.antar} />
-            </>
-          )}
-
-          {data?.details?.envelope?.narrative && (
-            <>
-              <Separator className="my-6" />
-              <NarrativeCard narrative={data.details.envelope.narrative} />
-            </>
-          )}
-
-          {dashaContext?.antar_explanation?.remedies && (
-            <>
-              <Separator className="my-6" />
-              <AntarRemediesCard
-                remedies={dashaContext.antar_explanation.remedies}
-                cautionLevel={dashaContext.antar_explanation.caution_level}
-              />
             </>
           )}
 

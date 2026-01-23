@@ -9,7 +9,9 @@ from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.engines.yearly_prediction_envelope import build_yearly_prediction_envelope
 from app.engines.synthesis_engine import synthesize_from_envelope
 from app.engines.interpretation_engine import build_interpretation_from_synthesis
+from app.engines.paraphrasing_engine import paraphrase_interpretation
 from app.engines.explainability_engine import build_explainability
+from app.engines.ai_interpretation_engine import generate_interpretation as generate_ai_interpretation
 
 router = APIRouter(prefix="/prediction", tags=["Prediction"])
 
@@ -95,6 +97,16 @@ def generate_yearly_prediction(payload: dict, db=Depends(get_db)):
         envelope=envelope,
         synthesis=synthesis,
     )
+
+    ai_interpretation = generate_ai_interpretation(
+        envelope=envelope,
+        synthesis=synthesis,
+        year=int(year),
+        month=1,
+    )
+
+    interpretation = paraphrase_interpretation(interpretation)
+    interpretation["ai_interpretation"] = ai_interpretation
 
     explainability = build_explainability(
         dasha_context=envelope["dasha_context"],
