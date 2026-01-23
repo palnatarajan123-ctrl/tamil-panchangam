@@ -15,6 +15,7 @@ from app.engines.synthesis_engine import synthesize_from_envelope
 from app.engines.interpretation_engine import build_interpretation_from_synthesis
 from app.engines.paraphrasing_engine import paraphrase_interpretation
 from app.engines.explainability_engine import build_explainability
+from app.engines.ai_interpretation_engine import generate_interpretation as generate_ai_interpretation
 
 
 # -------------------------------------------------
@@ -44,10 +45,15 @@ def run_prediction_pipeline(
         synthesis=synthesis,
     )
 
-    interpretation = paraphrase_interpretation(
-        interpretation,
-        enabled=True,
+    ai_interpretation = generate_ai_interpretation(
+        envelope=envelope,
+        synthesis=synthesis,
+        year=year,
+        month=month,
     )
+
+    interpretation = paraphrase_interpretation(interpretation)
+    interpretation["ai_interpretation"] = ai_interpretation
 
     explainability = build_explainability(
         dasha_context=envelope["dasha_context"],
@@ -60,6 +66,7 @@ def run_prediction_pipeline(
         "envelope": envelope,
         "synthesis": synthesis,
         "interpretation": interpretation,
+        "ai_interpretation": ai_interpretation,
         "explainability": explainability.model_dump(),
     }
 

@@ -17,6 +17,7 @@ from app.engines.synthesis_engine import synthesize_from_envelope
 from app.engines.interpretation_engine import build_interpretation_from_synthesis
 from app.engines.paraphrasing_engine import paraphrase_interpretation
 from app.engines.explainability_engine import build_explainability
+from app.engines.ai_interpretation_engine import generate_interpretation as generate_ai_interpretation
 
 from app.models.schema import (
     MonthlyPredictionRequest,
@@ -160,7 +161,22 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
         )
 
         # -------------------------------------------------
-        # 6. Paraphrasing
+        # 6. AI Interpretation (Level 1-3 structured output)
+        # -------------------------------------------------
+        ai_interpretation = generate_ai_interpretation(
+            envelope=envelope,
+            synthesis=synthesis,
+            year=payload.year,
+            month=payload.month,
+        )
+
+        print(
+            "DEBUG AI interpretation generated with momentum =",
+            ai_interpretation.get("window_summary", {}).get("momentum")
+        )
+
+        # -------------------------------------------------
+        # 7. Paraphrasing (legacy interpretation)
         # -------------------------------------------------
         interpretation = paraphrase_interpretation(
             interpretation
@@ -175,6 +191,8 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             raise RuntimeError(
                 "Interpretation schema violation after paraphrasing"
             )
+        
+        interpretation["ai_interpretation"] = ai_interpretation
 
         # -------------------------------------------------
         # 7. Persist
