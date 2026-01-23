@@ -1,0 +1,236 @@
+Prompt 1:
+PREDICTION SIGNAL EXPANSION (LOCKED SCOPE)
+Context:
+This is a FastAPI-based South Indian astrology engine already deployed on Replit.
+Core components already exist:
+•	Birth chart (Rasi)
+•	Navamsa (D9)
+•	Mahadasha + Antar Dasha
+•	Monthly prediction pipeline (envelope → synthesis → interpretation)
+The current issue is that predictions are static and repetitive because only slow-moving signals (Dashas) are used.
+Your task is to add missing, canonical South Indian astrology prediction signals while keeping architecture clean, deterministic, and auditable.
+ 
+🎯 OBJECTIVE
+Implement motion-based and quality-based prediction signals so that:
+•	Monthly / weekly predictions actually change
+•	Life-area text reflects real astrological movement
+•	AI (later) will only explain already-derived signals
+⚠️ Do NOT introduce generative AI yet. Deterministic only.
+ 
+🔒 HARD CONSTRAINTS (DO NOT BREAK)
+1.	Do not change existing database schemas unless explicitly required.
+2.	Do not remove or refactor existing Dashas, LifeAreaScorer, or synthesis logic.
+3.	New logic must live in new engine modules, not inside existing ones.
+4.	Every new signal must be:
+o	Deterministic
+o	Explainable
+o	Logged (debug-friendly)
+ 
+🧩 FEATURES TO IMPLEMENT (IN THIS ORDER)
+ 
+1️⃣ GOCHARA (TRANSIT) ENGINE — CRITICAL
+Create:
+app/engines/gochara_engine.py
+Responsibilities:
+•	Compute Jupiter, Saturn, Rahu, Ketu transits
+•	Evaluate transit effects from Moon sign (Chandra Rasi) and Lagna
+•	Classify results as:
+o	Favorable
+o	Neutral
+o	Challenging
+Required Outputs (structured):
+{
+  "jupiter": {
+    "from_moon_house": 7,
+    "effect": "favorable"
+  },
+  "saturn": {
+    "phase": "ashtama_sani",
+    "effect": "challenging"
+  },
+  "rahu_ketu": {
+    "axis": "6-12",
+    "effect": "disruptive"
+  }
+}
+Integrate into:
+•	prediction_envelope["gochara"]
+ 
+2️⃣ MOON TRANSIT RHYTHM (CHANDRA GATI)
+Create:
+app/engines/moon_transit_engine.py
+Responsibilities:
+•	Track Moon’s movement through signs for the prediction window
+•	Summarize emotional rhythm (not daily granularity yet)
+Example Output:
+{
+  "dominant_moods": ["restless", "reflective"],
+  "sensitive_days": [8, 19],
+  "supportive_days": [3, 14, 27]
+}
+Integrate into:
+•	prediction_envelope["chandra_gati"]
+ 
+3️⃣ NAKSHATRA + TARA BALA ENGINE
+Create:
+app/engines/nakshatra_engine.py
+Responsibilities:
+•	Compute:
+o	Birth Nakshatra
+o	Current Moon Nakshatra(s)
+o	Tara Bala classification (Janma, Sampat, Vipat, Kshemam, etc.)
+•	Output qualitative strength
+Example Output:
+{
+  "tara_bala": "vipat",
+  "quality": "unstable",
+  "note": "Caution advised in commitments"
+}
+Integrate into:
+•	prediction_envelope["nakshatra_context"]
+ 
+4️⃣ ASHTAKA VARGA VALIDATION (SCORE-ONLY)
+Create:
+app/engines/ashtakavarga_engine.py
+Responsibilities:
+•	Validate major transits (Saturn/Jupiter) against AV bindu strength
+•	No need for full AV table yet — just resistance vs support
+Example Output:
+{
+  "saturn": "low_support",
+  "jupiter": "high_support"
+}
+Integrate into:
+•	prediction_envelope["ashtakavarga"]
+ 
+5️⃣ REMEDY ENGINE (RULE-BASED)
+Create:
+app/engines/remedy_engine.py
+Responsibilities:
+•	Suggest remedies based on:
+o	Challenging gochara
+o	Weak tara bala
+o	Heavy Saturn/Rahu influence
+Example Output:
+{
+  "recommended": [
+    "Saturday charity",
+    "Hanuman mantra",
+    "Avoid major commitments on Tuesdays"
+  ]
+}
+Integrate into:
+•	prediction_envelope["remedies"]
+ 
+🔗 INTEGRATION POINTS
+Modify ONLY these existing files:
+build_monthly_prediction_envelope(...)
+•	Call the new engines
+•	Attach outputs to envelope
+•	Do not interpret here
+synthesize_from_envelope(...)
+•	Convert new signals into structured synthesis signals
+•	Feed into existing LifeAreaScorer
+ 
+🧾 INVENTORY & AUDIT REQUIREMENT (IMPORTANT)
+Create:
+/docs/PREDICTION_SIGNAL_INVENTORY.md
+For each new signal, log:
+•	Engine name
+•	Signal type (slow / fast / validation)
+•	Life areas impacted
+•	Used by (monthly / weekly / daily)
+•	Deterministic inputs
+This file must be updated as part of the implementation.
+ 
+🧪 DEBUGGING REQUIREMENTS
+•	Add DEBUG: logs for:
+o	Each new engine execution
+o	Envelope keys added
+•	No silent failures
+•	Prediction must still return 200 even if a new signal is unavailable (graceful degradation)
+ 
+🚫 DO NOT DO
+•	Do NOT add AI / LLMs
+•	Do NOT collapse logic into one giant function
+•	Do NOT touch frontend
+ 
+✅ SUCCESS CRITERIA
+After implementation:
+•	Monthly predictions differ meaningfully month-to-month
+•	Life-area scores change even under same Mahadasha
+•	Envelope contains motion + quality signals
+•	Ready to lock signal model and move into AI explanation layer
+
+
+
+
+
+
+
+
+
+
+
+
+Prompt 2:
+
+You are working inside an existing FastAPI-based Tamil Panchangam Astrology Engine.
+The system already has a stable prediction pipeline with Envelope → Synthesis → Interpretation.
+Objective:
+Implement additional deterministic astrology engines only.
+DO NOT generate natural language, prose, summaries, or AI explanations.
+ 
+Tasks
+1. Implement Drishti Engine
+•	Create app/engines/drishti_engine.py
+•	Implement Parashara aspects for Saturn, Jupiter, Mars
+•	Output structured aspect signals (planet, aspected_house, effect)
+2. Implement House Strength & Affliction Engine
+•	Create app/engines/house_strength_engine.py
+•	Compute HOUSE_STRENGTH_H* and HOUSE_AFFLICTION_H*
+•	Use natal chart only (static, deterministic)
+3. Implement Functional Benefic / Malefic Engine
+•	Create app/engines/functional_role_engine.py
+•	Determine functional role of each planet based on Lagna and lordship
+•	Output PLANET_FUNCTIONAL_ROLE
+4. Implement Selective Yoga Engine
+•	Create app/engines/yoga_engine.py
+•	Detect only:
+o	Gaja Kesari Yoga
+o	Dhana Yoga
+o	Viparita Raja Yoga
+o	Neecha Bhanga Raja Yoga (if applicable)
+5. Implement Event Window Engine
+•	Create app/engines/event_window_engine.py
+•	Use Moon transit + Tara Bala
+•	Output monthly windows: supportive, sensitive, challenging
+ 
+Integration Requirements
+•	All engines must be invoked inside prediction_envelope.py
+•	Add outputs under new envelope keys:
+o	drishti
+o	house_strength
+o	functional_roles
+o	yogas
+o	event_windows
+•	Update synthesis_engine.py to normalize new signals
+•	DO NOT modify:
+o	Existing dasha logic
+o	Existing gochara logic
+o	UI adapters
+ 
+Constraints
+•	Deterministic only
+•	No AI text generation
+•	Safe defaults on failure
+•	Add DEBUG logs for each engine
+ 
+Deliverables
+•	New engine files
+•	Envelope + synthesis wiring
+•	No breaking schema changes
+Update the documentation (Prediction Signal Inventory)
+Begin implementation incrementally and ensure the monthly prediction endpoint continues to work.
+ 
+

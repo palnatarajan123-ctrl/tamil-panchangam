@@ -13,6 +13,11 @@ from app.engines.moon_transit_engine import compute_chandra_gati
 from app.engines.nakshatra_engine import compute_nakshatra_context
 from app.engines.ashtakavarga_engine import compute_ashtakavarga_validation
 from app.engines.remedy_engine import compute_remedies
+from app.engines.drishti_engine import compute_drishti
+from app.engines.house_strength_engine import compute_all_house_strength
+from app.engines.functional_role_engine import compute_functional_roles
+from app.engines.yoga_engine import compute_yogas
+from app.engines.event_window_engine import compute_event_windows
 
 logger = logging.getLogger(__name__)
 
@@ -286,7 +291,57 @@ def build_monthly_prediction_envelope(
     )
 
     # -------------------------------------------------
-    # 12. Final Envelope (FACTS FIRST)
+    # 12. DRISHTI ENGINE - Prompt 2
+    # -------------------------------------------------
+    logger.debug("DEBUG: Computing Drishti (aspects)")
+    drishti = compute_drishti(
+        ephemeris=ephemeris,
+        houses=houses,
+        lagna_longitude=ephemeris.get("lagna", {}).get("longitude_deg", 0.0),
+    )
+
+    # -------------------------------------------------
+    # 13. HOUSE STRENGTH ENGINE - Prompt 2
+    # -------------------------------------------------
+    logger.debug("DEBUG: Computing House Strength")
+    house_strength = compute_all_house_strength(
+        ephemeris=ephemeris,
+        houses=houses,
+        drishti_data=drishti,
+    )
+
+    # -------------------------------------------------
+    # 14. FUNCTIONAL ROLE ENGINE - Prompt 2
+    # -------------------------------------------------
+    logger.debug("DEBUG: Computing Functional Roles")
+    functional_roles = compute_functional_roles(
+        ephemeris=ephemeris,
+        houses=houses,
+    )
+
+    # -------------------------------------------------
+    # 15. YOGA ENGINE - Prompt 2
+    # -------------------------------------------------
+    logger.debug("DEBUG: Computing Yogas")
+    yogas = compute_yogas(
+        ephemeris=ephemeris,
+        houses=houses,
+    )
+
+    # -------------------------------------------------
+    # 16. EVENT WINDOW ENGINE - Prompt 2
+    # -------------------------------------------------
+    logger.debug("DEBUG: Computing Event Windows")
+    event_windows = compute_event_windows(
+        birth_moon_longitude=birth_moon_longitude,
+        reference_date=reference_date_utc,
+        gochara_data=gochara,
+        latitude=latitude,
+        longitude=longitude,
+    )
+
+    # -------------------------------------------------
+    # 17. Final Envelope (FACTS FIRST)
     # -------------------------------------------------
     logger.debug(f"DEBUG: Envelope keys: gochara={bool(gochara)}, chandra_gati={bool(chandra_gati)}, nakshatra={bool(nakshatra_context)}, ashtakavarga={bool(ashtakavarga)}, remedies={bool(remedies)}")
     
@@ -326,4 +381,11 @@ def build_monthly_prediction_envelope(
         "nakshatra_context": nakshatra_context,
         "ashtakavarga": ashtakavarga,
         "remedies": remedies,
+
+        # ===== PROMPT 2 ENGINES =====
+        "drishti": drishti,
+        "house_strength": house_strength,
+        "functional_roles": functional_roles,
+        "yogas": yogas,
+        "event_windows": event_windows,
     }

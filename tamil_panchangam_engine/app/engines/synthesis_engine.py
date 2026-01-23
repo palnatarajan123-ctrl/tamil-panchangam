@@ -230,6 +230,193 @@ def synthesize_from_envelope(envelope: dict) -> dict:
         })
 
     # -------------------------------------------------
+    # DRISHTI (ASPECT) SIGNALS - Prompt 2
+    # -------------------------------------------------
+    drishti = envelope.get("drishti", {})
+    significant_aspects = drishti.get("significant_aspects", [])
+    drishti_summary = drishti.get("summary", {})
+    
+    for aspect in significant_aspects[:5]:
+        planet = aspect.get("planet", "")
+        aspected_house = aspect.get("aspected_house", 0)
+        effect = aspect.get("effect", "mixed")
+        
+        signals.append({
+            "key": f"DRISHTI_{planet}_H{aspected_house}",
+            "source": "drishti",
+            "kind": "aspect",
+            "planet": planet,
+            "house": aspected_house,
+            "valence": "pos" if effect == "supportive" else ("neg" if effect == "challenging" else "mix"),
+            "strength": 0.55,
+            "confidence": 0.70,
+            "rationale": f"{planet} aspects house {aspected_house} ({effect})",
+        })
+    
+    if drishti_summary.get("balance") == "benefic_dominant":
+        signals.append({
+            "key": "DRISHTI_BALANCE_BENEFIC",
+            "source": "drishti",
+            "kind": "aspect_summary",
+            "valence": "pos",
+            "strength": 0.45,
+            "confidence": 0.65,
+            "rationale": "Benefic aspects dominate chart",
+        })
+    elif drishti_summary.get("balance") == "malefic_dominant":
+        signals.append({
+            "key": "DRISHTI_BALANCE_MALEFIC",
+            "source": "drishti",
+            "kind": "aspect_summary",
+            "valence": "neg",
+            "strength": 0.45,
+            "confidence": 0.65,
+            "rationale": "Malefic aspects dominate chart",
+        })
+    
+    # -------------------------------------------------
+    # HOUSE STRENGTH SIGNALS - Prompt 2
+    # -------------------------------------------------
+    house_strength_data = envelope.get("house_strength", {})
+    hs_summary = house_strength_data.get("summary", {})
+    
+    for strong_house in hs_summary.get("strong_houses", []):
+        signals.append({
+            "key": f"HOUSE_STRENGTH_H{strong_house}",
+            "source": "house_strength",
+            "kind": "natal",
+            "house": strong_house,
+            "valence": "pos",
+            "strength": 0.50,
+            "confidence": 0.75,
+            "rationale": f"House {strong_house} is natally strong",
+        })
+    
+    for weak_house in hs_summary.get("weak_houses", []):
+        signals.append({
+            "key": f"HOUSE_WEAKNESS_H{weak_house}",
+            "source": "house_strength",
+            "kind": "natal",
+            "house": weak_house,
+            "valence": "neg",
+            "strength": 0.45,
+            "confidence": 0.70,
+            "rationale": f"House {weak_house} is natally weak",
+        })
+    
+    for afflicted_house in hs_summary.get("afflicted_houses", []):
+        signals.append({
+            "key": f"HOUSE_AFFLICTION_H{afflicted_house}",
+            "source": "house_strength",
+            "kind": "natal",
+            "house": afflicted_house,
+            "valence": "neg",
+            "strength": 0.55,
+            "confidence": 0.75,
+            "rationale": f"House {afflicted_house} has affliction",
+        })
+    
+    # -------------------------------------------------
+    # FUNCTIONAL ROLE SIGNALS - Prompt 2
+    # -------------------------------------------------
+    functional_roles = envelope.get("functional_roles", {})
+    fr_summary = functional_roles.get("summary", {})
+    
+    for yogakaraka in fr_summary.get("yogakarakas", []):
+        if yogakaraka in active_lords:
+            signals.append({
+                "key": f"YOGAKARAKA_ACTIVE_{yogakaraka}",
+                "source": "functional_roles",
+                "kind": "natal",
+                "planet": yogakaraka,
+                "valence": "pos",
+                "strength": 0.80,
+                "confidence": 0.85,
+                "rationale": f"{yogakaraka} is yogakaraka and currently active in dasha",
+            })
+    
+    for maraka in fr_summary.get("marakas", []):
+        if maraka in active_lords:
+            signals.append({
+                "key": f"MARAKA_ACTIVE_{maraka}",
+                "source": "functional_roles",
+                "kind": "natal",
+                "planet": maraka,
+                "valence": "neg",
+                "strength": 0.60,
+                "confidence": 0.70,
+                "rationale": f"{maraka} is maraka lord and currently active",
+            })
+    
+    # -------------------------------------------------
+    # YOGA SIGNALS - Prompt 2
+    # -------------------------------------------------
+    yogas = envelope.get("yogas", {})
+    yoga_list = yogas.get("yogas", [])
+    yoga_summary = yogas.get("summary", {})
+    
+    if yoga_summary.get("has_gaja_kesari"):
+        signals.append({
+            "key": "YOGA_GAJA_KESARI",
+            "source": "yoga",
+            "kind": "natal",
+            "valence": "pos",
+            "strength": 0.75,
+            "confidence": 0.80,
+            "rationale": "Gaja Kesari Yoga present - wisdom and leadership",
+        })
+    
+    if yoga_summary.get("has_dhana_yoga"):
+        signals.append({
+            "key": "YOGA_DHANA",
+            "source": "yoga",
+            "kind": "natal",
+            "valence": "pos",
+            "strength": 0.70,
+            "confidence": 0.75,
+            "rationale": "Dhana Yoga present - wealth potential",
+        })
+    
+    if yoga_summary.get("has_raja_yoga"):
+        signals.append({
+            "key": "YOGA_RAJA",
+            "source": "yoga",
+            "kind": "natal",
+            "valence": "pos",
+            "strength": 0.65,
+            "confidence": 0.70,
+            "rationale": "Raja Yoga present - power and success",
+        })
+    
+    # -------------------------------------------------
+    # EVENT WINDOW SIGNALS - Prompt 2
+    # -------------------------------------------------
+    event_windows = envelope.get("event_windows", {})
+    ew_summary = event_windows.get("summary", {})
+    overall_quality = ew_summary.get("overall_quality", "balanced")
+    
+    if overall_quality in ["favorable", "mildly_favorable"]:
+        signals.append({
+            "key": "EVENT_WINDOWS_FAVORABLE",
+            "source": "event_windows",
+            "kind": "timing",
+            "valence": "pos",
+            "strength": 0.55 if overall_quality == "favorable" else 0.40,
+            "confidence": 0.70,
+            "rationale": f"Monthly event windows are {overall_quality}",
+        })
+    elif overall_quality in ["challenging", "mildly_challenging"]:
+        signals.append({
+            "key": "EVENT_WINDOWS_CHALLENGING",
+            "source": "event_windows",
+            "kind": "timing",
+            "valence": "neg",
+            "strength": 0.50 if overall_quality == "challenging" else 0.35,
+            "confidence": 0.70,
+            "rationale": f"Monthly event windows are {overall_quality}",
+        })
+
+    # -------------------------------------------------
     # ACTIVE DASHA LORD SIGNALS (HOUSE-AWARE)
     # -------------------------------------------------
     for lord in active_lords:

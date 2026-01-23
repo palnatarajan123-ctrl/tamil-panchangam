@@ -194,6 +194,129 @@ Prediction pipeline continues even if individual engines fail.
 | Date | Version | Changes |
 |------|---------|---------|
 | 2026-01-23 | v1.0 | Initial EPIC Signal Expansion implementation |
+| 2026-01-23 | v2.0 | Prompt 2 implementation: Drishti, House Strength, Functional Roles, Yogas, Event Windows |
+
+---
+
+### 6. Drishti Engine (`app/engines/drishti_engine.py`) - Prompt 2
+
+| Signal | Type | Life Areas Impacted | Used By | Deterministic Inputs |
+|--------|------|---------------------|---------|---------------------|
+| `DRISHTI_{planet}_H{house}` | natal | varies by house | monthly | Planetary longitudes, Lagna |
+| `DRISHTI_BALANCE_*` | natal | all areas | monthly | All aspect calculations |
+
+**Parashara Special Aspects:**
+- Mars: 4th and 8th house aspects
+- Jupiter: 5th and 9th house aspects
+- Saturn: 3rd and 10th house aspects
+- Rahu/Ketu: 5th and 9th house aspects (like Jupiter)
+
+**Effect Classifications:**
+- supportive: Benefic planet aspect
+- challenging: Malefic planet aspect
+- protective: Malefic aspecting dusthana
+- mixed: Neutral planet aspect
+
+---
+
+### 7. House Strength Engine (`app/engines/house_strength_engine.py`) - Prompt 2
+
+| Signal | Type | Life Areas Impacted | Used By | Deterministic Inputs |
+|--------|------|---------------------|---------|---------------------|
+| `HOUSE_STRENGTH_H{n}` | natal | varies by house | monthly | Occupants, lord position, aspects |
+| `HOUSE_WEAKNESS_H{n}` | natal | varies by house | monthly | Occupants, lord position, aspects |
+| `HOUSE_AFFLICTION_H{n}` | natal | varies by house | monthly | Malefic presence/aspects |
+
+**Strength Factors:**
+- Benefic occupants: +10 points
+- Malefic in upachaya (3,6,10,11): +5 points
+- Malefic elsewhere: -8 points
+- Lord in kendra: +12 points
+- Lord in trikona: +15 points
+- Lord in dusthana: -10 points
+- Benefic aspects: +5 points each
+- Malefic aspects: -5 points each
+
+**Strength Levels:** strong (>=70), moderate (50-69), weak (30-49), very_weak (<30)
+
+**Affliction Sources:** Saturn/Rahu presence (+20), Mars/Ketu (+15), Saturn/Rahu aspect (+12), Mars aspect (+10)
+
+---
+
+### 8. Functional Role Engine (`app/engines/functional_role_engine.py`) - Prompt 2
+
+| Signal | Type | Life Areas Impacted | Used By | Deterministic Inputs |
+|--------|------|---------------------|---------|---------------------|
+| `YOGAKARAKA_ACTIVE_{planet}` | natal | all areas (strong positive) | monthly | Lagna, house lordship, active dasha |
+| `MARAKA_ACTIVE_{planet}` | natal | health, longevity | monthly | Lagna, house lordship, active dasha |
+| `PLANET_FUNCTIONAL_ROLE` | natal | varies | monthly | Lagna, house lordship |
+
+**Functional Roles:**
+- yogakaraka: Rules both trikona and kendra
+- benefic: Trikona lord without dusthana
+- malefic: Dusthana lord without trikona
+- neutral: Kendradhipati dosha (benefic owning kendra)
+- neutral_positive: Natural malefic owning kendra
+- maraka: Lords of 2nd or 7th house
+- mixed: Rules both favorable and unfavorable houses
+
+**Classical Yogakarakas by Lagna:**
+- Aries/Leo: Mars
+- Taurus/Libra/Aquarius: Saturn (Taurus), Saturn (Libra), Venus (Aquarius)
+- Cancer: Mars
+- Capricorn: Venus
+
+---
+
+### 9. Yoga Engine (`app/engines/yoga_engine.py`) - Prompt 2
+
+| Signal | Type | Life Areas Impacted | Used By | Deterministic Inputs |
+|--------|------|---------------------|---------|---------------------|
+| `YOGA_GAJA_KESARI` | natal | career, status, wisdom | monthly | Jupiter-Moon distance |
+| `YOGA_DHANA` | natal | finance, wealth | monthly | Lords of 2,5,9,11 positions |
+| `YOGA_RAJA` | natal | career, power, success | monthly | Viparita Raja detection |
+
+**Yogas Detected:**
+
+1. **Gaja Kesari Yoga**
+   - Jupiter in kendra (1,4,7,10) from Moon
+   - Effects: Leadership, wisdom, reputation, prosperity
+
+2. **Dhana Yoga**
+   - Lords of 2,5,9,11 in conjunction or mutual aspect
+   - Effects: Wealth accumulation, financial prosperity
+
+3. **Viparita Raja Yoga**
+   - Lords of 6,8,12 placed in other dusthanas
+   - Harsha Yoga: 6th lord in 8th or 12th
+   - Sarala Yoga: 8th lord in 6th or 12th
+   - Vimala Yoga: 12th lord in 6th or 8th
+   - Effects: Rise through unconventional means
+
+4. **Neecha Bhanga Raja Yoga**
+   - Debilitated planet's sign lord in kendra from Moon
+   - Effects: Success despite initial challenges
+
+---
+
+### 10. Event Window Engine (`app/engines/event_window_engine.py`) - Prompt 2
+
+| Signal | Type | Life Areas Impacted | Used By | Deterministic Inputs |
+|--------|------|---------------------|---------|---------------------|
+| `EVENT_WINDOWS_FAVORABLE` | fast | all areas | monthly | Moon transit, Tara Bala |
+| `EVENT_WINDOWS_CHALLENGING` | fast | all areas | monthly | Moon transit, Tara Bala |
+
+**Window Types:**
+- supportive: Favorable Tara Bala (Sampat, Kshemam, Sadhana, Mitra, Parama Mitra)
+- sensitive: Janma or Pratyak Tara
+- challenging: Vipat or Naidhana Tara
+
+**Overall Quality:**
+- favorable: Supportive > 2× Challenging
+- mildly_favorable: Supportive > Challenging
+- balanced: Equal distribution
+- mildly_challenging: Challenging > Supportive
+- challenging: Challenging > 2× Supportive
 
 ---
 
@@ -202,6 +325,6 @@ Prediction pipeline continues even if individual engines fail.
 - [ ] Full Ashtakavarga calculation from all 7 planets + Lagna
 - [ ] Weekly prediction granularity for Moon transits
 - [ ] Daily Tara Bala tracking
-- [ ] Planetary aspects (Drishti) engine
-- [ ] Yogas (special combinations) detection
+- [x] Planetary aspects (Drishti) engine ✓ Prompt 2
+- [x] Yogas (special combinations) detection ✓ Prompt 2
 - [ ] AI explanation layer for signal interpretation
