@@ -108,7 +108,28 @@ Press the **green Run button** to start both services automatically.
 2. **API Proxy**: Frontend `/api/*` requests are proxied to backend port 8000
 3. **Production**: Uvicorn serves both API and static frontend on port 5000
 
+## AI Interpretation Engine Governance
+
+### Contract (v1.0)
+- **Schema**: `docs/contracts/ai_interpretation_v1.schema.json`
+- **Documentation**: `docs/INTERPRETATION_CONTRACT.md`
+- Strict JSON Schema validation with fail-fast enforcement
+- 3-level structure: Window Summary, Life Areas, Attribution
+
+### Explainability Modes
+- **minimal**: Summary only (visibility flags hide details)
+- **standard**: Summary + explanation (hide signal attribution)
+- **full**: Complete output with all attribution
+
+### Key Files
+- `app/engines/ai_interpretation_engine.py` - Main interpretation engine
+- `app/engines/explainability_filter.py` - Post-processing visibility filter
+- `app/engines/synthesis_engine.py` - Signal synthesis
+
 ## Recent Changes
+- 2026-01-23: Added AI Interpretation Engine governance with JSON Schema contract
+- 2026-01-23: Created explainability filter (minimal/standard/full modes)
+- 2026-01-23: Added schema validation with fail-fast enforcement
 - 2026-01-22: Fixed startup configuration - dual server setup with Vite + Uvicorn
 - 2026-01-22: Added `allowedHosts: true` to fix Replit proxy blocking
 - 2026-01-22: Created `scripts/start-dev.sh` for parallel server startup
