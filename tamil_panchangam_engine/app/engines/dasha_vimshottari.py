@@ -156,11 +156,12 @@ def compute_vimshottari_dasha(
         current_start = end
 
     # -----------------------------
-    # Resolve CURRENT Mahadasha
+    # Resolve CURRENT Mahadasha + Antardasha
     # -----------------------------
 
     now = datetime.now(timezone.utc)
     current_dasha = None
+    current_antar = None
 
     for entry in timeline:
         start = datetime.fromisoformat(entry["start"])
@@ -173,6 +174,26 @@ def compute_vimshottari_dasha(
                 "end": entry["end"],
                 "is_partial": entry["is_partial"],
             }
+            
+            # Find current Antardasha within this Mahadasha
+            for antar in entry.get("antar_dashas", []):
+                antar_start = datetime.fromisoformat(antar["start"])
+                antar_end = datetime.fromisoformat(antar["end"])
+                
+                if antar_start <= now <= antar_end:
+                    # Calculate confidence weight (peaks mid-period)
+                    duration = (antar_end - antar_start).total_seconds()
+                    elapsed = (now - antar_start).total_seconds()
+                    progress = elapsed / duration if duration > 0 else 0.5
+                    confidence_weight = round(1.0 - abs(0.5 - progress), 2)
+                    
+                    current_antar = {
+                        "lord": antar["antar_lord"],
+                        "start": antar["start"],
+                        "end": antar["end"],
+                        "confidence_weight": confidence_weight,
+                    }
+                    break
             break
 
     if current_dasha is None:
@@ -183,6 +204,19 @@ def compute_vimshottari_dasha(
             "end": first["end"],
             "is_partial": first["is_partial"],
         }
+        
+        # Also get first antar for fallback
+        if first.get("antar_dashas"):
+            first_antar = first["antar_dashas"][0]
+            current_antar = {
+                "lord": first_antar["antar_lord"],
+                "start": first_antar["start"],
+                "end": first_antar["end"],
+                "confidence_weight": 0.5,
+            }
+    
+    # Add antar to current dasha object
+    current_dasha["antar"] = current_antar
 
     # 🔑 CRITICAL FIX: expose BOTH keys
     # timeline → Birth Chart UI

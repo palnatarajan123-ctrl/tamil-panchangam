@@ -210,7 +210,8 @@ export function adaptBirthChartToAstroContext(
 
   const activeDashaContext: ActiveDashaContext = extractDashaContext(
     birthChartUI.vimshottari,
-    predictionEnvelope?.dasha_context
+    predictionEnvelope?.dasha_context,
+    predictionEnvelope?.functional_roles
   );
 
   let transitContext: TransitContext;
@@ -314,7 +315,8 @@ function formatBirthDasha(vimshottari: any): string | null {
 
 function extractDashaContext(
   vimshottari: any,
-  dashaContext?: any
+  dashaContext?: any,
+  functionalRoles?: any
 ): ActiveDashaContext {
   const current = vimshottari?.current;
   const mahaLord = dashaContext?.maha_lord ?? current?.lord ?? null;
@@ -332,11 +334,15 @@ function extractDashaContext(
     }
   }
 
+  const yogakarakas = functionalRoles?.summary?.yogakarakas 
+    ?? functionalRoles?.summary?.classical_yogakarakas 
+    ?? [];
+
   return {
     currentMahadasha: mahaLord,
     currentAntardasha: antarLord,
     dashaBalance,
-    yogakarakaPlanets: dashaContext?.functional_roles?.yogakaraka ?? [],
+    yogakarakaPlanets: yogakarakas,
   };
 }
 

@@ -528,11 +528,18 @@ def _generate_life_area_interpretation(
         sig_valence = sig.get("valence")
         if not sig_valence and isinstance(sig.get("weights"), dict):
             sig_valence = sig["weights"].get("valence")
+        
+        sig_source = sig.get("source", "")
+        sig_engine = engine_display_names.get(sig_source, sig_source) if sig_source else None
+        
+        sig_weight = sig.get("strength") or sig.get("contrib") or 0
+        if isinstance(sig_weight, (int, float)):
+            sig_weight = round(float(sig_weight), 2)
+        
         signals_used.append({
-            "key": sig.get("key"),
-            "valence": sig_valence,
-            "strength": sig.get("strength") or sig.get("contrib"),
-            "rationale": sig.get("rationale"),
+            "engine": sig_engine,
+            "weight": sig_weight,
+            "valence": sig_valence or "neutral",
         })
     
     attribution = {

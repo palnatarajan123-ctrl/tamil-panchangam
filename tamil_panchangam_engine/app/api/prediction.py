@@ -18,6 +18,7 @@ from app.engines.interpretation_engine import build_interpretation_from_synthesi
 from app.engines.paraphrasing_engine import paraphrase_interpretation
 from app.engines.explainability_engine import build_explainability
 from app.engines.ai_interpretation_engine import generate_interpretation as generate_ai_interpretation
+from app.engines.explainability_filter import apply_explainability
 
 from app.models.schema import (
     MonthlyPredictionRequest,
@@ -174,6 +175,10 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             "DEBUG AI interpretation generated with momentum =",
             ai_interpretation.get("window_summary", {}).get("momentum")
         )
+
+        # Apply explainability filter to AI interpretation
+        explainability_level = payload.explainability_level or "full"
+        ai_interpretation = apply_explainability(ai_interpretation, explainability_level)
 
         # -------------------------------------------------
         # 7. Paraphrasing (legacy interpretation)
