@@ -1,8 +1,11 @@
 # app/api/base_chart.py
 
+import logging
 from fastapi import APIRouter, HTTPException
 from datetime import datetime
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 from app.models.schema import (
     BASE_CHART_STORE,
@@ -282,10 +285,22 @@ def get_base_chart(base_chart_id: str):
             detail=f"Base chart not found: {base_chart_id}",
         )
 
+    # Compute functional_roles on-the-fly if missing (for charts loaded from DuckDB)
+    chart_data = chart["data"]
+    if not chart_data.get("functional_roles"):
+        ephemeris = chart_data.get("ephemeris", {})
+        if ephemeris:
+            try:
+                computed_roles = compute_functional_roles(ephemeris=ephemeris, houses={})
+                chart_data["functional_roles"] = computed_roles
+            except Exception as e:
+                logger.warning(f"Failed to compute functional_roles: {e}")
+                chart_data["functional_roles"] = {}
+
     return BaseChartDetail(
         id=chart["id"],
         checksum=chart["checksum"],
         locked=chart["locked"],
         created_at=chart["created_at"],
-        data=chart["data"],
+        data=chart_data,
     )

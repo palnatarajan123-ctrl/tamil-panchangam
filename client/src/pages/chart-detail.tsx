@@ -116,11 +116,13 @@ export default function ChartDetail() {
 
   const generatePrediction = useMutation({
     mutationFn: async () => {
+      // Always request "full" from backend to get complete data
+      // Frontend adapter will filter based on user's explainabilityLevel selection
       const res = await apiRequest("POST", "/api/prediction/monthly", {
         base_chart_id: chartId,
         year: currentYear,
         month: currentMonth,
-        explainability_level: explainabilityLevel,
+        explainability_level: "full",
       });
       if (!res.ok) throw new Error("Failed to generate prediction");
       return res.json();

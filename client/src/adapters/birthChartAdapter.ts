@@ -90,6 +90,19 @@ export interface BirthChartUIModel {
       } | null;
     } | null;
   };
+
+  functional_roles?: {
+    lagna?: { rasi?: number; name?: string };
+    planets?: Record<string, any>;
+    summary?: {
+      functional_benefics?: string[];
+      functional_malefics?: string[];
+      neutrals?: string[];
+      yogakarakas?: string[];
+      classical_yogakarakas?: string[];
+      marakas?: string[];
+    };
+  };
 }
 
 /* ============================================================
@@ -229,5 +242,7 @@ export function adaptBirthChart(raw: any): BirthChartUIModel {
       timeline: view.dashas?.vimshottari?.timeline ?? [],
       current: view.dashas?.vimshottari?.current ?? null,
     },
+
+    functional_roles: view.functional_roles ?? undefined,
   };
 }
