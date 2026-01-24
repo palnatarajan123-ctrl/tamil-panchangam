@@ -364,6 +364,11 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
         "houses": houses,
         "rasi_view": rasi_view,
         "nakshatra_view": nakshatra_view,
+        
+        # -----------------------------
+        # Functional Roles (yogakaraka/benefic/malefic)
+        # -----------------------------
+        "functional_roles": base_chart.get("functional_roles", {}),
     
         "notes": [
             "Birth chart is computed using sidereal (Lahiri) calculations.",

@@ -211,7 +211,7 @@ export function adaptBirthChartToAstroContext(
   const activeDashaContext: ActiveDashaContext = extractDashaContext(
     birthChartUI.vimshottari,
     predictionEnvelope?.dasha_context,
-    predictionEnvelope?.functional_roles
+    birthChartUI.functional_roles ?? predictionEnvelope?.functional_roles
   );
 
   let transitContext: TransitContext;
