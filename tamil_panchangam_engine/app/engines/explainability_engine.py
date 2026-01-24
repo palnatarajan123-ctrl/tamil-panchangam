@@ -31,15 +31,20 @@ def build_explainability(
     coverage_ratio = overlap.get("coverage_ratio", 0.0)
     dominant_segment = overlap.get("dominant_segment")
 
-    active = dasha_context.get("active", {})
+    active = dasha_context.get("active") or {}
 
+    # Build dominant dasha string with null safety
+    maha = active.get("maha") or {}
+    antar = active.get("antar") or {}
+    pratyantar = active.get("pratyantar") or {}
+    
     dominant_dasha = "–".join(
-        [
-            active.get("maha", {}).get("lord", ""),
-            active.get("antar", {}).get("lord", ""),
-            active.get("pratyantar", {}).get("lord", ""),
-        ]
-    ).strip("–")
+        filter(None, [
+            maha.get("lord", ""),
+            antar.get("lord", ""),
+            pratyantar.get("lord", ""),
+        ])
+    )
 
     # -------------------------------------------------
     # DRIVER: Dasha overlap dominance
@@ -85,7 +90,7 @@ def build_explainability(
     # -------------------------------------------------
     if navamsa:
         dignity = navamsa.get("dignity", {})
-        active_maha = active.get("maha", {}).get("lord")
+        active_maha = maha.get("lord")
 
         if active_maha and active_maha in dignity:
             dignity_value = dignity[active_maha]
