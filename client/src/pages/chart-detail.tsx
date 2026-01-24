@@ -120,6 +120,7 @@ export default function ChartDetail() {
         base_chart_id: chartId,
         year: currentYear,
         month: currentMonth,
+        explainability_level: explainabilityLevel,
       });
       if (!res.ok) throw new Error("Failed to generate prediction");
       return res.json();

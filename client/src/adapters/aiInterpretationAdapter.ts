@@ -106,14 +106,30 @@ export function adaptAIInterpretation(
   aiInterpretation: AIInterpretationV1,
   level: ExplainabilityLevel = "full"
 ): PredictionViewModel {
+  // Combine UI level with backend visibility (AND logic - more restrictive wins)
   const visibility = aiInterpretation._visibility;
-  const effectiveLevel = (visibility?.level as ExplainabilityLevel) ?? level;
+  
+  // If backend provides a level, derive implied flags from it
+  const backendLevel = visibility?.level as ExplainabilityLevel | undefined;
+  const backendShowDominant = backendLevel ? backendLevel !== "minimal" : true;
+  const backendShowTiming = backendLevel ? backendLevel !== "minimal" : true;
+  const backendShowDeeper = backendLevel ? backendLevel !== "minimal" : true;
+  const backendShowAttr = backendLevel ? backendLevel === "full" : true;
+  const backendShowSignals = backendLevel ? backendLevel === "full" : true;
+  
+  // UI wants to show, but backend may restrict - use AND logic
+  const uiShowDominant = level !== "minimal";
+  const uiShowTiming = level !== "minimal";
+  const uiShowDeeper = level !== "minimal";
+  const uiShowAttr = level === "full";
+  const uiShowSignals = level === "full";
 
-  const showDominantForces = visibility?.show_dominant_forces ?? (effectiveLevel !== "minimal");
-  const showTimingGuidance = visibility?.show_timing_guidance ?? (effectiveLevel !== "minimal");
-  const showDeeperExplanation = visibility?.show_deeper_explanation ?? (effectiveLevel !== "minimal");
-  const showAttribution = visibility?.show_attribution ?? (effectiveLevel === "full");
-  const showSignalsUsed = visibility?.show_signals_used ?? (effectiveLevel === "full");
+  // Combine: explicit flags override level-derived flags, then AND with UI
+  const showDominantForces = uiShowDominant && (visibility?.show_dominant_forces ?? backendShowDominant);
+  const showTimingGuidance = uiShowTiming && (visibility?.show_timing_guidance ?? backendShowTiming);
+  const showDeeperExplanation = uiShowDeeper && (visibility?.show_deeper_explanation ?? backendShowDeeper);
+  const showAttribution = uiShowAttr && (visibility?.show_attribution ?? backendShowAttr);
+  const showSignalsUsed = uiShowSignals && (visibility?.show_signals_used ?? backendShowSignals);
 
   const windowSummary: WindowSummaryViewModel = {
     momentum: aiInterpretation.window_summary.momentum,
@@ -186,7 +202,7 @@ export function adaptAIInterpretation(
     generatedAt: aiInterpretation.generated_at,
     windowSummary,
     lifeAreas,
-    explainabilityLevel: effectiveLevel,
+    explainabilityLevel: level,
   };
 }
 

@@ -21,6 +21,9 @@ from app.engines.pancha_pakshi import get_birth_pakshi
 # ✅ Navamsa engine
 from app.engines.navamsa_engine import build_navamsa_chart
 
+# ✅ Functional Role engine
+from app.engines.functional_role_engine import compute_functional_roles
+
 from app.utils.time_utils import (
     normalize_birth_time_to_utc,
     get_timezone_from_coordinates,
@@ -137,6 +140,14 @@ def create_base_chart(payload: BaseChartCreateRequest):
     navamsa = build_navamsa_chart(ephemeris)
 
     # -------------------------------------------------
+    # 7b. Functional Roles (yogakaraka/benefic/malefic)
+    # -------------------------------------------------
+    functional_roles = compute_functional_roles(
+        ephemeris=ephemeris,
+        houses={}  # Houses extracted from ephemeris internally
+    )
+
+    # -------------------------------------------------
     # 8. Assemble immutable base chart
     # -------------------------------------------------
     base_chart = {
@@ -168,6 +179,7 @@ def create_base_chart(payload: BaseChartCreateRequest):
             "vimshottari": dasha,
         },
         "pancha_pakshi_birth": pakshi,
+        "functional_roles": functional_roles,
     }
 
     # -------------------------------------------------
