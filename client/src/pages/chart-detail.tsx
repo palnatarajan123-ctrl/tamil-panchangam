@@ -373,6 +373,57 @@ export default function ChartDetail() {
                                   </p>
                                 </div>
                               )}
+                              {/* Attribution - shown in standard and full modes */}
+                              {explainabilityLevel !== "minimal" && area.attribution && (
+                                <div 
+                                  className="border-t pt-3 mt-2"
+                                  data-testid={`attribution-${area.key}`}
+                                >
+                                  <div className="text-xs text-muted-foreground space-y-1">
+                                    {area.attribution.planets && area.attribution.planets.length > 0 && (
+                                      <div className="flex gap-2 flex-wrap items-center">
+                                        <span className="font-medium">Planets:</span>
+                                        {area.attribution.planets.map((p) => (
+                                          <Badge key={p} variant="outline" className="text-xs">{p}</Badge>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {area.attribution.dasha && (
+                                      <div>
+                                        <span className="font-medium">Dasha:</span>{" "}
+                                        <span className="font-mono">{area.attribution.dasha}</span>
+                                      </div>
+                                    )}
+                                    {area.attribution.engines && area.attribution.engines.length > 0 && (
+                                      <div className="flex gap-2 flex-wrap items-center">
+                                        <span className="font-medium">Engines:</span>
+                                        {area.attribution.engines.map((e) => (
+                                          <Badge key={e} variant="secondary" className="text-xs">{e}</Badge>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {/* Signals - only shown in full mode */}
+                                    {explainabilityLevel === "full" && area.attribution.signalsUsed && area.attribution.signalsUsed.length > 0 && (
+                                      <div className="border-t pt-2 mt-2">
+                                        <span className="font-medium">Signals:</span>
+                                        <div className="grid grid-cols-2 gap-1 mt-1">
+                                          {area.attribution.signalsUsed.map((sig, i) => (
+                                            <div 
+                                              key={i} 
+                                              className="flex justify-between bg-muted/30 px-2 py-0.5 rounded text-xs"
+                                            >
+                                              <span>{sig.engine}</span>
+                                              <span className={sig.valence === "positive" ? "text-green-600" : sig.valence === "negative" ? "text-red-600" : "text-muted-foreground"}>
+                                                {sig.weight > 0 ? "+" : ""}{sig.weight}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </AccordionContent>
                           </AccordionItem>
                         ))}

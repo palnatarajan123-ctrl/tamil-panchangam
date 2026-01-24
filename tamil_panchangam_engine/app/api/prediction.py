@@ -81,6 +81,14 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             if existing.get("interpretation")
             else None
         )
+        
+        # Apply explainability filter to cached AI interpretation
+        explainability_level = payload.explainability_level or "full"
+        if interpretation and "ai_interpretation" in interpretation:
+            interpretation["ai_interpretation"] = apply_explainability(
+                interpretation["ai_interpretation"],
+                explainability_level
+            )
 
         if "confidence" not in synthesis:
             synthesis["confidence"] = {
