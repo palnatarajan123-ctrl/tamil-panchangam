@@ -132,6 +132,10 @@ Press the **green Run button** to start both services automatically.
 - Visibility gating respects `_visibility` metadata or explicit level parameter
 
 ## Recent Changes
+- 2026-01-24: Fixed Functional Role Planets display to show yogakarakas, benefics, or lagna info
+- 2026-01-24: Added startup loading of charts from DuckDB to in-memory store
+- 2026-01-24: Fixed yogakaraka logic order (yogakaraka check before benefic check)
+- 2026-01-24: Fixed JSON payload parsing for charts loaded from DuckDB
 - 2026-01-23: Refactored Birth Chart UI with BirthAstroContextTable (5 grouped sections)
 - 2026-01-23: Removed Rasi/Nakshatra/Houses tab switcher from chart detail page
 - 2026-01-23: Added AI Interpretation section with explainability toggle on chart detail page

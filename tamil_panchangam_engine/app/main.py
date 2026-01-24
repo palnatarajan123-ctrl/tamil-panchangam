@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 
-from app.api.base_chart import router as base_chart_router
+from app.api.base_chart import router as base_chart_router, load_charts_from_db
 from app.api.prediction import router as prediction_router
 from app.api.interpretation import router as interpretation_router
 from app.api.ui_reports import router as ui_reports_router
@@ -57,6 +57,11 @@ app.add_middleware(
 # -----------------------------
 app.include_router(base_chart_router)
 app.include_router(prediction_router)
+
+@app.on_event("startup")
+def startup_event():
+    """Load charts from DuckDB on startup."""
+    load_charts_from_db()
 app.include_router(interpretation_router)
 app.include_router(ui_reports_router)
 app.include_router(ui_birth_chart_router)

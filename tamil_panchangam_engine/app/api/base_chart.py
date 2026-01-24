@@ -38,6 +38,46 @@ from app.repositories.base_chart_repo import get_base_chart_by_id
 router = APIRouter(prefix="/base-chart", tags=["Base Chart"])
 
 
+def load_charts_from_db():
+    """Load all charts from DuckDB into in-memory store on startup."""
+    import json
+    try:
+        with get_conn() as conn:
+            results = conn.execute(
+                "SELECT id, locked, payload FROM base_charts"
+            ).fetchall()
+            
+            loaded_count = 0
+            for row in results:
+                chart_id = row[0]
+                locked = row[1]
+                raw_payload = row[2]
+                
+                if isinstance(raw_payload, str):
+                    try:
+                        payload = json.loads(raw_payload)
+                    except json.JSONDecodeError:
+                        print(f"⚠️ Failed to parse payload for chart {chart_id}")
+                        continue
+                elif isinstance(raw_payload, dict):
+                    payload = raw_payload
+                else:
+                    continue
+                
+                BASE_CHART_STORE[chart_id] = {
+                    "id": chart_id,
+                    "checksum": compute_chart_checksum(payload),
+                    "locked": locked,
+                    "created_at": datetime.utcnow().isoformat(),
+                    "data": payload,
+                }
+                loaded_count += 1
+            
+            print(f"📂 Loaded {loaded_count} charts from DuckDB into memory")
+    except Exception as e:
+        print(f"⚠️ Failed to load charts from DB: {e}")
+
+
 # ============================================================
 # UI VIEW (D1 + Panchangam)
 # ============================================================

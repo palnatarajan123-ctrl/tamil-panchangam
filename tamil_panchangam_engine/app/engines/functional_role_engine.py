@@ -77,15 +77,15 @@ def determine_functional_role(
     
     reasons = []
     
-    if is_trikona_lord and not is_dusthana_lord:
-        functional_role = "benefic"
-        strength = "strong" if 9 in owned_houses or 5 in owned_houses else "moderate"
-        reasons.append(f"Trikona lord (houses {[h for h in owned_houses if h in TRIKONA_HOUSES]})")
-    
-    elif is_trikona_lord and is_kendra_lord and not is_dusthana_lord:
+    if is_trikona_lord and is_kendra_lord and not is_dusthana_lord:
         functional_role = "yogakaraka"
         strength = "very_strong"
         reasons.append("Yoga karaka - rules both trikona and kendra")
+    
+    elif is_trikona_lord and not is_dusthana_lord:
+        functional_role = "benefic"
+        strength = "strong" if 9 in owned_houses or 5 in owned_houses else "moderate"
+        reasons.append(f"Trikona lord (houses {[h for h in owned_houses if h in TRIKONA_HOUSES]})")
     
     elif is_dusthana_lord:
         if is_trikona_lord:

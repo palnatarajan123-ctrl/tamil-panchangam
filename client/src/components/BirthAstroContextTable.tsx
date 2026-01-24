@@ -27,6 +27,7 @@ interface ActiveDashaContext {
   currentAntardasha: string | null;
   dashaBalance: string | null;
   yogakarakaPlanets: string[];
+  functionalRoleSummary: string | null;
 }
 
 interface TransitContext {
@@ -139,11 +140,7 @@ export function BirthAstroContextTable({ data }: Props) {
             <ContextRow label="Dasha Balance" value={activeDashaContext.dashaBalance} />
             <ContextRow 
               label="Functional Role Planets" 
-              value={
-                activeDashaContext.yogakarakaPlanets.length > 0
-                  ? activeDashaContext.yogakarakaPlanets.join(", ")
-                  : null
-              }
+              value={activeDashaContext.functionalRoleSummary}
             />
 
             <SectionHeader title="Transit / Gochara Context" />
@@ -337,12 +334,26 @@ function extractDashaContext(
   const yogakarakas = functionalRoles?.summary?.yogakarakas 
     ?? functionalRoles?.summary?.classical_yogakarakas 
     ?? [];
+  
+  const benefics = functionalRoles?.summary?.functional_benefics ?? functionalRoles?.summary?.benefics ?? [];
+  const malefics = functionalRoles?.summary?.functional_malefics ?? functionalRoles?.summary?.malefics ?? [];
+  const lagnaName = functionalRoles?.lagna?.name ?? null;
+  
+  let functionalRoleSummary: string | null = null;
+  if (yogakarakas.length > 0) {
+    functionalRoleSummary = `Yogakaraka: ${yogakarakas.join(", ")}`;
+  } else if (benefics.length > 0) {
+    functionalRoleSummary = `Benefics: ${benefics.join(", ")}`;
+  } else if (lagnaName) {
+    functionalRoleSummary = `${lagnaName} lagna (no classical yogakaraka)`;
+  }
 
   return {
     currentMahadasha: mahaLord,
     currentAntardasha: antarLord,
     dashaBalance,
     yogakarakaPlanets: yogakarakas,
+    functionalRoleSummary,
   };
 }
 
