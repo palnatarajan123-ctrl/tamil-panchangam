@@ -70,7 +70,7 @@ def apply_explainability(
             "show_dominant_forces": True,
             "show_timing_guidance": True,
             "show_deeper_explanation": True,
-            "show_attribution": True,
+            "show_attribution": False,  # Hide attribution for standard (per docstring)
             "show_signals_used": False
         }
     

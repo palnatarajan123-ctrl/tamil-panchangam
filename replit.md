@@ -132,6 +132,9 @@ Press the **green Run button** to start both services automatically.
 - Visibility gating respects `_visibility` metadata or explicit level parameter
 
 ## Recent Changes
+- 2026-01-24: Fixed AI Interpretation explainability toggle - standard shows deeper explanation but not attribution, full shows all
+- 2026-01-24: Added attribution UI (planets, dasha, engines) and signals display in AI Interpretation section
+- 2026-01-24: Fixed cached predictions to apply explainability filter
 - 2026-01-24: Fixed Functional Role Planets display to show yogakarakas, benefics, or lagna info
 - 2026-01-24: Added startup loading of charts from DuckDB to in-memory store
 - 2026-01-24: Fixed yogakaraka logic order (yogakaraka check before benefic check)

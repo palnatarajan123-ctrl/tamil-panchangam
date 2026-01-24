@@ -112,21 +112,21 @@ export function adaptAIInterpretation(
   // If backend provides a level, derive implied flags from it
   // Match backend explainability_filter.py definitions:
   // - minimal: hide everything except summary
-  // - standard: show dominant/timing/deeper/attribution, hide signals
+  // - standard: show dominant/timing/deeper, hide attribution and signals
   // - full: show everything
   const backendLevel = visibility?.level as ExplainabilityLevel | undefined;
   const backendShowDominant = backendLevel ? backendLevel !== "minimal" : true;
   const backendShowTiming = backendLevel ? backendLevel !== "minimal" : true;
   const backendShowDeeper = backendLevel ? backendLevel !== "minimal" : true;
-  const backendShowAttr = backendLevel ? backendLevel !== "minimal" : true;  // standard + full
+  const backendShowAttr = backendLevel ? backendLevel === "full" : true;  // full only
   const backendShowSignals = backendLevel ? backendLevel === "full" : true;  // full only
   
   // UI wants to show, but backend may restrict - use AND logic
-  // Match backend definition: standard shows attribution, full shows signals
+  // Match backend definition: full shows attribution and signals
   const uiShowDominant = level !== "minimal";
   const uiShowTiming = level !== "minimal";
   const uiShowDeeper = level !== "minimal";
-  const uiShowAttr = level !== "minimal";  // standard + full both show attribution
+  const uiShowAttr = level === "full";      // only full shows attribution
   const uiShowSignals = level === "full";   // only full shows signals
 
   // Combine: explicit flags override level-derived flags, then AND with UI

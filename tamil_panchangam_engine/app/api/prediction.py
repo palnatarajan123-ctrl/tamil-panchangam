@@ -83,11 +83,11 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
         )
         
         # Apply explainability filter to cached AI interpretation
-        explainability_level = payload.explainability_level or "full"
+        explainability_level: str = payload.explainability_level or "full"
         if interpretation and "ai_interpretation" in interpretation:
             interpretation["ai_interpretation"] = apply_explainability(
                 interpretation["ai_interpretation"],
-                explainability_level
+                explainability_level  # type: ignore
             )
 
         if "confidence" not in synthesis:
@@ -185,8 +185,8 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
         )
 
         # Apply explainability filter to AI interpretation
-        explainability_level = payload.explainability_level or "full"
-        ai_interpretation = apply_explainability(ai_interpretation, explainability_level)
+        explainability_level: str = payload.explainability_level or "full"
+        ai_interpretation = apply_explainability(ai_interpretation, explainability_level)  # type: ignore
 
         # -------------------------------------------------
         # 7. Paraphrasing (legacy interpretation)
