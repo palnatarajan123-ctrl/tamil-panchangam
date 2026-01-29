@@ -16,6 +16,8 @@ from app.api.prediction_weekly import router as prediction_weekly_router
 from app.api.prediction_yearly import router as prediction_yearly_router
 from app.api.reports import router as reports_router
 from app.api.realtime_context import router as realtime_context_router
+from app.api.admin_llm import router as admin_llm_router
+from app.db.bootstrap import bootstrap
 
 
 
@@ -60,7 +62,8 @@ app.include_router(prediction_router)
 
 @app.on_event("startup")
 def startup_event():
-    """Load charts from DuckDB on startup."""
+    """Bootstrap database and load charts on startup."""
+    bootstrap()
     load_charts_from_db()
 app.include_router(interpretation_router)
 app.include_router(ui_reports_router)
@@ -75,6 +78,7 @@ def health_check():
     return {"status": "ok"}
 app.include_router(reports_router)
 app.include_router(realtime_context_router)
+app.include_router(admin_llm_router)
 
 # =====================================================
 # FRONTEND SERVING (SAFE, MINIMAL)

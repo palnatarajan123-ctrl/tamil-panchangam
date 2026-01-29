@@ -11,6 +11,7 @@ import Health from "@/pages/health";
 import Reports from "@/pages/reports";
 import Docs from "@/pages/docs";
 import ChartDetail from "@/pages/chart-detail";
+import AdminLLM from "@/pages/admin-llm";
 import NotFound from "@/pages/not-found";
 
 import PredictionScreen from "@/screens/prediction-screen";
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/reports" component={Reports} />
       <Route path="/health" component={Health} />
       <Route path="/docs" component={Docs} />
+      <Route path="/admin/llm" component={AdminLLM} />
 
       {/* ---------------------------------
          Birth Chart (STRUCTURE)

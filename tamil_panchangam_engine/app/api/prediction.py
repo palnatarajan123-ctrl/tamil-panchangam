@@ -19,6 +19,7 @@ from app.engines.paraphrasing_engine import paraphrase_interpretation
 from app.engines.explainability_engine import build_explainability
 from app.engines.ai_interpretation_engine import generate_interpretation as generate_ai_interpretation
 from app.engines.explainability_filter import apply_explainability
+from app.engines.llm_interpretation_orchestrator import generate_llm_interpretation
 
 from app.models.schema import (
     MonthlyPredictionRequest,
@@ -208,7 +209,26 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
         interpretation["ai_interpretation"] = ai_interpretation
 
         # -------------------------------------------------
-        # 7. Persist
+        # 7b. LLM Interpretation (language-only enhancement)
+        # -------------------------------------------------
+        period_key = f"{payload.year}-{payload.month:02d}"
+        llm_result = generate_llm_interpretation(
+            base_chart_id=payload.base_chart_id,
+            envelope=envelope,
+            synthesis=synthesis,
+            deterministic_interpretation=ai_interpretation,
+            year=payload.year,
+            period_type="monthly",
+            period_key=period_key,
+            feature_name="prediction",
+            prompt_version="weekly_v1",
+            explainability_mode=payload.explainability_level or "standard"
+        )
+        interpretation["llm_interpretation"] = llm_result.get("llm_interpretation")
+        interpretation["llm_metadata"] = llm_result.get("llm_metadata")
+
+        # -------------------------------------------------
+        # 8. Persist
         # -------------------------------------------------
         with get_conn() as conn:
             save_monthly_prediction(

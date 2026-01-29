@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Calendar, FileText, Activity, BookOpen } from "lucide-react";
+import { Sparkles, Calendar, FileText, Activity, BookOpen, Settings } from "lucide-react";
 
 export function Navigation() {
   const [location] = useLocation();
@@ -16,6 +16,7 @@ export function Navigation() {
   const utilityItems = [
     { href: "/health", label: "Health Status", icon: Activity },
     { href: "/docs", label: "Documentation", icon: BookOpen },
+    { href: "/admin/llm", label: "LLM Admin", icon: Settings },
   ];
 
   return (
