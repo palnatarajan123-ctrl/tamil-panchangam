@@ -131,7 +131,52 @@ Press the **green Run button** to start both services automatically.
 - Strict field omission (no defaults/fallbacks)
 - Visibility gating respects `_visibility` metadata or explicit level parameter
 
+## LLM Interpretation Layer
+
+### Architecture
+- **Purpose**: Language-only enhancement (astrology is always pre-computed deterministically)
+- **Provider**: OpenAI GPT-4o-mini via `app/llm/providers/openai_provider.py`
+- **Orchestrator**: `app/engines/llm_interpretation_orchestrator.py` coordinates cache, budget, and provider
+
+### Design Principles
+1. **Fail-fast to deterministic fallback** - No retries, immediate fallback on any error
+2. **Cache-first strategy** - Reuse interpretations by (chart_id, period_type, period_key, prompt_version)
+3. **Token budget enforcement** - Monthly 50k token limit with hard guardrails per call
+
+### Token Guardrails
+- **Completion tokens**: 800 max per call
+- **Total tokens**: 1,500 max per call
+- **Monthly budget**: 50,000 tokens (configurable via `llm_config` table)
+
+### Persistence (DuckDB)
+- `llm_interpretations` - Cached LLM outputs by chart/period/prompt_version
+- `llm_usage_log` - Every LLM call with token counts and fallback reasons
+- `llm_config` - Global settings (enabled, monthly_budget, active_provider)
+
+### Admin API Endpoints
+- `GET /admin/llm/status` - LLM configuration status
+- `POST /admin/llm/toggle` - Enable/disable LLM globally
+- `GET /admin/llm/usage/monthly` - Monthly token usage stats
+- `GET /admin/llm/usage/recent` - Last 20 LLM calls with details
+- `GET /admin/llm/fallback-summary` - Breakdown of fallback reasons
+
+### Admin Dashboard
+- **Route**: `/admin/llm`
+- **Features**: LLM status toggle, monthly usage gauge, fallback summary, recent calls table
+
+### Key Files
+- `app/llm/token_estimator.py` - Token counting using tiktoken
+- `app/llm/providers/openai_provider.py` - OpenAI API wrapper
+- `app/llm/prompts/interpretation_prompt_v1.txt` - Prompt template
+- `app/engines/llm_interpretation_orchestrator.py` - Main orchestration logic
+- `app/api/admin_llm.py` - Admin API endpoints
+- `client/src/pages/admin-llm.tsx` - Admin dashboard UI
+
 ## Recent Changes
+- 2026-01-29: Added LLM interpretation layer with OpenAI integration
+- 2026-01-29: Created token estimator, orchestrator, and OpenAI provider
+- 2026-01-29: Added DuckDB tables for LLM cache, usage logging, and config
+- 2026-01-29: Built Admin LLM dashboard at /admin/llm with usage monitoring
 - 2026-01-24: Fixed AI Interpretation explainability toggle - standard shows deeper explanation but not attribution, full shows all
 - 2026-01-24: Added attribution UI (planets, dasha, engines) and signals display in AI Interpretation section
 - 2026-01-24: Fixed cached predictions to apply explainability filter

@@ -30,7 +30,7 @@ from app.llm.providers import openai_provider
 logger = logging.getLogger(__name__)
 
 LLM_MONTHLY_TOKEN_BUDGET = 50_000
-PROMPT_VERSION = "weekly_v1"
+PROMPT_VERSION = "interpretation_v1"
 
 
 def _load_prompt_template() -> str:

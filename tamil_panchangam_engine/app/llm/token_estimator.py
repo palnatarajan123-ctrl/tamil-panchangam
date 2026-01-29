@@ -2,7 +2,7 @@
 """
 Token Estimator v1.0
 
-Estimates token counts for LLM calls using character heuristics.
+Estimates token counts for LLM calls using tiktoken.
 Used to enforce guardrails before making OpenAI API calls.
 
 Hard limits:
@@ -17,17 +17,39 @@ logger = logging.getLogger(__name__)
 
 MAX_COMPLETION_TOKENS = 800
 MAX_TOTAL_TOKENS = 1500
-CHARS_PER_TOKEN = 4
+
+_encoding = None
+
+def _get_encoding():
+    """Get or create the tiktoken encoding for gpt-4o-mini."""
+    global _encoding
+    if _encoding is None:
+        try:
+            import tiktoken
+            _encoding = tiktoken.encoding_for_model("gpt-4o-mini")
+        except Exception as e:
+            logger.warning(f"Failed to load tiktoken encoding: {e}, using fallback")
+            _encoding = "fallback"
+    return _encoding
 
 
 def estimate_tokens(text: str) -> int:
     """
-    Estimate token count using character heuristics.
-    Uses ~4 characters per token as a conservative estimate.
+    Estimate token count using tiktoken for accurate counts.
+    Falls back to character heuristic if tiktoken unavailable.
     """
     if not text:
         return 0
-    return max(1, len(text) // CHARS_PER_TOKEN)
+    
+    encoding = _get_encoding()
+    if encoding == "fallback":
+        return max(1, len(text) // 4)
+    
+    try:
+        return len(encoding.encode(text))
+    except Exception as e:
+        logger.warning(f"tiktoken encode failed: {e}, using fallback")
+        return max(1, len(text) // 4)
 
 
 def estimate_prompt_tokens(prompt: str, context: Dict[str, Any]) -> int:
@@ -36,8 +58,8 @@ def estimate_prompt_tokens(prompt: str, context: Dict[str, Any]) -> int:
     """
     import json
     context_str = json.dumps(context, default=str)
-    total_chars = len(prompt) + len(context_str)
-    return estimate_tokens(str(total_chars))
+    combined_text = prompt + context_str
+    return estimate_tokens(combined_text)
 
 
 def check_token_limits(
