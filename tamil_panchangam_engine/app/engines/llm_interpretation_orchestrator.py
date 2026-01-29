@@ -203,14 +203,16 @@ def _build_context_for_llm(
     dasha = envelope.get("dasha_context", {})
     
     life_areas = []
-    for area_data in synthesis.get("life_areas", []):
-        area_context = {
-            "area": area_data.get("area"),
-            "score": area_data.get("score"),
-            "strength_label": _score_to_strength(area_data.get("score", 50)),
-            "top_signals": area_data.get("top_signals", [])[:3]
-        }
-        life_areas.append(area_context)
+    synthesis_life_areas = synthesis.get("life_areas", {})
+    for area_name, area_data in synthesis_life_areas.items():
+        if isinstance(area_data, dict):
+            area_context = {
+                "area": area_name,
+                "score": area_data.get("score", 50),
+                "strength_label": _score_to_strength(area_data.get("score", 50)),
+                "top_signals": area_data.get("top_signals", [])[:3]
+            }
+            life_areas.append(area_context)
     
     return {
         "period_type": period_type,
