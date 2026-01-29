@@ -1,0 +1,236 @@
+Tamil Panchangam Astrology Engine — LLM Interpretation + Usage Dashboard (v1.0)
+You are working inside an existing FastAPI + DuckDB + React project called
+“Tamil Panchangam Astrology Engine.”
+This system already has:
+•	Fully implemented and LOCKED Tamil Panchangam astrology engines
+(Lagna, Nakshatra, Dasha, Gochara, Ashtakavarga, Drishti, Yogas, House Strength, Event Windows)
+•	A complete synthesis engine that produces:
+o	Life-area scores
+o	Ranked top signals with rationale
+•	A deterministic AI interpretation engine
+•	A working UI
+You are implementing ONLY:
+1.	An LLM-based language-only interpretation layer
+2.	An Admin / Setup → Usage Dashboard
+3.	OpenAI integration with strict guardrails
+4.	A hard LLM disabled flag for debugging
+Astrology computation, synthesis, and scoring must never be modified.
+ 
+🎯 GOALS
+1.	Use OpenAI only for narrative language
+2.	Keep all astrology logic deterministic and upstream
+3.	Ensure interpretations are:
+o	Unique per chart
+o	Unique per prediction window (weekly / monthly / yearly)
+4.	Enforce:
+o	Token guardrails
+o	Monthly engine-level budget
+o	Schema validation
+o	Deterministic fallback
+5.	Provide a transparent Usage Dashboard for monitoring and debugging
+ 
+🚫 NON-NEGOTIABLE RULES
+•	LLM must NEVER compute astrology
+•	LLM must NEVER change scores or signals
+•	LLM must NEVER predict events
+•	LLM must NEVER provide medical, legal, or financial advice
+•	System must function fully with LLM disabled or without API keys
+•	Any failure → deterministic fallback (automatic & silent)
+ 
+🧱 PART 1 — LLM INTERPRETATION ORCHESTRATOR
+Create file:
+app/engines/llm_interpretation_orchestrator.py
+Public API:
+def generate_llm_interpretation(
+    base_chart_id: str,
+    envelope: dict,
+    synthesis: dict,
+    deterministic_interpretation: dict,
+    year: int,
+    period_type: str,              # "weekly" | "monthly" | "yearly"
+    period_key: str,               # e.g. "2026-W03", "2026-01", "2026"
+    feature_name: str,             # e.g. "prediction"
+    prompt_version: str,           # e.g. "weekly_v1"
+    explainability_mode: str = "standard"
+) -> dict
+Responsibilities:
+•	Check Admin LLM Disabled flag
+•	Check cache reuse
+•	Enforce token limits
+•	Enforce monthly token budget
+•	Call OpenAI if allowed
+•	Validate JSON output against schema
+•	Persist output + metadata
+•	Fall back deterministically if needed
+ 
+🔌 PART 2 — OPENAI INTEGRATION (LANGUAGE ONLY)
+Create:
+app/llm/providers/openai_provider.py
+•	Uses OPENAI_API_KEY
+•	Model: gpt-4o-mini
+•	Temperature: 0.7
+•	JSON-only responses enforced
+•	No retries
+If key missing → skip LLM.
+ 
+🔢 PART 3 — TOKEN GUARDRAILS
+Create:
+app/llm/token_estimator.py
+Rules:
+•	Estimate tokens using character heuristics
+•	Hard limits:
+o	max_completion_tokens = 800
+o	Refuse call if estimated total tokens > 1500
+Token estimation must occur before any OpenAI call.
+ 
+🧠 PART 4 — WHAT TO PASS TO THE LLM (CRITICAL)
+The LLM receives ONLY synthesized meaning, never raw astrology.
+For Weekly / Monthly / Yearly uniqueness, pass:
+Context
+•	Period type (weekly / monthly / yearly)
+•	Period label (e.g. “Jan 2026”, “Week 3, 2026”)
+•	Lagna label
+•	Moon Nakshatra label
+•	Active Mahadasha / Antardasha labels
+For EACH life area
+•	Life-area score
+•	Top 2–3 ranked signals
+•	Plain-English rationale per signal
+•	Strength classification (supportive / neutral / watchful)
+Optional
+•	Theme tags
+•	Explainability mode
+ 
+🧾 PART 5 — PROMPT
+Create:
+app/llm/prompts/interpretation_prompt_v1.txt
+System Rules:
+•	You are a narrative explainer, not an astrologer
+•	Do not compute astrology
+•	Do not change scores or rankings
+•	No fear-based language
+•	No guarantees
+•	Use grounded, probabilistic language
+•	Avoid repetition across life areas
+Mandatory Output Instruction:
+Return STRICT JSON matching ai_interpretation_v1.schema.json.
+No markdown. No prose outside JSON.
+ 
+✅ PART 6 — VALIDATION
+Validate against:
+docs/contracts/ai_interpretation_v1.schema.json
+If validation fails:
+•	Log error
+•	Fall back to deterministic interpretation
+ 
+💾 PART 7 — PERSISTENCE & CACHING
+DuckDB Tables
+CREATE TABLE IF NOT EXISTS prediction_llm_interpretation (
+    id UUID,
+    base_chart_id TEXT,
+    period_type TEXT,
+    period_key TEXT,
+    feature_name TEXT,
+    provider TEXT,
+    model TEXT,
+    prompt_version TEXT,
+    prompt_tokens INTEGER,
+    completion_tokens INTEGER,
+    total_tokens INTEGER,
+    content_json JSON,
+    fallback_reason TEXT,
+    created_at TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS llm_token_usage (
+    id UUID,
+    feature_name TEXT,
+    prompt_version TEXT,
+    total_tokens INTEGER,
+    created_at TIMESTAMP
+);
+Reuse cached interpretation if:
+(base_chart_id, period_type, period_key, feature_name, prompt_version)
+matches exactly.
+ 
+💰 PART 8 — MONTHLY TOKEN BUDGET (ENGINE-LEVEL)
+Config:
+LLM_MONTHLY_TOKEN_BUDGET = 50_000
+Budget Query:
+SELECT COALESCE(SUM(total_tokens), 0) AS tokens_used
+FROM llm_token_usage
+WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE);
+If budget exceeded → deterministic fallback.
+ 
+🛠️ PART 9 — ADMIN / SETUP PAGE (USAGE DASHBOARD)
+Add Admin → Setup → AI / LLM Usage
+Backend endpoints:
+•	/admin/llm/status
+•	/admin/llm/usage/monthly
+•	/admin/llm/usage/recent
+•	/admin/llm/fallback-summary
+•	/admin/llm/toggle (LLM enabled / disabled)
+ 
+Dashboard Sections
+A. LLM Status
+•	LLM Enabled: Yes / No
+•	Active Provider: OpenAI / None
+•	Current prompt versions
+B. Monthly Token Usage
+•	Budget
+•	Used
+•	Remaining
+•	% consumed
+C. Recent Calls
+•	Timestamp
+•	Chart ID
+•	Period
+•	Tokens
+•	Fallback reason
+D. Fallback Summary
+•	Counts by reason
+ 
+🚦 PART 10 — HARD “LLM DISABLED” FLAG (DEBUGGING)
+Store in config table or env:
+LLM_ENABLED = True
+If False:
+•	No LLM calls
+•	Always deterministic interpretation
+•	Still log fallback reason = llm_disabled
+ 
+🌐 PART 11 — API WIRING
+In app/api/prediction.py:
+•	After deterministic interpretation:
+o	Call generate_llm_interpretation
+o	Return:
+{
+  "ai_interpretation": {...},
+  "llm_interpretation": {...},
+  "llm_metadata": {
+    "provider": "openai | none",
+    "prompt_version": "...",
+    "fallback_reason": null | "llm_disabled" | "budget_exceeded" | ...
+  }
+}
+ 
+🪵 LOGGING
+Structured logs:
+•	base_chart_id
+•	period_type
+•	period_key
+•	prompt_version
+•	token_estimate
+•	total_tokens
+•	provider_used
+•	fallback_reason
+•	validation_status
+ 
+✅ FINAL RULE
+You are building a language renderer, not an astrology engine.
+Do NOT:
+•	Recompute astrology
+•	Modify synthesis
+•	Touch scoring
+•	Add UI controls beyond Admin / Setup
+•	Add external services
+Build it safe, auditable, deterministic, and boringly correct.
+

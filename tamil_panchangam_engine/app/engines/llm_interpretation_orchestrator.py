@@ -1,0 +1,414 @@
+# app/engines/llm_interpretation_orchestrator.py
+"""
+LLM Interpretation Orchestrator v1.0
+
+Coordinates LLM-based language interpretation for astrology predictions.
+Handles:
+- Admin LLM disabled flag check
+- Cache reuse
+- Token limit enforcement
+- Monthly budget enforcement
+- OpenAI API calls
+- Schema validation
+- Persistence
+- Deterministic fallback
+
+The LLM is ONLY for language generation - all astrology is pre-computed.
+"""
+
+import uuid
+import logging
+import json
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, Any, Optional, Literal
+
+from app.db.duckdb import get_conn
+from app.llm.token_estimator import check_token_limits, get_max_completion_tokens
+from app.llm.providers import openai_provider
+
+logger = logging.getLogger(__name__)
+
+LLM_MONTHLY_TOKEN_BUDGET = 50_000
+PROMPT_VERSION = "weekly_v1"
+
+
+def _load_prompt_template() -> str:
+    """Load the interpretation prompt template."""
+    prompt_paths = [
+        Path(__file__).parent.parent / "llm" / "prompts" / "interpretation_prompt_v1.txt",
+        Path("tamil_panchangam_engine/app/llm/prompts/interpretation_prompt_v1.txt"),
+    ]
+    
+    for path in prompt_paths:
+        if path.exists():
+            return path.read_text()
+    
+    return "You are a narrative assistant. Return JSON matching the schema."
+
+
+def is_llm_enabled() -> bool:
+    """Check if LLM is enabled in config."""
+    try:
+        with get_conn() as conn:
+            result = conn.execute(
+                "SELECT value FROM llm_config WHERE key = 'llm_enabled'"
+            ).fetchone()
+            if result:
+                return result[0].lower() == "true"
+    except Exception as e:
+        logger.warning(f"Failed to check LLM config: {e}")
+    return True
+
+
+def set_llm_enabled(enabled: bool) -> bool:
+    """Set LLM enabled/disabled state."""
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO llm_config (key, value, updated_at)
+                VALUES ('llm_enabled', ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) DO UPDATE SET 
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+                """,
+                ["true" if enabled else "false"]
+            )
+            return True
+    except Exception as e:
+        logger.error(f"Failed to set LLM config: {e}")
+        return False
+
+
+def get_monthly_token_usage() -> Dict[str, Any]:
+    """Get token usage for current month."""
+    try:
+        with get_conn() as conn:
+            result = conn.execute("""
+                SELECT COALESCE(SUM(total_tokens), 0) AS tokens_used
+                FROM llm_token_usage
+                WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+            """).fetchone()
+            
+            tokens_used = int(result[0]) if result else 0
+            
+            return {
+                "budget": LLM_MONTHLY_TOKEN_BUDGET,
+                "used": tokens_used,
+                "remaining": max(0, LLM_MONTHLY_TOKEN_BUDGET - tokens_used),
+                "percent_used": round((tokens_used / LLM_MONTHLY_TOKEN_BUDGET) * 100, 1)
+            }
+    except Exception as e:
+        logger.error(f"Failed to get token usage: {e}")
+        return {
+            "budget": LLM_MONTHLY_TOKEN_BUDGET,
+            "used": 0,
+            "remaining": LLM_MONTHLY_TOKEN_BUDGET,
+            "percent_used": 0.0
+        }
+
+
+def _check_cache(
+    base_chart_id: str,
+    period_type: str,
+    period_key: str,
+    feature_name: str,
+    prompt_version: str
+) -> Optional[Dict[str, Any]]:
+    """Check for cached LLM interpretation."""
+    try:
+        with get_conn() as conn:
+            result = conn.execute("""
+                SELECT content_json FROM prediction_llm_interpretation
+                WHERE base_chart_id = ?
+                AND period_type = ?
+                AND period_key = ?
+                AND feature_name = ?
+                AND prompt_version = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, [base_chart_id, period_type, period_key, feature_name, prompt_version]).fetchone()
+            
+            if result and result[0]:
+                logger.info(f"LLM cache hit: {base_chart_id}/{period_type}/{period_key}")
+                if isinstance(result[0], str):
+                    return json.loads(result[0])
+                return result[0]
+    except Exception as e:
+        logger.warning(f"Cache lookup failed: {e}")
+    
+    return None
+
+
+def _persist_interpretation(
+    base_chart_id: str,
+    period_type: str,
+    period_key: str,
+    feature_name: str,
+    prompt_version: str,
+    provider: Optional[str],
+    model: Optional[str],
+    prompt_tokens: int,
+    completion_tokens: int,
+    total_tokens: int,
+    content_json: Dict[str, Any],
+    fallback_reason: Optional[str]
+) -> None:
+    """Persist LLM interpretation and token usage."""
+    try:
+        interpretation_id = str(uuid.uuid4())
+        with get_conn() as conn:
+            conn.execute("""
+                INSERT INTO prediction_llm_interpretation (
+                    id, base_chart_id, period_type, period_key, feature_name,
+                    provider, model, prompt_version, prompt_tokens,
+                    completion_tokens, total_tokens, content_json,
+                    fallback_reason, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, [
+                interpretation_id, base_chart_id, period_type, period_key,
+                feature_name, provider, model, prompt_version, prompt_tokens,
+                completion_tokens, total_tokens, json.dumps(content_json),
+                fallback_reason
+            ])
+            
+            if total_tokens > 0 and not fallback_reason:
+                usage_id = str(uuid.uuid4())
+                conn.execute("""
+                    INSERT INTO llm_token_usage (
+                        id, feature_name, prompt_version, total_tokens, created_at
+                    ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, [usage_id, feature_name, prompt_version, total_tokens])
+                
+    except Exception as e:
+        logger.error(f"Failed to persist interpretation: {e}")
+
+
+def _build_context_for_llm(
+    envelope: Dict[str, Any],
+    synthesis: Dict[str, Any],
+    deterministic_interpretation: Dict[str, Any],
+    period_type: str,
+    period_key: str,
+    explainability_mode: str
+) -> Dict[str, Any]:
+    """
+    Build the context to pass to the LLM.
+    
+    Only includes synthesized meaning - never raw astrology computation.
+    """
+    lagna = envelope.get("lagna", {})
+    nakshatra = envelope.get("nakshatra_context", {})
+    dasha = envelope.get("dasha_context", {})
+    
+    life_areas = []
+    for area_data in synthesis.get("life_areas", []):
+        area_context = {
+            "area": area_data.get("area"),
+            "score": area_data.get("score"),
+            "strength_label": _score_to_strength(area_data.get("score", 50)),
+            "top_signals": area_data.get("top_signals", [])[:3]
+        }
+        life_areas.append(area_context)
+    
+    return {
+        "period_type": period_type,
+        "period_label": period_key,
+        "lagna_label": lagna.get("label", lagna.get("rasi", "Unknown")),
+        "moon_nakshatra": nakshatra.get("janma_nakshatra", "Unknown"),
+        "mahadasha_lord": dasha.get("maha_lord", "Unknown"),
+        "antardasha_lord": dasha.get("antar_lord", "Unknown"),
+        "life_areas": life_areas,
+        "explainability_mode": explainability_mode,
+        "deterministic_summary": deterministic_interpretation.get("window_summary", {}).get("summary", "")
+    }
+
+
+def _score_to_strength(score: int) -> str:
+    """Convert numeric score to strength label."""
+    if score >= 65:
+        return "supportive"
+    elif score >= 45:
+        return "neutral"
+    else:
+        return "watchful"
+
+
+def _validate_llm_output(output: Dict[str, Any]) -> bool:
+    """Validate LLM output against schema."""
+    required_keys = ["window_summary", "life_areas"]
+    
+    if not all(k in output for k in required_keys):
+        logger.warning("LLM output missing required keys")
+        return False
+    
+    window = output.get("window_summary", {})
+    if not window.get("summary"):
+        logger.warning("LLM output missing window summary")
+        return False
+    
+    return True
+
+
+def generate_llm_interpretation(
+    base_chart_id: str,
+    envelope: Dict[str, Any],
+    synthesis: Dict[str, Any],
+    deterministic_interpretation: Dict[str, Any],
+    year: int,
+    period_type: Literal["weekly", "monthly", "yearly"],
+    period_key: str,
+    feature_name: str = "prediction",
+    prompt_version: str = PROMPT_VERSION,
+    explainability_mode: str = "standard"
+) -> Dict[str, Any]:
+    """
+    Generate LLM-enhanced interpretation.
+    
+    Orchestrates the full LLM interpretation flow:
+    1. Check if LLM is enabled
+    2. Check cache
+    3. Enforce token limits and budget
+    4. Call OpenAI
+    5. Validate and persist
+    6. Fallback to deterministic if needed
+    
+    Args:
+        base_chart_id: The chart identifier
+        envelope: Full prediction envelope data
+        synthesis: Synthesis output with scores and signals
+        deterministic_interpretation: Pre-computed deterministic interpretation
+        year: Prediction year
+        period_type: "weekly" | "monthly" | "yearly"
+        period_key: e.g. "2026-W03", "2026-01", "2026"
+        feature_name: e.g. "prediction"
+        prompt_version: e.g. "weekly_v1"
+        explainability_mode: "minimal" | "standard" | "full"
+        
+    Returns:
+        dict with:
+        - llm_interpretation: The LLM-generated content (or deterministic fallback)
+        - llm_metadata: Provider info, version, fallback reason
+    """
+    result = {
+        "llm_interpretation": None,
+        "llm_metadata": {
+            "provider": "none",
+            "model": None,
+            "prompt_version": prompt_version,
+            "fallback_reason": None,
+            "tokens_used": 0
+        }
+    }
+    
+    if not is_llm_enabled():
+        logger.info("LLM disabled - using deterministic fallback")
+        result["llm_interpretation"] = deterministic_interpretation
+        result["llm_metadata"]["fallback_reason"] = "llm_disabled"
+        _persist_interpretation(
+            base_chart_id, period_type, period_key, feature_name,
+            prompt_version, None, None, 0, 0, 0,
+            deterministic_interpretation, "llm_disabled"
+        )
+        return result
+    
+    cached = _check_cache(base_chart_id, period_type, period_key, feature_name, prompt_version)
+    if cached:
+        result["llm_interpretation"] = cached
+        result["llm_metadata"]["provider"] = "cache"
+        result["llm_metadata"]["fallback_reason"] = None
+        return result
+    
+    usage = get_monthly_token_usage()
+    if usage["remaining"] <= 0:
+        logger.warning("Monthly token budget exceeded")
+        result["llm_interpretation"] = deterministic_interpretation
+        result["llm_metadata"]["fallback_reason"] = "budget_exceeded"
+        _persist_interpretation(
+            base_chart_id, period_type, period_key, feature_name,
+            prompt_version, None, None, 0, 0, 0,
+            deterministic_interpretation, "budget_exceeded"
+        )
+        return result
+    
+    if not openai_provider.is_available():
+        logger.info("OpenAI not available - using deterministic fallback")
+        result["llm_interpretation"] = deterministic_interpretation
+        result["llm_metadata"]["fallback_reason"] = "openai_key_missing"
+        _persist_interpretation(
+            base_chart_id, period_type, period_key, feature_name,
+            prompt_version, None, None, 0, 0, 0,
+            deterministic_interpretation, "openai_key_missing"
+        )
+        return result
+    
+    context = _build_context_for_llm(
+        envelope, synthesis, deterministic_interpretation,
+        period_type, period_key, explainability_mode
+    )
+    
+    system_prompt = _load_prompt_template()
+    user_prompt = f"Generate interpretation for this astrological context:\n\n{json.dumps(context, indent=2)}"
+    
+    token_check = check_token_limits(system_prompt, context)
+    if not token_check["allowed"]:
+        logger.warning(f"Token limit exceeded: {token_check['reason']}")
+        result["llm_interpretation"] = deterministic_interpretation
+        result["llm_metadata"]["fallback_reason"] = "token_limit_exceeded"
+        _persist_interpretation(
+            base_chart_id, period_type, period_key, feature_name,
+            prompt_version, None, None, 0, 0, 0,
+            deterministic_interpretation, "token_limit_exceeded"
+        )
+        return result
+    
+    llm_response, usage_info, error = openai_provider.call_openai(
+        system_prompt, user_prompt, get_max_completion_tokens()
+    )
+    
+    if error:
+        logger.warning(f"OpenAI call failed: {error}")
+        result["llm_interpretation"] = deterministic_interpretation
+        result["llm_metadata"]["fallback_reason"] = error
+        _persist_interpretation(
+            base_chart_id, period_type, period_key, feature_name,
+            prompt_version, "openai", "gpt-4o-mini", 0, 0, 0,
+            deterministic_interpretation, error
+        )
+        return result
+    
+    if not _validate_llm_output(llm_response):
+        logger.warning("LLM output validation failed")
+        result["llm_interpretation"] = deterministic_interpretation
+        result["llm_metadata"]["fallback_reason"] = "validation_failed"
+        _persist_interpretation(
+            base_chart_id, period_type, period_key, feature_name,
+            prompt_version, "openai", usage_info.get("model"),
+            usage_info.get("prompt_tokens", 0),
+            usage_info.get("completion_tokens", 0),
+            usage_info.get("total_tokens", 0),
+            deterministic_interpretation, "validation_failed"
+        )
+        return result
+    
+    result["llm_interpretation"] = llm_response
+    result["llm_metadata"]["provider"] = "openai"
+    result["llm_metadata"]["model"] = usage_info.get("model")
+    result["llm_metadata"]["tokens_used"] = usage_info.get("total_tokens", 0)
+    
+    _persist_interpretation(
+        base_chart_id, period_type, period_key, feature_name,
+        prompt_version, "openai", usage_info.get("model"),
+        usage_info.get("prompt_tokens", 0),
+        usage_info.get("completion_tokens", 0),
+        usage_info.get("total_tokens", 0),
+        llm_response, None
+    )
+    
+    logger.info(
+        f"LLM interpretation generated: {base_chart_id}/{period_type}/{period_key} "
+        f"[{usage_info.get('total_tokens', 0)} tokens]"
+    )
+    
+    return result
