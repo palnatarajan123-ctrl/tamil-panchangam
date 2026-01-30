@@ -60,9 +60,12 @@ class PakshiRhythmContext(BaseModel):
 
 
 class PredictionArea(BaseModel):
-    """Single prediction life area."""
+    """Single prediction life area with full details."""
     area: str
+    score: int = 50
+    outlook: str = "neutral"
     interpretation: str
+    deeper_explanation: Optional[str] = None
     guidance: Optional[str] = None
 
 
@@ -98,5 +101,6 @@ class CanonicalReportData(BaseModel):
     reflection_prompts: List[str]
     
     closing_note: str
+    closing_affirmation: Optional[str] = None
     
     llm_enhanced: bool = False

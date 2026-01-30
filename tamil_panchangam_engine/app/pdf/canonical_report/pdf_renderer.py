@@ -211,6 +211,34 @@ def _build_how_to_read(styles) -> List:
     return elements
 
 
+def _svg_data_uri_to_image(data_uri: str, width: float = 2.5*inch, height: float = 2.5*inch):
+    """Convert SVG data URI to ReportLab Image object."""
+    if not data_uri or not data_uri.startswith("data:image/svg+xml;base64,"):
+        return None
+    
+    try:
+        svg_b64 = data_uri.split(",", 1)[1]
+        svg_bytes = base64.b64decode(svg_b64)
+        
+        from reportlab.graphics import renderPDF
+        from svglib.svglib import svg2rlg
+        import io
+        
+        drawing = svg2rlg(io.BytesIO(svg_bytes))
+        if drawing:
+            scale_x = width / drawing.width if drawing.width else 1
+            scale_y = height / drawing.height if drawing.height else 1
+            scale = min(scale_x, scale_y)
+            drawing.width = drawing.width * scale
+            drawing.height = drawing.height * scale
+            drawing.scale(scale, scale)
+            return drawing
+    except Exception as e:
+        pass
+    
+    return None
+
+
 def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
     """Build natal snapshot section with charts and birth reference."""
     elements = []
@@ -225,6 +253,25 @@ def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
     ))
     
     elements.append(Spacer(1, 0.3*inch))
+    
+    d1_chart = _svg_data_uri_to_image(data.chart_images.d1_rasi)
+    d9_chart = _svg_data_uri_to_image(data.chart_images.d9_navamsa)
+    
+    if d1_chart or d9_chart:
+        chart_row = []
+        if d1_chart:
+            chart_row.append(d1_chart)
+        if d9_chart:
+            chart_row.append(d9_chart)
+        
+        if chart_row:
+            chart_table = Table([chart_row], colWidths=[2.8*inch] * len(chart_row))
+            chart_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            elements.append(chart_table)
+            elements.append(Spacer(1, 0.3*inch))
     
     elements.append(Paragraph("Birth Reference", styles['SubsectionTitle']))
     
@@ -349,8 +396,34 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def _score_to_label(score: int) -> str:
+    """Convert score to human-readable label."""
+    if score >= 75:
+        return "Strong Support"
+    elif score >= 65:
+        return "Favorable"
+    elif score >= 55:
+        return "Mildly Supportive"
+    elif score >= 45:
+        return "Neutral"
+    elif score >= 35:
+        return "Watchful"
+    else:
+        return "Challenging"
+
+
+def _score_to_color(score: int):
+    """Convert score to color for visual indicator."""
+    if score >= 65:
+        return colors.Color(0.2, 0.6, 0.3)
+    elif score >= 45:
+        return colors.Color(0.6, 0.5, 0.2)
+    else:
+        return colors.Color(0.7, 0.3, 0.3)
+
+
 def _build_predictions(data: CanonicalReportData, styles) -> List:
-    """Build predictions section."""
+    """Build predictions section with full details and scores."""
     elements = []
     
     elements.append(Paragraph("Predictions", styles['SectionTitle']))
@@ -358,16 +431,56 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
     if data.prediction_overview:
         elements.append(Paragraph("Overview", styles['SubsectionTitle']))
         elements.append(Paragraph(data.prediction_overview, styles['BodyText']))
-        elements.append(Spacer(1, 0.2*inch))
+        elements.append(Spacer(1, 0.3*inch))
+    
+    scores_data = [["Life Area", "Score", "Outlook"]]
+    for area in data.prediction_areas:
+        scores_data.append([
+            area.area,
+            f"{area.score}/100 ({_score_to_label(area.score)})",
+            area.outlook.title()
+        ])
+    
+    scores_table = Table(scores_data, colWidths=[2*inch, 2.2*inch, 1.5*inch])
+    scores_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(scores_table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    elements.append(Paragraph("Detailed Insights", styles['SubsectionTitle']))
+    elements.append(Spacer(1, 0.15*inch))
     
     for area in data.prediction_areas:
-        elements.append(KeepTogether([
-            Paragraph(area.area, styles['SubsectionTitle']),
-            Paragraph(area.interpretation, styles['BodyText']),
-            Paragraph(f"<i>Guidance: {area.guidance}</i>", styles['BodyText']) 
-                if area.guidance else Spacer(1, 0.1*inch),
-            Spacer(1, 0.15*inch),
-        ]))
+        area_elements = [
+            Paragraph(f"<b>{area.area}</b> ({area.score}/100 - {_score_to_label(area.score)})", 
+                     styles['BodyText']),
+        ]
+        
+        if area.interpretation:
+            area_elements.append(Paragraph(area.interpretation, styles['BodyText']))
+        
+        if area.deeper_explanation:
+            area_elements.append(Paragraph(
+                f"<i>{area.deeper_explanation}</i>", 
+                styles['BodyText']
+            ))
+        
+        if area.guidance:
+            area_elements.append(Paragraph(
+                f"<b>Guidance:</b> {area.guidance}", 
+                styles['BodyText']
+            ))
+        
+        area_elements.append(Spacer(1, 0.2*inch))
+        elements.append(KeepTogether(area_elements))
     
     elements.append(PageBreak())
     
@@ -404,7 +517,14 @@ def _build_closing(data: CanonicalReportData, styles) -> List:
     
     elements.append(Paragraph(data.closing_note, styles['BodyText']))
     
-    elements.append(Spacer(1, inch))
+    if data.closing_affirmation:
+        elements.append(Spacer(1, 0.3*inch))
+        elements.append(Paragraph(
+            f"<i>\"{data.closing_affirmation}\"</i>",
+            styles['BodyText']
+        ))
+    
+    elements.append(Spacer(1, 0.5*inch))
     
     if data.llm_enhanced:
         elements.append(Paragraph(

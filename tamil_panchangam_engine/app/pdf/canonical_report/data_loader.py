@@ -8,7 +8,7 @@ Fails gracefully if required data is missing.
 
 import json
 import hashlib
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime
 import logging
 
@@ -111,7 +111,7 @@ def load_cached_llm_interpretation(
     base_chart_id: str,
     period_type: str,
     period_key: str,
-    feature_name: str = "interpretation"
+    feature_name: str = "prediction"
 ) -> Optional[Dict[str, Any]]:
     """Load cached LLM interpretation if available."""
     try:
@@ -291,15 +291,24 @@ def _extract_pakshi_rhythm(envelope: Dict[str, Any]) -> PakshiRhythmContext:
 def _extract_prediction_areas(
     interpretation: Dict[str, Any],
     llm_interpretation: Optional[Dict[str, Any]] = None
-) -> Tuple[str, list]:
-    """Extract prediction areas from interpretation."""
+) -> Tuple[str, list, list, list]:
+    """
+    Extract prediction areas, practices, and reflections from interpretation.
     
+    Returns: (overview, areas, practices, reflections)
+    """
     ai_interp = interpretation.get("ai_interpretation", {})
     
     source = llm_interpretation if llm_interpretation else ai_interp
     
     window_summary = source.get("window_summary", {})
-    overview = window_summary.get("narrative", "") or source.get("overview", "") or source.get("summary", "")
+    overview = (
+        window_summary.get("overview", "") or 
+        window_summary.get("summary", "") or 
+        window_summary.get("narrative", "") or 
+        source.get("overview", "") or 
+        source.get("summary", "")
+    )
     
     life_areas = source.get("life_areas", {})
     
@@ -308,7 +317,10 @@ def _extract_prediction_areas(
         if isinstance(area_data, dict):
             areas.append(PredictionArea(
                 area=area_name.replace("_", " ").title(),
+                score=area_data.get("score", 50),
+                outlook=area_data.get("outlook", "neutral"),
                 interpretation=area_data.get("interpretation", area_data.get("summary", "")),
+                deeper_explanation=area_data.get("deeper_explanation"),
                 guidance=area_data.get("guidance"),
             ))
         elif isinstance(area_data, str):
@@ -317,7 +329,62 @@ def _extract_prediction_areas(
                 interpretation=area_data,
             ))
     
-    return overview, areas
+    practices = source.get("practices", [])
+    if not practices:
+        practices = _generate_default_practices(areas)
+    
+    reflections = source.get("reflection_prompts", source.get("reflections", []))
+    if not reflections:
+        reflections = _generate_default_reflections(areas)
+    
+    return overview, areas, practices, reflections
+
+
+def _generate_default_practices(areas: list) -> List[str]:
+    """Generate default practices based on life areas."""
+    practices = []
+    
+    for area in areas:
+        if area.score >= 65:
+            if "career" in area.area.lower():
+                practices.append("Leverage this favorable period for career initiatives and networking")
+            elif "finance" in area.area.lower():
+                practices.append("Consider strategic financial planning during this supportive window")
+            elif "relationship" in area.area.lower():
+                practices.append("Nurture important relationships through quality time together")
+            elif "health" in area.area.lower():
+                practices.append("Build on current vitality with sustainable wellness practices")
+            elif "personal" in area.area.lower() or "growth" in area.area.lower():
+                practices.append("Dedicate time to learning and spiritual development")
+        elif area.score < 45:
+            if "health" in area.area.lower():
+                practices.append("Prioritize rest and stress management during this period")
+    
+    if not practices:
+        practices = [
+            "Begin each day with a moment of stillness and intention-setting",
+            "Practice gratitude by noting three blessings each evening",
+            "Spend time in nature to restore balance and perspective"
+        ]
+    
+    return practices[:5]
+
+
+def _generate_default_reflections(areas: list) -> List[str]:
+    """Generate default reflection prompts."""
+    reflections = [
+        "What patterns in your life are ready for conscious transformation?",
+        "How can you align your daily actions with your deeper values?",
+        "What would you do differently if you trusted the timing of your life?"
+    ]
+    
+    for area in areas:
+        if area.score >= 65 and "career" in area.area.lower():
+            reflections.append("What vision for your work brings you the most alive?")
+        elif area.score < 45 and "relationship" in area.area.lower():
+            reflections.append("What boundaries would support healthier connections?")
+    
+    return reflections[:4]
 
 
 def build_report_data(
@@ -359,7 +426,7 @@ def build_report_data(
     navamsa_data = envelope.get("navamsa", {})
     navamsa_planet_signs = navamsa_data.get("planet_signs", {})
     
-    overview, prediction_areas = _extract_prediction_areas(
+    overview, prediction_areas, practices, reflections = _extract_prediction_areas(
         interpretation, llm_interpretation
     )
     
@@ -394,11 +461,41 @@ def build_report_data(
         prediction_overview=overview,
         prediction_areas=prediction_areas,
         
-        practices=interpretation.get("practices", []),
-        reflection_prompts=interpretation.get("reflections", []),
+        practices=practices,
+        reflection_prompts=reflections,
         
-        closing_note=interpretation.get("closing", 
-            "May this guidance support your journey with awareness and wisdom."),
+        closing_note=_generate_closing_note(prediction_areas),
+        closing_affirmation=_generate_closing_affirmation(prediction_areas),
         
         llm_enhanced=llm_interpretation is not None,
     )
+
+
+def _generate_closing_note(areas: list) -> str:
+    """Generate contextual closing note based on prediction areas."""
+    supportive_count = sum(1 for a in areas if a.score >= 65)
+    watchful_count = sum(1 for a in areas if a.score < 45)
+    
+    if supportive_count >= 3:
+        return (
+            "This period carries supportive energies across multiple life areas. "
+            "Trust in the flow while taking inspired action. "
+            "May this guidance illuminate your path with clarity and purpose."
+        )
+    elif watchful_count >= 3:
+        return (
+            "This period invites patience and introspection. "
+            "Challenges are teachers in disguise, offering opportunities for growth. "
+            "May this guidance support your journey with resilience and wisdom."
+        )
+    else:
+        return (
+            "This period presents a balanced mix of opportunities and invitations for growth. "
+            "Navigate with awareness, honoring both action and stillness. "
+            "May this guidance illuminate your path with clarity and peace."
+        )
+
+
+def _generate_closing_affirmation(areas: list) -> str:
+    """Generate closing affirmation."""
+    return "The stars illuminate possibilities; your choices create your destiny."
