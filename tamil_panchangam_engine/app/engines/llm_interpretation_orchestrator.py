@@ -239,15 +239,20 @@ def _score_to_strength(score: int) -> str:
 
 def _validate_llm_output(output: Dict[str, Any]) -> bool:
     """Validate LLM output against schema."""
+    logger.debug(f"Validating LLM output keys: {list(output.keys())}")
+    
     required_keys = ["window_summary", "life_areas"]
     
     if not all(k in output for k in required_keys):
-        logger.warning("LLM output missing required keys")
+        logger.warning(f"LLM output missing required keys. Got: {list(output.keys())}")
         return False
     
     window = output.get("window_summary", {})
-    if not window.get("summary"):
-        logger.warning("LLM output missing window summary")
+    logger.debug(f"Window summary keys: {list(window.keys())}")
+    
+    has_overview = window.get("overview") or window.get("summary")
+    if not has_overview:
+        logger.warning(f"LLM output missing window summary/overview. Window keys: {list(window.keys())}")
         return False
     
     return True

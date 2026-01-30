@@ -175,6 +175,9 @@ Press the **green Run button** to start both services automatically.
 - `client/src/pages/admin-llm.tsx` - Admin dashboard UI
 
 ## Recent Changes
+- 2026-01-30: Fixed frontend adapter to prefer LLM interpretation over deterministic fallback
+- 2026-01-30: Improved LLM prompt to generate warm, personalized narratives with second-person language
+- 2026-01-30: Fixed LLM validation to accept both 'overview' and 'summary' field names
 - 2026-01-30: Fixed OpenAI provider to use stdlib urllib (no external packages needed)
 - 2026-01-30: Extended LLM interpretation to weekly and yearly prediction endpoints
 - 2026-01-30: Increased token limits to 1500 completion / 6000 total per call

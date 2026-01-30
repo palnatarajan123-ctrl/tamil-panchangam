@@ -211,17 +211,31 @@ export function adaptAIInterpretation(
   };
 }
 
-export function hasValidAIInterpretation(details: any): boolean {
+function isValidInterpretationShape(obj: any): boolean {
   return (
-    details?.interpretation?.ai_interpretation?.engine_version === "ai-interpretation-v1.0" &&
-    details?.interpretation?.ai_interpretation?.window_summary != null &&
-    details?.interpretation?.ai_interpretation?.life_areas != null
+    obj?.engine_version === "ai-interpretation-v1.0" &&
+    obj?.window_summary != null &&
+    obj?.life_areas != null
   );
+}
+
+export function hasValidAIInterpretation(details: any): boolean {
+  const llmInterp = details?.interpretation?.llm_interpretation;
+  const aiInterp = details?.interpretation?.ai_interpretation;
+  return isValidInterpretationShape(llmInterp) || isValidInterpretationShape(aiInterp);
 }
 
 export function extractAIInterpretation(details: any): AIInterpretationV1 | null {
   if (!hasValidAIInterpretation(details)) {
     return null;
   }
-  return details.interpretation.ai_interpretation as AIInterpretationV1;
+  
+  const llmInterp = details.interpretation.llm_interpretation;
+  const aiInterp = details.interpretation.ai_interpretation;
+  
+  if (isValidInterpretationShape(llmInterp)) {
+    return llmInterp as AIInterpretationV1;
+  }
+  
+  return aiInterp as AIInterpretationV1;
 }
