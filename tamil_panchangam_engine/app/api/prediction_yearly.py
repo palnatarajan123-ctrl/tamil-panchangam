@@ -5,6 +5,7 @@ import json
 
 from app.db.session import get_db
 from app.repositories.base_chart_repo import get_base_chart_by_id
+from app.repositories.yearly_prediction_repo import save_yearly_prediction
 
 from app.engines.yearly_prediction_envelope import build_yearly_prediction_envelope
 from app.engines.synthesis_engine import synthesize_from_envelope
@@ -148,6 +149,17 @@ def generate_yearly_prediction(payload: dict, db=Depends(get_db)):
             interpretation.get("summary")
             or interpretation.get("headline")
         )
+
+    # Save yearly prediction to database for PDF generation
+    save_yearly_prediction(
+        base_chart_id=base_chart_id,
+        year=int(year),
+        status="success",
+        envelope=json.dumps(envelope),
+        synthesis=json.dumps(synthesis),
+        interpretation=json.dumps(interpretation),
+        engine_version="v4.1",
+    )
 
     return {
         "id": prediction_id,
