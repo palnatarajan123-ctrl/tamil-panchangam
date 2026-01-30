@@ -7,7 +7,7 @@ Used to enforce guardrails before making OpenAI API calls.
 
 Hard limits:
 - max_completion_tokens = 800
-- Refuse call if estimated total tokens > 1500
+- Refuse call if estimated total tokens > 4000
 """
 
 import logging
@@ -16,7 +16,7 @@ from typing import Dict, Any
 logger = logging.getLogger(__name__)
 
 MAX_COMPLETION_TOKENS = 800
-MAX_TOTAL_TOKENS = 1500
+MAX_TOTAL_TOKENS = 4000
 
 _encoding = None
 
