@@ -8,7 +8,6 @@ import { Navigation } from "@/components/navigation";
 import Home from "@/pages/home";
 import Predictions from "@/pages/predictions"; // legacy
 import Health from "@/pages/health";
-import Reports from "@/pages/reports";
 import Docs from "@/pages/docs";
 import ChartDetail from "@/pages/chart-detail";
 import AdminLLM from "@/pages/admin-llm";
@@ -48,7 +47,6 @@ function Router() {
       </Route>
 
       {/* Static pages */}
-      <Route path="/reports" component={Reports} />
       <Route path="/health" component={Health} />
       <Route path="/docs" component={Docs} />
       <Route path="/admin/llm" component={AdminLLM} />

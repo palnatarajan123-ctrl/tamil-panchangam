@@ -70,15 +70,12 @@ def _create_styles():
         spaceAfter=8,
     ))
     
-    styles.add(ParagraphStyle(
-        name='BodyText',
-        parent=styles['Normal'],
-        fontSize=11,
-        textColor=colors.Color(*COLORS["text"]),
-        alignment=TA_JUSTIFY,
-        spaceAfter=8,
-        leading=14,
-    ))
+    # Override existing BodyText style with custom settings
+    styles['BodyText'].fontSize = 11
+    styles['BodyText'].textColor = colors.Color(*COLORS["text"])
+    styles['BodyText'].alignment = TA_JUSTIFY
+    styles['BodyText'].spaceAfter = 8
+    styles['BodyText'].leading = 14
     
     styles.add(ParagraphStyle(
         name='MutedText',

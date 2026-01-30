@@ -59,7 +59,7 @@ def load_base_chart(base_chart_id: str) -> Dict[str, Any]:
     """Load base chart from database."""
     with get_conn() as conn:
         result = conn.execute("""
-            SELECT * FROM base_chart WHERE id = ?
+            SELECT * FROM base_charts WHERE id = ?
         """, [base_chart_id]).fetchone()
         
         if not result:
@@ -73,7 +73,7 @@ def load_prediction(base_chart_id: str, year: int, month: int) -> Dict[str, Any]
     """Load monthly prediction from database."""
     with get_conn() as conn:
         result = conn.execute("""
-            SELECT * FROM predictions 
+            SELECT * FROM monthly_predictions 
             WHERE base_chart_id = ? AND year = ? AND month = ?
             ORDER BY created_at DESC
             LIMIT 1
@@ -92,8 +92,8 @@ def load_yearly_prediction(base_chart_id: str, year: int) -> Dict[str, Any]:
     """Load yearly prediction from database."""
     with get_conn() as conn:
         result = conn.execute("""
-            SELECT * FROM predictions 
-            WHERE base_chart_id = ? AND year = ? AND period_type = 'yearly'
+            SELECT * FROM yearly_predictions 
+            WHERE base_chart_id = ? AND year = ?
             ORDER BY created_at DESC
             LIMIT 1
         """, [base_chart_id, year]).fetchone()

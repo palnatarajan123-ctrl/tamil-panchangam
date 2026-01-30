@@ -1,15 +1,13 @@
 import { Link, useLocation } from "wouter";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Calendar, FileText, Activity, BookOpen, Settings } from "lucide-react";
+import { Sparkles, Activity, BookOpen, Settings } from "lucide-react";
 
 export function Navigation() {
   const [location] = useLocation();
 
   const navItems = [
     { href: "/", label: "Generate Chart", icon: Sparkles },
-/*    { href: "/predictions", label: "Monthly Predictions", icon: Calendar }, */
-    { href: "/reports", label: "Reports", icon: FileText },
   ];
 
   

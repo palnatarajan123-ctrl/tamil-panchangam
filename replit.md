@@ -229,6 +229,9 @@ Press the **green Run button** to start both services automatically.
 4. **Single Pipeline** - All legacy PDF code has been removed
 
 ## Recent Changes
+- 2026-01-30: **FIX** - Fixed PDF data_loader table names (base_charts, monthly_predictions, yearly_predictions)
+- 2026-01-30: **FIX** - Fixed ReportLab BodyText style conflict (override instead of add)
+- 2026-01-30: **CLEANUP** - Removed legacy Reports page and navigation link
 - 2026-01-30: **NEW FEATURE** - Canonical PDF Report Builder with 8-section structure
 - 2026-01-30: Removed all legacy PDF generation code (unified to single pipeline)
 - 2026-01-30: Added "Generate PDF Report" button to Predictions UI (monthly/yearly only)
