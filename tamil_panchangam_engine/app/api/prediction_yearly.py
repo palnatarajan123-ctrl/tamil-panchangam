@@ -128,7 +128,7 @@ def generate_yearly_prediction(payload: dict, db=Depends(get_db)):
         period_type="yearly",
         period_key=period_key,
         feature_name="prediction",
-        prompt_version="interpretation_v1",
+        prompt_version="interpretation_v2",
         explainability_mode=explainability_level,
     )
     interpretation["llm_interpretation"] = llm_result.get("llm_interpretation")

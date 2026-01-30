@@ -472,9 +472,14 @@ def build_report_data(
     envelope = _safe_json(prediction.get("envelope"), {})
     interpretation = _safe_json(prediction.get("interpretation"), {})
     
+    # First try cached LLM interpretation table
     llm_interpretation = load_cached_llm_interpretation(
         base_chart_id, report_type, period_key
     )
+    
+    # Fallback: extract from interpretation column (yearly/weekly store it there)
+    if not llm_interpretation:
+        llm_interpretation = interpretation.get("llm_interpretation", {})
     
     ephemeris = payload.get("ephemeris", {})
     planets = ephemeris.get("planets", {})
