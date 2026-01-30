@@ -35,7 +35,7 @@ from app.llm.payload_builder import (
 
 logger = logging.getLogger(__name__)
 
-LLM_MONTHLY_TOKEN_BUDGET = 50_000
+LLM_MONTHLY_TOKEN_BUDGET = 1_000_000
 PROMPT_VERSION = "interpretation_v1"
 
 

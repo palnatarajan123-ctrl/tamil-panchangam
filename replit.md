@@ -148,7 +148,7 @@ Press the **green Run button** to start both services automatically.
 ### Token Guardrails
 - **Completion tokens**: 1,500 max per call
 - **Total tokens**: 6,000 max per call
-- **Monthly budget**: 50,000 tokens (configurable via `llm_config` table)
+- **Monthly budget**: 1,000,000 tokens (configurable via `llm_config` table)
 
 ### Persistence (DuckDB)
 - `llm_interpretations` - Cached LLM outputs by chart/period/prompt_version
