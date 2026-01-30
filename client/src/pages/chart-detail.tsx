@@ -51,7 +51,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { adaptBirthChart } from "@/adapters/birthChartAdapter";
 import { 
-  adaptAIInterpretation, 
+  adaptInterpretation, 
   type PredictionViewModel,
   type ExplainabilityLevel,
 } from "@/adapters/aiInterpretationAdapter";
@@ -136,7 +136,7 @@ export default function ChartDetail() {
   });
 
   const prediction = rawInterpretation
-    ? adaptAIInterpretation(rawInterpretation, explainabilityLevel)
+    ? adaptInterpretation(rawInterpretation, explainabilityLevel)
     : null;
 
   if (isLoading) {

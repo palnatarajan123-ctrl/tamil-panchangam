@@ -10,7 +10,7 @@ import { DashaTimeline } from "@/components/DashaTimeline";
 import { PredictionTimelineControl } from "@/components/prediction/PredictionTimelineControl";
 
 import {
-  adaptAIInterpretation,
+  adaptInterpretation,
   extractAIInterpretation,
   hasValidAIInterpretation,
   type ExplainabilityLevel,
@@ -205,7 +205,7 @@ export default function PredictionScreen() {
           -------------------------------------------------- */}
           {hasValidAIInterpretation(data.details) && (
             <MonthlyPredictionView
-              prediction={adaptAIInterpretation(extractAIInterpretation(data.details)!, explainabilityLevel)}
+              prediction={adaptInterpretation(extractAIInterpretation(data.details)!, explainabilityLevel)}
               period={period}
             />
           )}
