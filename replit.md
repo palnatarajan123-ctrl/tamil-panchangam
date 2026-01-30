@@ -175,12 +175,15 @@ Press the **green Run button** to start both services automatically.
 - `client/src/pages/admin-llm.tsx` - Admin dashboard UI
 
 ## Recent Changes
+- 2026-01-30: **CRITICAL FIX** - Implemented LLM payload trimming (3200→1500 tokens weekly, 3200→2100 monthly)
+- 2026-01-30: Created payload_builder.py with meaning-layer-only data extraction
+- 2026-01-30: Added hard pre-call token guardrails (prompt/completion/total limits per period type)
+- 2026-01-30: Added JSON repair function to handle malformed LLM responses
 - 2026-01-30: Fixed frontend adapter to prefer LLM interpretation over deterministic fallback
 - 2026-01-30: Improved LLM prompt to generate warm, personalized narratives with second-person language
 - 2026-01-30: Fixed LLM validation to accept both 'overview' and 'summary' field names
 - 2026-01-30: Fixed OpenAI provider to use stdlib urllib (no external packages needed)
 - 2026-01-30: Extended LLM interpretation to weekly and yearly prediction endpoints
-- 2026-01-30: Increased token limits to 1500 completion / 6000 total per call
 - 2026-01-29: Added LLM interpretation layer with OpenAI integration
 - 2026-01-29: Created token estimator, orchestrator, and OpenAI provider
 - 2026-01-29: Added DuckDB tables for LLM cache, usage logging, and config

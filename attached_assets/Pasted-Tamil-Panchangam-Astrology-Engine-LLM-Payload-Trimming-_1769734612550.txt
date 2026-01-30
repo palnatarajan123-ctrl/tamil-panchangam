@@ -1,0 +1,172 @@
+Tamil Panchangam Astrology Engine — LLM Payload Trimming & Guardrails (CRITICAL FIX)
+You are working inside an existing FastAPI + DuckDB project called
+“Tamil Panchangam Astrology Engine.”
+This system already has:
+•	Fully implemented and LOCKED astrology engines
+•	A complete synthesis engine
+•	A deterministic interpretation engine
+•	An LLM interpretation orchestrator
+•	Usage dashboard showing unexpectedly high token usage
+🚨 PROBLEM TO FIX
+A single LLM interpretation consumed an unexpectedly large portion of the monthly token budget.
+This indicates LLM payload bloat.
+ 
+🎯 OBJECTIVE
+Trim the LLM input payload to the absolute minimum required for high-quality narrative generation, while enforcing hard, pre-call guardrails.
+Astrology computation, synthesis logic, and scoring must not be modified.
+ 
+🚫 NON-NEGOTIABLE RULES
+•	LLM must receive ONLY curated “meaning-layer” data
+•	LLM must NEVER receive:
+o	Full envelope
+o	Full synthesis object
+o	Full deterministic interpretation
+o	Raw planetary positions
+o	Degrees, aspects, tables, or calculations
+•	Token estimation and enforcement must occur before calling the LLM
+•	If payload exceeds limits → deterministic fallback
+ 
+🧱 PART 1 — CREATE A MEANING-LAYER BUILDER (MANDATORY)
+Create file:
+app/llm/payload_builder.py
+Public function (authoritative):
+def build_llm_payload(
+    *,
+    period_type: str,              # weekly | monthly | yearly
+    period_label: str,             # "Week 3, 2026" / "Jan 2026" / "2026"
+    lagna: str,
+    moon_nakshatra: str,
+    active_dasha: dict,            # labels only
+    life_area_scores: dict,
+    top_signals_by_life_area: dict,
+    explainability_mode: str
+) -> dict:
+    ...
+ 
+🔑 Payload Construction Rules (STRICT)
+1️⃣ Context (labels only)
+Include ONLY:
+{
+  "period_type": "...",
+  "period_label": "...",
+  "lagna": "...",
+  "moon_nakshatra": "...",
+  "active_dasha": {
+    "mahadasha": "...",
+    "antardasha": "..."
+  },
+  "explainability_mode": "minimal | standard | full"
+}
+❌ No dates
+❌ No degrees
+❌ No planets list
+ 
+2️⃣ Life Areas (TRIMMED, PERIOD-SPECIFIC)
+Weekly
+•	Max 3–4 life areas
+•	1 signal per area
+•	Rationale: 1 short sentence
+Monthly
+•	Max 5–6 life areas
+•	2 signals per area
+•	Rationale: 1–2 short sentences
+Yearly
+•	All life areas (7–8)
+•	3 signals per area
+•	Rationale: 2–3 short sentences
+ 
+Life Area Structure (authoritative)
+{
+  "name": "career",
+  "score": 72,
+  "strength": "supportive | neutral | watchful",
+  "signals": [
+    {
+      "summary": "Increased responsibility",
+      "rationale": "This period emphasizes discipline and steady effort."
+    }
+  ]
+}
+❌ No nested astrology
+❌ No repeated explanations
+❌ No cross-life-area commentary
+ 
+🧮 PART 2 — HARD TOKEN GUARDRAILS (BEFORE LLM CALL)
+Add constants:
+MAX_PROMPT_TOKENS = {
+    "weekly": 900,
+    "monthly": 1400,
+    "yearly": 2200
+}
+
+MAX_COMPLETION_TOKENS = {
+    "weekly": 500,
+    "monthly": 900,
+    "yearly": 1200
+}
+
+MAX_TOTAL_TOKENS = {
+    "weekly": 1500,
+    "monthly": 2500,
+    "yearly": 4500
+}
+ 
+Enforcement Logic (MANDATORY)
+estimated_prompt = estimate_tokens(payload)
+
+if estimated_prompt > MAX_PROMPT_TOKENS[period_type]:
+    return deterministic_fallback(reason="prompt_too_large")
+
+if estimated_prompt + MAX_COMPLETION_TOKENS[period_type] > MAX_TOTAL_TOKENS[period_type]:
+    return deterministic_fallback(reason="token_budget_exceeded")
+No exceptions.
+No retries.
+ 
+🧪 PART 3 — DEBUG LOGGING (TEMPORARY BUT REQUIRED)
+Add logs before every LLM call:
+log.info(
+    "LLM payload size",
+    period_type=period_type,
+    chars=len(json.dumps(payload)),
+    estimated_tokens=estimated_prompt,
+    life_areas=len(payload["life_areas"])
+)
+This must appear in logs before provider invocation.
+ 
+🔁 PART 4 — ORCHESTRATOR CHANGE (CRITICAL)
+In:
+app/engines/llm_interpretation_orchestrator.py
+Replace any direct passing of:
+•	envelope
+•	synthesis
+•	deterministic interpretation
+With:
+payload = build_llm_payload(...)
+The LLM must NEVER see raw engine output again.
+ 
+🧪 PART 5 — EXPECTED RESULTS (VALIDATION)
+After this change:
+Period	Expected total tokens
+Weekly	900–1,400
+Monthly	1,800–2,700
+Yearly	3,000–4,200
+If a single chart consumes >10% of monthly quota:
+•	Treat it as a bug
+•	Fail fast
+•	Fall back
+ 
+✅ FINAL RULE
+You are not “optimizing tokens.”
+You are enforcing architectural discipline.
+The LLM is a language renderer, not a reasoning engine.
+Do not:
+•	Pass raw astrology
+•	Trust the LLM to self-limit
+•	Let prompt size grow silently
+ 
+📌 DELIVERABLE
+•	A new payload_builder.py
+•	Updated orchestrator using trimmed payload
+•	Hard token caps enforced pre-call
+•	Debug logs proving payload reduction
+ 

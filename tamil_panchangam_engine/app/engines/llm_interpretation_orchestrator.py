@@ -26,6 +26,12 @@ from typing import Dict, Any, Optional, Literal
 from app.db.duckdb import get_conn
 from app.llm.token_estimator import check_token_limits, get_max_completion_tokens
 from app.llm.providers import openai_provider
+from app.llm.payload_builder import (
+    build_llm_payload,
+    validate_payload_size,
+    extract_payload_inputs,
+    MAX_COMPLETION_TOKENS
+)
 
 logger = logging.getLogger(__name__)
 
@@ -350,28 +356,39 @@ def generate_llm_interpretation(
         )
         return result
     
-    context = _build_context_for_llm(
-        envelope, synthesis, deterministic_interpretation,
-        period_type, period_key, explainability_mode
+    payload_inputs = extract_payload_inputs(
+        envelope, synthesis, period_type, period_key
     )
     
-    system_prompt = _load_prompt_template()
-    user_prompt = f"Generate interpretation for this astrological context:\n\n{json.dumps(context, indent=2)}"
+    payload = build_llm_payload(
+        period_type=period_type,
+        period_label=payload_inputs["period_label"],
+        lagna=payload_inputs["lagna"],
+        moon_nakshatra=payload_inputs["moon_nakshatra"],
+        active_dasha=payload_inputs["active_dasha"],
+        life_area_scores=payload_inputs["life_area_scores"],
+        top_signals_by_life_area=payload_inputs["top_signals_by_life_area"],
+        explainability_mode=explainability_mode
+    )
     
-    token_check = check_token_limits(system_prompt, context)
-    if not token_check["allowed"]:
-        logger.warning(f"Token limit exceeded: {token_check['reason']}")
+    is_valid, reason, estimated_tokens = validate_payload_size(payload, period_type)
+    if not is_valid:
+        logger.warning(f"Payload validation failed: {reason} (estimated {estimated_tokens} tokens)")
         result["llm_interpretation"] = deterministic_interpretation
-        result["llm_metadata"]["fallback_reason"] = "token_limit_exceeded"
+        result["llm_metadata"]["fallback_reason"] = reason
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
             prompt_version, None, None, 0, 0, 0,
-            deterministic_interpretation, "token_limit_exceeded"
+            deterministic_interpretation, reason
         )
         return result
     
+    system_prompt = _load_prompt_template()
+    user_prompt = f"Generate interpretation:\n\n{json.dumps(payload, indent=2)}"
+    
+    max_completion = MAX_COMPLETION_TOKENS.get(period_type, 900)
     llm_response, usage_info, error = openai_provider.call_openai(
-        system_prompt, user_prompt, get_max_completion_tokens()
+        system_prompt, user_prompt, max_completion
     )
     
     usage_info = usage_info or {}

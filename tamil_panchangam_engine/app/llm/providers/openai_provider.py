@@ -22,6 +22,48 @@ from typing import Dict, Any, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 MODEL = "gpt-4o-mini"
+
+
+def _repair_json(content: str) -> Optional[Dict[str, Any]]:
+    """
+    Attempt to repair common JSON issues from LLM output.
+    Returns parsed dict if successful, None if repair fails.
+    """
+    import re
+    
+    repaired = content.strip()
+    
+    if repaired.startswith("```json"):
+        repaired = repaired[7:]
+    if repaired.startswith("```"):
+        repaired = repaired[3:]
+    if repaired.endswith("```"):
+        repaired = repaired[:-3]
+    repaired = repaired.strip()
+    
+    repaired = re.sub(r',(\s*[}\]])', r'\1', repaired)
+    
+    repaired = re.sub(r':\s*,', ': null,', repaired)
+    repaired = re.sub(r':\s*}', ': null}', repaired)
+    
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+    
+    brace_count = repaired.count('{') - repaired.count('}')
+    bracket_count = repaired.count('[') - repaired.count(']')
+    
+    if brace_count > 0 or bracket_count > 0:
+        repaired += '}' * brace_count + ']' * bracket_count
+        try:
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            pass
+    
+    return None
+
+
 TEMPERATURE = 0.7
 PROVIDER_NAME = "openai"
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
@@ -109,7 +151,16 @@ def call_openai(
             )
             return parsed_json, usage_info, None
         except json.JSONDecodeError as e:
+            logger.warning(f"JSON parse failed, attempting repair: {e}")
+            logger.debug(f"Raw LLM content (first 500 chars): {content[:500]}")
+            
+            repaired = _repair_json(content)
+            if repaired:
+                logger.info(f"JSON repair successful: {usage_info['total_tokens']} tokens")
+                return repaired, usage_info, None
+            
             logger.error(f"OpenAI returned invalid JSON: {e}")
+            logger.debug(f"Raw LLM content (last 200 chars): {content[-200:]}")
             return None, usage_info, "json_parse_error"
             
     except urllib.error.HTTPError as e:
