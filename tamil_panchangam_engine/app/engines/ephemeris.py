@@ -125,6 +125,10 @@ def compute_sidereal_positions(
 
     This output is AUTHORITATIVE.
     """
+    # ✅ Ensure Lahiri ayanamsa is set before EVERY calculation
+    # (protects against global state pollution from other modules)
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    
     jd = to_julian_day(dt_utc)
 
     planets = {}

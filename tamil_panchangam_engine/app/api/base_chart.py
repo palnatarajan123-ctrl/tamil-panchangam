@@ -144,7 +144,7 @@ def get_birth_chart_ui(base_chart_id: str):
 # ============================================================
 
 @router.post("/create", response_model=BaseChartCreateResponse)
-def create_base_chart(payload: BaseChartCreateRequest):
+def create_base_chart(payload: BaseChartCreateRequest, force_recalculate: bool = False):
     """
     Immutable birth chart creation with deduplication.
 
@@ -152,6 +152,9 @@ def create_base_chart(payload: BaseChartCreateRequest):
     - Deterministic
     - Contract-safe
     - Deduplicated (same birth data = same chart_id for LLM cache sharing)
+    
+    Args:
+        force_recalculate: If True, bypasses cache and recalculates ephemeris
     """
 
     # -------------------------------------------------
@@ -164,15 +167,16 @@ def create_base_chart(payload: BaseChartCreateRequest):
         longitude=payload.longitude,
     )
     
-    existing_chart_id = _find_existing_chart_by_fingerprint(fingerprint)
-    if existing_chart_id:
-        existing = BASE_CHART_STORE[existing_chart_id]
-        logger.info(f"Returning existing chart {existing_chart_id} (fingerprint match)")
-        return BaseChartCreateResponse(
-            base_chart_id=existing_chart_id,
-            checksum=existing["checksum"],
-            locked=existing["locked"],
-        )
+    if not force_recalculate:
+        existing_chart_id = _find_existing_chart_by_fingerprint(fingerprint)
+        if existing_chart_id:
+            existing = BASE_CHART_STORE[existing_chart_id]
+            logger.info(f"Returning existing chart {existing_chart_id} (fingerprint match)")
+            return BaseChartCreateResponse(
+                base_chart_id=existing_chart_id,
+                checksum=existing["checksum"],
+                locked=existing["locked"],
+            )
 
     # -------------------------------------------------
     # 1. Resolve timezone
