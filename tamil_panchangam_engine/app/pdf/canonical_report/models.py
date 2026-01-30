@@ -63,12 +63,20 @@ class PakshiRhythmContext(BaseModel):
     activity_phase: str
 
 
+class SignalDetail(BaseModel):
+    """Individual signal with full details."""
+    engine: str
+    direction: str  # "pos" or "neg"
+    weight: float
+
+
 class SignalAttribution(BaseModel):
     """Attribution data for a life area prediction."""
     dasha: str = ""
     planets: List[str] = []
     engines: List[str] = []
     signals_count: int = 0
+    signals: List[SignalDetail] = []
 
 
 class PredictionArea(BaseModel):

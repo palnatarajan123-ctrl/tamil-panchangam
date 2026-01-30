@@ -374,11 +374,22 @@ def _extract_prediction_areas(
         attribution = None
         if attr_data:
             signals_used = attr_data.get("signals_used", [])
+            from .models import SignalDetail
+            parsed_signals = []
+            if isinstance(signals_used, list):
+                for sig in signals_used:
+                    if isinstance(sig, dict):
+                        parsed_signals.append(SignalDetail(
+                            engine=sig.get("engine", "Unknown"),
+                            direction="pos" if sig.get("weight", 0) >= 0 else "neg",
+                            weight=sig.get("weight", 0)
+                        ))
             attribution = SignalAttribution(
                 dasha=attr_data.get("dasha", ""),
                 planets=attr_data.get("planets", []),
                 engines=attr_data.get("engines", []),
-                signals_count=len(signals_used) if isinstance(signals_used, list) else 0
+                signals_count=len(parsed_signals),
+                signals=parsed_signals
             )
         
         areas.append(PredictionArea(

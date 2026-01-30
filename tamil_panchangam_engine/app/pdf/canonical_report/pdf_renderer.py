@@ -553,19 +553,35 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
         
         if area.attribution:
             attr = area.attribution
-            attr_parts = []
-            if attr.dasha:
-                attr_parts.append(f"Dasha: {attr.dasha}")
-            if attr.planets:
-                attr_parts.append(f"Planets: {', '.join(attr.planets)}")
-            if attr.signals_count > 0:
-                attr_parts.append(f"Signals: {attr.signals_count}")
+            attr_lines = []
             
-            if attr_parts:
+            main_parts = []
+            if attr.planets:
+                main_parts.append(f"Planets: {', '.join(attr.planets)}")
+            if attr.dasha:
+                main_parts.append(f"Dasha: {attr.dasha}")
+            if main_parts:
+                attr_lines.append(" | ".join(main_parts))
+            
+            if attr.engines:
+                attr_lines.append(f"Engines: {', '.join(attr.engines)}")
+            
+            if attr.signals:
+                signal_strs = []
+                for sig in attr.signals:
+                    signal_strs.append(f"{sig.engine} ({sig.direction}, {sig.weight:.2f})")
+                attr_lines.append(f"Signals: {' | '.join(signal_strs)}")
+            
+            if attr_lines:
                 area_elements.append(Paragraph(
-                    f"<font size='9' color='gray'>Attribution: {' | '.join(attr_parts)}</font>",
+                    f"<font size='9' color='gray'>ASTROLOGICAL ATTRIBUTION</font>",
                     styles['BodyText']
                 ))
+                for line in attr_lines:
+                    area_elements.append(Paragraph(
+                        f"<font size='8' color='gray'>{line}</font>",
+                        styles['BodyText']
+                    ))
         
         area_elements.append(Spacer(1, 0.2*inch))
         elements.append(KeepTogether(area_elements))
