@@ -1,166 +1,161 @@
 """
 South Indian Chart Renderer using ReportLab
 
-Renders D1/D9 charts directly to ReportLab Drawing objects for PDF embedding.
-No external SVG libraries required.
+Mirrors the frontend SouthIndianChart component logic exactly.
+Uses lagna-based rotation for correct sign placement.
 """
 
 from typing import Dict, List, Optional
 from reportlab.graphics.shapes import Drawing, Rect, Line, String, Group
 from reportlab.lib.colors import Color, black, white
 
-CHART_SIZE = 200
-CELL_SIZE = CHART_SIZE // 4
-GRID_PADDING = 10
+# Sign order (matches frontend SIGN_NAMES)
+SIGN_NAMES = [
+    "Mesham", "Rishabam", "Mithunam", "Kadakam", "Simmam", "Kanni",
+    "Thulam", "Vrischikam", "Dhanusu", "Makaram", "Kumbham", "Meenam"
+]
 
-SOUTH_INDIAN_SIGN_POSITIONS = {
-    "Leo":         (0, 0),
-    "Virgo":       (1, 0),
-    "Libra":       (2, 0),
-    "Scorpio":     (3, 0),
-    "Cancer":      (0, 1),
-    "Sagittarius": (3, 1),
-    "Gemini":      (0, 2),
-    "Capricorn":   (3, 2),
-    "Taurus":      (0, 3),
-    "Aries":       (1, 3),
-    "Pisces":      (2, 3),
-    "Aquarius":    (3, 3),
-}
+# Tamil abbreviations (3 chars uppercase)
+SIGN_ABBREVS = {name: name[:3].upper() for name in SIGN_NAMES}
 
-SIGN_ABBREVS = {
-    "Aries": "MES", "Taurus": "RIS", "Gemini": "MIT", "Cancer": "KAD",
-    "Leo": "SIM", "Virgo": "KAN", "Libra": "THU", "Scorpio": "VRI",
-    "Sagittarius": "DHA", "Capricorn": "MAK", "Aquarius": "KUM", "Pisces": "MEE",
-    "Mesham": "MES", "Rishabam": "RIS", "Mithunam": "MIT", "Kadagam": "KAD",
-    "Simham": "SIM", "Kanni": "KAN", "Thulam": "THU", "Vrishchikam": "VRI",
-    "Dhanusu": "DHA", "Makaram": "MAK", "Kumbam": "KUM", "Meenam": "MEE"
-}
+# Grid positions for houses 0-11 (matches frontend HOUSE_COORDS)
+HOUSE_COORDS = [
+    (1, 0), (2, 0), (3, 0),  # Top row: houses 0, 1, 2
+    (3, 1),                   # Right col: house 3
+    (3, 2),                   # Right col: house 4
+    (3, 3), (2, 3), (1, 3), (0, 3),  # Bottom row: houses 5, 6, 7, 8
+    (0, 2),                   # Left col: house 9
+    (0, 1),                   # Left col: house 10
+    (0, 0),                   # Top-left: house 11
+]
 
-TAMIL_TO_ENGLISH = {
-    "Mesham": "Aries", "Rishabam": "Taurus", "Mithunam": "Gemini", "Kadagam": "Cancer",
-    "Simham": "Leo", "Kanni": "Virgo", "Thulam": "Libra", "Vrishchikam": "Scorpio",
-    "Dhanusu": "Sagittarius", "Makaram": "Capricorn", "Kumbam": "Aquarius", "Meenam": "Pisces",
-    "Vrischikam": "Scorpio", "Kumbham": "Aquarius", "Kadakam": "Cancer",
-}
+# Name variations mapping to canonical index
+NAME_TO_INDEX = {name: i for i, name in enumerate(SIGN_NAMES)}
+NAME_TO_INDEX.update({
+    "Simham": 4, "Simmam": 4,
+    "Vrishchikam": 7, "Vrischikam": 7,
+    "Kumbam": 10, "Kumbham": 10,
+    "Kadagam": 3, "Kadakam": 3,
+    "Meenam": 11,
+    # English names
+    "Aries": 0, "Taurus": 1, "Gemini": 2, "Cancer": 3,
+    "Leo": 4, "Virgo": 5, "Libra": 6, "Scorpio": 7,
+    "Sagittarius": 8, "Capricorn": 9, "Aquarius": 10, "Pisces": 11,
+})
 
 PLANET_ABBREVS = {
     "Sun": "Su", "Moon": "Mo", "Mars": "Ma", "Mercury": "Me",
     "Jupiter": "Ju", "Venus": "Ve", "Saturn": "Sa", "Rahu": "Ra", "Ketu": "Ke",
-    "Ascendant": "As", "Lagna": "As"
 }
 
-COLOR_EXALTED = Color(0.1, 0.5, 0.22)
-COLOR_DEBILITATED = Color(0.7, 0.14, 0.09)
-COLOR_DEFAULT = black
-COLOR_SIGN_LABEL = Color(0.4, 0.4, 0.4)
-COLOR_GRID = Color(0.3, 0.3, 0.3)
+COLOR_GRID = Color(0.5, 0.5, 0.5)
+COLOR_SIGN = Color(0.5, 0.5, 0.5)
+COLOR_LAGNA = Color(0.85, 0.55, 0.35)  # Highlight lagna
+COLOR_PLANET = black
 
 
 def render_south_indian_chart_reportlab(
     chart_type: str,
     planet_signs: Dict[str, List[str]],
+    lagna_sign: Optional[str] = None,
     title: Optional[str] = None,
-    dignity: Optional[Dict[str, str]] = None,
-    width: float = CHART_SIZE,
-    height: float = CHART_SIZE
+    width: float = 180,
+    height: float = 180
 ) -> Drawing:
     """
-    Render a South Indian chart as a ReportLab Drawing.
+    Render a South Indian chart matching frontend logic.
     
     Args:
         chart_type: "D1" or "D9"
         planet_signs: Dict mapping sign names to list of planets
+        lagna_sign: The ascendant sign name (for highlighting and rotation)
         title: Optional chart title
-        dignity: Optional dict of planet dignities for coloring
-        width: Drawing width
-        height: Drawing height
-    
-    Returns:
-        ReportLab Drawing object ready for PDF embedding
+        width/height: Drawing dimensions
     """
-    drawing = Drawing(width, height + 25)
+    drawing = Drawing(width, height + 20)
+    cell_size = width / 4
     
-    cell_size = min(width, height) / 4
+    # Determine lagna index for rotation
+    lagna_idx = 0
+    if lagna_sign:
+        lagna_idx = NAME_TO_INDEX.get(lagna_sign, 0)
     
+    # Build planets by sign index
+    planets_by_rasi: Dict[int, List[str]] = {}
+    for sign_name, planets in planet_signs.items():
+        rasi_idx = NAME_TO_INDEX.get(sign_name)
+        if rasi_idx is not None:
+            planets_by_rasi[rasi_idx] = planets
+    
+    # Title
     if title:
         drawing.add(String(
-            width / 2, height + 15,
-            title,
-            fontName='Helvetica-Bold',
-            fontSize=10,
-            textAnchor='middle',
-            fillColor=black
+            width / 2, height + 12, title,
+            fontName='Helvetica-Bold', fontSize=9,
+            textAnchor='middle', fillColor=black
         ))
     
-    for row in range(5):
-        y = height - (row * cell_size)
-        drawing.add(Line(0, y, width, y, strokeColor=COLOR_GRID, strokeWidth=1))
+    # Grid lines
+    for i in range(5):
+        y = height - (i * cell_size)
+        drawing.add(Line(0, y, width, y, strokeColor=COLOR_GRID, strokeWidth=0.5))
+    for i in range(5):
+        x = i * cell_size
+        drawing.add(Line(x, 0, x, height, strokeColor=COLOR_GRID, strokeWidth=0.5))
     
-    for col in range(5):
+    # Diagonals in center
+    drawing.add(Line(cell_size, height - cell_size, cell_size * 3, height - cell_size * 3, 
+                     strokeColor=COLOR_GRID, strokeWidth=0.5))
+    drawing.add(Line(cell_size * 3, height - cell_size, cell_size, height - cell_size * 3, 
+                     strokeColor=COLOR_GRID, strokeWidth=0.5))
+    
+    # Render houses (using frontend rotation logic)
+    for house_idx, (col, row) in enumerate(HOUSE_COORDS):
+        rasi_idx = (house_idx + lagna_idx) % 12
+        sign_name = SIGN_NAMES[rasi_idx]
+        abbrev = sign_name[:3].upper()
+        is_lagna = (rasi_idx == lagna_idx)
+        
         x = col * cell_size
-        drawing.add(Line(x, 0, x, height, strokeColor=COLOR_GRID, strokeWidth=1))
-    
-    for sign_name, (col, row) in SOUTH_INDIAN_SIGN_POSITIONS.items():
-        x = col * cell_size + 3
-        y = height - (row * cell_size) - 12
-        abbrev = SIGN_ABBREVS.get(sign_name, sign_name[:2])
+        y = height - (row * cell_size)  # Flip Y for ReportLab
+        
+        # Sign label
+        label_color = COLOR_LAGNA if is_lagna else COLOR_SIGN
         drawing.add(String(
-            x, y, abbrev,
-            fontName='Helvetica',
-            fontSize=8,
-            fillColor=COLOR_SIGN_LABEL
+            x + cell_size / 2, y - 10, abbrev,
+            fontName='Helvetica', fontSize=7,
+            textAnchor='middle', fillColor=label_color
         ))
-    
-    for sign_name, planets in planet_signs.items():
-        lookup_name = TAMIL_TO_ENGLISH.get(sign_name, sign_name)
-        if lookup_name not in SOUTH_INDIAN_SIGN_POSITIONS:
-            continue
         
-        col, row = SOUTH_INDIAN_SIGN_POSITIONS[lookup_name]
-        base_x = col * cell_size + 3
-        base_y = height - (row * cell_size) - 26
-        
-        for idx, planet in enumerate(sorted(planets)[:4]):
-            abbrev = PLANET_ABBREVS.get(planet, planet[:2])
-            
-            color = COLOR_DEFAULT
-            if dignity:
-                status = dignity.get(planet)
-                if status == "exalted":
-                    color = COLOR_EXALTED
-                elif status == "debilitated":
-                    color = COLOR_DEBILITATED
-            
-            y_offset = idx * 11
+        # Lagna marker
+        if is_lagna:
             drawing.add(String(
-                base_x, base_y - y_offset, abbrev,
-                fontName='Helvetica-Bold',
-                fontSize=9,
-                fillColor=color
+                x + cell_size / 2, y - 20, "Lagna",
+                fontName='Helvetica', fontSize=6,
+                textAnchor='middle', fillColor=COLOR_LAGNA
+            ))
+        
+        # Planets in this sign
+        planets = planets_by_rasi.get(rasi_idx, [])
+        for idx, planet in enumerate(planets[:4]):
+            abbrev_p = PLANET_ABBREVS.get(planet, planet[:2])
+            drawing.add(String(
+                x + cell_size / 2, y - 32 - (idx * 10), abbrev_p,
+                fontName='Helvetica-Bold', fontSize=8,
+                textAnchor='middle', fillColor=COLOR_PLANET
             ))
     
-    center_x = width / 2
-    center_y = height / 2
-    
-    if chart_type == "D9":
-        label = "D9"
-    else:
-        label = "D1"
-    
+    # Center label
+    cx, cy = width / 2, height / 2
     drawing.add(String(
-        center_x, center_y + 5, label,
-        fontName='Helvetica-Bold',
-        fontSize=14,
-        textAnchor='middle',
-        fillColor=Color(0.6, 0.6, 0.6)
+        cx, cy + 5, chart_type,
+        fontName='Helvetica-Bold', fontSize=12,
+        textAnchor='middle', fillColor=Color(0.4, 0.4, 0.4)
     ))
     drawing.add(String(
-        center_x, center_y - 10, "South Indian",
-        fontName='Helvetica',
-        fontSize=8,
-        textAnchor='middle',
-        fillColor=Color(0.6, 0.6, 0.6)
+        cx, cy - 8, "South Indian",
+        fontName='Helvetica', fontSize=7,
+        textAnchor='middle', fillColor=Color(0.5, 0.5, 0.5)
     ))
     
     return drawing

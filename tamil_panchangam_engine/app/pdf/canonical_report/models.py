@@ -86,6 +86,7 @@ class ChartImages(BaseModel):
     d9_navamsa: str
     d1_planet_signs: Dict[str, List[str]] = {}
     d9_planet_signs: Dict[str, List[str]] = {}
+    lagna_sign: str = ""
 
 
 class CanonicalReportData(BaseModel):

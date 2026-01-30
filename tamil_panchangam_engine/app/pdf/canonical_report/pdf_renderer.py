@@ -212,12 +212,13 @@ def _build_how_to_read(styles) -> List:
     return elements
 
 
-def _render_chart_drawing(chart_type: str, planet_signs: dict, title: str = None):
+def _render_chart_drawing(chart_type: str, planet_signs: dict, title: str = None, lagna_sign: str = None):
     """Render chart as ReportLab Drawing object."""
     try:
         drawing = render_south_indian_chart_reportlab(
             chart_type=chart_type,
             planet_signs=planet_signs,
+            lagna_sign=lagna_sign,
             title=title,
             width=180,
             height=180
@@ -253,8 +254,8 @@ def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
     
     elements.append(Spacer(1, 0.3*inch))
     
-    d1_chart = _render_chart_drawing("D1", data.chart_images.d1_planet_signs, "Rasi (D1)")
-    d9_chart = _render_chart_drawing("D9", data.chart_images.d9_planet_signs, "Navamsa (D9)")
+    d1_chart = _render_chart_drawing("D1", data.chart_images.d1_planet_signs, "Rasi (D1)", data.chart_images.lagna_sign)
+    d9_chart = _render_chart_drawing("D9", data.chart_images.d9_planet_signs, "Navamsa (D9)", data.chart_images.lagna_sign)
     
     chart_row = [d1_chart, d9_chart]
     chart_table = Table([chart_row], colWidths=[2.8*inch, 2.8*inch])
