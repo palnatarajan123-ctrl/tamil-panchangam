@@ -211,32 +211,25 @@ def _build_how_to_read(styles) -> List:
     return elements
 
 
-def _svg_data_uri_to_image(data_uri: str, width: float = 2.5*inch, height: float = 2.5*inch):
-    """Convert SVG data URI to ReportLab Image object."""
-    if not data_uri or not data_uri.startswith("data:image/svg+xml;base64,"):
-        return None
+def _render_chart_placeholder(chart_type: str, styles) -> List:
+    """Render chart placeholder when SVG rendering is not available."""
+    elements = []
     
-    try:
-        svg_b64 = data_uri.split(",", 1)[1]
-        svg_bytes = base64.b64decode(svg_b64)
-        
-        from reportlab.graphics import renderPDF
-        from svglib.svglib import svg2rlg
-        import io
-        
-        drawing = svg2rlg(io.BytesIO(svg_bytes))
-        if drawing:
-            scale_x = width / drawing.width if drawing.width else 1
-            scale_y = height / drawing.height if drawing.height else 1
-            scale = min(scale_x, scale_y)
-            drawing.width = drawing.width * scale
-            drawing.height = drawing.height * scale
-            drawing.scale(scale, scale)
-            return drawing
-    except Exception as e:
-        pass
+    placeholder_table = Table(
+        [[f"{chart_type} Chart\n(View in app for full visualization)"]],
+        colWidths=[2.5*inch],
+        rowHeights=[1.5*inch]
+    )
+    placeholder_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.95, 0.95, 0.95)),
+        ('BOX', (0, 0), (-1, -1), 1, colors.Color(*COLORS["muted"])),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.Color(*COLORS["secondary"])),
+    ]))
     
-    return None
+    return placeholder_table
 
 
 def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
@@ -254,15 +247,15 @@ def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
     
     elements.append(Spacer(1, 0.3*inch))
     
-    d1_chart = _svg_data_uri_to_image(data.chart_images.d1_rasi)
-    d9_chart = _svg_data_uri_to_image(data.chart_images.d9_navamsa)
+    has_d1 = data.chart_images.d1_rasi and len(data.chart_images.d1_rasi) > 50
+    has_d9 = data.chart_images.d9_navamsa and len(data.chart_images.d9_navamsa) > 50
     
-    if d1_chart or d9_chart:
+    if has_d1 or has_d9:
         chart_row = []
-        if d1_chart:
-            chart_row.append(d1_chart)
-        if d9_chart:
-            chart_row.append(d9_chart)
+        if has_d1:
+            chart_row.append(_render_chart_placeholder("Rasi (D1)", styles))
+        if has_d9:
+            chart_row.append(_render_chart_placeholder("Navamsa (D9)", styles))
         
         if chart_row:
             chart_table = Table([chart_row], colWidths=[2.8*inch] * len(chart_row))
