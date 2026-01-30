@@ -369,6 +369,8 @@ def generate_llm_interpretation(
         system_prompt, user_prompt, get_max_completion_tokens()
     )
     
+    usage_info = usage_info or {}
+    
     if error:
         logger.warning(f"OpenAI call failed: {error}")
         result["llm_interpretation"] = deterministic_interpretation
@@ -380,8 +382,8 @@ def generate_llm_interpretation(
         )
         return result
     
-    if not _validate_llm_output(llm_response):
-        logger.warning("LLM output validation failed")
+    if llm_response is None or not _validate_llm_output(llm_response):
+        logger.warning("LLM output validation failed or response is None")
         result["llm_interpretation"] = deterministic_interpretation
         result["llm_metadata"]["fallback_reason"] = "validation_failed"
         _persist_interpretation(

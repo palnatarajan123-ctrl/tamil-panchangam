@@ -1,13 +1,15 @@
 # app/llm/token_estimator.py
 """
-Token Estimator v1.0
+Token Estimator v1.1
 
-Estimates token counts for LLM calls using tiktoken.
+Estimates token counts for LLM calls.
+Falls back to character heuristic if tiktoken unavailable.
 Used to enforce guardrails before making OpenAI API calls.
 
 Hard limits:
-- max_completion_tokens = 800
-- Refuse call if estimated total tokens > 4000
+- max_completion_tokens = 1500
+- max_total_tokens = 6000
+- Refuse call if estimated total tokens exceeds limit
 """
 
 import logging
@@ -15,8 +17,8 @@ from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
-MAX_COMPLETION_TOKENS = 800
-MAX_TOTAL_TOKENS = 4000
+MAX_COMPLETION_TOKENS = 1500
+MAX_TOTAL_TOKENS = 6000
 
 _encoding = None
 

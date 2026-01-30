@@ -6,11 +6,13 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.128.0",
     "jsonschema>=4.0.0",
+    "openai>=1.0.0",
     "pydantic>=2.12.5",
     "pyswisseph>=2.10.3.2",
     "pytz>=2025.2",
     "reportlab>=4.4.7",
     "svgwrite>=1.4.3",
+    "tiktoken>=0.5.0",
     "timezonefinder>=8.2.0",
     "uvicorn>=0.40.0",
 ]

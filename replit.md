@@ -135,17 +135,19 @@ Press the **green Run button** to start both services automatically.
 
 ### Architecture
 - **Purpose**: Language-only enhancement (astrology is always pre-computed deterministically)
-- **Provider**: OpenAI GPT-4o-mini via `app/llm/providers/openai_provider.py`
+- **Provider**: OpenAI GPT-4o-mini via `app/llm/providers/openai_provider.py` (uses stdlib urllib, no external package needed)
 - **Orchestrator**: `app/engines/llm_interpretation_orchestrator.py` coordinates cache, budget, and provider
+- **Endpoints**: All prediction endpoints (monthly, weekly, yearly) support LLM interpretation
 
 ### Design Principles
 1. **Fail-fast to deterministic fallback** - No retries, immediate fallback on any error
 2. **Cache-first strategy** - Reuse interpretations by (chart_id, period_type, period_key, prompt_version)
 3. **Token budget enforcement** - Monthly 50k token limit with hard guardrails per call
+4. **Zero external dependencies** - Uses Python stdlib (urllib) for API calls, no openai/tiktoken packages needed
 
 ### Token Guardrails
-- **Completion tokens**: 800 max per call
-- **Total tokens**: 1,500 max per call
+- **Completion tokens**: 1,500 max per call
+- **Total tokens**: 6,000 max per call
 - **Monthly budget**: 50,000 tokens (configurable via `llm_config` table)
 
 ### Persistence (DuckDB)
@@ -173,6 +175,9 @@ Press the **green Run button** to start both services automatically.
 - `client/src/pages/admin-llm.tsx` - Admin dashboard UI
 
 ## Recent Changes
+- 2026-01-30: Fixed OpenAI provider to use stdlib urllib (no external packages needed)
+- 2026-01-30: Extended LLM interpretation to weekly and yearly prediction endpoints
+- 2026-01-30: Increased token limits to 1500 completion / 6000 total per call
 - 2026-01-29: Added LLM interpretation layer with OpenAI integration
 - 2026-01-29: Created token estimator, orchestrator, and OpenAI provider
 - 2026-01-29: Added DuckDB tables for LLM cache, usage logging, and config

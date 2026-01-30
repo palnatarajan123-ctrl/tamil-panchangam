@@ -12,6 +12,8 @@ from app.engines.interpretation_engine import build_interpretation_from_synthesi
 from app.engines.paraphrasing_engine import paraphrase_interpretation
 from app.engines.explainability_engine import build_explainability
 from app.engines.ai_interpretation_engine import generate_interpretation as generate_ai_interpretation
+from app.engines.explainability_filter import apply_explainability
+from app.engines.llm_interpretation_orchestrator import generate_llm_interpretation
 
 router = APIRouter(prefix="/prediction", tags=["Prediction"])
 
@@ -105,8 +107,31 @@ def generate_yearly_prediction(payload: dict, db=Depends(get_db)):
         month=1,
     )
 
+    # Apply explainability filter to AI interpretation
+    explainability_level = payload.get("explainability_level", "full")
+    ai_interpretation = apply_explainability(ai_interpretation, explainability_level)
+
     interpretation = paraphrase_interpretation(interpretation)
     interpretation["ai_interpretation"] = ai_interpretation
+
+    # --------------------------------------------------
+    # LLM Interpretation (language-only enhancement)
+    # --------------------------------------------------
+    period_key = str(int(year))
+    llm_result = generate_llm_interpretation(
+        base_chart_id=base_chart_id,
+        envelope=envelope,
+        synthesis=synthesis,
+        deterministic_interpretation=ai_interpretation,
+        year=int(year),
+        period_type="yearly",
+        period_key=period_key,
+        feature_name="prediction",
+        prompt_version="interpretation_v1",
+        explainability_mode=explainability_level,
+    )
+    interpretation["llm_interpretation"] = llm_result.get("llm_interpretation")
+    interpretation["llm_metadata"] = llm_result.get("llm_metadata")
 
     explainability = build_explainability(
         dasha_context=envelope["dasha_context"],
