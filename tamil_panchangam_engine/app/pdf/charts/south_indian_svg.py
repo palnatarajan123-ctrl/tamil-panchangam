@@ -1,240 +1,184 @@
 """
 South Indian Chart SVG Renderer
 
-Deterministic SVG renderer for D1 / D9 charts used in PDF generation.
-
-Rules:
-- Pure rendering only
-- No astrology computation
-- No randomness
-- Same input => same SVG output
+Mirrors the frontend SouthIndianChart component logic exactly.
+Uses lagna-based rotation for correct sign placement.
 """
 
-from typing import List
+from typing import List, Dict, Optional
 from xml.sax.saxutils import escape
 
 from app.pdf.charts.chart_models import ChartSvgInput
-from app.pdf.charts.layout import (
-    SVG_WIDTH,
-    SVG_HEIGHT,
-    GRID_SIZE,
-    CELL_SIZE,
-    GRID_PADDING,
-    SOUTH_INDIAN_SIGNS,
-    SIGN_TO_GRID_POSITION,
-    GRID_STROKE_COLOR,
-    GRID_STROKE_WIDTH,
-    SIGN_FONT_SIZE,
-    PLANET_FONT_SIZE,
-    SIGN_FONT_FAMILY,
-    PLANET_FONT_FAMILY,
-    TITLE_FONT_SIZE,
-    TITLE_FONT_FAMILY,
-    COLOR_SIGN_LABEL,
-    COLOR_PLANET_DEFAULT,
-    COLOR_EXALTED,
-    COLOR_DEBILITATED,
-    grid_cell_center,
-    planet_text_position,
-)
 
-# ===============================
-# Public API
-# ===============================
+SVG_WIDTH = 520
+SVG_HEIGHT = 520
+GRID_SIZE = 4
+CELL_SIZE = 120
+GRID_PADDING = 20
+
+# Sign order (matches frontend SIGN_NAMES)
+SIGN_NAMES = [
+    "Mesham", "Rishabam", "Mithunam", "Kadakam", "Simmam", "Kanni",
+    "Thulam", "Vrischikam", "Dhanusu", "Makaram", "Kumbham", "Meenam"
+]
+
+# Grid positions for houses 0-11 (matches frontend HOUSE_COORDS)
+HOUSE_COORDS = [
+    (1, 0), (2, 0), (3, 0),
+    (3, 1),
+    (3, 2),
+    (3, 3), (2, 3), (1, 3), (0, 3),
+    (0, 2),
+    (0, 1),
+    (0, 0),
+]
+
+# Name variations mapping to canonical index
+NAME_TO_INDEX: Dict[str, int] = {name: i for i, name in enumerate(SIGN_NAMES)}
+NAME_TO_INDEX.update({
+    "Simham": 4, "Simmam": 4,
+    "Vrishchikam": 7, "Vrischikam": 7,
+    "Kumbam": 10, "Kumbham": 10,
+    "Kadagam": 3, "Kadakam": 3,
+    "Meenam": 11,
+    "Aries": 0, "Taurus": 1, "Gemini": 2, "Cancer": 3,
+    "Leo": 4, "Virgo": 5, "Libra": 6, "Scorpio": 7,
+    "Sagittarius": 8, "Capricorn": 9, "Aquarius": 10, "Pisces": 11,
+})
+
+COLOR_GRID = "#555555"
+COLOR_SIGN = "#666666"
+COLOR_LAGNA = "#d97706"
+COLOR_PLANET = "#000000"
+COLOR_EXALTED = "#1A7F37"
+COLOR_DEBILITATED = "#B42318"
+
 
 def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
     """
     Render a South Indian chart as an SVG string.
-
-    This function is:
-    - Deterministic
-    - Side-effect free
-    - Safe for PDF embedding
+    Uses lagna-based rotation matching the frontend.
     """
-
     svg_elements: List[str] = []
-
+    
+    lagna_idx = 0
+    if input.lagna_sign:
+        lagna_idx = NAME_TO_INDEX.get(input.lagna_sign, 0)
+    
+    # Build planets by sign index
+    planets_by_rasi: Dict[int, List[str]] = {}
+    for sign_name, planets in input.planet_signs.items():
+        rasi_idx = NAME_TO_INDEX.get(sign_name)
+        if rasi_idx is not None:
+            planets_by_rasi[rasi_idx] = planets
+    
     # SVG Header
     svg_elements.append(
         f'<svg xmlns="http://www.w3.org/2000/svg" '
         f'width="{SVG_WIDTH}" height="{SVG_HEIGHT}" '
         f'viewBox="0 0 {SVG_WIDTH} {SVG_HEIGHT}">'
     )
-
-    # Title (defensive + chart-type aware)
-    title = _resolve_title(input)
-    if title:
-        svg_elements.append(_render_title(title))
-
-    # Grid
-    svg_elements.extend(_render_grid())
-
-    # Center label (chart-type aware)
-    svg_elements.extend(_render_center_label(input))
-
-    # Sign labels
-    svg_elements.extend(_render_sign_labels())
-
-    # Planets
-    svg_elements.extend(_render_planets(input))
-
-    # Close SVG
-    svg_elements.append("</svg>")
-
-    return "\n".join(svg_elements)
-
-
-# ===============================
-# Internal Helpers
-# ===============================
-
-def _resolve_title(input: ChartSvgInput) -> str:
-    """
-    Ensure correct title based on chart type.
-    Callers may forget or pass incorrect labels.
-    """
-
-    if input.title:
-        return input.title
-
-    if input.chart_type == "D9":
-        return "Navamsa Chart (D9)"
-
-    return "Rāsi Chart (D1)"
-
-
-def _render_title(title: str) -> str:
-    x = SVG_WIDTH // 2
-    y = GRID_PADDING // 2 + TITLE_FONT_SIZE
-
-    return (
-        f'<text x="{x}" y="{y}" '
-        f'text-anchor="middle" '
-        f'font-family="{TITLE_FONT_FAMILY}" '
-        f'font-size="{TITLE_FONT_SIZE}">'
-        f'{escape(title)}'
-        f'</text>'
+    
+    # Background
+    svg_elements.append(
+        f'<rect x="0" y="0" width="{SVG_WIDTH}" height="{SVG_HEIGHT}" '
+        f'fill="#1a1a1a" rx="6"/>'
     )
-
-
-def _render_grid() -> List[str]:
-    elements = []
-
-    for row in range(GRID_SIZE + 1):
-        y = GRID_PADDING + (row * CELL_SIZE)
-        elements.append(
+    
+    # Grid lines
+    for i in range(5):
+        y = GRID_PADDING + (i * CELL_SIZE)
+        svg_elements.append(
             f'<line x1="{GRID_PADDING}" y1="{y}" '
             f'x2="{SVG_WIDTH - GRID_PADDING}" y2="{y}" '
-            f'stroke="{GRID_STROKE_COLOR}" '
-            f'stroke-width="{GRID_STROKE_WIDTH}"/>'
+            f'stroke="{COLOR_GRID}" stroke-width="1"/>'
         )
-
-    for col in range(GRID_SIZE + 1):
-        x = GRID_PADDING + (col * CELL_SIZE)
-        elements.append(
+    for i in range(5):
+        x = GRID_PADDING + (i * CELL_SIZE)
+        svg_elements.append(
             f'<line x1="{x}" y1="{GRID_PADDING}" '
             f'x2="{x}" y2="{SVG_HEIGHT - GRID_PADDING}" '
-            f'stroke="{GRID_STROKE_COLOR}" '
-            f'stroke-width="{GRID_STROKE_WIDTH}"/>'
+            f'stroke="{COLOR_GRID}" stroke-width="1"/>'
         )
-
-    return elements
-
-
-def _render_sign_labels() -> List[str]:
-    elements = []
-
-    for sign in SOUTH_INDIAN_SIGNS:
-        if sign not in SIGN_TO_GRID_POSITION:
-            continue
-
-        col, row = SIGN_TO_GRID_POSITION[sign]
-        cx, cy = grid_cell_center(col, row)
-
-        elements.append(
-            f'<text x="{cx}" y="{cy - (CELL_SIZE // 2) + 18}" '
-            f'text-anchor="middle" '
-            f'font-family="{SIGN_FONT_FAMILY}" '
-            f'font-size="{SIGN_FONT_SIZE}" '
-            f'fill="{COLOR_SIGN_LABEL}">'
-            f'{sign}'
-            f'</text>'
+    
+    # Diagonals
+    svg_elements.append(
+        f'<line x1="{GRID_PADDING + CELL_SIZE}" y1="{GRID_PADDING + CELL_SIZE}" '
+        f'x2="{GRID_PADDING + CELL_SIZE*3}" y2="{GRID_PADDING + CELL_SIZE*3}" '
+        f'stroke="{COLOR_GRID}" stroke-width="1"/>'
+    )
+    svg_elements.append(
+        f'<line x1="{GRID_PADDING + CELL_SIZE*3}" y1="{GRID_PADDING + CELL_SIZE}" '
+        f'x2="{GRID_PADDING + CELL_SIZE}" y2="{GRID_PADDING + CELL_SIZE*3}" '
+        f'stroke="{COLOR_GRID}" stroke-width="1"/>'
+    )
+    
+    # Render houses with lagna rotation
+    for house_idx, (col, row) in enumerate(HOUSE_COORDS):
+        rasi_idx = (house_idx + lagna_idx) % 12
+        sign_name = SIGN_NAMES[rasi_idx]
+        abbrev = sign_name[:3].upper()
+        is_lagna = (rasi_idx == lagna_idx)
+        
+        x = GRID_PADDING + (col * CELL_SIZE)
+        y = GRID_PADDING + (row * CELL_SIZE)
+        cx = x + CELL_SIZE / 2
+        
+        # Sign label
+        label_color = COLOR_LAGNA if is_lagna else COLOR_SIGN
+        svg_elements.append(
+            f'<text x="{cx}" y="{y + 18}" text-anchor="middle" '
+            f'font-family="monospace" font-size="11" fill="{label_color}">'
+            f'{escape(abbrev)}</text>'
         )
-
-    return elements
-
-
-def _render_planets(input: ChartSvgInput) -> List[str]:
-    elements = []
-
-    # planet_signs is Dict[str, List[str]] = {sign: [planets]}
-    planets_by_sign = input.planet_signs
-
-    for sign, planets in planets_by_sign.items():
-        if sign not in SIGN_TO_GRID_POSITION:
-            continue
-
-        col, row = SIGN_TO_GRID_POSITION[sign]
-
-        for idx, planet in enumerate(sorted(planets)):
-            x, y = planet_text_position(col, row, idx)
-            color = _planet_color(input, planet)
-
-            elements.append(
-                f'<text x="{x}" y="{y}" '
-                f'font-family="{PLANET_FONT_FAMILY}" '
-                f'font-size="{PLANET_FONT_SIZE}" '
-                f'fill="{color}">'
-                f'{escape(planet)}'
-                f'</text>'
+        
+        # Lagna marker
+        if is_lagna:
+            svg_elements.append(
+                f'<text x="{cx}" y="{y + 32}" text-anchor="middle" '
+                f'font-family="sans-serif" font-size="10" font-weight="600" fill="{COLOR_LAGNA}">'
+                f'Lagna</text>'
             )
-
-    return elements
-
-
-def _planet_color(input: ChartSvgInput, planet: str) -> str:
-    """
-    Determine planet color based on dignity (D9 only).
-    """
-    if not input.dignity:
-        return COLOR_PLANET_DEFAULT
-
-    status = input.dignity.get(planet)
-    if status == "exalted":
-        return COLOR_EXALTED
-    if status == "debilitated":
-        return COLOR_DEBILITATED
-
-    return COLOR_PLANET_DEFAULT
-
-def _render_center_label(input: ChartSvgInput) -> List[str]:
-    """
-    Render the center chart label (D1 / D9 aware).
-    """
-
-    cx = SVG_WIDTH // 2
-    cy = SVG_HEIGHT // 2
-
-    if input.chart_type == "D9":
-        main_label = "Navamsa Chart (D9)"
-    else:
-        main_label = "Rāsi Chart (D1)"
-
-    return [
-        (
-            f'<text x="{cx}" y="{cy - 6}" '
-            f'text-anchor="middle" '
-            f'font-family="{TITLE_FONT_FAMILY}" '
-            f'font-size="{TITLE_FONT_SIZE}">'
-            f'{escape(main_label)}'
-            f'</text>'
-        ),
-        (
-            f'<text x="{cx}" y="{cy + 14}" '
-            f'text-anchor="middle" '
-            f'font-family="{SIGN_FONT_FAMILY}" '
-            f'font-size="{SIGN_FONT_SIZE}">'
-            f'South Indian'
-            f'</text>'
-        ),
-    ]
+        
+        # Planets
+        planets = planets_by_rasi.get(rasi_idx, [])
+        for idx, planet in enumerate(planets[:4]):
+            planet_color = COLOR_PLANET
+            if input.dignity:
+                d = input.dignity.get(planet)
+                if d == "exalted":
+                    planet_color = COLOR_EXALTED
+                elif d == "debilitated":
+                    planet_color = COLOR_DEBILITATED
+            
+            svg_elements.append(
+                f'<text x="{cx}" y="{y + 50 + idx * 16}" text-anchor="middle" '
+                f'font-family="sans-serif" font-size="13" font-weight="500" fill="{planet_color}">'
+                f'{escape(planet)}</text>'
+            )
+    
+    # Center panel
+    center_x = GRID_PADDING + CELL_SIZE
+    center_y = GRID_PADDING + CELL_SIZE
+    svg_elements.append(
+        f'<rect x="{center_x}" y="{center_y}" width="{CELL_SIZE*2}" height="{CELL_SIZE*2}" '
+        f'fill="rgba(0,0,0,0.3)" rx="4"/>'
+    )
+    
+    # Center label
+    title = input.title or ("Navamsa Chart (D9)" if input.chart_type == "D9" else "Rāsi Chart (D1)")
+    subtitle = "D9 · Marriage & Dharma" if input.chart_type == "D9" else "South Indian"
+    
+    svg_elements.append(
+        f'<text x="{SVG_WIDTH/2}" y="{SVG_HEIGHT/2 - 8}" text-anchor="middle" '
+        f'font-family="sans-serif" font-size="14" font-weight="700" fill="#ffffff">'
+        f'{escape(title)}</text>'
+    )
+    svg_elements.append(
+        f'<text x="{SVG_WIDTH/2}" y="{SVG_HEIGHT/2 + 12}" text-anchor="middle" '
+        f'font-family="sans-serif" font-size="11" fill="#888888">'
+        f'{escape(subtitle)}</text>'
+    )
+    
+    svg_elements.append("</svg>")
+    return "\n".join(svg_elements)

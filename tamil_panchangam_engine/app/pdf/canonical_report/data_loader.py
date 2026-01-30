@@ -146,7 +146,7 @@ def _convert_planet_to_sign_mapping(planet_signs: Dict[str, Any]) -> Dict[str, L
     return signs_to_planets
 
 
-def _generate_chart_svg(planet_signs: Dict[str, Any], chart_type: str = "D1", title: str = "") -> str:
+def _generate_chart_svg(planet_signs: Dict[str, Any], chart_type: str = "D1", title: str = "", lagna_sign: str = "") -> str:
     """Generate SVG chart and return as data URI."""
     try:
         signs_to_planets = _convert_planet_to_sign_mapping(planet_signs)
@@ -155,6 +155,7 @@ def _generate_chart_svg(planet_signs: Dict[str, Any], chart_type: str = "D1", ti
             chart_type=chart_type,
             planet_signs=signs_to_planets,
             title=title,
+            lagna_sign=lagna_sign,
         )
         
         svg_content = render_south_indian_chart_svg(chart_input)
@@ -466,8 +467,8 @@ def build_report_data(
         birth_reference=_extract_birth_reference(payload),
         
         chart_images=ChartImages(
-            d1_rasi=_generate_chart_svg(rasi_planet_signs, "D1", "Rasi (D1)"),
-            d9_navamsa=_generate_chart_svg(navamsa_planet_signs, "D9", "Navamsa (D9)"),
+            d1_rasi=_generate_chart_svg(rasi_planet_signs, "D1", "Rāsi Chart (D1)", lagna_sign),
+            d9_navamsa=_generate_chart_svg(navamsa_planet_signs, "D9", "Navamsa Chart (D9)", lagna_sign),
             d1_planet_signs=_convert_planet_to_sign_mapping(rasi_planet_signs),
             d9_planet_signs=_convert_planet_to_sign_mapping(navamsa_planet_signs),
             lagna_sign=lagna_sign,

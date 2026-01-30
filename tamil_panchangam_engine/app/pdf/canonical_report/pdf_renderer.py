@@ -27,7 +27,13 @@ import base64
 
 from .models import CanonicalReportData
 from .config import COLORS, MARGIN
-from app.pdf.charts.reportlab_chart import render_south_indian_chart_reportlab
+from io import BytesIO
+
+try:
+    from svglib.svglib import svg2rlg
+    HAS_SVGLIB = True
+except ImportError:
+    HAS_SVGLIB = False
 
 
 def _create_styles():
@@ -212,31 +218,34 @@ def _build_how_to_read(styles) -> List:
     return elements
 
 
-def _render_chart_drawing(chart_type: str, planet_signs: dict, title: str = None, lagna_sign: str = None):
-    """Render chart as ReportLab Drawing object."""
-    try:
-        drawing = render_south_indian_chart_reportlab(
-            chart_type=chart_type,
-            planet_signs=planet_signs,
-            lagna_sign=lagna_sign,
-            title=title,
-            width=180,
-            height=180
-        )
-        return drawing
-    except Exception as e:
-        placeholder_table = Table(
-            [[f"{chart_type} Chart\n(View in app)"]],
-            colWidths=[2*inch],
-            rowHeights=[1.2*inch]
-        )
-        placeholder_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.95, 0.95, 0.95)),
-            ('BOX', (0, 0), (-1, -1), 1, colors.Color(*COLORS["muted"])),
-        ]))
-        return placeholder_table
+def _render_chart_from_svg(svg_data_uri: str, chart_type: str):
+    """Convert existing SVG data URI to ReportLab Drawing."""
+    if HAS_SVGLIB and svg_data_uri and svg_data_uri.startswith("data:image/svg+xml;base64,"):
+        try:
+            svg_b64 = svg_data_uri.split(",", 1)[1]
+            svg_bytes = base64.b64decode(svg_b64)
+            drawing = svg2rlg(BytesIO(svg_bytes))
+            if drawing:
+                scale = 180 / max(drawing.width, drawing.height)
+                drawing.width = drawing.width * scale
+                drawing.height = drawing.height * scale
+                drawing.scale(scale, scale)
+                return drawing
+        except Exception:
+            pass
+    
+    placeholder_table = Table(
+        [[f"{chart_type} Chart\n(View in app)"]],
+        colWidths=[2*inch],
+        rowHeights=[1.5*inch]
+    )
+    placeholder_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.95, 0.95, 0.95)),
+        ('BOX', (0, 0), (-1, -1), 1, colors.Color(*COLORS["muted"])),
+    ]))
+    return placeholder_table
 
 
 def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
@@ -254,8 +263,8 @@ def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
     
     elements.append(Spacer(1, 0.3*inch))
     
-    d1_chart = _render_chart_drawing("D1", data.chart_images.d1_planet_signs, "Rasi (D1)", data.chart_images.lagna_sign)
-    d9_chart = _render_chart_drawing("D9", data.chart_images.d9_planet_signs, "Navamsa (D9)", data.chart_images.lagna_sign)
+    d1_chart = _render_chart_from_svg(data.chart_images.d1_rasi, "D1")
+    d9_chart = _render_chart_from_svg(data.chart_images.d9_navamsa, "D9")
     
     chart_row = [d1_chart, d9_chart]
     chart_table = Table([chart_row], colWidths=[2.8*inch, 2.8*inch])

@@ -15,3 +15,4 @@ class ChartSvgInput:
     planet_signs: Dict[str, List[str]]   # {"Aries": ["Sun", "Moon"], ...}
     title: str
     dignity: Optional[Dict[str, str]] = None
+    lagna_sign: Optional[str] = None     # For lagna-based rotation
