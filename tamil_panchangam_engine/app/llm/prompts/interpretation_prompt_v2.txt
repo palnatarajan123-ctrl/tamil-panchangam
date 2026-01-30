@@ -53,7 +53,7 @@ OUTPUT: Return ONLY this JSON (no markdown, no prose outside JSON):
   "practices_and_reflection": {
     "daily_practice": "Simple daily habit (5-10 minutes)",
     "weekly_practice": "Weekly reflection or reset activity",
-    "reflection_question": "One thoughtful, non-fear-based question"
+    "reflection_guidance": "A short reflective guidance paragraph (2-3 sentences) focused on mindset, self-observation, and intentional response. Do not ask questions. Provide calm, grounded wisdom."
   },
   "closing": {
     "key_takeaways": [

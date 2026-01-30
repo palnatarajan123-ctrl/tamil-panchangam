@@ -416,34 +416,35 @@ export default function Predictions() {
       {/* RESULT */}
       {prediction && (
         <>
-          {/* Calculation Confidence Indicator */}
+          {/* Prediction Confidence - shown once below summary */}
           {calculationConfidence && (
-            <Card className="mb-4" data-testid="card-calculation-confidence">
+            <Card className="mb-4" data-testid="card-prediction-confidence">
               <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                   {calculationConfidence.level === "high" ? (
-                    <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
                   ) : calculationConfidence.level === "medium" ? (
-                    <Info className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    <Info className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
                   ) : (
-                    <ShieldAlert className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    <ShieldAlert className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
                   )}
                   <div>
-                    <span className="font-medium">Calculation Confidence: </span>
+                    <span className="font-medium">Prediction Confidence: </span>
                     <span className={
                       calculationConfidence.level === "high" 
-                        ? "text-green-600 dark:text-green-400" 
+                        ? "text-green-600 dark:text-green-400 font-medium" 
                         : calculationConfidence.level === "medium"
-                        ? "text-amber-600 dark:text-amber-400"
-                        : "text-red-600 dark:text-red-400"
+                        ? "text-amber-600 dark:text-amber-400 font-medium"
+                        : "text-red-600 dark:text-red-400 font-medium"
                     }>
-                      {calculationConfidence.level.charAt(0).toUpperCase() + calculationConfidence.level.slice(1)}
+                      {calculationConfidence.level === "high" ? "High" : 
+                       calculationConfidence.level === "medium" ? "Medium" : "Sensitive"}
                     </span>
-                    {calculationConfidence.cusp_cases && calculationConfidence.cusp_cases.length > 0 && (
-                      <span className="text-sm text-muted-foreground ml-2">
-                        ({calculationConfidence.cusp_cases.length} cusp placement{calculationConfidence.cusp_cases.length > 1 ? 's' : ''} detected)
-                      </span>
-                    )}
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {calculationConfidence.level === "high" 
+                        ? "All planetary positions are clearly within sign boundaries."
+                        : "Some influences fall near transitional boundaries. Interpret trends as ranges rather than absolutes."}
+                    </p>
                   </div>
                 </div>
               </CardContent>

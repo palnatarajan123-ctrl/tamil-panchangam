@@ -1,0 +1,169 @@
+Tamil Panchangam Astrology Engine — Targeted Fixes + PDF/UI Corrections (Stabilization v1.1)
+You are working inside the existing Tamil Panchangam Astrology Engine
+(FastAPI + DuckDB + React + PDF).
+⚠️ STRICT SCOPE CONTROL
+Do NOT introduce new astrology logic, scoring changes, charts, or UX flows beyond what is explicitly listed.
+ 
+🎯 OBJECTIVES (ONLY THESE)
+Implement fixes for:
+🔴 RED / 🟠 ORANGE (Already Approved)
+1.	Eliminate "None" placeholder leaks in prediction narratives
+2.	Reduce repetitive dasha phrasing across life areas
+3.	Correct calculation confidence escalation (Mars cusp handling)
+4.	Reduce repetitive / generic LLM narrative structure
+📄 PDF & UI GAPS (NEW — MUST FIX)
+5.	Practices & Reflection section incorrectly contains a prompt question instead of an answer
+6.	Prediction confidence exists internally but is not displayed correctly in UI or PDF
+7.	Chart headings are missing / mis-grouped in PDF
+8.	Birth chart entry screen needs robust City LOV → auto lat/long/timezone
+ 
+🚫 NON-NEGOTIABLES
+•	Do NOT change astrology math
+•	Do NOT change life-area scores
+•	Do NOT add new charts
+•	Do NOT add new LLM calls beyond those specified
+•	Do NOT increase token budgets
+•	Do NOT add external services
+ 
+🧱 PART 1 — PRACTICES & REFLECTION (PDF FIX)
+Problem
+The Practices & Reflection section currently contains:
+•	A prompt question
+•	Instead of a generated reflective answer
+This breaks narrative completeness.
+ 
+REQUIRED FIX
+A. Move reflection generation upstream (ONE-SHOT)
+During the existing LLM interpretation call:
+•	Add a new field in the prompt payload:
+"reflection_prompt": "Based on this prediction window, provide a short reflective guidance paragraph focused on mindset, self-observation, and intentional response. Do not ask questions. Do not give instructions."
+B. Store LLM response
+Persist in DuckDB alongside interpretation:
+ALTER TABLE prediction_llm_interpretation
+ADD COLUMN reflection_text TEXT;
+C. PDF Rendering Rule
+•	PDF must only render the stored reflection_text
+•	Never render the original prompt
+•	No additional LLM calls during PDF generation
+ 
+🧱 PART 2 — PREDICTION CONFIDENCE (UI + PDF)
+Problem
+calculation_confidence exists but is:
+•	Not consistently surfaced
+•	Shown in wrong sections or missing entirely
+ 
+REQUIRED FIX
+A. Backend (No new logic)
+Ensure every prediction response includes:
+{
+  "calculation_confidence": {
+    "level": "high | medium | sensitive",
+    "reason": "..."
+  }
+}
+B. UI Placement
+•	Display once per prediction window
+•	Location:
+o	Immediately below the Prediction Summary
+o	Not inside life-area sections
+Label copy (exact):
+Prediction Confidence:
+Sensitive — Some influences fall near transitional boundaries. Interpret trends as ranges rather than absolutes.
+(Use actual level/reason dynamically.)
+ 
+C. PDF Placement
+•	Same copy
+•	Appears:
+o	After Summary
+o	Before Life-Area breakdown
+•	Never repeated per section
+ 
+🧱 PART 3 — PDF CHART HEADING & GROUPING FIX
+Problem
+•	D1 and D9 headings are missing
+•	Tier-1 charts are not clearly grouped
+ 
+REQUIRED FIX
+A. Heading Rules (MANDATORY)
+PDF must render charts in this exact order:
+Birth Chart (D1)
+[Chart Image]
+
+Navamsa (D9)
+[Chart Image]
+
+Tier-1 Divisional Charts
+--------------------------------
+Dasamsa (D10)
+[Chart Image]
+
+Hora (D2)
+[Chart Image]
+
+Saptamsa (D7)
+[Chart Image]
+Rules:
+•	Each chart heading must appear above its chart
+•	Tier-1 group heading must be on a new line
+•	Do NOT inline headings inside chart components
+This is a layout-only fix.
+ 
+🧱 PART 4 — BIRTH CHART ENTRY: CITY LOV → AUTO GEO
+Problem
+City entry is fragile and error-prone.
+ 
+REQUIRED FIX (NO EXTERNAL SERVICE)
+A. Add City LOV
+Create:
+app/static/cities_lov.json
+Each entry:
+{
+  "city": "Chennai",
+  "country": "India",
+  "latitude": 13.0827,
+  "longitude": 80.2707,
+  "timezone": "Asia/Kolkata"
+}
+Populate with:
+•	Major Indian cities
+•	Major global metros (top ~200 is sufficient)
+ 
+B. UI Behavior (Birth Chart Entry Screen)
+•	City field becomes autocomplete dropdown
+•	On selection:
+o	Auto-populate latitude
+o	Auto-populate longitude
+o	Auto-populate timezone
+•	Fields remain editable for advanced users
+C. Validation
+•	If city selected → lat/long/timezone must match LOV
+•	If manual entry → user must confirm override
+ 
+🧱 PART 5 — KEEP PRIOR FIXES (DO NOT REMOVE)
+Ensure the following fixes from Stabilization v1.0 remain active:
+•	Null signal sanitization
+•	"None" assertion guard
+•	Dasha repetition suppression
+•	Mars cusp confidence downgrade
+•	Narrative structure variation
+•	LLM safety assertions
+ 
+🧪 EXPECTED OUTCOME
+After this prompt is implemented:
+•	❌ No prompt questions appear in PDF
+•	✅ Reflection section reads as completed guidance
+•	✅ Prediction confidence is visible, clear, and placed correctly
+•	✅ Charts are labeled and grouped correctly
+•	✅ Birth chart entry is robust and user-proof
+•	✅ No astrology logic changed
+•	✅ No extra LLM spend
+ 
+🧠 FINAL NOTE
+This prompt does not add features.
+It finishes the product.
+After this:
+•	Reports are executive-grade
+•	PDFs are publishable
+•	UI is safe for non-experts
+•	The system is internally consistent
+
