@@ -46,12 +46,16 @@ NAME_TO_INDEX.update({
     "Sagittarius": 8, "Capricorn": 9, "Aquarius": 10, "Pisces": 11,
 })
 
-COLOR_GRID = "#555555"
-COLOR_SIGN = "#666666"
-COLOR_LAGNA = "#d97706"
-COLOR_PLANET = "#000000"
-COLOR_EXALTED = "#1A7F37"
-COLOR_DEBILITATED = "#B42318"
+COLOR_BG = "#f5f5f0"
+COLOR_GRID = "#888888"
+COLOR_SIGN = "#555555"
+COLOR_LAGNA = "#b45309"
+COLOR_PLANET = "#1a1a1a"
+COLOR_EXALTED = "#15803d"
+COLOR_DEBILITATED = "#b91c1c"
+COLOR_CENTER_BG = "#e8e8e0"
+COLOR_TITLE = "#1a1a1a"
+COLOR_SUBTITLE = "#666666"
 
 
 def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
@@ -82,7 +86,7 @@ def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
     # Background
     svg_elements.append(
         f'<rect x="0" y="0" width="{SVG_WIDTH}" height="{SVG_HEIGHT}" '
-        f'fill="#1a1a1a" rx="6"/>'
+        f'fill="{COLOR_BG}" rx="6"/>'
     )
     
     # Grid lines
@@ -162,7 +166,7 @@ def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
     center_y = GRID_PADDING + CELL_SIZE
     svg_elements.append(
         f'<rect x="{center_x}" y="{center_y}" width="{CELL_SIZE*2}" height="{CELL_SIZE*2}" '
-        f'fill="rgba(0,0,0,0.3)" rx="4"/>'
+        f'fill="{COLOR_CENTER_BG}" rx="4"/>'
     )
     
     # Center label
@@ -171,12 +175,12 @@ def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
     
     svg_elements.append(
         f'<text x="{SVG_WIDTH/2}" y="{SVG_HEIGHT/2 - 8}" text-anchor="middle" '
-        f'font-family="sans-serif" font-size="14" font-weight="700" fill="#ffffff">'
+        f'font-family="sans-serif" font-size="14" font-weight="700" fill="{COLOR_TITLE}">'
         f'{escape(title)}</text>'
     )
     svg_elements.append(
         f'<text x="{SVG_WIDTH/2}" y="{SVG_HEIGHT/2 + 12}" text-anchor="middle" '
-        f'font-family="sans-serif" font-size="11" fill="#888888">'
+        f'font-family="sans-serif" font-size="11" fill="{COLOR_SUBTITLE}">'
         f'{escape(subtitle)}</text>'
     )
     
