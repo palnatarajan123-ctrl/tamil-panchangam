@@ -29,6 +29,12 @@ function rasiToIndex(rasi?: string): number {
    UI Model Contracts
    ============================================================ */
 
+interface ChartData {
+  lagna: number;
+  planets: Record<string, number>;
+  dignity?: Record<string, "exalted" | "debilitated" | "neutral">;
+}
+
 export interface BirthChartUIModel {
   identity: {
     name: string;
@@ -49,6 +55,21 @@ export interface BirthChartUIModel {
     lagna: number;
     planets: Record<string, number>;
     dignity: Record<string, "exalted" | "debilitated" | "neutral">;
+  };
+
+  divisionalCharts: {
+    D1: ChartData;
+    D2?: ChartData;
+    D7?: ChartData;
+    D9: ChartData;
+    D10?: ChartData;
+  };
+
+  chartMetadata?: {
+    ayanamsa: string;
+    division_method: string;
+    precision: string;
+    node_type: string;
   };
 
   rasi: Array<{
@@ -127,6 +148,21 @@ function mapChartToPlanets(chart: Record<string, any>) {
   return out;
 }
 
+const ENGLISH_TO_TAMIL: Record<string, string> = {
+  Aries: "Mesham",
+  Taurus: "Rishabam",
+  Gemini: "Mithunam",
+  Cancer: "Kadakam",
+  Leo: "Simmam",
+  Virgo: "Kanni",
+  Libra: "Thulam",
+  Scorpio: "Vrischikam",
+  Sagittarius: "Dhanusu",
+  Capricorn: "Makaram",
+  Aquarius: "Kumbham",
+  Pisces: "Meenam",
+};
+
 /**
  * Convert Navamsa structure → usable UI maps
  */
@@ -140,36 +176,47 @@ function adaptNavamsa(divisionalCharts: any) {
   > = {};
 
   Object.entries(d9).forEach(([planet, data]: any) => {
-    const sign = data?.navamsa_sign;
+    const sign = data?.navamsa_sign || data?.sign;
     if (!sign) return;
 
-    // Convert English Navamsa sign → Tamil index order
-    // (UI chart still uses Tamil order)
-    const tamilIndex = rasiToIndex(
-      ({
-        Aries: "Mesham",
-        Taurus: "Rishabam",
-        Gemini: "Mithunam",
-        Cancer: "Kadakam",
-        Leo: "Simmam",
-        Virgo: "Kanni",
-        Libra: "Thulam",
-        Scorpio: "Vrischikam",
-        Sagittarius: "Dhanusu",
-        Capricorn: "Makaram",
-        Aquarius: "Kumbham",
-        Pisces: "Meenam",
-      } as Record<string, string>)[sign]
-    );
-
+    const tamilIndex = rasiToIndex(ENGLISH_TO_TAMIL[sign] || sign);
     planets[planet] = tamilIndex;
     dignity[planet] = data?.dignity ?? "neutral";
   });
 
   return {
-    lagna: 0, // Navamsa lagna derivation is optional & future EPIC
+    lagna: 0,
     planets,
     dignity,
+  };
+}
+
+/**
+ * Adapt any divisional chart (D2, D7, D10) to UI format
+ */
+function adaptDivisionalChart(chartData: any): ChartData {
+  const planets: Record<string, number> = {};
+  const dignity: Record<string, "exalted" | "debilitated" | "neutral"> = {};
+
+  if (!chartData?.planets) {
+    return { lagna: 0, planets: {}, dignity: {} };
+  }
+
+  Object.entries(chartData.planets).forEach(([planet, data]: any) => {
+    const sign = data?.sign;
+    if (!sign) return;
+
+    const tamilIndex = rasiToIndex(ENGLISH_TO_TAMIL[sign] || sign);
+    planets[planet] = tamilIndex;
+    if (data?.dignity) {
+      dignity[planet] = data.dignity;
+    }
+  });
+
+  return {
+    lagna: 0,
+    planets,
+    dignity: Object.keys(dignity).length > 0 ? dignity : undefined,
   };
 }
 
@@ -200,6 +247,22 @@ export function adaptBirthChart(raw: any): BirthChartUIModel {
     view.divisional_charts ?? view.charts
   );
 
+  /* ---------------- All Tier-1 Divisional Charts ---------------- */
+  
+  const divCharts = view.divisional_charts ?? {};
+  const lagnaIndex = rasiToIndex(view.lagna_details?.rasi);
+
+  const divisionalCharts = {
+    D1: {
+      lagna: lagnaIndex,
+      planets: planetsByRasiIndex,
+    },
+    D2: divCharts.D2 ? adaptDivisionalChart(divCharts.D2) : undefined,
+    D7: divCharts.D7 ? adaptDivisionalChart(divCharts.D7) : undefined,
+    D9: navamsaChart,
+    D10: divCharts.D10 ? adaptDivisionalChart(divCharts.D10) : undefined,
+  };
+
   /* ---------------- Final UI Model ---------------- */
 
   return {
@@ -214,11 +277,15 @@ export function adaptBirthChart(raw: any): BirthChartUIModel {
     },
 
     southIndianChart: {
-      lagna: rasiToIndex(view.lagna_details?.rasi),
+      lagna: lagnaIndex,
       planets: planetsByRasiIndex,
     },
 
     navamsaChart,
+
+    divisionalCharts,
+
+    chartMetadata: view.chart_metadata ?? undefined,
 
     rasi: (view.rasi_view ?? []).map((r: any) => ({
       name: r.rasi,

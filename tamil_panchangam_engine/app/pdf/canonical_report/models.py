@@ -126,6 +126,24 @@ class ChartImages(BaseModel):
     d1_planet_signs: Dict[str, List[str]] = {}
     d9_planet_signs: Dict[str, List[str]] = {}
     lagna_sign: str = ""
+    
+    # Tier-1 divisional charts
+    d2_hora: str = ""
+    d7_saptamsa: str = ""
+    d10_dasamsa: str = ""
+    d2_planet_signs: Dict[str, List[str]] = {}
+    d7_planet_signs: Dict[str, List[str]] = {}
+    d10_planet_signs: Dict[str, List[str]] = {}
+
+
+class MethodologyInfo(BaseModel):
+    """Methodology and calculation confidence info."""
+    ephemeris_source: str = "Swiss Ephemeris"
+    ayanamsa: str = "Lahiri (Chitrapaksha)"
+    node_type: str = "Mean Node"
+    division_method: str = "Parashara"
+    calculation_confidence: str = "high"
+    cusp_cases: List[str] = []
 
 
 class CanonicalReportData(BaseModel):
@@ -162,3 +180,5 @@ class CanonicalReportData(BaseModel):
     practices_v2: Optional[PracticesAndReflection] = None
     closing_v2: Optional[Closing] = None
     is_v2: bool = False
+    
+    methodology: Optional[MethodologyInfo] = None

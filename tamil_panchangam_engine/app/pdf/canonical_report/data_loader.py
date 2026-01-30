@@ -15,6 +15,7 @@ import logging
 from app.db.duckdb import get_conn
 from app.pdf.charts.south_indian_svg import render_south_indian_chart_svg
 from app.pdf.charts.chart_models import ChartSvgInput
+from app.engines.corner_case_detector import assess_calculation_confidence
 from .models import (
     CanonicalReportData,
     BirthDetails,
@@ -30,6 +31,7 @@ from .models import (
     Overview,
     PracticesAndReflection,
     Closing,
+    MethodologyInfo,
 )
 
 logger = logging.getLogger(__name__)
@@ -494,6 +496,43 @@ def build_report_data(
     # D9 uses navamsa lagna if available, otherwise defaults to Mesham (index 0) like frontend
     d9_lagna_sign = lagna_data.get("navamsa_sign", "Mesham") if isinstance(lagna_data, dict) else "Mesham"
     
+    # Extract Tier-1 divisional charts (D2, D7, D10)
+    divisional_charts = payload.get("divisional_charts", {})
+    
+    d2_data = divisional_charts.get("D2", {}).get("planets", {})
+    d2_planet_signs = {planet: data.get("sign", "") for planet, data in d2_data.items() if isinstance(data, dict)}
+    
+    d7_data = divisional_charts.get("D7", {}).get("planets", {})
+    d7_planet_signs = {planet: data.get("sign", "") for planet, data in d7_data.items() if isinstance(data, dict)}
+    
+    d10_data = divisional_charts.get("D10", {}).get("planets", {})
+    d10_planet_signs = {planet: data.get("sign", "") for planet, data in d10_data.items() if isinstance(data, dict)}
+    
+    # Methodology info from chart metadata + calculation confidence
+    chart_metadata = payload.get("chart_metadata", {})
+    
+    # Assess calculation confidence using corner case detector
+    try:
+        confidence_result = assess_calculation_confidence(ephemeris)
+        calc_confidence = confidence_result.get("level", "high")
+        cusp_cases = [
+            f"{c['planet']} ({c['position']} of sign)" 
+            for c in confidence_result.get("cusp_cases", [])
+        ]
+    except Exception as e:
+        logger.warning(f"Failed to assess calculation confidence: {e}")
+        calc_confidence = "high"
+        cusp_cases = []
+    
+    methodology = MethodologyInfo(
+        ephemeris_source="Swiss Ephemeris",
+        ayanamsa=chart_metadata.get("ayanamsa", "Lahiri (Chitrapaksha)"),
+        node_type=chart_metadata.get("node_type", "Mean Node"),
+        division_method=chart_metadata.get("division_method", "Parashara"),
+        calculation_confidence=calc_confidence,
+        cusp_cases=cusp_cases,
+    )
+    
     (overview, prediction_areas, practices, is_v2, 
      monthly_theme_data, overview_v2_data, practices_v2_data, closing_v2_data) = _extract_prediction_areas(
         interpretation, llm_interpretation
@@ -551,6 +590,13 @@ def build_report_data(
             d1_planet_signs=_convert_planet_to_sign_mapping(rasi_planet_signs),
             d9_planet_signs=_convert_planet_to_sign_mapping(navamsa_planet_signs),
             lagna_sign=lagna_sign,
+            # Tier-1 divisional charts
+            d2_hora=_generate_chart_svg(d2_planet_signs, "D2", "Hora (D2)", "") if d2_planet_signs else "",
+            d7_saptamsa=_generate_chart_svg(d7_planet_signs, "D7", "Saptamsa (D7)", "") if d7_planet_signs else "",
+            d10_dasamsa=_generate_chart_svg(d10_planet_signs, "D10", "Dasamsa (D10)", "") if d10_planet_signs else "",
+            d2_planet_signs=_convert_planet_to_sign_mapping(d2_planet_signs),
+            d7_planet_signs=_convert_planet_to_sign_mapping(d7_planet_signs),
+            d10_planet_signs=_convert_planet_to_sign_mapping(d10_planet_signs),
         ),
         
         core_life_themes=interpretation.get("core_themes", []),
@@ -575,6 +621,8 @@ def build_report_data(
         practices_v2=practices_v2,
         closing_v2=closing_v2,
         is_v2=is_v2,
+        
+        methodology=methodology,
     )
 
 

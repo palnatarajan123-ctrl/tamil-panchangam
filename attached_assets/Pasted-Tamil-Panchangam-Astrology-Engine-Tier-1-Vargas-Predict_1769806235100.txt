@@ -1,0 +1,181 @@
+Tamil Panchangam Astrology Engine — Tier-1 Vargas, Predictions, PDF & Methodology (v1.0)
+You are working inside an existing FastAPI + DuckDB + React project called
+“Tamil Panchangam Astrology Engine.”
+CURRENT STATE (DO NOT CHANGE)
+•	Core D1 engine is COMPLETE and LOCKED
+•	Synthesis engine is COMPLETE
+•	Deterministic interpretation engine is COMPLETE
+•	LLM layer exists for language only
+•	Corner-case detection & calculation confidence design is finalized
+•	UI and PDF pipelines already exist
+•	PDF generation uses existing prediction outputs (no recomputation)
+ 
+🎯 OBJECTIVES (AUTHORITATIVE)
+Implement the following three initiatives together, without re-architecting:
+ 
+1️⃣ CREATE ALL TIER-1 DIVISIONAL CHARTS (VARGAS)
+Tier-1 Charts to Implement
+You must implement only the following:
+Chart	Name	Purpose
+D1	Rāśi	Core chart (already exists)
+D9	Navamsa	Dharma, maturity
+D10	Dasamsa	Career, authority
+D7	Saptamsa	Creativity, children
+D2	Hora	Wealth, sustenance
+❌ Do NOT add D12, D30, D60 at this stage.
+ 
+A. Engine Layer
+Create or extend:
+app/engines/divisional_charts/
+  ├── d2_hora.py
+  ├── d7_saptamsa.py
+  ├── d9_navamsa.py   (existing, reuse)
+  ├── d10_dasamsa.py
+Rules:
+•	Use exact sidereal longitude
+•	Use Parashara classical division
+•	No rounding before division
+•	Log longitude to arc-second precision
+•	Do NOT auto-adjust cusp cases
+Each chart must return:
+{
+  "chart": "D10",
+  "planets": {
+    "Sun": { "sign": "...", "longitude": "dd:mm:ss" }
+  }
+}
+ 
+B. Birth Chart Creation Flow (UI + Backend)
+Backend
+During birthchart creation:
+•	Compute ALL Tier-1 charts
+•	Persist them alongside D1
+•	Store metadata:
+{
+  "ayanamsa": "lahiri",
+  "division_method": "parashara",
+  "precision": "arc-second"
+}
+UI (Birth Chart Page)
+•	Add a tabbed selector:
+o	D1 | D9 | D10 | D7 | D2
+•	Charts are read-only
+•	No recalculation allowed
+ 
+2️⃣ PREDICTIONS USING TIER-1 CHARTS (LLM = LANGUAGE ONLY)
+A. Prediction Engine (NO NEW ASTRO LOGIC)
+Update synthesis inputs so that:
+•	D9, D10, D7, D2 contribute signals only
+•	D1 remains primary weighting
+•	Divisional charts refine, never override
+Example:
+•	Career → D10 + D1
+•	Wealth → D2 + D1
+•	Family/Creativity → D7
+•	Long-term direction → D9
+Do NOT change scoring formulas — only add signal sources.
+ 
+B. LLM Interpretation (Weekly / Monthly / Yearly)
+The LLM must:
+•	Receive already-ranked signals
+•	Never know which chart produced them
+•	Produce unique narratives per period
+For example:
+•	Weekly → light D1 + D10 emphasis
+•	Monthly → D1 + D9 + D10
+•	Yearly → all Tier-1 charts synthesized upstream
+LLM input must remain trimmed meaning-layer only.
+ 
+3️⃣ PDF REPORT — REUSE, DON’T RECREATE
+A. PDF Content Rules
+You must:
+•	Reuse existing:
+o	Charts
+o	Scores
+o	Predictions
+o	LLM interpretations
+•	Do NOT recompute anything in PDF generation
+ 
+B. PDF Sections (Additive Only)
+Add the following sections:
+📘 Charts Section
+•	D1, D9, D10, D7, D2
+•	Rendered exactly as UI
+•	One chart per page (or grouped logically)
+ 
+📘 Predictions Section
+•	Weekly / Monthly / Yearly
+•	Include:
+o	Life-area scores
+o	LLM narrative
+o	Calculation confidence indicator
+ 
+📘 Methodology Appendix (MANDATORY)
+Insert a static section explaining:
+•	Swiss Ephemeris usage
+•	Lahiri ayanamsa
+•	Parashara divisional method
+•	Deterministic synthesis
+•	LLM used only for language
+•	Reproducibility guarantee
+This content must be static, not AI-generated.
+ 
+4️⃣ METHODOLOGY & CAUTION — UI + PDF
+A. Methodology Documentation (Single Source)
+Create:
+app/static/methodology.md
+Content must explicitly state:
+•	All calculations use Swiss Ephemeris
+•	Lahiri ayanamsa (Chitrapaksha)
+•	Classical Parashara divisional charts
+•	Deterministic scoring and synthesis
+•	LLM used only to explain results
+ 
+B. Cusp Tolerance Note (IMPORTANT)
+Include a dedicated subsection:
+Cusp & Boundary Sensitivity
+For fast-moving planets (Moon, Mercury, Venus), placements very close to sign or divisional boundaries may vary slightly across traditions or software.
+This system:
+•	Logs planetary longitude to arc-second precision
+•	Uses deterministic boundary rules
+•	Does not auto-adjust placements
+In rare cases, interpretations may emphasize a range of outcomes rather than a single expression.
+This text must appear:
+•	In UI “About / Methodology”
+•	In PDF appendix
+•	Never inside LLM output
+ 
+5️⃣ CALCULATION CONFIDENCE INTEGRATION
+Extend all prediction outputs with:
+{
+  "calculation_confidence": {
+    "level": "high | medium | sensitive",
+    "reason": "..."
+  }
+}
+Rules:
+•	Derived from corner-case detector
+•	Read-only
+•	Never affects scores
+•	LLM may soften tone if level = sensitive
+ 
+🚫 NON-NEGOTIABLES
+•	Do NOT change D1 logic
+•	Do NOT auto-correct cusp cases
+•	Do NOT expose raw degree math to users
+•	Do NOT add fear-based disclaimers
+•	Do NOT add additional charts
+ 
+✅ EXPECTED RESULT
+After implementation:
+•	Tier-1 charts are visible and consistent
+•	Predictions are richer but deterministic
+•	LLM cost remains bounded
+•	PDFs are reproducible and audit-safe
+•	Variance is transparent, not hidden
+•	Experts trust the methodology
+•	Users feel informed, not confused
+ 
+🧠 FINAL PRINCIPLE
+You are not chasing “perfect astrology.”
+You are building a responsible, explainable, professional system.

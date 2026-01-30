@@ -11,6 +11,7 @@ import Health from "@/pages/health";
 import Docs from "@/pages/docs";
 import ChartDetail from "@/pages/chart-detail";
 import AdminLLM from "@/pages/admin-llm";
+import MethodologyPage from "@/pages/methodology";
 import NotFound from "@/pages/not-found";
 
 import PredictionScreen from "@/screens/prediction-screen";
@@ -49,6 +50,7 @@ function Router() {
       {/* Static pages */}
       <Route path="/health" component={Health} />
       <Route path="/docs" component={Docs} />
+      <Route path="/methodology" component={MethodologyPage} />
       <Route path="/admin/llm" component={AdminLLM} />
 
       {/* ---------------------------------

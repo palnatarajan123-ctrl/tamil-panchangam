@@ -50,8 +50,16 @@ from app.engines.panchangam import compute_panchangam
 from app.engines.dasha_vimshottari import compute_vimshottari_dasha
 from app.engines.pancha_pakshi import get_birth_pakshi
 
-# ✅ Navamsa engine
+# ✅ Navamsa engine (legacy import for compatibility)
 from app.engines.navamsa_engine import build_navamsa_chart
+
+# ✅ Tier-1 Divisional Charts
+from app.engines.divisional_charts import (
+    build_hora_chart,
+    build_saptamsa_chart,
+    build_navamsa_chart as build_d9_chart,
+    build_dasamsa_chart,
+)
 
 # ✅ Functional Role engine
 from app.engines.functional_role_engine import compute_functional_roles
@@ -245,9 +253,22 @@ def create_base_chart(payload: BaseChartCreateRequest, force_recalculate: bool =
     )
 
     # -------------------------------------------------
-    # 7. Navamsa (D9) — IMMUTABLE
+    # 7. Tier-1 Divisional Charts — IMMUTABLE
     # -------------------------------------------------
-    navamsa = build_navamsa_chart(ephemeris)
+    # D2: Hora (Wealth)
+    d2_hora = build_hora_chart(ephemeris)
+    
+    # D7: Saptamsa (Creativity/Children)
+    d7_saptamsa = build_saptamsa_chart(ephemeris)
+    
+    # D9: Navamsa (Dharma/Maturity) - using new standardized builder
+    d9_navamsa = build_d9_chart(ephemeris)
+    
+    # D10: Dasamsa (Career/Authority)
+    d10_dasamsa = build_dasamsa_chart(ephemeris)
+    
+    # Legacy navamsa for backward compatibility
+    navamsa_legacy = build_navamsa_chart(ephemeris)
 
     # -------------------------------------------------
     # 7b. Functional Roles (yogakaraka/benefic/malefic)
@@ -274,15 +295,25 @@ def create_base_chart(payload: BaseChartCreateRequest, force_recalculate: bool =
         "ephemeris": ephemeris,
         "panchangam_birth": panchangam,
 
-        # ✅ Non-breaking: keep the existing key
+        # ✅ Legacy format for backward compatibility
         "charts": {
-            # Future-proof: you can also store D1 here later if desired
-            "D9": navamsa,
+            "D9": navamsa_legacy,
         },
 
-        # ✅ Additive alias: safe for future expansion, but don't rely on it yet
+        # ✅ Tier-1 Divisional Charts (standardized format)
         "divisional_charts": {
-            "D9": navamsa,
+            "D2": d2_hora,
+            "D7": d7_saptamsa,
+            "D9": d9_navamsa,
+            "D10": d10_dasamsa,
+        },
+        
+        # ✅ Metadata for audit
+        "chart_metadata": {
+            "ayanamsa": "lahiri",
+            "division_method": "parashara",
+            "precision": "arc-second",
+            "node_type": node_type,
         },
 
         "dashas": {

@@ -28,6 +28,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { DashaTimeline } from "@/components/DashaTimeline";
 import { ChartPair } from "@/components/ChartPair";
+import { TabbedChartViewer } from "@/components/TabbedChartViewer";
 import { 
   BirthAstroContextTable, 
   adaptBirthChartToAstroContext,
@@ -203,15 +204,20 @@ export default function ChartDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Charts */}
         <div className="lg:col-span-2 space-y-6">
-          <ChartPair
-            d1={{
-              lagna: ui.southIndianChart.lagna,
-              planets: ui.southIndianChart.planets,
-            }}
-            d9={{
-              lagna: ui.navamsaChart.lagna,
-              planets: ui.navamsaChart.planets,
-              dignity: ui.navamsaChart.dignity,
+          <TabbedChartViewer
+            charts={{
+              D1: {
+                lagna: ui.southIndianChart.lagna,
+                planets: ui.southIndianChart.planets,
+              },
+              D2: ui.divisionalCharts?.D2,
+              D7: ui.divisionalCharts?.D7,
+              D9: {
+                lagna: ui.navamsaChart.lagna,
+                planets: ui.navamsaChart.planets,
+                dignity: ui.navamsaChart.dignity,
+              },
+              D10: ui.divisionalCharts?.D10,
             }}
           />
 

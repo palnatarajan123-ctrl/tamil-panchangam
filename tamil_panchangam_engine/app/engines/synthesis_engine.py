@@ -349,6 +349,75 @@ def synthesize_from_envelope(envelope: dict) -> dict:
             })
     
     # -------------------------------------------------
+    # TIER-1 DIVISIONAL CHART SIGNALS
+    # D10 → Career, D2 → Wealth, D7 → Family/Creativity, D9 → Direction
+    # These REFINE but do not OVERRIDE D1 signals
+    # -------------------------------------------------
+    divisional_charts = envelope.get("divisional_charts", {})
+    
+    # D10 (Dasamsa) - Career emphasis
+    d10 = divisional_charts.get("D10", {})
+    d10_planets = d10.get("planets", {})
+    if d10_planets and isinstance(d10_planets, dict):
+        for planet in ["Sun", "Saturn", "Jupiter"]:
+            planet_data = d10_planets.get(planet, {})
+            if isinstance(planet_data, dict):
+                d10_sign = planet_data.get("sign", "")
+                if d10_sign:
+                    signals.append({
+                        "key": f"D10_{planet}",
+                        "source": "divisional_d10",
+                        "kind": "career_refinement",
+                        "planet": planet,
+                        "valence": "pos" if planet in BENEFIC_LORDS else "mix",
+                        "strength": 0.35,
+                        "confidence": 0.70,
+                        "rationale": f"D10 {planet} in {d10_sign} refines career outlook",
+                    })
+    
+    # D2 (Hora) - Wealth emphasis
+    d2 = divisional_charts.get("D2", {})
+    d2_planets = d2.get("planets", {})
+    if d2_planets and isinstance(d2_planets, dict) and len(d2_planets) > 0:
+        sun_data = d2_planets.get("Sun", {})
+        moon_data = d2_planets.get("Moon", {})
+        
+        sun_sign = sun_data.get("sign", "") if isinstance(sun_data, dict) else ""
+        moon_sign = moon_data.get("sign", "") if isinstance(moon_data, dict) else ""
+        
+        if sun_sign or moon_sign:
+            signals.append({
+                "key": "D2_WEALTH_PATTERN",
+                "source": "divisional_d2",
+                "kind": "wealth_refinement",
+                "valence": "mix",
+                "strength": 0.30,
+                "confidence": 0.65,
+                "rationale": f"D2 Hora pattern indicates wealth characteristics",
+            })
+    
+    # D7 (Saptamsa) - Creativity/Children emphasis
+    d7 = divisional_charts.get("D7", {})
+    d7_planets = d7.get("planets", {})
+    if d7_planets and isinstance(d7_planets, dict) and len(d7_planets) > 0:
+        jupiter_data = d7_planets.get("Jupiter", {})
+        venus_data = d7_planets.get("Venus", {})
+        
+        jupiter_sign = jupiter_data.get("sign", "") if isinstance(jupiter_data, dict) else ""
+        venus_sign = venus_data.get("sign", "") if isinstance(venus_data, dict) else ""
+        
+        if jupiter_sign or venus_sign:
+            signals.append({
+                "key": "D7_CREATIVE_POTENTIAL",
+                "source": "divisional_d7",
+                "kind": "family_refinement",
+                "valence": "pos",
+                "strength": 0.30,
+                "confidence": 0.65,
+                "rationale": "D7 benefic placement supports creativity and family",
+            })
+    
+    # -------------------------------------------------
     # YOGA SIGNALS - Prompt 2
     # -------------------------------------------------
     yogas = envelope.get("yogas", {})

@@ -676,6 +676,150 @@ def _build_closing(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def _build_divisional_charts(data: CanonicalReportData, styles) -> List:
+    """Build Tier-1 divisional charts section."""
+    elements = []
+    
+    has_d2 = bool(data.chart_images.d2_hora)
+    has_d7 = bool(data.chart_images.d7_saptamsa)
+    has_d10 = bool(data.chart_images.d10_dasamsa)
+    
+    if not (has_d2 or has_d7 or has_d10):
+        return elements
+    
+    elements.append(Paragraph("Divisional Charts (Vargas)", styles['SectionTitle']))
+    
+    elements.append(Paragraph(
+        "Divisional charts (Vargas) refine the birth chart analysis by examining "
+        "specific life areas. These follow the Classical Parashara method.",
+        styles['BodyText']
+    ))
+    
+    elements.append(Spacer(1, 0.2*inch))
+    
+    chart_info = [
+        ("D10 - Dasamsa", data.chart_images.d10_dasamsa, "Career & Authority", has_d10),
+        ("D2 - Hora", data.chart_images.d2_hora, "Wealth & Sustenance", has_d2),
+        ("D7 - Saptamsa", data.chart_images.d7_saptamsa, "Creativity & Children", has_d7),
+    ]
+    
+    charts_rendered = []
+    labels = []
+    
+    for label, svg_data, purpose, has_data in chart_info:
+        if has_data:
+            charts_rendered.append(_render_chart_from_svg(svg_data, label.split(" - ")[0]))
+            labels.append(f"{label}\n({purpose})")
+    
+    if charts_rendered:
+        if len(charts_rendered) <= 2:
+            chart_table = Table([charts_rendered], colWidths=[2.5*inch] * len(charts_rendered))
+            label_table = Table([labels], colWidths=[2.5*inch] * len(labels))
+        else:
+            chart_table = Table([charts_rendered[:2], charts_rendered[2:] + [""]], colWidths=[2.5*inch, 2.5*inch])
+            label_table = Table([labels[:2], labels[2:] + [""]], colWidths=[2.5*inch, 2.5*inch])
+        
+        chart_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elements.append(chart_table)
+        
+        label_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.Color(*COLORS["muted"])),
+        ]))
+        elements.append(label_table)
+    
+    elements.append(PageBreak())
+    
+    return elements
+
+
+def _build_methodology_appendix(data: CanonicalReportData, styles) -> List:
+    """Build methodology appendix section."""
+    elements = []
+    
+    if not data.methodology:
+        return elements
+    
+    elements.append(Paragraph("Appendix: Methodology", styles['SectionTitle']))
+    
+    elements.append(Paragraph(
+        "This section documents the calculation standards and methodology used in this report.",
+        styles['BodyText']
+    ))
+    
+    elements.append(Spacer(1, 0.2*inch))
+    
+    method = data.methodology
+    calc_confidence = getattr(method, 'calculation_confidence', 'high')
+    method_table = [
+        ["Standard", "Value"],
+        ["Ephemeris Source", method.ephemeris_source],
+        ["Ayanamsa", method.ayanamsa],
+        ["Node Calculation", method.node_type],
+        ["Division Method", method.division_method],
+        ["Calculation Confidence", calc_confidence.title() if calc_confidence else "High"],
+    ]
+    
+    table = Table(method_table, colWidths=[2.5*inch, 3*inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(table)
+    
+    elements.append(Spacer(1, 0.3*inch))
+    
+    elements.append(Paragraph("Cusp Sensitivity Note", styles['SubsectionTitle']))
+    
+    elements.append(Paragraph(
+        "For fast-moving celestial bodies (Moon, Mercury, Venus, Ascendant), placements very "
+        "close to sign or divisional boundaries may vary slightly across different software or "
+        "traditions due to minor differences in ayanamsa calculation, rounding approaches, or "
+        "birth time precision limitations.",
+        styles['BodyText']
+    ))
+    
+    cusp_cases = getattr(method, 'cusp_cases', [])
+    if cusp_cases:
+        elements.append(Spacer(1, 0.15*inch))
+        elements.append(Paragraph(
+            "<b>Detected Cusp Placements:</b>",
+            styles['BodyText']
+        ))
+        for case in cusp_cases:
+            elements.append(Paragraph(f"• {case}", styles['BodyText']))
+    
+    elements.append(Spacer(1, 0.2*inch))
+    
+    elements.append(Paragraph(
+        "This system uses arc-second precision and deterministic boundary rules. No automatic "
+        "adjustments are made, and degrees are not rounded before computing divisions.",
+        styles['BodyText']
+    ))
+    
+    elements.append(Spacer(1, 0.3*inch))
+    
+    elements.append(Paragraph("Reproducibility Guarantee", styles['SubsectionTitle']))
+    
+    elements.append(Paragraph(
+        "Given identical inputs (date of birth, time of birth, geographic coordinates, "
+        "and node type selection), this system will produce identical outputs on any date, "
+        "on any device, indefinitely.",
+        styles['BodyText']
+    ))
+    
+    return elements
+
+
 def render_pdf(data: CanonicalReportData) -> bytes:
     """
     Render complete PDF from report data.
@@ -700,10 +844,12 @@ def render_pdf(data: CanonicalReportData) -> bytes:
     story.extend(_build_cover_page(data, styles))
     story.extend(_build_how_to_read(styles))
     story.extend(_build_natal_snapshot(data, styles))
+    story.extend(_build_divisional_charts(data, styles))
     story.extend(_build_astrological_context(data, styles))
     story.extend(_build_predictions(data, styles))
     story.extend(_build_practices_reflection(data, styles))
     story.extend(_build_closing(data, styles))
+    story.extend(_build_methodology_appendix(data, styles))
     
     doc.build(story)
     

@@ -341,7 +341,12 @@ def build_monthly_prediction_envelope(
     )
 
     # -------------------------------------------------
-    # 17. Final Envelope (FACTS FIRST)
+    # 17. TIER-1 DIVISIONAL CHARTS
+    # -------------------------------------------------
+    divisional_charts = base_chart.get("divisional_charts", {})
+    
+    # -------------------------------------------------
+    # 18. Final Envelope (FACTS FIRST)
     # -------------------------------------------------
     logger.debug(f"DEBUG: Envelope keys: gochara={bool(gochara)}, chandra_gati={bool(chandra_gati)}, nakshatra={bool(nakshatra_context)}, ashtakavarga={bool(ashtakavarga)}, remedies={bool(remedies)}")
     
@@ -374,6 +379,9 @@ def build_monthly_prediction_envelope(
         },
 
         "navamsa": d9_context,
+        
+        # ===== TIER-1 DIVISIONAL CHARTS =====
+        "divisional_charts": divisional_charts,
 
         # ===== EPIC SIGNAL EXPANSION =====
         "gochara": gochara,
