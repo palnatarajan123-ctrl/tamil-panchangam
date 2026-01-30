@@ -80,7 +80,7 @@ def load_prediction(base_chart_id: str, year: int, month: int) -> Dict[str, Any]
         result = conn.execute("""
             SELECT * FROM monthly_predictions 
             WHERE base_chart_id = ? AND year = ? AND month = ?
-            ORDER BY generated_at DESC
+            ORDER BY created_at DESC
             LIMIT 1
         """, [base_chart_id, year, month]).fetchone()
         
@@ -99,7 +99,7 @@ def load_yearly_prediction(base_chart_id: str, year: int) -> Dict[str, Any]:
         result = conn.execute("""
             SELECT * FROM yearly_predictions 
             WHERE base_chart_id = ? AND year = ?
-            ORDER BY generated_at DESC
+            ORDER BY created_at DESC
             LIMIT 1
         """, [base_chart_id, year]).fetchone()
         
@@ -127,7 +127,7 @@ def load_cached_llm_interpretation(
                 AND period_type = ?
                 AND period_key = ?
                 AND feature_name = ?
-                ORDER BY generated_at DESC
+                ORDER BY created_at DESC
                 LIMIT 1
             """, [base_chart_id, period_type, period_key, feature_name]).fetchone()
             
