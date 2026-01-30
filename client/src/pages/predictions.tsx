@@ -45,6 +45,9 @@ import {
   ArrowLeft,
   AlertCircle,
   FileDown,
+  ShieldCheck,
+  ShieldAlert,
+  Info,
 } from "lucide-react";
 
 const MONTHS = [
@@ -83,6 +86,10 @@ export default function Predictions() {
     month?: number;
   } | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [calculationConfidence, setCalculationConfidence] = useState<{
+    level: string;
+    cusp_cases: Array<{ planet: string; position: string }>;
+  } | null>(null);
 
   if (!baseChartId) {
     return (
@@ -173,6 +180,14 @@ export default function Predictions() {
 
       const viewModel = adaptInterpretation(extracted.primary, explainabilityLevel, extracted.deterministic);
       setPrediction(viewModel);
+      
+      // Extract calculation confidence from envelope
+      const envelope = data.details?.envelope;
+      if (envelope?.calculation_confidence) {
+        setCalculationConfidence(envelope.calculation_confidence);
+      } else {
+        setCalculationConfidence(null);
+      }
       
       setLastPredictionParams({
         year: Number(variables.year),
@@ -401,6 +416,40 @@ export default function Predictions() {
       {/* RESULT */}
       {prediction && (
         <>
+          {/* Calculation Confidence Indicator */}
+          {calculationConfidence && (
+            <Card className="mb-4" data-testid="card-calculation-confidence">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  {calculationConfidence.level === "high" ? (
+                    <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  ) : calculationConfidence.level === "medium" ? (
+                    <Info className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  ) : (
+                    <ShieldAlert className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  )}
+                  <div>
+                    <span className="font-medium">Calculation Confidence: </span>
+                    <span className={
+                      calculationConfidence.level === "high" 
+                        ? "text-green-600 dark:text-green-400" 
+                        : calculationConfidence.level === "medium"
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-red-600 dark:text-red-400"
+                    }>
+                      {calculationConfidence.level.charAt(0).toUpperCase() + calculationConfidence.level.slice(1)}
+                    </span>
+                    {calculationConfidence.cusp_cases && calculationConfidence.cusp_cases.length > 0 && (
+                      <span className="text-sm text-muted-foreground ml-2">
+                        ({calculationConfidence.cusp_cases.length} cusp placement{calculationConfidence.cusp_cases.length > 1 ? 's' : ''} detected)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           <MonthlyPredictionView prediction={prediction} period={predictionType} />
           
           {/* PDF Download Button - Only for monthly and yearly */}
