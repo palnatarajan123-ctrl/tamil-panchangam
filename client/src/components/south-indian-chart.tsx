@@ -31,21 +31,30 @@ const SIGN_NAMES = [
 
 /* ============================================================
    South Indian Grid Coordinates (4×4 with hollow center)
+   
+   STANDARD SOUTH INDIAN: Signs are FIXED in their positions.
+   - [0,0] top-left = Pisces (rasi 11)
+   - [1,0] = Aries (rasi 0)
+   - [2,0] = Taurus (rasi 1)
+   - etc. clockwise
+   
+   Array index corresponds to RASI INDEX (0=Aries, 11=Pisces).
+   Position at HOUSE_COORDS[rasiIndex] gives the grid location.
    ============================================================ */
 
 const HOUSE_COORDS: [number, number][] = [
-  [1, 0],
-  [2, 0],
-  [3, 0],
-  [3, 1],
-  [3, 2],
-  [3, 3],
-  [2, 3],
-  [1, 3],
-  [0, 3],
-  [0, 2],
-  [0, 1],
-  [0, 0],
+  [1, 0],  // Rasi 0 (Aries) → position [1,0]
+  [2, 0],  // Rasi 1 (Taurus) → position [2,0]
+  [3, 0],  // Rasi 2 (Gemini) → position [3,0]
+  [3, 1],  // Rasi 3 (Cancer) → position [3,1]
+  [3, 2],  // Rasi 4 (Leo) → position [3,2]
+  [3, 3],  // Rasi 5 (Virgo) → position [3,3]
+  [2, 3],  // Rasi 6 (Libra) → position [2,3]
+  [1, 3],  // Rasi 7 (Scorpio) → position [1,3]
+  [0, 3],  // Rasi 8 (Sagittarius) → position [0,3]
+  [0, 2],  // Rasi 9 (Capricorn) → position [0,2]
+  [0, 1],  // Rasi 10 (Aquarius) → position [0,1]
+  [0, 0],  // Rasi 11 (Pisces) → position [0,0] top-left
 ];
 
 /* ============================================================
@@ -147,9 +156,8 @@ export function SouthIndianChart({
         stroke={strokeColor}
       />
 
-      {/* Houses */}
-      {HOUSE_COORDS.map(([col, row], index) => {
-        const rasiIndex = (index + lagna) % 12;
+      {/* Houses - South Indian: Signs are FIXED, iterate by rasi index */}
+      {HOUSE_COORDS.map(([col, row], rasiIndex) => {
         const signName = SIGN_NAMES[rasiIndex];
         const planetsHere = planetsInRasi(rasiIndex);
         const isLagna = rasiIndex === lagna;
@@ -158,7 +166,7 @@ export function SouthIndianChart({
         const y = row * cellSize;
 
         return (
-          <g key={index}>
+          <g key={rasiIndex}>
             {/* Sign Label */}
             <text
               x={x + cellSize / 2}
