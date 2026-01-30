@@ -439,8 +439,8 @@ def build_report_data(
     planets = ephemeris.get("planets", {})
     rasi_planet_signs = {planet: data.get("rasi", "") for planet, data in planets.items()}
     
-    navamsa_data = envelope.get("navamsa", {})
-    navamsa_planet_signs = navamsa_data.get("planet_signs", {})
+    d9_data = payload.get("charts", {}).get("D9", {})
+    navamsa_planet_signs = {planet: data.get("navamsa_sign", "") for planet, data in d9_data.items() if isinstance(data, dict)}
     
     overview, prediction_areas, practices = _extract_prediction_areas(
         interpretation, llm_interpretation

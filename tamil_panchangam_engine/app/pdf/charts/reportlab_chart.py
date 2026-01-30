@@ -14,24 +14,34 @@ CELL_SIZE = CHART_SIZE // 4
 GRID_PADDING = 10
 
 SOUTH_INDIAN_SIGN_POSITIONS = {
-    "Aries":       (1, 0),
-    "Taurus":      (2, 0),
-    "Gemini":      (3, 0),
-    "Cancer":      (3, 1),
-    "Leo":         (3, 2),
-    "Virgo":       (3, 3),
-    "Libra":       (2, 3),
-    "Scorpio":     (1, 3),
-    "Sagittarius": (0, 3),
-    "Capricorn":   (0, 2),
-    "Aquarius":    (0, 1),
-    "Pisces":      (0, 0),
+    "Leo":         (0, 0),
+    "Virgo":       (1, 0),
+    "Libra":       (2, 0),
+    "Scorpio":     (3, 0),
+    "Cancer":      (0, 1),
+    "Sagittarius": (3, 1),
+    "Gemini":      (0, 2),
+    "Capricorn":   (3, 2),
+    "Taurus":      (0, 3),
+    "Aries":       (1, 3),
+    "Pisces":      (2, 3),
+    "Aquarius":    (3, 3),
 }
 
 SIGN_ABBREVS = {
-    "Aries": "Ar", "Taurus": "Ta", "Gemini": "Ge", "Cancer": "Ca",
-    "Leo": "Le", "Virgo": "Vi", "Libra": "Li", "Scorpio": "Sc",
-    "Sagittarius": "Sg", "Capricorn": "Cp", "Aquarius": "Aq", "Pisces": "Pi"
+    "Aries": "MES", "Taurus": "RIS", "Gemini": "MIT", "Cancer": "KAD",
+    "Leo": "SIM", "Virgo": "KAN", "Libra": "THU", "Scorpio": "VRI",
+    "Sagittarius": "DHA", "Capricorn": "MAK", "Aquarius": "KUM", "Pisces": "MEE",
+    "Mesham": "MES", "Rishabam": "RIS", "Mithunam": "MIT", "Kadagam": "KAD",
+    "Simham": "SIM", "Kanni": "KAN", "Thulam": "THU", "Vrishchikam": "VRI",
+    "Dhanusu": "DHA", "Makaram": "MAK", "Kumbam": "KUM", "Meenam": "MEE"
+}
+
+TAMIL_TO_ENGLISH = {
+    "Mesham": "Aries", "Rishabam": "Taurus", "Mithunam": "Gemini", "Kadagam": "Cancer",
+    "Simham": "Leo", "Kanni": "Virgo", "Thulam": "Libra", "Vrishchikam": "Scorpio",
+    "Dhanusu": "Sagittarius", "Makaram": "Capricorn", "Kumbam": "Aquarius", "Meenam": "Pisces",
+    "Vrischikam": "Scorpio", "Kumbham": "Aquarius", "Kadakam": "Cancer",
 }
 
 PLANET_ABBREVS = {
@@ -103,10 +113,11 @@ def render_south_indian_chart_reportlab(
         ))
     
     for sign_name, planets in planet_signs.items():
-        if sign_name not in SOUTH_INDIAN_SIGN_POSITIONS:
+        lookup_name = TAMIL_TO_ENGLISH.get(sign_name, sign_name)
+        if lookup_name not in SOUTH_INDIAN_SIGN_POSITIONS:
             continue
         
-        col, row = SOUTH_INDIAN_SIGN_POSITIONS[sign_name]
+        col, row = SOUTH_INDIAN_SIGN_POSITIONS[lookup_name]
         base_x = col * cell_size + 3
         base_y = height - (row * cell_size) - 26
         
