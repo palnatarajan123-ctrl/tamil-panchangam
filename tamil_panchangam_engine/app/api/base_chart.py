@@ -1,11 +1,39 @@
 # app/api/base_chart.py
 
 import logging
+import hashlib
 from fastapi import APIRouter, HTTPException
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _compute_birth_fingerprint(
+    date_of_birth: str,
+    time_of_birth: str,
+    latitude: float,
+    longitude: float,
+) -> str:
+    """
+    Compute a deterministic fingerprint for birth data.
+    Same birth data = same fingerprint = same chart (for cache sharing).
+    """
+    data = f"{date_of_birth}|{time_of_birth}|{latitude:.4f}|{longitude:.4f}"
+    return hashlib.sha256(data.encode()).hexdigest()[:16]
+
+
+def _find_existing_chart_by_fingerprint(fingerprint: str) -> Optional[str]:
+    """
+    Check if a chart with this birth fingerprint already exists.
+    Returns chart_id if found, None otherwise.
+    """
+    for chart_id, chart in BASE_CHART_STORE.items():
+        stored_fp = chart.get("fingerprint")
+        if stored_fp == fingerprint:
+            logger.info(f"Found existing chart {chart_id} for fingerprint {fingerprint}")
+            return chart_id
+    return None
 
 from app.models.schema import (
     BASE_CHART_STORE,
@@ -67,12 +95,22 @@ def load_charts_from_db():
                 else:
                     continue
                 
+                # Compute fingerprint for deduplication
+                reference = payload.get("reference", {})
+                fingerprint = _compute_birth_fingerprint(
+                    date_of_birth=reference.get("date_of_birth", ""),
+                    time_of_birth=reference.get("time_of_birth", ""),
+                    latitude=reference.get("latitude", 0),
+                    longitude=reference.get("longitude", 0),
+                )
+                
                 BASE_CHART_STORE[chart_id] = {
                     "id": chart_id,
                     "checksum": compute_chart_checksum(payload),
                     "locked": locked,
                     "created_at": datetime.utcnow().isoformat(),
                     "data": payload,
+                    "fingerprint": fingerprint,
                 }
                 loaded_count += 1
             
@@ -107,13 +145,33 @@ def get_birth_chart_ui(base_chart_id: str):
 @router.post("/create", response_model=BaseChartCreateResponse)
 def create_base_chart(payload: BaseChartCreateRequest):
     """
-    Immutable birth chart creation.
+    Immutable birth chart creation with deduplication.
 
     Guarantees:
     - Deterministic
     - Contract-safe
-    - In-memory (by design)
+    - Deduplicated (same birth data = same chart_id for LLM cache sharing)
     """
+
+    # -------------------------------------------------
+    # 0. Check for existing chart with same birth data
+    # -------------------------------------------------
+    fingerprint = _compute_birth_fingerprint(
+        date_of_birth=payload.date_of_birth.isoformat(),
+        time_of_birth=payload.time_of_birth.strftime("%H:%M:%S"),
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+    )
+    
+    existing_chart_id = _find_existing_chart_by_fingerprint(fingerprint)
+    if existing_chart_id:
+        existing = BASE_CHART_STORE[existing_chart_id]
+        logger.info(f"Returning existing chart {existing_chart_id} (fingerprint match)")
+        return BaseChartCreateResponse(
+            base_chart_id=existing_chart_id,
+            checksum=existing["checksum"],
+            locked=existing["locked"],
+        )
 
     # -------------------------------------------------
     # 1. Resolve timezone
@@ -246,6 +304,7 @@ def create_base_chart(payload: BaseChartCreateRequest):
         "locked": True,
         "created_at": datetime.utcnow(),
         "data": base_chart,
+        "fingerprint": fingerprint,
     }
 
     return BaseChartCreateResponse(

@@ -83,6 +83,11 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             else None
         )
         
+        # Mark as returned from prediction cache (no new LLM call)
+        if interpretation and "llm_metadata" in interpretation:
+            interpretation["llm_metadata"]["from_cache"] = True
+            interpretation["llm_metadata"]["tokens_used"] = 0  # No new tokens spent
+        
         # Apply explainability filter to cached AI interpretation
         explainability_level: str = payload.explainability_level or "full"
         if interpretation and "ai_interpretation" in interpretation:

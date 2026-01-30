@@ -166,9 +166,22 @@ Press the **green Run button** to start both services automatically.
 - **Route**: `/admin/llm`
 - **Features**: LLM status toggle, monthly usage gauge, fallback summary, recent calls table
 
+### Caching Strategy (Two Levels)
+1. **Prediction-level cache**: Full predictions (envelope + synthesis + interpretation) are cached per chart/year/month
+   - Returns immediately on repeat requests
+   - `llm_metadata.from_cache = true` and `tokens_used = 0` when returning from cache
+2. **LLM-level cache**: LLM interpretations are cached per (chart_id, period_type, period_key, prompt_version)
+   - Prevents duplicate LLM calls for same chart/period
+
+### Birth Chart Deduplication
+- Same birth data (date, time, location) always returns the same chart_id
+- Uses SHA-256 fingerprint of birth data for deduplication
+- Enables cache sharing across sessions
+
 ### Key Files
 - `app/llm/token_estimator.py` - Token counting using tiktoken
-- `app/llm/providers/openai_provider.py` - OpenAI API wrapper
+- `app/llm/providers/openai_provider.py` - OpenAI API wrapper with JSON repair
+- `app/llm/payload_builder.py` - Meaning-layer payload extraction for LLM
 - `app/llm/prompts/interpretation_prompt_v1.txt` - Prompt template
 - `app/engines/llm_interpretation_orchestrator.py` - Main orchestration logic
 - `app/api/admin_llm.py` - Admin API endpoints
