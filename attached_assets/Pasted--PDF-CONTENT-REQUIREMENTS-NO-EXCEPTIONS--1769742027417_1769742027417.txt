@@ -1,0 +1,91 @@
+---------------------------------------------------
+PDF CONTENT REQUIREMENTS (NO EXCEPTIONS)
+---------------------------------------------------
+
+The PDF MUST include ALL of the following:
+
+A. CHARTS (MANDATORY VISUALS)
+- Render and embed:
+  - Rasi Chart (D1)
+  - Navamsa Chart (D9)
+- Charts must be visible images, not referenced text.
+
+B. NATAL SNAPSHOT (COMPLETE)
+- Birth Reference table
+- Explanation of D1 (personality & life expression)
+- Explanation of D9 (soul & relationship dharma)
+- Natal strengths and sensitivities narrative
+
+C. CORE LIFE THEMES (NEW SECTION)
+- Stable themes derived from birth + navamsa
+- Career orientation
+- Relationship style
+- Emotional processing
+- Growth tendencies
+- No time-bound predictions here
+
+D. ASTROLOGICAL CONTEXT – CURRENT PERIOD
+- Active Dasha interpretation
+- Transit synthesis (not just tables)
+- Nakshatra & timing explanation
+- Pakshi / rhythm explanation
+- Favorable / challenging tone of the month
+
+E. PREDICTIONS (FULL, STRUCTURED)
+- Overall Monthly Overview (MANDATORY)
+- Life-area scores table:
+  - Career
+  - Finance
+  - Relationships
+  - Health & Energy
+  - Personal Growth
+- For EACH life area:
+  - Explanation (not one-liners)
+  - Opportunities
+  - Watch-outs
+  - Practical guidance
+
+F. PRACTICES & REFLECTION (MANDATORY)
+- Grounded daily or weekly practices
+- Reflection prompts
+- No superstition or fear-based remedies
+
+G. CLOSING SECTION (MANDATORY)
+- Summary of the period
+- 3–5 key takeaways
+- One reflective question
+- Encouraging closing note
+
+---------------------------------------------------
+LLM & CACHING RULES
+---------------------------------------------------
+
+- Use cached LLM output whenever available.
+- Do NOT shorten content for PDF.
+- PDF must render FULL explanations, not summaries.
+- Prompt versioning must be respected.
+- max_tokens_per_call = 800 (no new calls unless section missing).
+
+---------------------------------------------------
+RENDERING
+---------------------------------------------------
+
+- Build structured HTML.
+- Embed charts via <img>.
+- Render tables and narratives clearly.
+- Convert HTML to PDF using an HTML-to-PDF renderer.
+
+---------------------------------------------------
+UI INVOCATION
+---------------------------------------------------
+
+- PDF generation is triggered ONLY from the Predictions UI.
+- CTA label: “Generate PDF Report”
+- No automatic or background generation.
+
+---------------------------------------------------
+FINAL RULE
+---------------------------------------------------
+
+This PDF must read like a COMPLETE, PREMIUM astrology report.
+No partial sections. No placeholders. No one-line summaries.
