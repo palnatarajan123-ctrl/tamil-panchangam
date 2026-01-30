@@ -26,6 +26,10 @@ from .models import (
     PredictionArea,
     SignalAttribution,
     ChartImages,
+    MonthlyTheme,
+    Overview,
+    PracticesAndReflection,
+    Closing,
 )
 
 logger = logging.getLogger(__name__)
@@ -300,26 +304,37 @@ def _extract_pakshi_rhythm(envelope: Dict[str, Any]) -> PakshiRhythmContext:
 def _extract_prediction_areas(
     interpretation: Dict[str, Any],
     llm_interpretation: Optional[Dict[str, Any]] = None
-) -> Tuple[str, list, list]:
+) -> Tuple[str, list, list, bool, Optional[Dict], Optional[Dict], Optional[Dict], Optional[Dict]]:
     """
     Extract prediction areas and practices from interpretation.
     
-    Returns: (overview, areas, practices)
+    Returns: (overview, areas, practices, is_v2, monthly_theme, overview_v2, practices_v2, closing_v2)
     """
     ai_interp = interpretation.get("ai_interpretation", {})
     
     llm_source = llm_interpretation if llm_interpretation else {}
     deterministic_source = ai_interp
     
-    window_summary = llm_source.get("window_summary", {})
-    overview = (
-        window_summary.get("overview", "") or 
-        window_summary.get("summary", "") or 
-        window_summary.get("narrative", "") or 
-        llm_source.get("overview", "") or 
-        llm_source.get("summary", "") or
-        deterministic_source.get("window_summary", {}).get("overview", "")
-    )
+    is_v2 = llm_source.get("engine_version") == "ai-interpretation-v2.0"
+    
+    if is_v2:
+        overview_v2_data = llm_source.get("overview", {})
+        overview = overview_v2_data.get("energy_pattern", "")
+    else:
+        window_summary = llm_source.get("window_summary", {})
+        overview = (
+            window_summary.get("overview", "") or 
+            window_summary.get("summary", "") or 
+            window_summary.get("narrative", "") or 
+            llm_source.get("overview", "") or 
+            llm_source.get("summary", "") or
+            deterministic_source.get("window_summary", {}).get("overview", "")
+        )
+        overview_v2_data = None
+    
+    monthly_theme_data = llm_source.get("monthly_theme") if is_v2 else None
+    practices_v2_data = llm_source.get("practices_and_reflection") if is_v2 else None
+    closing_v2_data = llm_source.get("closing") if is_v2 else None
     
     llm_life_areas = llm_source.get("life_areas", {})
     det_life_areas = deterministic_source.get("life_areas", {})
@@ -344,6 +359,10 @@ def _extract_prediction_areas(
             det_area_data.get("deeper_explanation", "")
         )
         
+        opportunity = llm_area_data.get("opportunity") if is_v2 else None
+        watch_out = llm_area_data.get("watch_out") if is_v2 else None
+        one_action = llm_area_data.get("one_action") if is_v2 else None
+        
         attr_data = det_area_data.get("attribution", {})
         attribution = None
         if attr_data:
@@ -362,6 +381,9 @@ def _extract_prediction_areas(
             interpretation=interpretation_text,
             deeper_explanation=deeper_explanation,
             guidance=llm_area_data.get("guidance") or det_area_data.get("guidance"),
+            opportunity=opportunity,
+            watch_out=watch_out,
+            one_action=one_action,
             attribution=attribution
         ))
     
@@ -369,7 +391,7 @@ def _extract_prediction_areas(
     if not practices:
         practices = _generate_default_practices(areas)
     
-    return overview, areas, practices
+    return overview, areas, practices, is_v2, monthly_theme_data, overview_v2_data, practices_v2_data, closing_v2_data
 
 
 def _generate_default_practices(areas: list) -> List[str]:
@@ -449,11 +471,42 @@ def build_report_data(
     # D9 uses navamsa lagna if available, otherwise defaults to Mesham (index 0) like frontend
     d9_lagna_sign = lagna_data.get("navamsa_sign", "Mesham") if isinstance(lagna_data, dict) else "Mesham"
     
-    overview, prediction_areas, practices = _extract_prediction_areas(
+    (overview, prediction_areas, practices, is_v2, 
+     monthly_theme_data, overview_v2_data, practices_v2_data, closing_v2_data) = _extract_prediction_areas(
         interpretation, llm_interpretation
     )
     
     birth_details_data = payload.get("birth_details", {})
+    
+    monthly_theme = None
+    if monthly_theme_data:
+        monthly_theme = MonthlyTheme(
+            title=monthly_theme_data.get("title", ""),
+            narrative=monthly_theme_data.get("narrative", "")
+        )
+    
+    overview_v2 = None
+    if overview_v2_data and isinstance(overview_v2_data, dict):
+        overview_v2 = Overview(
+            energy_pattern=overview_v2_data.get("energy_pattern", ""),
+            key_focus=overview_v2_data.get("key_focus", []),
+            avoid_or_be_mindful=overview_v2_data.get("avoid_or_be_mindful", [])
+        )
+    
+    practices_v2 = None
+    if practices_v2_data:
+        practices_v2 = PracticesAndReflection(
+            daily_practice=practices_v2_data.get("daily_practice"),
+            weekly_practice=practices_v2_data.get("weekly_practice"),
+            reflection_question=practices_v2_data.get("reflection_question")
+        )
+    
+    closing_v2 = None
+    if closing_v2_data:
+        closing_v2 = Closing(
+            key_takeaways=closing_v2_data.get("key_takeaways", []),
+            encouragement=closing_v2_data.get("encouragement")
+        )
     
     return CanonicalReportData(
         report_type=report_type.title(),
@@ -493,6 +546,12 @@ def build_report_data(
         closing_affirmation=_generate_closing_affirmation(prediction_areas),
         
         llm_enhanced=llm_interpretation is not None,
+        
+        monthly_theme=monthly_theme,
+        overview_v2=overview_v2,
+        practices_v2=practices_v2,
+        closing_v2=closing_v2,
+        is_v2=is_v2,
     )
 
 

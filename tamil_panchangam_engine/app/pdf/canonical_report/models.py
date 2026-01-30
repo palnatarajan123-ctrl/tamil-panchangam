@@ -77,7 +77,36 @@ class PredictionArea(BaseModel):
     interpretation: str
     deeper_explanation: Optional[str] = None
     guidance: Optional[str] = None
+    opportunity: Optional[str] = None
+    watch_out: Optional[str] = None
+    one_action: Optional[str] = None
     attribution: Optional[SignalAttribution] = None
+
+
+class MonthlyTheme(BaseModel):
+    """V2 monthly theme."""
+    title: str
+    narrative: str
+
+
+class Overview(BaseModel):
+    """V2 overview with focus areas."""
+    energy_pattern: str
+    key_focus: List[str] = []
+    avoid_or_be_mindful: List[str] = []
+
+
+class PracticesAndReflection(BaseModel):
+    """V2 practices and reflection."""
+    daily_practice: Optional[str] = None
+    weekly_practice: Optional[str] = None
+    reflection_question: Optional[str] = None
+
+
+class Closing(BaseModel):
+    """V2 closing section."""
+    key_takeaways: List[str] = []
+    encouragement: Optional[str] = None
 
 
 class ChartImages(BaseModel):
@@ -117,3 +146,9 @@ class CanonicalReportData(BaseModel):
     closing_affirmation: Optional[str] = None
     
     llm_enhanced: bool = False
+    
+    monthly_theme: Optional[MonthlyTheme] = None
+    overview_v2: Optional[Overview] = None
+    practices_v2: Optional[PracticesAndReflection] = None
+    closing_v2: Optional[Closing] = None
+    is_v2: bool = False

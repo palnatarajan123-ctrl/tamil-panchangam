@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { MonthlyPredictionView } from "@/components/prediction/MonthlyPredictionView";
 import {
-  adaptAIInterpretation,
+  adaptInterpretation,
   extractAIInterpretation,
   hasValidAIInterpretation,
   type PredictionViewModel,
@@ -171,7 +171,7 @@ export default function Predictions() {
         return;
       }
 
-      const viewModel = adaptAIInterpretation(aiInterpretation, explainabilityLevel);
+      const viewModel = adaptInterpretation(aiInterpretation, explainabilityLevel);
       setPrediction(viewModel);
       
       setLastPredictionParams({

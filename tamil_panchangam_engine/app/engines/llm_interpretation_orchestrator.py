@@ -36,14 +36,15 @@ from app.llm.payload_builder import (
 logger = logging.getLogger(__name__)
 
 LLM_MONTHLY_TOKEN_BUDGET = 1_000_000
-PROMPT_VERSION = "interpretation_v1"
+PROMPT_VERSION = "interpretation_v2"
 
 
-def _load_prompt_template() -> str:
+def _load_prompt_template(version: str = "v2") -> str:
     """Load the interpretation prompt template."""
+    prompt_file = f"interpretation_prompt_{version}.txt"
     prompt_paths = [
-        Path(__file__).parent.parent / "llm" / "prompts" / "interpretation_prompt_v1.txt",
-        Path("tamil_panchangam_engine/app/llm/prompts/interpretation_prompt_v1.txt"),
+        Path(__file__).parent.parent / "llm" / "prompts" / prompt_file,
+        Path(f"tamil_panchangam_engine/app/llm/prompts/{prompt_file}"),
     ]
     
     for path in prompt_paths:
@@ -244,8 +245,28 @@ def _score_to_strength(score: int) -> str:
 
 
 def _validate_llm_output(output: Dict[str, Any]) -> bool:
-    """Validate LLM output against schema."""
+    """Validate LLM output against schema (supports v1 and v2)."""
     logger.debug(f"Validating LLM output keys: {list(output.keys())}")
+    
+    engine_version = output.get("engine_version", "")
+    
+    if engine_version == "ai-interpretation-v2.0":
+        required_keys = ["monthly_theme", "overview", "life_areas", "practices_and_reflection", "closing"]
+        if not all(k in output for k in required_keys):
+            logger.warning(f"LLM v2 output missing required keys. Got: {list(output.keys())}")
+            return False
+        
+        theme = output.get("monthly_theme", {})
+        if not theme.get("title") or not theme.get("narrative"):
+            logger.warning("LLM v2 output missing monthly_theme title/narrative")
+            return False
+        
+        overview = output.get("overview", {})
+        if not overview.get("energy_pattern"):
+            logger.warning("LLM v2 output missing overview.energy_pattern")
+            return False
+        
+        return True
     
     required_keys = ["window_summary", "life_areas"]
     

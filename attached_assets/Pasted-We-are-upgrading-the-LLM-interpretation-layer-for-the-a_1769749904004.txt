@@ -1,0 +1,180 @@
+We are upgrading the LLM interpretation layer for the astrology prediction engine.
+This change must ENRICH the interpretation content in a structured way and ensure the SAME output is used by both UI and PDF.
+
+DO NOT create separate logic for UI vs PDF.
+There must be ONE canonical LLM interpretation stored and reused everywhere.
+
+====================================================
+1. GOAL
+====================================================
+
+The current interpretation is correct but feels “skinny.”
+We want more depth, clarity, and usefulness WITHOUT:
+- inventing astrology
+- adding fear-based language
+- increasing verbosity unnecessarily
+
+The solution is STRUCTURE, not length.
+
+====================================================
+2. SINGLE CANONICAL INTERPRETATION OBJECT
+====================================================
+
+All LLM output must be stored as ONE structured object, for example:
+
+llm_interpretation = {
+  "monthly_theme": {...},
+  "overview": {...},
+  "life_areas": {...},
+  "practices_and_reflection": {...},
+  "closing": {...}
+}
+
+This object:
+- Is generated ONCE per chart + period
+- Is stored in DB/cache
+- Is rendered identically in UI and PDF
+
+====================================================
+3. REQUIRED LLM OUTPUT STRUCTURE
+====================================================
+
+Update the LLM prompt so it MUST return the following JSON structure:
+
+----------------------------------------------------
+A) MONTHLY THEME (MANDATORY)
+----------------------------------------------------
+
+"monthly_theme": {
+  "title": "Concise theme name (5–7 words)",
+  "narrative": "1 short paragraph describing the emotional and situational tone of the month"
+}
+
+----------------------------------------------------
+B) OVERVIEW (MANDATORY)
+----------------------------------------------------
+
+"overview": {
+  "energy_pattern": "How this month generally feels and flows",
+  "key_focus": [
+    "What deserves attention",
+    "What matters most now",
+    "Where effort pays off"
+  ],
+  "avoid_or_be_mindful": [
+    "Common pitfall",
+    "Energy drain",
+    "Behavior to watch"
+  ]
+}
+
+----------------------------------------------------
+C) LIFE AREAS (MANDATORY, ALL AREAS)
+----------------------------------------------------
+
+"life_areas": {
+  "career": {
+    "score": number or qualitative bucket,
+    "summary": "2–3 sentence high-level summary",
+    "opportunity": "What can go well if handled consciously",
+    "watch_out": "What could create friction",
+    "one_action": "One grounded, practical action"
+  },
+  "finance": { ...same structure... },
+  "relationships": { ...same structure... },
+  "health_and_energy": { ...same structure... },
+  "personal_growth": { ...same structure... }
+}
+
+Language rules:
+- No repetition across areas
+- Each area must feel distinct
+- Do NOT restate planet names excessively; explain impact instead
+
+----------------------------------------------------
+D) PRACTICES & REFLECTION (MANDATORY)
+----------------------------------------------------
+
+"practices_and_reflection": {
+  "daily_practice": "Simple daily habit (5–10 minutes)",
+  "weekly_practice": "Weekly reflection or reset",
+  "reflection_question": "One thoughtful, non-fear-based question"
+}
+
+----------------------------------------------------
+E) CLOSING (MANDATORY)
+----------------------------------------------------
+
+"closing": {
+  "key_takeaways": [
+    "Takeaway 1",
+    "Takeaway 2",
+    "Takeaway 3"
+  ],
+  "encouragement": "Warm, grounded closing paragraph"
+}
+
+====================================================
+4. ASTROLOGY SAFETY RULES
+====================================================
+
+The LLM MUST:
+- Use ONLY the deterministic astrology data passed in
+- NOT invent new planetary positions
+- NOT exaggerate outcomes
+- NOT use fear-based, fatalistic, or remedial language
+- Keep tone calm, grounded, and advisory
+
+====================================================
+5. PROMPT DESIGN REQUIREMENTS
+====================================================
+
+- Prompt must explicitly instruct the LLM to return VALID JSON only
+- Field names must match exactly
+- No markdown, no prose outside JSON
+- max_tokens_per_call = 800
+- If output exceeds limit, truncate gracefully but preserve structure
+
+====================================================
+6. STORAGE & REUSE
+====================================================
+
+- Store the entire llm_interpretation object in DB/cache
+- Keyed by:
+  base_chart_id + period_type + period_key + feature_name + prompt_version
+- UI and PDF must BOTH read from this stored object
+- No secondary summarization for PDF
+
+====================================================
+7. UI & PDF DISPLAY (EXPLICIT)
+====================================================
+
+- UI:
+  - Show Monthly Theme at top
+  - Expandable sections for life areas
+  - Practices & Reflection as a distinct section
+
+- PDF:
+  - Same content, formatted for reading
+  - No content loss or shortening
+
+====================================================
+8. PRICING / TIERS
+====================================================
+
+For now:
+- ALL interpretation fields are FREE
+- Do NOT implement gating or premium flags
+- Structure must support future gating, but no branching yet
+
+====================================================
+9. ACCEPTANCE CRITERIA
+====================================================
+
+After this change:
+- UI and PDF show richer, non-repetitive content
+- Report no longer feels “skinny”
+- No duplicate LLM calls for same chart + period
+- Same interpretation appears everywhere
+
+Deliver this as ONE cohesive implementation.

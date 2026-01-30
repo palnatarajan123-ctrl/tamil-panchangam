@@ -430,7 +430,32 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
     
     elements.append(Paragraph("Predictions", styles['SectionTitle']))
     
-    if data.prediction_overview:
+    if data.is_v2 and data.monthly_theme:
+        elements.append(Paragraph(
+            f"<b>{data.monthly_theme.title}</b>",
+            styles['SubsectionTitle']
+        ))
+        elements.append(Paragraph(data.monthly_theme.narrative, styles['BodyText']))
+        elements.append(Spacer(1, 0.3*inch))
+    
+    if data.is_v2 and data.overview_v2:
+        elements.append(Paragraph("Energy & Focus", styles['SubsectionTitle']))
+        elements.append(Paragraph(data.overview_v2.energy_pattern, styles['BodyText']))
+        
+        if data.overview_v2.key_focus:
+            elements.append(Spacer(1, 0.1*inch))
+            elements.append(Paragraph("<b>Key Focus Areas:</b>", styles['BodyText']))
+            for focus in data.overview_v2.key_focus:
+                elements.append(Paragraph(f"• {focus}", styles['BodyText']))
+        
+        if data.overview_v2.avoid_or_be_mindful:
+            elements.append(Spacer(1, 0.1*inch))
+            elements.append(Paragraph("<b>Be Mindful Of:</b>", styles['BodyText']))
+            for item in data.overview_v2.avoid_or_be_mindful:
+                elements.append(Paragraph(f"• {item}", styles['BodyText']))
+        
+        elements.append(Spacer(1, 0.3*inch))
+    elif data.prediction_overview:
         elements.append(Paragraph("Overview", styles['SubsectionTitle']))
         elements.append(Paragraph(data.prediction_overview, styles['BodyText']))
         elements.append(Spacer(1, 0.3*inch))
@@ -475,6 +500,24 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
                 styles['BodyText']
             ))
         
+        if area.opportunity:
+            area_elements.append(Paragraph(
+                f"<b>Opportunity:</b> {area.opportunity}", 
+                styles['BodyText']
+            ))
+        
+        if area.watch_out:
+            area_elements.append(Paragraph(
+                f"<b>Watch Out:</b> {area.watch_out}", 
+                styles['BodyText']
+            ))
+        
+        if area.one_action:
+            area_elements.append(Paragraph(
+                f"<b>One Action:</b> {area.one_action}", 
+                styles['BodyText']
+            ))
+        
         if area.guidance:
             area_elements.append(Paragraph(
                 f"<b>Guidance:</b> {area.guidance}", 
@@ -509,7 +552,34 @@ def _build_practices_reflection(data: CanonicalReportData, styles) -> List:
     """Build practices section."""
     elements = []
     
-    if data.practices:
+    if data.is_v2 and data.practices_v2:
+        elements.append(Paragraph("Practices & Reflection", styles['SectionTitle']))
+        
+        if data.practices_v2.daily_practice:
+            elements.append(Paragraph(
+                f"<b>Daily Practice:</b> {data.practices_v2.daily_practice}", 
+                styles['BodyText']
+            ))
+        
+        if data.practices_v2.weekly_practice:
+            elements.append(Paragraph(
+                f"<b>Weekly Practice:</b> {data.practices_v2.weekly_practice}", 
+                styles['BodyText']
+            ))
+        
+        if data.practices_v2.reflection_question:
+            elements.append(Spacer(1, 0.15*inch))
+            elements.append(Paragraph(
+                f"<b>Reflection Question:</b>", 
+                styles['BodyText']
+            ))
+            elements.append(Paragraph(
+                f"<i>\"{data.practices_v2.reflection_question}\"</i>", 
+                styles['BodyText']
+            ))
+        
+        elements.append(Spacer(1, 0.3*inch))
+    elif data.practices:
         elements.append(Paragraph("Suggested Practices", styles['SectionTitle']))
         for practice in data.practices:
             elements.append(Paragraph(f"• {practice}", styles['BodyText']))
@@ -522,16 +592,30 @@ def _build_closing(data: CanonicalReportData, styles) -> List:
     """Build closing section."""
     elements = []
     
-    elements.append(Paragraph("Closing Note", styles['SectionTitle']))
-    
-    elements.append(Paragraph(data.closing_note, styles['BodyText']))
-    
-    if data.closing_affirmation:
-        elements.append(Spacer(1, 0.3*inch))
-        elements.append(Paragraph(
-            f"<i>\"{data.closing_affirmation}\"</i>",
-            styles['BodyText']
-        ))
+    if data.is_v2 and data.closing_v2:
+        elements.append(Paragraph("Key Takeaways", styles['SectionTitle']))
+        
+        if data.closing_v2.key_takeaways:
+            for takeaway in data.closing_v2.key_takeaways:
+                elements.append(Paragraph(f"• {takeaway}", styles['BodyText']))
+            elements.append(Spacer(1, 0.2*inch))
+        
+        if data.closing_v2.encouragement:
+            elements.append(Paragraph(
+                f"<i>{data.closing_v2.encouragement}</i>",
+                styles['BodyText']
+            ))
+    else:
+        elements.append(Paragraph("Closing Note", styles['SectionTitle']))
+        
+        elements.append(Paragraph(data.closing_note, styles['BodyText']))
+        
+        if data.closing_affirmation:
+            elements.append(Spacer(1, 0.3*inch))
+            elements.append(Paragraph(
+                f"<i>\"{data.closing_affirmation}\"</i>",
+                styles['BodyText']
+            ))
     
     elements.append(Spacer(1, 0.5*inch))
     
