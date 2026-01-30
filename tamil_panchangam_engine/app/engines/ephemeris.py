@@ -26,7 +26,11 @@ PLANETS = {
     "Jupiter": swe.JUPITER,
     "Venus": swe.VENUS,
     "Saturn": swe.SATURN,
-    "Rahu": swe.TRUE_NODE,
+}
+
+NODE_TYPES = {
+    "true": swe.TRUE_NODE,
+    "mean": swe.MEAN_NODE,
 }
 
 RASI_NAMES = [
@@ -114,7 +118,8 @@ def get_nakshatra(longitude: float) -> Dict:
 def compute_sidereal_positions(
     dt_utc: datetime,
     latitude: float,
-    longitude: float
+    longitude: float,
+    node_type: str = "mean"
 ) -> Dict:
     """
     MASTER FUNCTION
@@ -123,10 +128,15 @@ def compute_sidereal_positions(
     - Moon rasi & nakshatra
     - Lagna
 
+    Args:
+        dt_utc: Birth datetime in UTC
+        latitude: Birth location latitude
+        longitude: Birth location longitude  
+        node_type: "mean" (traditional Tamil) or "true" (astronomical)
+                   Default is "mean" for traditional Tamil astrology compatibility.
+
     This output is AUTHORITATIVE.
     """
-    # ✅ Ensure Lahiri ayanamsa is set before EVERY calculation
-    # (protects against global state pollution from other modules)
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     
     jd = to_julian_day(dt_utc)
@@ -139,8 +149,13 @@ def compute_sidereal_positions(
             "rasi": get_rasi(lon)
         }
 
-    # Ketu = Rahu + 180°
-    rahu_lon = planets["Rahu"]["longitude_deg"]
+    node_id = NODE_TYPES.get(node_type.lower(), swe.MEAN_NODE)
+    rahu_lon = get_sidereal_longitude(jd, node_id)
+    planets["Rahu"] = {
+        "longitude_deg": rahu_lon,
+        "rasi": get_rasi(rahu_lon)
+    }
+    
     ketu_lon = (rahu_lon + 180) % 360
     planets["Ketu"] = {
         "longitude_deg": ketu_lon,
@@ -151,6 +166,7 @@ def compute_sidereal_positions(
 
     return {
         "julian_day": jd,
+        "node_type": node_type.lower(),
         "lagna": {
             "longitude_deg": compute_lagna(jd, latitude, longitude),
             "rasi": get_rasi(compute_lagna(jd, latitude, longitude))

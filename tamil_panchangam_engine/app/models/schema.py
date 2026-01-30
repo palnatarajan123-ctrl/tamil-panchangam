@@ -97,6 +97,11 @@ class BaseChartCreateRequest(BaseModel):
     timezone: Optional[str] = Field(
         default=None, description="IANA timezone (e.g., Asia/Kolkata)"
     )
+    
+    node_type: Optional[Literal["mean", "true"]] = Field(
+        default="mean",
+        description="Rahu/Ketu calculation method: 'mean' (traditional Tamil) or 'true' (astronomical)"
+    )
 
 
 class BaseChartCreateResponse(BaseModel):

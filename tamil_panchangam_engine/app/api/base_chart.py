@@ -14,12 +14,13 @@ def _compute_birth_fingerprint(
     time_of_birth: str,
     latitude: float,
     longitude: float,
+    node_type: str = "mean",
 ) -> str:
     """
     Compute a deterministic fingerprint for birth data.
-    Same birth data = same fingerprint = same chart (for cache sharing).
+    Same birth data + node_type = same fingerprint = same chart (for cache sharing).
     """
-    data = f"{date_of_birth}|{time_of_birth}|{latitude:.4f}|{longitude:.4f}"
+    data = f"{date_of_birth}|{time_of_birth}|{latitude:.4f}|{longitude:.4f}|{node_type}"
     return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 
@@ -160,11 +161,13 @@ def create_base_chart(payload: BaseChartCreateRequest, force_recalculate: bool =
     # -------------------------------------------------
     # 0. Check for existing chart with same birth data
     # -------------------------------------------------
+    node_type = payload.node_type or "mean"
     fingerprint = _compute_birth_fingerprint(
         date_of_birth=payload.date_of_birth.isoformat(),
         time_of_birth=payload.time_of_birth.strftime("%H:%M:%S"),
         latitude=payload.latitude,
         longitude=payload.longitude,
+        node_type=node_type,
     )
     
     if not force_recalculate:
@@ -212,6 +215,7 @@ def create_base_chart(payload: BaseChartCreateRequest, force_recalculate: bool =
         birth_utc,
         payload.latitude,
         payload.longitude,
+        node_type=node_type,
     )
 
     # -------------------------------------------------
