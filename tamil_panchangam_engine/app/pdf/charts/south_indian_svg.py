@@ -167,9 +167,8 @@ def _render_sign_labels() -> List[str]:
 def _render_planets(input: ChartSvgInput) -> List[str]:
     elements = []
 
-    planets_by_sign = {}
-    for planet, sign in input.planet_signs.items():
-        planets_by_sign.setdefault(sign, []).append(planet)
+    # planet_signs is Dict[str, List[str]] = {sign: [planets]}
+    planets_by_sign = input.planet_signs
 
     for sign, planets in planets_by_sign.items():
         if sign not in SIGN_TO_GRID_POSITION:

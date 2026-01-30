@@ -199,53 +199,92 @@ def _extract_birth_reference(payload: Dict[str, Any]) -> BirthReference:
 
 def _extract_dasha_context(envelope: Dict[str, Any]) -> DashaContext:
     """Extract dasha context from prediction envelope."""
-    vimshottari = envelope.get("vimshottari", {})
+    dasha_ctx = envelope.get("dasha_context", {})
+    active = dasha_ctx.get("active", {})
+    maha = active.get("maha", {})
+    antar = active.get("antar", {})
+    
+    maha_lord = dasha_ctx.get("maha_lord", maha.get("lord", "Unknown"))
+    antar_lord = dasha_ctx.get("antar_lord", antar.get("lord", "Unknown"))
+    
+    maha_end = maha.get("end", "")
+    balance = "Unknown"
+    if maha_end:
+        try:
+            from datetime import datetime
+            end_dt = datetime.fromisoformat(maha_end.replace("Z", "+00:00"))
+            years_left = (end_dt - datetime.now(end_dt.tzinfo)).days / 365.25
+            balance = f"{years_left:.1f} years remaining"
+        except:
+            pass
     
     return DashaContext(
-        mahadasha=vimshottari.get("mahadasha", "Unknown"),
-        mahadasha_lord=vimshottari.get("mahadasha_lord", "Unknown"),
-        antardasha=vimshottari.get("antardasha", "Unknown"),
-        antardasha_lord=vimshottari.get("antardasha_lord", "Unknown"),
-        dasha_balance=vimshottari.get("balance", "Unknown"),
+        mahadasha=maha_lord,
+        mahadasha_lord=maha_lord,
+        antardasha=antar_lord,
+        antardasha_lord=antar_lord,
+        dasha_balance=balance,
     )
 
 
 def _extract_transit_context(envelope: Dict[str, Any]) -> TransitContext:
-    """Extract transit context from prediction envelope."""
-    transits = envelope.get("transits", {})
+    """Extract transit context from prediction envelope (gochara)."""
+    gochara = envelope.get("gochara", {})
     
-    jupiter_sign = transits.get("jupiter", {}).get("sign", "Unknown")
-    saturn_sign = transits.get("saturn", {}).get("sign", "Unknown")
-    rahu = transits.get("rahu", {}).get("sign", "Unknown")
-    ketu = transits.get("ketu", {}).get("sign", "Unknown")
+    jupiter = gochara.get("jupiter", {})
+    saturn = gochara.get("saturn", {})
+    rahu_ketu = gochara.get("rahu_ketu", {})
+    
+    jupiter_sign = jupiter.get("transit_rasi", "Unknown")
+    saturn_sign = saturn.get("transit_rasi", "Unknown")
+    rahu_sign = rahu_ketu.get("rahu_rasi", "Unknown")
+    ketu_sign = rahu_ketu.get("ketu_rasi", "Unknown")
     
     return TransitContext(
         jupiter_transit=f"Jupiter in {jupiter_sign}",
         saturn_transit=f"Saturn in {saturn_sign}",
-        rahu_ketu_axis=f"Rahu in {rahu}, Ketu in {ketu}",
+        rahu_ketu_axis=f"Rahu in {rahu_sign}, Ketu in {ketu_sign}",
     )
 
 
 def _extract_nakshatra_timing(envelope: Dict[str, Any]) -> NakshatraTimingContext:
     """Extract nakshatra timing context."""
-    tara_bala = envelope.get("tara_bala", {})
-    timing = envelope.get("timing", {})
+    nakshatra_ctx = envelope.get("nakshatra_context", {})
+    if isinstance(nakshatra_ctx, str):
+        nakshatra_ctx = {}
+    
+    chandra_gati = envelope.get("chandra_gati", {})
+    if isinstance(chandra_gati, str):
+        chandra_gati = {}
+    
+    tara_name = nakshatra_ctx.get("tara_name", nakshatra_ctx.get("tara_bala", "Neutral"))
+    moon_nak = nakshatra_ctx.get("current_nakshatra", nakshatra_ctx.get("moon_nakshatra", "Unknown"))
+    
+    moods = chandra_gati.get("dominant_moods", [])
+    gati_phase = ", ".join(moods[:2]) if moods else "Unknown"
     
     return NakshatraTimingContext(
-        current_moon_nakshatra=timing.get("moon_nakshatra", "Unknown"),
-        tara_bala=tara_bala.get("rating", "Neutral"),
-        chandra_gati=timing.get("chandra_gati", "Unknown"),
-        favorable_window=timing.get("favorable_window", "Consult chart"),
+        current_moon_nakshatra=moon_nak,
+        tara_bala=tara_name,
+        chandra_gati=gati_phase,
+        favorable_window="Consult chart",
     )
 
 
 def _extract_pakshi_rhythm(envelope: Dict[str, Any]) -> PakshiRhythmContext:
-    """Extract pakshi rhythm context."""
-    pakshi = envelope.get("pakshi", {})
+    """Extract pakshi rhythm context from biological_rhythm."""
+    bio_rhythm = envelope.get("biological_rhythm", {})
+    if isinstance(bio_rhythm, str):
+        bio_rhythm = {}
+    pakshi_daily = bio_rhythm.get("pancha_pakshi_daily", {})
+    
+    dominant = pakshi_daily.get("dominant_pakshi", "Unknown")
+    activities = pakshi_daily.get("recommended_activities", [])
+    activity_phase = activities[0] if activities else "Unknown"
     
     return PakshiRhythmContext(
-        dominant_pakshi=pakshi.get("bird", "Unknown"),
-        activity_phase=pakshi.get("activity", "Unknown"),
+        dominant_pakshi=dominant,
+        activity_phase=activity_phase,
     )
 
 
@@ -255,9 +294,12 @@ def _extract_prediction_areas(
 ) -> Tuple[str, list]:
     """Extract prediction areas from interpretation."""
     
-    source = llm_interpretation if llm_interpretation else interpretation
+    ai_interp = interpretation.get("ai_interpretation", {})
     
-    overview = source.get("overview") or source.get("summary", "")
+    source = llm_interpretation if llm_interpretation else ai_interp
+    
+    window_summary = source.get("window_summary", {})
+    overview = window_summary.get("narrative", "") or source.get("overview", "") or source.get("summary", "")
     
     life_areas = source.get("life_areas", {})
     
@@ -314,8 +356,7 @@ def build_report_data(
     planets = ephemeris.get("planets", {})
     rasi_planet_signs = {planet: data.get("rasi", "") for planet, data in planets.items()}
     
-    charts_data = payload.get("charts", {})
-    navamsa_data = charts_data.get("navamsa", {})
+    navamsa_data = envelope.get("navamsa", {})
     navamsa_planet_signs = navamsa_data.get("planet_signs", {})
     
     overview, prediction_areas = _extract_prediction_areas(
