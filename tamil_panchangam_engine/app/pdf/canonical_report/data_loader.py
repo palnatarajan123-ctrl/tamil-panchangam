@@ -24,6 +24,7 @@ from .models import (
     NakshatraTimingContext,
     PakshiRhythmContext,
     PredictionArea,
+    SignalAttribution,
     ChartImages,
 )
 
@@ -134,14 +135,21 @@ def load_cached_llm_interpretation(
     return None
 
 
-def _generate_chart_svg(planet_signs: Dict[str, Any], chart_type: str = "D1", title: str = "") -> str:
-    """Generate SVG chart and return as data URI."""
-    try:
-        signs_to_planets: Dict[str, list] = {}
-        for planet, sign in planet_signs.items():
+def _convert_planet_to_sign_mapping(planet_signs: Dict[str, Any]) -> Dict[str, List[str]]:
+    """Convert planet->sign mapping to sign->planets mapping for chart rendering."""
+    signs_to_planets: Dict[str, list] = {}
+    for planet, sign in planet_signs.items():
+        if sign and isinstance(sign, str):
             if sign not in signs_to_planets:
                 signs_to_planets[sign] = []
             signs_to_planets[sign].append(planet)
+    return signs_to_planets
+
+
+def _generate_chart_svg(planet_signs: Dict[str, Any], chart_type: str = "D1", title: str = "") -> str:
+    """Generate SVG chart and return as data URI."""
+    try:
+        signs_to_planets = _convert_planet_to_sign_mapping(planet_signs)
         
         chart_input = ChartSvgInput(
             chart_type=chart_type,
@@ -291,53 +299,76 @@ def _extract_pakshi_rhythm(envelope: Dict[str, Any]) -> PakshiRhythmContext:
 def _extract_prediction_areas(
     interpretation: Dict[str, Any],
     llm_interpretation: Optional[Dict[str, Any]] = None
-) -> Tuple[str, list, list, list]:
+) -> Tuple[str, list, list]:
     """
-    Extract prediction areas, practices, and reflections from interpretation.
+    Extract prediction areas and practices from interpretation.
     
-    Returns: (overview, areas, practices, reflections)
+    Returns: (overview, areas, practices)
     """
     ai_interp = interpretation.get("ai_interpretation", {})
     
-    source = llm_interpretation if llm_interpretation else ai_interp
+    llm_source = llm_interpretation if llm_interpretation else {}
+    deterministic_source = ai_interp
     
-    window_summary = source.get("window_summary", {})
+    window_summary = llm_source.get("window_summary", {})
     overview = (
         window_summary.get("overview", "") or 
         window_summary.get("summary", "") or 
         window_summary.get("narrative", "") or 
-        source.get("overview", "") or 
-        source.get("summary", "")
+        llm_source.get("overview", "") or 
+        llm_source.get("summary", "") or
+        deterministic_source.get("window_summary", {}).get("overview", "")
     )
     
-    life_areas = source.get("life_areas", {})
+    llm_life_areas = llm_source.get("life_areas", {})
+    det_life_areas = deterministic_source.get("life_areas", {})
     
     areas = []
-    for area_name, area_data in life_areas.items():
-        if isinstance(area_data, dict):
-            areas.append(PredictionArea(
-                area=area_name.replace("_", " ").title(),
-                score=area_data.get("score", 50),
-                outlook=area_data.get("outlook", "neutral"),
-                interpretation=area_data.get("interpretation", area_data.get("summary", "")),
-                deeper_explanation=area_data.get("deeper_explanation"),
-                guidance=area_data.get("guidance"),
-            ))
-        elif isinstance(area_data, str):
-            areas.append(PredictionArea(
-                area=area_name.replace("_", " ").title(),
-                interpretation=area_data,
-            ))
+    for area_name, det_area_data in det_life_areas.items():
+        if not isinstance(det_area_data, dict):
+            continue
+        
+        llm_area_data = llm_life_areas.get(area_name, {})
+        if isinstance(llm_area_data, str):
+            llm_area_data = {"interpretation": llm_area_data}
+        
+        interpretation_text = (
+            llm_area_data.get("interpretation") or 
+            llm_area_data.get("summary") or
+            det_area_data.get("interpretation", det_area_data.get("summary", ""))
+        )
+        
+        deeper_explanation = (
+            llm_area_data.get("deeper_explanation") or
+            det_area_data.get("deeper_explanation", "")
+        )
+        
+        attr_data = det_area_data.get("attribution", {})
+        attribution = None
+        if attr_data:
+            signals_used = attr_data.get("signals_used", [])
+            attribution = SignalAttribution(
+                dasha=attr_data.get("dasha", ""),
+                planets=attr_data.get("planets", []),
+                engines=attr_data.get("engines", []),
+                signals_count=len(signals_used) if isinstance(signals_used, list) else 0
+            )
+        
+        areas.append(PredictionArea(
+            area=area_name.replace("_", " ").title(),
+            score=det_area_data.get("score", 50),
+            outlook=det_area_data.get("outlook", "neutral"),
+            interpretation=interpretation_text,
+            deeper_explanation=deeper_explanation,
+            guidance=llm_area_data.get("guidance") or det_area_data.get("guidance"),
+            attribution=attribution
+        ))
     
-    practices = source.get("practices", [])
+    practices = llm_source.get("practices", [])
     if not practices:
         practices = _generate_default_practices(areas)
     
-    reflections = source.get("reflection_prompts", source.get("reflections", []))
-    if not reflections:
-        reflections = _generate_default_reflections(areas)
-    
-    return overview, areas, practices, reflections
+    return overview, areas, practices
 
 
 def _generate_default_practices(areas: list) -> List[str]:
@@ -370,21 +401,6 @@ def _generate_default_practices(areas: list) -> List[str]:
     return practices[:5]
 
 
-def _generate_default_reflections(areas: list) -> List[str]:
-    """Generate default reflection prompts."""
-    reflections = [
-        "What patterns in your life are ready for conscious transformation?",
-        "How can you align your daily actions with your deeper values?",
-        "What would you do differently if you trusted the timing of your life?"
-    ]
-    
-    for area in areas:
-        if area.score >= 65 and "career" in area.area.lower():
-            reflections.append("What vision for your work brings you the most alive?")
-        elif area.score < 45 and "relationship" in area.area.lower():
-            reflections.append("What boundaries would support healthier connections?")
-    
-    return reflections[:4]
 
 
 def build_report_data(
@@ -426,7 +442,7 @@ def build_report_data(
     navamsa_data = envelope.get("navamsa", {})
     navamsa_planet_signs = navamsa_data.get("planet_signs", {})
     
-    overview, prediction_areas, practices, reflections = _extract_prediction_areas(
+    overview, prediction_areas, practices = _extract_prediction_areas(
         interpretation, llm_interpretation
     )
     
@@ -449,6 +465,8 @@ def build_report_data(
         chart_images=ChartImages(
             d1_rasi=_generate_chart_svg(rasi_planet_signs, "D1", "Rasi (D1)"),
             d9_navamsa=_generate_chart_svg(navamsa_planet_signs, "D9", "Navamsa (D9)"),
+            d1_planet_signs=_convert_planet_to_sign_mapping(rasi_planet_signs),
+            d9_planet_signs=_convert_planet_to_sign_mapping(navamsa_planet_signs),
         ),
         
         core_life_themes=interpretation.get("core_themes", []),
@@ -462,7 +480,6 @@ def build_report_data(
         prediction_areas=prediction_areas,
         
         practices=practices,
-        reflection_prompts=reflections,
         
         closing_note=_generate_closing_note(prediction_areas),
         closing_affirmation=_generate_closing_affirmation(prediction_areas),

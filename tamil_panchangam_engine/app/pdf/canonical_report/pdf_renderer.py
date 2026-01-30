@@ -27,6 +27,7 @@ import base64
 
 from .models import CanonicalReportData
 from .config import COLORS, MARGIN
+from app.pdf.charts.reportlab_chart import render_south_indian_chart_reportlab
 
 
 def _create_styles():
@@ -211,25 +212,30 @@ def _build_how_to_read(styles) -> List:
     return elements
 
 
-def _render_chart_placeholder(chart_type: str, styles) -> List:
-    """Render chart placeholder when SVG rendering is not available."""
-    elements = []
-    
-    placeholder_table = Table(
-        [[f"{chart_type} Chart\n(View in app for full visualization)"]],
-        colWidths=[2.5*inch],
-        rowHeights=[1.5*inch]
-    )
-    placeholder_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.95, 0.95, 0.95)),
-        ('BOX', (0, 0), (-1, -1), 1, colors.Color(*COLORS["muted"])),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.Color(*COLORS["secondary"])),
-    ]))
-    
-    return placeholder_table
+def _render_chart_drawing(chart_type: str, planet_signs: dict, title: str = None):
+    """Render chart as ReportLab Drawing object."""
+    try:
+        drawing = render_south_indian_chart_reportlab(
+            chart_type=chart_type,
+            planet_signs=planet_signs,
+            title=title,
+            width=180,
+            height=180
+        )
+        return drawing
+    except Exception as e:
+        placeholder_table = Table(
+            [[f"{chart_type} Chart\n(View in app)"]],
+            colWidths=[2*inch],
+            rowHeights=[1.2*inch]
+        )
+        placeholder_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.95, 0.95, 0.95)),
+            ('BOX', (0, 0), (-1, -1), 1, colors.Color(*COLORS["muted"])),
+        ]))
+        return placeholder_table
 
 
 def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
@@ -247,24 +253,17 @@ def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
     
     elements.append(Spacer(1, 0.3*inch))
     
-    has_d1 = data.chart_images.d1_rasi and len(data.chart_images.d1_rasi) > 50
-    has_d9 = data.chart_images.d9_navamsa and len(data.chart_images.d9_navamsa) > 50
+    d1_chart = _render_chart_drawing("D1", data.chart_images.d1_planet_signs, "Rasi (D1)")
+    d9_chart = _render_chart_drawing("D9", data.chart_images.d9_planet_signs, "Navamsa (D9)")
     
-    if has_d1 or has_d9:
-        chart_row = []
-        if has_d1:
-            chart_row.append(_render_chart_placeholder("Rasi (D1)", styles))
-        if has_d9:
-            chart_row.append(_render_chart_placeholder("Navamsa (D9)", styles))
-        
-        if chart_row:
-            chart_table = Table([chart_row], colWidths=[2.8*inch] * len(chart_row))
-            chart_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-            elements.append(chart_table)
-            elements.append(Spacer(1, 0.3*inch))
+    chart_row = [d1_chart, d9_chart]
+    chart_table = Table([chart_row], colWidths=[2.8*inch, 2.8*inch])
+    chart_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(chart_table)
+    elements.append(Spacer(1, 0.3*inch))
     
     elements.append(Paragraph("Birth Reference", styles['SubsectionTitle']))
     
@@ -472,6 +471,22 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
                 styles['BodyText']
             ))
         
+        if area.attribution:
+            attr = area.attribution
+            attr_parts = []
+            if attr.dasha:
+                attr_parts.append(f"Dasha: {attr.dasha}")
+            if attr.planets:
+                attr_parts.append(f"Planets: {', '.join(attr.planets)}")
+            if attr.signals_count > 0:
+                attr_parts.append(f"Signals: {attr.signals_count}")
+            
+            if attr_parts:
+                area_elements.append(Paragraph(
+                    f"<font size='9' color='gray'>Attribution: {' | '.join(attr_parts)}</font>",
+                    styles['BodyText']
+                ))
+        
         area_elements.append(Spacer(1, 0.2*inch))
         elements.append(KeepTogether(area_elements))
     
@@ -481,23 +496,14 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
 
 
 def _build_practices_reflection(data: CanonicalReportData, styles) -> List:
-    """Build practices and reflection section."""
+    """Build practices section."""
     elements = []
     
-    elements.append(Paragraph("Practices & Reflection", styles['SectionTitle']))
-    
     if data.practices:
-        elements.append(Paragraph("Suggested Practices", styles['SubsectionTitle']))
+        elements.append(Paragraph("Suggested Practices", styles['SectionTitle']))
         for practice in data.practices:
             elements.append(Paragraph(f"• {practice}", styles['BodyText']))
-        elements.append(Spacer(1, 0.2*inch))
-    
-    if data.reflection_prompts:
-        elements.append(Paragraph("Reflection Prompts", styles['SubsectionTitle']))
-        for prompt in data.reflection_prompts:
-            elements.append(Paragraph(f"• {prompt}", styles['BodyText']))
-    
-    elements.append(Spacer(1, 0.3*inch))
+        elements.append(Spacer(1, 0.3*inch))
     
     return elements
 

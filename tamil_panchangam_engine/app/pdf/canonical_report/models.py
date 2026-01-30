@@ -27,6 +27,8 @@ class BirthReference(BaseModel):
     nakshatra_lord: str
     birth_dasha: str
     functional_role_planets: Dict[str, str]
+    sun_sign: Optional[str] = None
+    ayanamsa: Optional[str] = None
 
 
 class DashaContext(BaseModel):
@@ -59,6 +61,14 @@ class PakshiRhythmContext(BaseModel):
     activity_phase: str
 
 
+class SignalAttribution(BaseModel):
+    """Attribution data for a life area prediction."""
+    dasha: str = ""
+    planets: List[str] = []
+    engines: List[str] = []
+    signals_count: int = 0
+
+
 class PredictionArea(BaseModel):
     """Single prediction life area with full details."""
     area: str
@@ -67,12 +77,15 @@ class PredictionArea(BaseModel):
     interpretation: str
     deeper_explanation: Optional[str] = None
     guidance: Optional[str] = None
+    attribution: Optional[SignalAttribution] = None
 
 
 class ChartImages(BaseModel):
-    """SVG chart images as base64 data URIs."""
+    """Chart data for rendering."""
     d1_rasi: str
     d9_navamsa: str
+    d1_planet_signs: Dict[str, List[str]] = {}
+    d9_planet_signs: Dict[str, List[str]] = {}
 
 
 class CanonicalReportData(BaseModel):
@@ -98,7 +111,6 @@ class CanonicalReportData(BaseModel):
     prediction_areas: List[PredictionArea]
     
     practices: List[str]
-    reflection_prompts: List[str]
     
     closing_note: str
     closing_affirmation: Optional[str] = None
