@@ -1,6 +1,6 @@
 // client/src/pages/chart-detail.tsx
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 
@@ -76,6 +76,7 @@ export default function ChartDetail() {
   const { id: chartId } = useParams<{ id: string }>();
   const [explainabilityLevel, setExplainabilityLevel] = useState<ExplainabilityLevel>("standard");
   const [rawInterpretation, setRawInterpretation] = useState<any>(null);
+  const [activeChartTab, setActiveChartTab] = useState<string>("D1");
 
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -219,30 +220,37 @@ export default function ChartDetail() {
               },
               D10: ui.divisionalCharts?.D10,
             }}
+            onTabChange={setActiveChartTab}
           />
 
-          <BirthAstroContextTable 
-            data={adaptBirthChartToAstroContext(ui, undefined, realtimeContextData ?? undefined)} 
-          />
+          {/* Only show reference context and AI interpretation for D1 */}
+          {activeChartTab === "D1" && (
+            <>
+              <BirthAstroContextTable 
+                data={adaptBirthChartToAstroContext(ui, undefined, realtimeContextData ?? undefined)} 
+              />
 
-          <DashaTimeline
-            timeline={ui.vimshottari.timeline}
-            current={
-              ui.vimshottari.current
-                ? {
-                    maha: {
-                      lord: ui.vimshottari.current.lord,
-                      start: ui.vimshottari.current.start,
-                      end: ui.vimshottari.current.end,
-                      is_partial: ui.vimshottari.current.is_partial,
-                    },
-                    antar: ui.vimshottari.current.antar ?? null,
-                  }
-                : undefined
-            }
-          />
+              <DashaTimeline
+                timeline={ui.vimshottari.timeline}
+                current={
+                  ui.vimshottari.current
+                    ? {
+                        maha: {
+                          lord: ui.vimshottari.current.lord,
+                          start: ui.vimshottari.current.start,
+                          end: ui.vimshottari.current.end,
+                          is_partial: ui.vimshottari.current.is_partial,
+                        },
+                        antar: ui.vimshottari.current.antar ?? null,
+                      }
+                    : undefined
+                }
+              />
+            </>
+          )}
 
-          {/* AI Interpretation Section */}
+          {/* AI Interpretation Section - Only for D1 */}
+          {activeChartTab === "D1" && (
           <Card className="border-muted" data-testid="card-ai-interpretation">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
@@ -447,6 +455,7 @@ export default function ChartDetail() {
               )}
             </CardContent>
           </Card>
+          )}
         </div>
 
         {/* Sidebar */}

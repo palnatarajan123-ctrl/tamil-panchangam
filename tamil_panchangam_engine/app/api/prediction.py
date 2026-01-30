@@ -20,6 +20,7 @@ from app.engines.explainability_engine import build_explainability
 from app.engines.ai_interpretation_engine import generate_interpretation as generate_ai_interpretation
 from app.engines.explainability_filter import apply_explainability
 from app.engines.llm_interpretation_orchestrator import generate_llm_interpretation
+from app.engines.corner_case_detector import assess_calculation_confidence
 
 from app.models.schema import (
     MonthlyPredictionRequest,
@@ -131,6 +132,15 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             year=payload.year,
             month=payload.month,
         )
+        
+        # Add calculation confidence from corner case detector
+        ephemeris = base_chart_payload.get("ephemeris", {})
+        try:
+            calc_confidence = assess_calculation_confidence(ephemeris)
+            envelope["calculation_confidence"] = calc_confidence
+        except Exception as e:
+            print(f"Warning: Failed to assess calculation confidence: {e}")
+            envelope["calculation_confidence"] = {"level": "high", "cusp_cases": []}
 
         # -------------------------------------------------
         # 4. Synthesis

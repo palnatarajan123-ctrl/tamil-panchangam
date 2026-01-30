@@ -19,6 +19,7 @@ interface DivisionalCharts {
 
 interface TabbedChartViewerProps {
   charts: DivisionalCharts;
+  onTabChange?: (tab: string) => void;
 }
 
 const CHART_INFO: Record<string, { title: string; subtitle: string; purpose: string }> = {
@@ -49,7 +50,7 @@ const CHART_INFO: Record<string, { title: string; subtitle: string; purpose: str
   },
 };
 
-export function TabbedChartViewer({ charts }: TabbedChartViewerProps) {
+export function TabbedChartViewer({ charts, onTabChange }: TabbedChartViewerProps) {
   const availableCharts = Object.entries(charts).filter(
     ([_, data]) => data && Object.keys(data.planets || {}).length > 0
   );
@@ -61,16 +62,27 @@ export function TabbedChartViewer({ charts }: TabbedChartViewerProps) {
 
   const [activeTab, setActiveTab] = useState(firstAvailable);
 
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    onTabChange?.(tab);
+  };
+
   useEffect(() => {
     const isCurrentAvailable = availableCharts.some(([k]) => k === activeTab);
     if (!isCurrentAvailable && firstAvailable !== activeTab) {
       setActiveTab(firstAvailable);
+      onTabChange?.(firstAvailable);
     }
-  }, [charts, activeTab, firstAvailable, availableCharts]);
+  }, [charts, activeTab, firstAvailable, availableCharts, onTabChange]);
+  
+  // Notify parent of initial tab
+  useEffect(() => {
+    onTabChange?.(firstAvailable);
+  }, []);
 
   return (
     <Card className="border-muted" data-testid="card-tabbed-charts">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <div className="border-b px-4 pt-4">
           <TabsList className="grid w-full grid-cols-5 h-auto gap-1" data-testid="tabs-chart-selector">
             {["D1", "D9", "D10", "D7", "D2"].map((chartKey) => {

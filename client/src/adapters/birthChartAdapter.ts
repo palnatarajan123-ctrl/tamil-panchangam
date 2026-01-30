@@ -165,9 +165,14 @@ const ENGLISH_TO_TAMIL: Record<string, string> = {
 
 /**
  * Convert Navamsa structure → usable UI maps
+ * Handles both legacy format { planet: { sign, dignity } }
+ * and new format { planets: { planet: { sign, dignity } } }
  */
 function adaptNavamsa(divisionalCharts: any) {
-  const d9 = divisionalCharts?.D9 ?? {};
+  const d9Raw = divisionalCharts?.D9 ?? {};
+  
+  // Support new format with planets wrapper OR legacy direct format
+  const d9 = d9Raw?.planets ?? d9Raw;
 
   const planets: Record<string, number> = {};
   const dignity: Record<
@@ -176,6 +181,9 @@ function adaptNavamsa(divisionalCharts: any) {
   > = {};
 
   Object.entries(d9).forEach(([planet, data]: any) => {
+    // Skip metadata fields
+    if (planet === "metadata" || planet === "lagna") return;
+    
     const sign = data?.navamsa_sign || data?.sign;
     if (!sign) return;
 
