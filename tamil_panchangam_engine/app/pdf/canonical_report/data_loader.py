@@ -158,21 +158,42 @@ def _generate_chart_svg(planet_signs: Dict[str, Any], chart_type: str = "D1", ti
         return ""
 
 
-def _extract_birth_reference(chart: Dict[str, Any]) -> BirthReference:
-    """Extract birth reference data from chart payload."""
-    payload = _safe_json(chart.get("payload"), {})
-    birth_interp = _safe_json(chart.get("birth_interpretation"), {})
+def _extract_birth_reference(payload: Dict[str, Any]) -> BirthReference:
+    """Extract birth reference data from parsed chart payload."""
+    ephemeris = payload.get("ephemeris", {})
+    moon_data = ephemeris.get("moon", {})
+    lagna_data = ephemeris.get("lagna", {})
+    nakshatra_data = moon_data.get("nakshatra", {})
     
-    vimshottari = payload.get("vimshottari", {})
+    dashas = payload.get("dashas", {})
+    vimshottari = dashas.get("vimshottari", {})
+    current_dasha = vimshottari.get("current", {})
+    
+    nakshatra_lords = {
+        "Ashwini": "Ketu", "Bharani": "Venus", "Krittika": "Sun",
+        "Rohini": "Moon", "Mrigashira": "Mars", "Ardra": "Rahu",
+        "Punarvasu": "Jupiter", "Pushya": "Saturn", "Ashlesha": "Mercury",
+        "Magha": "Ketu", "Purva Phalguni": "Venus", "Uttara Phalguni": "Sun",
+        "Hasta": "Moon", "Chitra": "Mars", "Swati": "Rahu",
+        "Vishakha": "Jupiter", "Anuradha": "Saturn", "Jyeshtha": "Mercury",
+        "Mula": "Ketu", "Purva Ashadha": "Venus", "Uttara Ashadha": "Sun",
+        "Shravana": "Moon", "Dhanishta": "Mars", "Shatabhisha": "Rahu",
+        "Purva Bhadrapada": "Jupiter", "Uttara Bhadrapada": "Saturn", "Revati": "Mercury",
+    }
+    
+    nakshatra_name = nakshatra_data.get("name", "Unknown")
+    nakshatra_lord = nakshatra_lords.get(nakshatra_name, "Unknown")
+    
+    starting_dasha = vimshottari.get("starting_dasha", "Unknown")
     
     return BirthReference(
-        janma_nakshatra=payload.get("nakshatra", {}).get("name", "Unknown"),
-        janma_rasi=payload.get("moon_sign", "Unknown"),
-        lagna=payload.get("lagna", "Unknown"),
-        moon_sign=payload.get("moon_sign", "Unknown"),
-        nakshatra_lord=payload.get("nakshatra", {}).get("lord", "Unknown"),
-        birth_dasha=f"{vimshottari.get('mahadasha', 'Unknown')} - {vimshottari.get('antardasha', 'Unknown')}",
-        functional_role_planets=birth_interp.get("functional_roles", {}),
+        janma_nakshatra=nakshatra_name,
+        janma_rasi=moon_data.get("rasi", "Unknown"),
+        lagna=lagna_data.get("rasi", "Unknown"),
+        moon_sign=moon_data.get("rasi", "Unknown"),
+        nakshatra_lord=nakshatra_lord,
+        birth_dasha=f"{starting_dasha} - {starting_dasha}",
+        functional_role_planets={},
     )
 
 
@@ -289,16 +310,19 @@ def build_report_data(
         base_chart_id, report_type, period_key
     )
     
-    rasi = payload.get("rasi", {}).get("planet_signs", {})
-    navamsa = payload.get("navamsa", {}).get("planet_signs", {})
+    ephemeris = payload.get("ephemeris", {})
+    planets = ephemeris.get("planets", {})
+    rasi_planet_signs = {planet: data.get("rasi", "") for planet, data in planets.items()}
+    
+    charts_data = payload.get("charts", {})
+    navamsa_data = charts_data.get("navamsa", {})
+    navamsa_planet_signs = navamsa_data.get("planet_signs", {})
     
     overview, prediction_areas = _extract_prediction_areas(
         interpretation, llm_interpretation
     )
     
-    birth_meta = chart.get("birth_data", {})
-    if isinstance(birth_meta, str):
-        birth_meta = _safe_json(birth_meta, {})
+    birth_details_data = payload.get("birth_details", {})
     
     return CanonicalReportData(
         report_type=report_type.title(),
@@ -306,17 +330,17 @@ def build_report_data(
         generated_at=datetime.now(),
         
         birth_details=BirthDetails(
-            name=birth_meta.get("name", "Chart Holder"),
-            date=birth_meta.get("date", "Unknown"),
-            time=birth_meta.get("time", "Unknown"),
-            place=birth_meta.get("place", "Unknown"),
+            name=birth_details_data.get("name", "Chart Holder"),
+            date=birth_details_data.get("date_of_birth", "Unknown"),
+            time=birth_details_data.get("time_of_birth", "Unknown"),
+            place=birth_details_data.get("place_of_birth", "Unknown"),
         ),
         
-        birth_reference=_extract_birth_reference(chart),
+        birth_reference=_extract_birth_reference(payload),
         
         chart_images=ChartImages(
-            d1_rasi=_generate_chart_svg(rasi, "Rasi (D1)"),
-            d9_navamsa=_generate_chart_svg(navamsa, "Navamsa (D9)"),
+            d1_rasi=_generate_chart_svg(rasi_planet_signs, "D1", "Rasi (D1)"),
+            d9_navamsa=_generate_chart_svg(navamsa_planet_signs, "D9", "Navamsa (D9)"),
         ),
         
         core_life_themes=interpretation.get("core_themes", []),
