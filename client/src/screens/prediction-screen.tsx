@@ -11,7 +11,7 @@ import { PredictionTimelineControl } from "@/components/prediction/PredictionTim
 
 import {
   adaptInterpretation,
-  extractAIInterpretation,
+  extractInterpretationWithDeterministic,
   hasValidAIInterpretation,
   type ExplainabilityLevel,
 } from "@/adapters/aiInterpretationAdapter";
@@ -203,12 +203,16 @@ export default function PredictionScreen() {
           {/* -------------------------------------------------
               Prediction Body
           -------------------------------------------------- */}
-          {hasValidAIInterpretation(data.details) && (
-            <MonthlyPredictionView
-              prediction={adaptInterpretation(extractAIInterpretation(data.details)!, explainabilityLevel)}
-              period={period}
-            />
-          )}
+          {hasValidAIInterpretation(data.details) && (() => {
+            const extracted = extractInterpretationWithDeterministic(data.details);
+            if (!extracted) return null;
+            return (
+              <MonthlyPredictionView
+                prediction={adaptInterpretation(extracted.primary, explainabilityLevel, extracted.deterministic)}
+                period={period}
+              />
+            );
+          })()}
 
           {dashaContext?.active?.antar && (
             <>

@@ -51,7 +51,9 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { adaptBirthChart } from "@/adapters/birthChartAdapter";
 import { 
-  adaptInterpretation, 
+  adaptInterpretation,
+  extractInterpretationWithDeterministic,
+  hasValidAIInterpretation,
   type PredictionViewModel,
   type ExplainabilityLevel,
 } from "@/adapters/aiInterpretationAdapter";
@@ -128,15 +130,18 @@ export default function ChartDetail() {
       return res.json();
     },
     onSuccess: (data) => {
-      const aiInterpretation = data?.details?.interpretation?.ai_interpretation;
-      if (aiInterpretation) {
-        setRawInterpretation(aiInterpretation);
+      if (hasValidAIInterpretation(data?.details)) {
+        setRawInterpretation(data.details);
       }
     },
   });
 
-  const prediction = rawInterpretation
-    ? adaptInterpretation(rawInterpretation, explainabilityLevel)
+  const prediction = rawInterpretation && hasValidAIInterpretation({ interpretation: rawInterpretation.interpretation })
+    ? (() => {
+        const extracted = extractInterpretationWithDeterministic({ interpretation: rawInterpretation.interpretation });
+        if (!extracted) return null;
+        return adaptInterpretation(extracted.primary, explainabilityLevel, extracted.deterministic);
+      })()
     : null;
 
   if (isLoading) {

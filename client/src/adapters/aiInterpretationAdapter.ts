@@ -197,13 +197,15 @@ function isV1Interpretation(obj: any): obj is AIInterpretationV1 {
 
 export function adaptAIInterpretationV2(
   aiInterpretation: AIInterpretationV2,
-  level: ExplainabilityLevel = "full"
+  level: ExplainabilityLevel = "full",
+  deterministicInterpretation?: AIInterpretationV1
 ): PredictionViewModel {
   const visibility = aiInterpretation._visibility;
   const showTheme = level !== "minimal" && (visibility?.show_monthly_theme !== false);
   const showOverview = level !== "minimal" && (visibility?.show_overview !== false);
   const showPractices = level !== "minimal" && (visibility?.show_practices !== false);
   const showClosing = level !== "minimal" && (visibility?.show_closing !== false);
+  const showAttribution = level === "full";
 
   const result: PredictionViewModel = {
     engineVersion: aiInterpretation.engine_version,
@@ -280,6 +282,28 @@ export function adaptAIInterpretationV2(
       }
       if (area.one_action) {
         viewModel.oneAction = area.one_action;
+      }
+
+      if (showAttribution && deterministicInterpretation?.life_areas?.[key]?.attribution) {
+        const attrData = deterministicInterpretation.life_areas[key].attribution;
+        const attribution: LifeAreaAttribution = {};
+
+        if (attrData.planets && attrData.planets.length > 0) {
+          attribution.planets = attrData.planets;
+        }
+        if (attrData.dasha && attrData.dasha !== "X") {
+          attribution.dasha = attrData.dasha;
+        }
+        if (attrData.engines && attrData.engines.length > 0) {
+          attribution.engines = attrData.engines;
+        }
+        if (attrData.signals_used && attrData.signals_used.length > 0) {
+          attribution.signalsUsed = attrData.signals_used;
+        }
+
+        if (Object.keys(attribution).length > 0) {
+          viewModel.attribution = attribution;
+        }
       }
 
       return viewModel;
@@ -405,6 +429,11 @@ export function hasValidAIInterpretation(details: any): boolean {
   return isValidInterpretationShape(llmInterp) || isValidInterpretationShape(aiInterp);
 }
 
+export interface ExtractedInterpretation {
+  primary: AIInterpretationV1 | AIInterpretationV2;
+  deterministic?: AIInterpretationV1;
+}
+
 export function extractAIInterpretation(details: any): AIInterpretationV1 | AIInterpretationV2 | null {
   if (!hasValidAIInterpretation(details)) {
     return null;
@@ -420,13 +449,34 @@ export function extractAIInterpretation(details: any): AIInterpretationV1 | AIIn
   return aiInterp;
 }
 
+export function extractInterpretationWithDeterministic(details: any): ExtractedInterpretation | null {
+  if (!hasValidAIInterpretation(details)) {
+    return null;
+  }
+  
+  const llmInterp = details.interpretation.llm_interpretation;
+  const aiInterp = details.interpretation.ai_interpretation;
+  
+  if (isValidInterpretationShape(llmInterp)) {
+    return {
+      primary: llmInterp,
+      deterministic: isV1Interpretation(aiInterp) ? aiInterp : undefined,
+    };
+  }
+  
+  return {
+    primary: aiInterp,
+  };
+}
+
 // Unified adapter that handles both v1 and v2
 export function adaptInterpretation(
   interpretation: AIInterpretationV1 | AIInterpretationV2,
-  level: ExplainabilityLevel = "full"
+  level: ExplainabilityLevel = "full",
+  deterministicInterpretation?: AIInterpretationV1
 ): PredictionViewModel {
   if (isV2Interpretation(interpretation)) {
-    return adaptAIInterpretationV2(interpretation, level);
+    return adaptAIInterpretationV2(interpretation, level, deterministicInterpretation);
   }
   return adaptAIInterpretation(interpretation as AIInterpretationV1, level);
 }

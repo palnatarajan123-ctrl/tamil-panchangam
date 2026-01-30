@@ -8,7 +8,7 @@ import { z } from "zod";
 import { MonthlyPredictionView } from "@/components/prediction/MonthlyPredictionView";
 import {
   adaptInterpretation,
-  extractAIInterpretation,
+  extractInterpretationWithDeterministic,
   hasValidAIInterpretation,
   type PredictionViewModel,
   type ExplainabilityLevel,
@@ -163,15 +163,15 @@ export default function Predictions() {
         return;
       }
 
-      const aiInterpretation = extractAIInterpretation(data.details);
-      if (!aiInterpretation) {
+      const extracted = extractInterpretationWithDeterministic(data.details);
+      if (!extracted) {
         setPrediction(null);
         setPredictionError("Failed to extract AI Interpretation.");
         setLastPredictionParams(null);
         return;
       }
 
-      const viewModel = adaptInterpretation(aiInterpretation, explainabilityLevel);
+      const viewModel = adaptInterpretation(extracted.primary, explainabilityLevel, extracted.deterministic);
       setPrediction(viewModel);
       
       setLastPredictionParams({
