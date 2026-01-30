@@ -187,7 +187,51 @@ Press the **green Run button** to start both services automatically.
 - `app/api/admin_llm.py` - Admin API endpoints
 - `client/src/pages/admin-llm.tsx` - Admin dashboard UI
 
+## Canonical PDF Report Builder
+
+### Architecture
+- **Single Entry Point**: All PDF generation goes through `app/pdf/canonical_report/`
+- **Read-Only**: Reads ALL data from database/cache, NEVER recalculates astrology
+- **Rendering Engine**: ReportLab Platypus (structured document building)
+
+### PDF Structure (8 Sections)
+1. **Cover Page** - User name, birth details, report type, date generated, disclaimer
+2. **How to Read** - Deterministic vs interpretive explanation
+3. **Natal Snapshot** - D1/D9 charts, birth reference table
+4. **Core Life Themes** - Derived from stored natal analysis
+5. **Astrological Context** - Dasha, transit, nakshatra, pakshi tables
+6. **Predictions** - Overview + life areas (career, relationships, health, finances)
+7. **Practices & Reflection** - Suggested practices and prompts
+8. **Summary & Closing** - Closing note with AI-enhanced indicator
+
+### API Endpoint
+- `GET /api/reports/pdf` - Generate canonical PDF report
+  - Query params: `base_chart_id`, `report_type` (monthly/yearly), `year`, `month` (for monthly)
+- `GET /api/reports/pdf/preview` - Preview PDF inline in browser
+
+### UI Integration
+- **Location**: Predictions page, after monthly/yearly prediction generation
+- **Button**: "Generate PDF Report" (only shows for monthly/yearly, not weekly)
+- **Behavior**: Downloads PDF file with naming pattern `panchangam_{chart_short}_{year}_{month}.pdf`
+
+### Key Files
+- `app/pdf/canonical_report/config.py` - Centralized configuration
+- `app/pdf/canonical_report/models.py` - Data models (Pydantic)
+- `app/pdf/canonical_report/data_loader.py` - Database reader (read-only)
+- `app/pdf/canonical_report/pdf_renderer.py` - ReportLab Platypus renderer
+- `app/pdf/canonical_report/report_builder.py` - Main entry point
+- `app/api/canonical_report.py` - API endpoint
+
+### Design Principles
+1. **No Recalculation** - All astrology data comes from stored predictions
+2. **Reuse LLM Cache** - Uses cached LLM interpretations when available
+3. **Fail Gracefully** - Returns 404 if required data is missing
+4. **Single Pipeline** - All legacy PDF code has been removed
+
 ## Recent Changes
+- 2026-01-30: **NEW FEATURE** - Canonical PDF Report Builder with 8-section structure
+- 2026-01-30: Removed all legacy PDF generation code (unified to single pipeline)
+- 2026-01-30: Added "Generate PDF Report" button to Predictions UI (monthly/yearly only)
 - 2026-01-30: **CRITICAL FIX** - Implemented LLM payload trimming (3200→1500 tokens weekly, 3200→2100 monthly)
 - 2026-01-30: Created payload_builder.py with meaning-layer-only data extraction
 - 2026-01-30: Added hard pre-call token guardrails (prompt/completion/total limits per period type)

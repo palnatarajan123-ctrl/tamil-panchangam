@@ -12,8 +12,9 @@ from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 import logging
 
-from app.db.duckdb_store import get_conn
-from app.pdf.charts.south_indian_svg import render_south_indian_chart
+from app.db.duckdb import get_conn
+from app.pdf.charts.south_indian_svg import render_south_indian_chart_svg
+from app.pdf.charts.chart_models import ChartSvgInput
 from .models import (
     CanonicalReportData,
     BirthDetails,
@@ -133,10 +134,22 @@ def load_cached_llm_interpretation(
     return None
 
 
-def _generate_chart_svg(planet_signs: Dict[str, str], title: str = "") -> str:
+def _generate_chart_svg(planet_signs: Dict[str, Any], chart_type: str = "D1", title: str = "") -> str:
     """Generate SVG chart and return as data URI."""
     try:
-        svg_content = render_south_indian_chart(planet_signs)
+        signs_to_planets: Dict[str, list] = {}
+        for planet, sign in planet_signs.items():
+            if sign not in signs_to_planets:
+                signs_to_planets[sign] = []
+            signs_to_planets[sign].append(planet)
+        
+        chart_input = ChartSvgInput(
+            chart_type=chart_type,
+            planet_signs=signs_to_planets,
+            title=title,
+        )
+        
+        svg_content = render_south_indian_chart_svg(chart_input)
         import base64
         svg_b64 = base64.b64encode(svg_content.encode()).decode()
         return f"data:image/svg+xml;base64,{svg_b64}"

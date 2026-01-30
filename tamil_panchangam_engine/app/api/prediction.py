@@ -26,8 +26,6 @@ from app.models.schema import (
     MonthlyPredictionResponse,
 )
 
-from app.pdf.pdf_context_builder import build_pdf_context
-
 
 router = APIRouter(prefix="/prediction", tags=["Prediction"])
 
