@@ -620,6 +620,23 @@ def _build_practices_reflection(data: CanonicalReportData, styles) -> List:
                 f"<i>\"{data.practices_v2.reflection_question}\"</i>", 
                 styles['BodyText']
             ))
+            
+            # Show reflection guidance if available
+            if data.practices_v2.reflection_guidance:
+                elements.append(Spacer(1, 0.1*inch))
+                elements.append(Paragraph(
+                    f"<b>Guidance:</b> {data.practices_v2.reflection_guidance}",
+                    styles['BodyText']
+                ))
+            else:
+                # Default guidance text
+                elements.append(Spacer(1, 0.1*inch))
+                elements.append(Paragraph(
+                    "<b>Guidance:</b> Take a few minutes to sit with this question. "
+                    "There is no right or wrong answer - simply notice what arises within you. "
+                    "Consider journaling your thoughts to deepen your self-awareness.",
+                    styles['BodyText']
+                ))
         
         elements.append(Spacer(1, 0.3*inch))
     elif data.practices:

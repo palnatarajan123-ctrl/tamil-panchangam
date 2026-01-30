@@ -111,6 +111,7 @@ class PracticesAndReflection(BaseModel):
     daily_practice: Optional[str] = None
     weekly_practice: Optional[str] = None
     reflection_question: Optional[str] = None
+    reflection_guidance: Optional[str] = None  # Guidance for the reflection question
 
 
 class Closing(BaseModel):

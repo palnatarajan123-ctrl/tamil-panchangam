@@ -64,6 +64,7 @@ def startup_event():
     """Bootstrap database and load charts on startup."""
     bootstrap()
     load_charts_from_db()
+
 app.include_router(interpretation_router)
 app.include_router(ui_reports_router)
 app.include_router(ui_birth_chart_router)

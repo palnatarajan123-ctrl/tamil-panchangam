@@ -101,7 +101,7 @@ def load_yearly_prediction(base_chart_id: str, year: int) -> Dict[str, Any]:
         result = conn.execute("""
             SELECT * FROM yearly_predictions 
             WHERE base_chart_id = ? AND year = ?
-            ORDER BY created_at DESC
+            ORDER BY generated_at DESC
             LIMIT 1
         """, [base_chart_id, year]).fetchone()
         
@@ -560,7 +560,8 @@ def build_report_data(
         practices_v2 = PracticesAndReflection(
             daily_practice=practices_v2_data.get("daily_practice"),
             weekly_practice=practices_v2_data.get("weekly_practice"),
-            reflection_question=practices_v2_data.get("reflection_question")
+            reflection_question=practices_v2_data.get("reflection_question"),
+            reflection_guidance=practices_v2_data.get("reflection_guidance")
         )
     
     closing_v2 = None

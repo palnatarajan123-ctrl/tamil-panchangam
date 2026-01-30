@@ -94,6 +94,16 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
                 interpretation["ai_interpretation"],
                 explainability_level  # type: ignore
             )
+        
+        # Add calculation confidence for cached predictions if missing
+        if "calculation_confidence" not in envelope:
+            ephemeris = base_chart_payload.get("ephemeris", {})
+            try:
+                calc_confidence = assess_calculation_confidence(ephemeris)
+                envelope["calculation_confidence"] = calc_confidence
+            except Exception as e:
+                print(f"Warning: Failed to assess calculation confidence (cached): {e}")
+                envelope["calculation_confidence"] = {"level": "high", "cusp_cases": []}
 
         if "confidence" not in synthesis:
             synthesis["confidence"] = {
