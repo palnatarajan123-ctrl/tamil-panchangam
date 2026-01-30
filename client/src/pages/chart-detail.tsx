@@ -476,20 +476,6 @@ export default function ChartDetail() {
             </CardContent>
           </Card>
 
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            onClick={() =>
-              window.open(
-                `/api/reports/charts/${chartId}/pdf`,
-                "_blank"
-              )
-            }
-          >
-            <Download className="h-4 w-4" />
-            Download Birth Chart PDF
-          </Button>
-
           <Link href={`/chart/${chartId}/predictions`}>
             <Button className="w-full gap-2 mt-2">
               <Calendar className="h-4 w-4" />

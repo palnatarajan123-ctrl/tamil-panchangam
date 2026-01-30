@@ -139,23 +139,30 @@ export default function PredictionScreen() {
       {data && (
         <>
           {/* -------------------------------------------------
-              Download
+              Download (only for monthly/yearly)
           -------------------------------------------------- */}
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() =>
-                window.open(
-                  `/api/reports/prediction/${id}/${year}/full-report/pdf`,
-                  "_blank"
-                )
-              }
-              data-testid="button-download-pdf"
-            >
-              <Download className="h-4 w-4" />
-              Download Full Report (PDF)
-            </Button>
+            {(period === "monthly" || period === "yearly") && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => {
+                  const params = new URLSearchParams({
+                    base_chart_id: id,
+                    report_type: period,
+                    year: year.toString(),
+                  });
+                  if (period === "monthly") {
+                    params.append("month", index.toString());
+                  }
+                  window.open(`/api/reports/pdf?${params.toString()}`, "_blank");
+                }}
+                data-testid="button-download-pdf"
+              >
+                <Download className="h-4 w-4" />
+                Download Full Report (PDF)
+              </Button>
+            )}
 
             <div className="flex items-center gap-2">
               <Layers className="h-4 w-4 text-muted-foreground" />
