@@ -446,6 +446,9 @@ def build_report_data(
     lagna_data = ephemeris.get("lagna", {})
     lagna_sign = lagna_data.get("rasi", "") if isinstance(lagna_data, dict) else ""
     
+    # D9 uses navamsa lagna if available, otherwise defaults to Mesham (index 0) like frontend
+    d9_lagna_sign = lagna_data.get("navamsa_sign", "Mesham") if isinstance(lagna_data, dict) else "Mesham"
+    
     overview, prediction_areas, practices = _extract_prediction_areas(
         interpretation, llm_interpretation
     )
@@ -468,7 +471,7 @@ def build_report_data(
         
         chart_images=ChartImages(
             d1_rasi=_generate_chart_svg(rasi_planet_signs, "D1", "Rāsi Chart (D1)", lagna_sign),
-            d9_navamsa=_generate_chart_svg(navamsa_planet_signs, "D9", "Navamsa Chart (D9)", lagna_sign),
+            d9_navamsa=_generate_chart_svg(navamsa_planet_signs, "D9", "Navamsa Chart (D9)", d9_lagna_sign),
             d1_planet_signs=_convert_planet_to_sign_mapping(rasi_planet_signs),
             d9_planet_signs=_convert_planet_to_sign_mapping(navamsa_planet_signs),
             lagna_sign=lagna_sign,
