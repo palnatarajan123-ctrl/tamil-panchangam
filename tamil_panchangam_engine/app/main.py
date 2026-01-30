@@ -10,13 +10,12 @@ from app.api.base_chart import router as base_chart_router, load_charts_from_db
 from app.api.prediction import router as prediction_router
 from app.api.interpretation import router as interpretation_router
 from app.api.ui_reports import router as ui_reports_router
-from app.api.report_exports import router as report_exports_router
 from app.api.ui_birth_chart import router as ui_birth_chart_router
 from app.api.prediction_weekly import router as prediction_weekly_router
 from app.api.prediction_yearly import router as prediction_yearly_router
-from app.api.reports import router as reports_router
 from app.api.realtime_context import router as realtime_context_router
 from app.api.admin_llm import router as admin_llm_router
+from app.api.canonical_report import router as canonical_report_router
 from app.db.bootstrap import bootstrap
 
 
@@ -68,7 +67,6 @@ def startup_event():
 app.include_router(interpretation_router)
 app.include_router(ui_reports_router)
 app.include_router(ui_birth_chart_router)
-app.include_router(report_exports_router)
 app.include_router(prediction_weekly_router)
 app.include_router(prediction_yearly_router)
 
@@ -76,9 +74,10 @@ app.include_router(prediction_yearly_router)
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
-app.include_router(reports_router)
+
 app.include_router(realtime_context_router)
 app.include_router(admin_llm_router)
+app.include_router(canonical_report_router)
 
 # =====================================================
 # FRONTEND SERVING (SAFE, MINIMAL)

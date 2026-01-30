@@ -1,0 +1,102 @@
+"""
+Canonical PDF Report Builder - Data Models
+
+These models define the structure of data passed to the PDF renderer.
+All data is READ-ONLY from database - no recalculation.
+"""
+
+from typing import Dict, List, Optional, Any
+from pydantic import BaseModel
+from datetime import datetime
+
+
+class BirthDetails(BaseModel):
+    """Birth details for cover page."""
+    name: str
+    date: str
+    time: str
+    place: str
+
+
+class BirthReference(BaseModel):
+    """Static birth reference data (never changes)."""
+    janma_nakshatra: str
+    janma_rasi: str
+    lagna: str
+    moon_sign: str
+    nakshatra_lord: str
+    birth_dasha: str
+    functional_role_planets: Dict[str, str]
+
+
+class DashaContext(BaseModel):
+    """Active dasha context for current period."""
+    mahadasha: str
+    mahadasha_lord: str
+    antardasha: str
+    antardasha_lord: str
+    dasha_balance: str
+
+
+class TransitContext(BaseModel):
+    """Transit/Gochara context."""
+    jupiter_transit: str
+    saturn_transit: str
+    rahu_ketu_axis: str
+
+
+class NakshatraTimingContext(BaseModel):
+    """Nakshatra and timing context."""
+    current_moon_nakshatra: str
+    tara_bala: str
+    chandra_gati: str
+    favorable_window: str
+
+
+class PakshiRhythmContext(BaseModel):
+    """Pakshi rhythm context."""
+    dominant_pakshi: str
+    activity_phase: str
+
+
+class PredictionArea(BaseModel):
+    """Single prediction life area."""
+    area: str
+    interpretation: str
+    guidance: Optional[str] = None
+
+
+class ChartImages(BaseModel):
+    """SVG chart images as base64 data URIs."""
+    d1_rasi: str
+    d9_navamsa: str
+
+
+class CanonicalReportData(BaseModel):
+    """Complete data model for canonical PDF report."""
+    
+    report_type: str
+    period_label: str
+    generated_at: datetime
+    
+    birth_details: BirthDetails
+    birth_reference: BirthReference
+    
+    chart_images: ChartImages
+    
+    core_life_themes: List[str]
+    
+    dasha_context: DashaContext
+    transit_context: TransitContext
+    nakshatra_timing: NakshatraTimingContext
+    pakshi_rhythm: PakshiRhythmContext
+    
+    prediction_overview: str
+    prediction_areas: List[PredictionArea]
+    
+    practices: List[str]
+    reflection_prompts: List[str]
+    
+    closing_note: str
+    
+    llm_enhanced: bool = False

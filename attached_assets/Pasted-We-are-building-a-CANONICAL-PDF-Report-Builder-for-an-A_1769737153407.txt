@@ -1,0 +1,198 @@
+We are building a CANONICAL PDF Report Builder for an AI-powered astrology engine using FastAPI in Replit.
+
+THIS IMPLEMENTATION MUST:
+- REMOVE all existing PDF generation logic
+- REMOVE all existing “generate report”, “export”, or “reporting” utilities
+- REPLACE them with ONE authoritative report builder pipeline
+
+There must be NO parallel or legacy report-generation code paths after this change.
+
+---------------------------------------------------
+1. EXPLICIT REMOVALS (MANDATORY)
+---------------------------------------------------
+
+1. Identify and DELETE or DISABLE:
+   - Any existing generate_report() functions
+   - Any ad-hoc markdown-to-PDF logic
+   - Any experimental or placeholder PDF/export endpoints
+   - Any background or auto-report generation jobs
+
+2. After this change:
+   - There must be exactly ONE entry point for PDF generation
+   - All reports must go through this new Report Builder
+
+---------------------------------------------------
+2. SOURCE OF TRUTH (READ-ONLY)
+---------------------------------------------------
+
+The PDF Report Builder is a RENDERING STEP ONLY.
+
+It must:
+- Read ALL astrological data from database or cache
+- Reuse previously generated LLM interpretations when available
+
+It must NEVER:
+- Recalculate birth charts
+- Recalculate dashas, transits, nakshatras, tara bala, pakshi, or timing
+- Derive new astrological facts
+- Trigger astrology engine computations
+
+If required data is missing, FAIL the request gracefully.
+
+---------------------------------------------------
+3. ASTROLOGICAL CONTEXT TO RENDER (NO COMPUTATION)
+---------------------------------------------------
+
+STATIC — BIRTH REFERENCE (never changes):
+- Janma Nakshatra
+- Janma Rasi
+- Lagna
+- Moon Sign
+- Nakshatra Lord
+- Birth Dasha
+- Functional Role Planets (e.g., Yogakaraka)
+
+DYNAMIC — CURRENT PERIOD (already computed and stored):
+ACTIVE DASHA CONTEXT
+- Current Mahadasha
+- Current Antardasha
+- Dasha Balance
+
+TRANSIT / GOCHARA CONTEXT
+- Jupiter Transit
+- Saturn Transit
+- Rahu–Ketu Axis
+
+NAKSHATRA & TIMING CONTEXT
+- Current Moon Nakshatra
+- Tara Bala
+- Chandra Gati
+- Favorable Window
+
+PAKSHI / RHYTHM CONTEXT
+- Dominant Pakshi
+- Activity Phase
+
+These values must be rendered EXACTLY as stored.
+No reinterpretation. No recalculation.
+
+---------------------------------------------------
+4. PDF STRUCTURE (STRICT AND FIXED)
+---------------------------------------------------
+
+The PDF must be generated in this exact order:
+
+1. Cover Page
+   - User name
+   - Birth details (date / time / place)
+   - Report type (Monthly / Yearly)
+   - Date generated
+   - Gentle disclaimer
+
+2. How to Read This Report
+   - Deterministic vs interpretive explanation
+   - Emphasis on awareness and choice
+
+3. Natal Snapshot
+   - Birth Chart (D1 image)
+   - Navamsa Chart (D9 image)
+   - Birth Reference table
+
+4. Core Life Themes
+   - Derived from stored natal analysis
+
+5. Astrological Context – Current Period
+   - Dasha table
+   - Transit table
+   - Nakshatra & Timing table
+   - Pakshi & Rhythm table
+
+6. Predictions
+   - Overview
+   - Career
+   - Relationships
+   - Health & Energy
+   - Finances
+   - Practical Guidance
+
+7. Practices & Reflection
+
+8. Summary & Closing Note
+
+---------------------------------------------------
+5. LLM USAGE RULES (HYBRID ONLY)
+---------------------------------------------------
+
+- LLM is used ONLY for narrative interpretation.
+- All astrological facts come from stored data.
+- Prompt versioning is mandatory (e.g. monthly_v1, yearly_v1).
+- Cached LLM output must be reused when inputs + prompt_version match.
+- max_tokens_per_call = 800
+- No LLM calls if section already exists in cache.
+
+---------------------------------------------------
+6. CACHING & VERSIONING
+---------------------------------------------------
+
+Cache generated sections using:
+- user_id
+- section_name
+- input_hash
+- prompt_version
+
+If all keys match, return cached content without calling the LLM.
+
+---------------------------------------------------
+7. TOKEN LOGGING
+---------------------------------------------------
+
+Log every LLM call with:
+- user_id
+- report_type
+- pdf_version
+- section_name
+- prompt_version
+- prompt_tokens
+- completion_tokens
+- total_tokens
+- timestamp
+
+Store logs locally (DuckDB or SQLite).
+
+---------------------------------------------------
+8. PDF RENDERING TOOL (MANDATORY)
+---------------------------------------------------
+
+- Build structured HTML from stored data.
+- Embed charts using <img>.
+- Convert HTML to PDF using an HTML-to-PDF renderer.
+- Styling must be minimal, readable, and professional.
+
+DO NOT use raw ReportLab.
+DO NOT generate PDFs directly from markdown.
+
+---------------------------------------------------
+9. UI PLACEMENT & INVOCATION (EXPLICIT)
+---------------------------------------------------
+
+- The PDF Report Builder is triggered ONLY from the Predictions UI.
+- Placement:
+  - After Monthly or Yearly prediction generation
+  - Primary CTA label: “Generate PDF Report”
+
+- Do NOT:
+  - Auto-generate PDFs
+  - Show PDF buttons on birth chart creation
+  - Trigger PDF generation in background jobs
+
+---------------------------------------------------
+10. CONSTRAINTS
+---------------------------------------------------
+
+- No UI redesigns.
+- No external services.
+- One canonical report pipeline only.
+- Centralize configuration (limits, versions).
+- Production-safe, deterministic behavior.
+
+This Report Builder replaces ALL prior report/export logic.

@@ -44,6 +44,7 @@ import {
   Sparkles,
   ArrowLeft,
   AlertCircle,
+  FileDown,
 } from "lucide-react";
 
 const MONTHS = [
@@ -77,6 +78,11 @@ export default function Predictions() {
     "monthly" | "weekly" | "yearly"
   >("monthly");
   const [explainabilityLevel] = useState<ExplainabilityLevel>("full");
+  const [lastPredictionParams, setLastPredictionParams] = useState<{
+    year: number;
+    month?: number;
+  } | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   if (!baseChartId) {
     return (
@@ -142,12 +148,13 @@ export default function Predictions() {
       return res.json();
     },
 
-    onSuccess: data => {
+    onSuccess: (data, variables) => {
       setPredictionError(null);
 
       if (!hasValidAIInterpretation(data.details)) {
         setPrediction(null);
         setPredictionError("AI Interpretation data is missing or invalid.");
+        setLastPredictionParams(null);
         toast({
           title: "Prediction Error",
           description: "AI Interpretation data is missing from the response.",
@@ -160,11 +167,17 @@ export default function Predictions() {
       if (!aiInterpretation) {
         setPrediction(null);
         setPredictionError("Failed to extract AI Interpretation.");
+        setLastPredictionParams(null);
         return;
       }
 
       const viewModel = adaptAIInterpretation(aiInterpretation, explainabilityLevel);
       setPrediction(viewModel);
+      
+      setLastPredictionParams({
+        year: Number(variables.year),
+        month: variables.month ? Number(variables.month) : undefined,
+      });
 
       toast({
         title: "Prediction Generated",
@@ -175,6 +188,7 @@ export default function Predictions() {
     onError: (e: Error) => {
       setPrediction(null);
       setPredictionError(e.message);
+      setLastPredictionParams(null);
       toast({
         title: "Prediction failed",
         description: e.message,
@@ -182,6 +196,59 @@ export default function Predictions() {
       });
     },
   });
+
+  const handleDownloadPdf = async () => {
+    if (!baseChartId || !lastPredictionParams) return;
+    
+    setIsDownloadingPdf(true);
+    
+    try {
+      const params = new URLSearchParams({
+        base_chart_id: baseChartId,
+        report_type: predictionType,
+        year: lastPredictionParams.year.toString(),
+      });
+      
+      if (predictionType === "monthly" && lastPredictionParams.month) {
+        params.append("month", lastPredictionParams.month.toString());
+      }
+      
+      const res = await fetch(`/api/reports/pdf?${params.toString()}`);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to generate PDF");
+      }
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      
+      const contentDisposition = res.headers.get("Content-Disposition");
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+      const filename = filenameMatch?.[1] || `report_${lastPredictionParams.year}.pdf`;
+      
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "PDF Downloaded",
+        description: "Your astrology report has been downloaded.",
+      });
+    } catch (e: any) {
+      toast({
+        title: "PDF Download Failed",
+        description: e.message || "Unable to generate the PDF report.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -333,7 +400,34 @@ export default function Predictions() {
 
       {/* RESULT */}
       {prediction && (
-        <MonthlyPredictionView prediction={prediction} period={predictionType} />
+        <>
+          <MonthlyPredictionView prediction={prediction} period={predictionType} />
+          
+          {/* PDF Download Button - Only for monthly and yearly */}
+          {(predictionType === "monthly" || predictionType === "yearly") && lastPredictionParams && (
+            <div className="mt-6 flex justify-center">
+              <Button
+                onClick={handleDownloadPdf}
+                disabled={isDownloadingPdf}
+                size="lg"
+                className="gap-2"
+                data-testid="button-download-pdf"
+              >
+                {isDownloadingPdf ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generating PDF...
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="h-4 w-4" />
+                    Generate PDF Report
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
