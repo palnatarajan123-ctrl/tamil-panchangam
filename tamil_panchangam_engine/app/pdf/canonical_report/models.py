@@ -38,6 +38,8 @@ class DashaContext(BaseModel):
     antardasha: str
     antardasha_lord: str
     dasha_balance: str
+    functional_benefics: List[str] = []
+    functional_malefics: List[str] = []
 
 
 class TransitContext(BaseModel):

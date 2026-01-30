@@ -231,12 +231,19 @@ def _extract_dasha_context(envelope: Dict[str, Any]) -> DashaContext:
         except:
             pass
     
+    functional_roles = envelope.get("functional_roles", {})
+    summary = functional_roles.get("summary", {})
+    benefics = summary.get("functional_benefics", [])
+    malefics = summary.get("functional_malefics", [])
+    
     return DashaContext(
         mahadasha=maha_lord,
         mahadasha_lord=maha_lord,
         antardasha=antar_lord,
         antardasha_lord=antar_lord,
         dasha_balance=balance,
+        functional_benefics=benefics,
+        functional_malefics=malefics,
     )
 
 

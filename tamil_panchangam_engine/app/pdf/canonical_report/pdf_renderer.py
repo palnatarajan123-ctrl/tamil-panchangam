@@ -328,13 +328,18 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
     
     dasha = data.dasha_context
     dasha_table = [
-        ["Period", "Lord", "Details"],
-        ["Mahadasha", dasha.mahadasha, dasha.mahadasha_lord],
-        ["Antardasha", dasha.antardasha, dasha.antardasha_lord],
-        ["Balance", dasha.dasha_balance, "-"],
+        ["Attribute", "Value"],
+        ["Current Mahadasha", dasha.mahadasha],
+        ["Current Antardasha", dasha.antardasha],
+        ["Dasha Balance", dasha.dasha_balance],
     ]
     
-    table = Table(dasha_table, colWidths=[1.8*inch, 1.8*inch, 2*inch])
+    if dasha.functional_benefics:
+        dasha_table.append(["Functional Benefics", ", ".join(dasha.functional_benefics)])
+    if dasha.functional_malefics:
+        dasha_table.append(["Functional Malefics", ", ".join(dasha.functional_malefics)])
+    
+    table = Table(dasha_table, colWidths=[2*inch, 3.5*inch])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -383,6 +388,28 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
     ]
     
     table = Table(timing_table, colWidths=[2*inch, 3.5*inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(table)
+    
+    elements.append(Spacer(1, 0.3*inch))
+    
+    elements.append(Paragraph("Pakshi / Rhythm Context", styles['SubsectionTitle']))
+    
+    pakshi = data.pakshi_rhythm
+    pakshi_table = [
+        ["Aspect", "Current Value"],
+        ["Dominant Pakshi", pakshi.dominant_pakshi],
+        ["Activity Phase", pakshi.activity_phase],
+    ]
+    
+    table = Table(pakshi_table, colWidths=[2*inch, 3.5*inch])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
