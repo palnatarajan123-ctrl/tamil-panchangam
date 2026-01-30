@@ -96,12 +96,13 @@ def load_charts_from_db():
                     continue
                 
                 # Compute fingerprint for deduplication
-                reference = payload.get("reference", {})
+                # Birth data is in 'birth_details', not 'reference'
+                birth_details = payload.get("birth_details", {})
                 fingerprint = _compute_birth_fingerprint(
-                    date_of_birth=reference.get("date_of_birth", ""),
-                    time_of_birth=reference.get("time_of_birth", ""),
-                    latitude=reference.get("latitude", 0),
-                    longitude=reference.get("longitude", 0),
+                    date_of_birth=birth_details.get("date_of_birth", ""),
+                    time_of_birth=birth_details.get("time_of_birth", ""),
+                    latitude=birth_details.get("latitude", 0) or 0,
+                    longitude=birth_details.get("longitude", 0) or 0,
                 )
                 
                 BASE_CHART_STORE[chart_id] = {
