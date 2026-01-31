@@ -1,0 +1,163 @@
+Tamil Panchangam Astrology Engine — Semantic Enrichment + Time-Window Depth Tuning (v1.5)
+You are working inside the existing Tamil Panchangam Astrology Engine
+(FastAPI + DuckDB + React + PDF).
+ 
+🎯 GOALS
+Goal 1 — Semantic Enrichment (Interpretive Hints)
+Provide the LLM with richer linguistic material derived from existing deterministic calculations so it can produce more detailed, non-repetitive paragraphs without recomputing astrology.
+Goal 2 — Time-Window Depth Tuning
+Adjust narrative depth by prediction window:
+•	Weekly → concise but meaningful
+•	Monthly → balanced and explanatory
+•	Yearly → deeper synthesis and patterns
+ 
+🚫 NON-NEGOTIABLES
+•	Do NOT change astrology calculations
+•	Do NOT introduce new astrology logic
+•	Do NOT let the LLM infer or compute astrology
+•	Do NOT add new LLM calls
+•	Do NOT break schema compatibility
+•	Do NOT increase token caps beyond existing limits
+ 
+🧱 PART 1 — INTERPRETIVE HINT GENERATION (AUTHORITATIVE)
+Rationale
+The LLM currently receives:
+•	Engine names
+•	Polarity
+•	Numeric weights
+This is mathematically correct but linguistically sparse.
+We will add interpretive hints that translate existing results into plain-English meaning, deterministically.
+ 
+🔧 IMPLEMENTATION
+File to modify
+app/engines/synthesis_engine.py
+(or the file where life-area signals are finalized)
+ 
+Add interpretive_hint to each signal
+For every signal object already produced, extend it like this:
+signal["interpretive_hint"] = generate_interpretive_hint(
+    engine=signal["engine"],
+    polarity=signal["polarity"],
+    strength=signal["weight"],
+    life_area=life_area_name
+)
+ 
+Create helper (deterministic, no astrology)
+New file (or existing utils file):
+app/engines/interpretive_hints.py
+def generate_interpretive_hint(engine, polarity, strength, life_area):
+    if engine == "Gochara":
+        if polarity == "positive":
+            return "supports progress through favorable timing and external circumstances aligning more easily"
+        else:
+            return "introduces delays or friction due to less supportive external conditions"
+
+    if engine == "Drishti":
+        if polarity == "positive":
+            return "enhances focus and clarity through reinforcing influences"
+        else:
+            return "creates pressure points that require careful navigation and restraint"
+
+    if engine == "Ashtakavarga":
+        if polarity == "positive":
+            return "indicates underlying structural support that sustains outcomes over time"
+        else:
+            return "signals reduced margin for error, making consistency more important"
+
+    return "adds subtle influence that shapes how this area unfolds during the period"
+✔ No astrology is recomputed
+✔ No new meaning is invented
+✔ Fully deterministic
+✔ Cacheable and reproducible
+ 
+Persist interpretive hints
+Ensure interpretive_hint is:
+•	Stored in DuckDB with the signal
+•	Passed through to the LLM payload
+•	Included in cached results
+ 
+🧱 PART 2 — PAYLOAD USAGE (MINIMAL CHANGE)
+File
+app/llm/payload_builder.py
+Ensure each signal sent to the LLM includes:
+{
+  "summary": "...",
+  "rationale": "...",
+  "interpretive_hint": "supports progress through favorable timing and external circumstances aligning more easily"
+}
+⚠️ Do NOT remove existing fields.
+This is an augmentation, not a replacement.
+ 
+🧱 PART 3 — TIME-WINDOW DEPTH TUNING (CRITICAL)
+File to modify
+app/llm/prompts/interpretation_prompt_v1.txt
+ 
+🔧 Add this section verbatim
+TIME WINDOW DEPTH RULES
+
+The depth of explanation must vary by prediction window.
+
+If window_type = "weekly":
+- Overall Theme: 3–4 sentences
+- Each Life Area: 2–3 sentences
+- Focus on immediate tone and short-term manifestations
+- Avoid long-term framing
+
+If window_type = "monthly":
+- Overall Theme: 6–8 sentences
+- Each Life Area: 4–6 sentences
+- Balance immediate experiences with emerging patterns
+
+If window_type = "yearly":
+- Overall Theme: 8–10 sentences
+- Each Life Area: 5–7 sentences
+- Emphasize repeating themes, sustained influences, and long arcs
+- Avoid day-to-day phrasing
+
+You MUST respect these sentence ranges.
+ 
+Clarify signal usage (important)
+Add immediately after:
+INTERPRETIVE HINT USAGE
+
+Use the provided interpretive hints to elaborate meaning.
+Do NOT restate them verbatim.
+Integrate them naturally into narrative explanations.
+Do NOT invent new interpretations.
+ 
+🧪 VALIDATION CRITERIA
+After implementing and regenerating:
+Weekly
+•	Concise, readable
+•	Not shallow
+•	No fluff
+Monthly
+•	Clearly more detailed than weekly
+•	Uses interpretive hints naturally
+•	Distinct life-area narratives
+Yearly
+•	Deep, synthesized
+•	Pattern-oriented
+•	No repetition across sections
+Across all:
+•	No astrology hallucination
+•	No repetition spam
+•	No coaching clichés
+ 
+🧠 WHY THIS WORKS (IMPORTANT)
+•	The LLM now has semantic raw material
+•	Prompt rules finally have something to expand
+•	Depth scales naturally with time horizon
+•	Determinism and guardrails remain intact
+•	Token usage increases modestly, not explosively
+This is the correct professional architecture.
+ 
+✅ EXPECTED RESULT
+You should now see:
+•	Life areas with full, grounded paragraphs
+•	Each section feels distinct
+•	Yearly reports feel meaningfully richer than monthly
+•	Weekly reports feel focused, not thin
+•	No loss of astrological correctness
+ 
+

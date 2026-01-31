@@ -506,6 +506,19 @@ def synthesize_from_envelope(envelope: dict) -> dict:
             })
 
     # -------------------------------------------------
+    # ADD INTERPRETIVE HINTS TO ALL SIGNALS
+    # -------------------------------------------------
+    from app.engines.interpretive_hints import generate_interpretive_hint
+    
+    for signal in signals:
+        signal["interpretive_hint"] = generate_interpretive_hint(
+            engine=signal.get("source", ""),
+            polarity=signal.get("valence", "mix"),
+            strength=signal.get("strength", 0.5),
+            life_area=None  # Will be contextualized per life area in payload
+        )
+    
+    # -------------------------------------------------
     # FINAL SIGNAL AUDIT
     # -------------------------------------------------
     print("DEBUG: FINAL SIGNALS (count =", len(signals), ")")

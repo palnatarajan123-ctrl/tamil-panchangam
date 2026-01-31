@@ -63,9 +63,10 @@ def sanitize_signals(signals: list) -> list:
 
 
 def _trim_signal(signal: Dict[str, Any]) -> Optional[Dict[str, str]]:
-    """Extract only summary and rationale from a signal. Returns None if invalid."""
+    """Extract summary, rationale, and interpretive_hint from a signal. Returns None if invalid."""
     key = signal.get("key", "")
     rationale = signal.get("rationale", "")
+    interpretive_hint = signal.get("interpretive_hint", "")
     
     # Skip if key or rationale is None or empty
     if not key or not rationale:
@@ -80,10 +81,16 @@ def _trim_signal(signal: Dict[str, Any]) -> Optional[Dict[str, str]]:
     if summary.lower() == "none" or rationale.lower() == "none":
         return None
     
-    return {
+    result = {
         "summary": summary,
         "rationale": rationale
     }
+    
+    # Include interpretive_hint if available
+    if interpretive_hint and str(interpretive_hint).lower() != "none":
+        result["interpretive_hint"] = interpretive_hint
+    
+    return result
 
 
 def _score_to_strength(score: int) -> str:
