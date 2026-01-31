@@ -173,6 +173,11 @@ def build_llm_payload(
         "life_areas": life_areas
     }
     
+    # Safety assertion: ensure no dasha leaked into life-area payloads
+    assert all(
+        "active_dasha" not in area for area in payload["life_areas"]
+    ), "Dasha leaked into life-area payload"
+    
     return payload
 
 

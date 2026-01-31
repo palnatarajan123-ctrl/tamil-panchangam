@@ -404,16 +404,27 @@ def generate_llm_interpretation(
         envelope, synthesis, period_type, period_key
     )
     
-    payload = build_llm_payload(
-        period_type=period_type,
-        period_label=payload_inputs["period_label"],
-        lagna=payload_inputs["lagna"],
-        moon_nakshatra=payload_inputs["moon_nakshatra"],
-        active_dasha=payload_inputs["active_dasha"],
-        life_area_scores=payload_inputs["life_area_scores"],
-        top_signals_by_life_area=payload_inputs["top_signals_by_life_area"],
-        explainability_mode=explainability_mode
-    )
+    try:
+        payload = build_llm_payload(
+            period_type=period_type,
+            period_label=payload_inputs["period_label"],
+            lagna=payload_inputs["lagna"],
+            moon_nakshatra=payload_inputs["moon_nakshatra"],
+            active_dasha=payload_inputs["active_dasha"],
+            life_area_scores=payload_inputs["life_area_scores"],
+            top_signals_by_life_area=payload_inputs["top_signals_by_life_area"],
+            explainability_mode=explainability_mode
+        )
+    except AssertionError as e:
+        logger.error(f"Dasha payload leak detected: {e}")
+        result["llm_interpretation"] = deterministic_interpretation
+        result["llm_metadata"]["fallback_reason"] = "dasha_payload_leak"
+        _persist_interpretation(
+            base_chart_id, period_type, period_key, feature_name,
+            prompt_version, None, None, 0, 0, 0,
+            deterministic_interpretation, "dasha_payload_leak"
+        )
+        return result
     
     # FIX 1: Hard-stop check for "None" placeholder leakage (exact spec compliance)
     payload_json = json.dumps(payload)

@@ -1,0 +1,78 @@
+Tamil Panchangam Astrology Engine — Remove Dasha From Life-Area Payloads (v1.3)
+You are working inside the existing Tamil Panchangam Astrology Engine
+(FastAPI + DuckDB + React + PDF).
+ 
+🎯 GOAL
+Eliminate repetitive dasha references inside individual life-area predictions by structurally removing dasha context from life-area LLM payloads, while retaining dasha explanation once at the overall prediction level.
+We explicitly accept that:
+•	Life-area narratives will no longer mention dasha directly
+•	Overall Theme will carry dasha influence
+•	This improves clarity, reduces repetition, and does not materially reduce accuracy
+ 
+🚫 NON-NEGOTIABLES
+•	Do NOT change astrology calculations
+•	Do NOT change life-area scores or signals
+•	Do NOT add new LLM calls
+•	Do NOT change token budgets
+•	Do NOT modify PDF layout or UI
+•	Do NOT re-introduce dasha indirectly via prompts
+ 
+🧱 REQUIRED CHANGE (AUTHORITATIVE)
+File to modify
+app/llm/payload_builder.py
+ 
+🔧 IMPLEMENTATION STEPS
+1️⃣ Remove dasha from life-area payloads
+Locate the loop that builds the life_areas payload.
+❌ Current (example pattern):
+{
+  "name": area.name,
+  "score": area.score,
+  "signals": area.signals,
+  "active_dasha": active_dasha
+}
+✅ Replace with:
+{
+  "name": area.name,
+  "score": area.score,
+  "signals": area.signals
+}
+ 
+2️⃣ Attach dasha ONLY to overall context
+After constructing life_areas, ensure dasha is attached once:
+payload["overall_context"]["active_dasha"] = active_dasha
+There must be no other reference to active_dasha anywhere in the payload.
+ 
+3️⃣ Safety assertion (optional but recommended)
+Immediately before the LLM call:
+assert all(
+    "active_dasha" not in area for area in payload["life_areas"]
+), "Dasha leaked into life-area payload"
+If assertion fails:
+•	Skip LLM
+•	Fall back to deterministic interpretation
+•	Log fallback_reason="dasha_payload_leak"
+ 
+🧪 VALIDATION CRITERIA (MANDATORY)
+After regenerating a report:
+•	“Dasha:” appears only once in the report
+•	Overall Theme explains the active dasha
+•	Life-area sections do not restate dasha influence
+•	Narrative feels less templated and more distinct per life area
+•	No regression in scores, signals, or charts
+ 
+🧠 RATIONALE (FOR FUTURE YOU)
+•	Dasha is a global temporal context
+•	Life-area sections should focus on manifestation, not timing mechanics
+•	Removing dasha locally:
+o	Reduces repetition
+o	Improves readability
+o	Aligns with how experienced astrologers actually speak
+This is a presentation fix, not a predictive downgrade.
+ 
+✅ EXPECTED OUTCOME
+•	Reports feel cleaner and less repetitive
+•	No more “dasha colors all experiences” spam
+•	Overall Theme carries temporal context
+•	Life areas feel genuinely differentiated
+ 
