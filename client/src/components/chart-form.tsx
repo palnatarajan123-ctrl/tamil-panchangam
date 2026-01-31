@@ -275,13 +275,13 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
   });
 
   const filteredCities = useMemo(() => {
-    if (!citySearch) return CITIES_LOV.slice(0, 20);
+    if (!citySearch || citySearch.length < 2) return [];
     const lower = citySearch.toLowerCase();
     return CITIES_LOV.filter(
       (c) =>
         c.city.toLowerCase().includes(lower) ||
         c.country.toLowerCase().includes(lower)
-    ).slice(0, 20);
+    ).slice(0, 15);
   }, [citySearch]);
 
   const handleCitySelect = (city: CityEntry) => {
@@ -499,7 +499,7 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
                               )}
                               data-testid="button-city-select"
                             >
-                              {field.value || "Select city..."}
+                              {field.value || "Search for a city worldwide..."}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
@@ -507,7 +507,7 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
                         <PopoverContent className="w-full p-0" align="start">
                           <Command>
                             <CommandInput
-                              placeholder="Search cities..."
+                              placeholder="Type city name (e.g., London, Tokyo, New York)..."
                               value={citySearch}
                               onValueChange={setCitySearch}
                               data-testid="input-city-search"
@@ -515,16 +515,24 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
                             <CommandList>
                               <CommandEmpty>
                                 <div className="p-2 text-center">
-                                  <p className="text-sm text-muted-foreground mb-2">City not found</p>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleManualEntry}
-                                    data-testid="button-manual-entry"
-                                  >
-                                    Enter coordinates manually
-                                  </Button>
+                                  {citySearch.length < 2 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                      Type at least 2 characters to search global cities
+                                    </p>
+                                  ) : (
+                                    <>
+                                      <p className="text-sm text-muted-foreground mb-2">City not found</p>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleManualEntry}
+                                        data-testid="button-manual-entry"
+                                      >
+                                        Enter coordinates manually
+                                      </Button>
+                                    </>
+                                  )}
                                 </div>
                               </CommandEmpty>
                               <CommandGroup>
