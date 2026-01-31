@@ -5,10 +5,10 @@ LLM Payload Builder v1.0
 Builds minimal "meaning-layer" payloads for LLM interpretation.
 NEVER passes raw astrology, full envelope, or full synthesis.
 
-Token Guardrails (HARD LIMITS - no exceptions):
-- Weekly:  max 900 prompt tokens, 500 completion, 1500 total
-- Monthly: max 1400 prompt tokens, 900 completion, 2500 total
-- Yearly:  max 2200 prompt tokens, 1200 completion, 4500 total
+Token Guardrails (HARD LIMITS - adjusted for Narrative Unlock v1.7):
+- Weekly:  max 1000 prompt tokens, 1500 completion, 2500 total
+- Monthly: max 1200 prompt tokens, 3000 completion, 5000 total
+- Yearly:  max 1500 prompt tokens, 3500 completion, 6000 total
 """
 
 import json
@@ -18,21 +18,21 @@ from typing import Dict, Any, List, Literal, Optional
 logger = logging.getLogger(__name__)
 
 MAX_PROMPT_TOKENS = {
-    "weekly": 600,
-    "monthly": 900,
+    "weekly": 1000,
+    "monthly": 1200,
     "yearly": 1500
 }
 
 MAX_COMPLETION_TOKENS = {
-    "weekly": 1000,
-    "monthly": 2000,
-    "yearly": 2500
+    "weekly": 1500,
+    "monthly": 3000,
+    "yearly": 3500
 }
 
 MAX_TOTAL_TOKENS = {
-    "weekly": 1800,
-    "monthly": 3200,
-    "yearly": 4500
+    "weekly": 2500,
+    "monthly": 5000,
+    "yearly": 6000
 }
 
 LIFE_AREA_LIMITS = {
