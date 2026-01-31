@@ -15,20 +15,20 @@ GLOBAL RULES
 - Total output must be under 2000 tokens.
 
 TIME WINDOW DEPTH RULES (CRITICAL)
-The depth of explanation must vary by prediction window.
+The depth of explanation must vary by prediction window (read period_type from input).
 
-If window_type = "weekly":
+If period_type = "weekly":
 - Overall Theme: 3–4 sentences
 - Each Life Area: 2–3 sentences
 - Focus on immediate tone and short-term manifestations
 - Avoid long-term framing
 
-If window_type = "monthly":
+If period_type = "monthly":
 - Overall Theme: 6–8 sentences
 - Each Life Area: 4–6 sentences
 - Balance immediate experiences with emerging patterns
 
-If window_type = "yearly":
+If period_type = "yearly":
 - Overall Theme: 8–10 sentences
 - Each Life Area: 5–7 sentences
 - Emphasize repeating themes, sustained influences, and long arcs

@@ -106,7 +106,7 @@ def generate_interpretive_hint(
         else:
             return "brings variable emphasis to this life domain"
     
-    if "divisional" in engine_lower or engine_lower.startswith("d"):
+    if "divisional" in engine_lower:
         if is_positive:
             return "refines and strengthens outcomes in specialized chart analysis"
         elif is_negative:
@@ -114,7 +114,7 @@ def generate_interpretive_hint(
         else:
             return "provides additional perspective on how this area unfolds"
     
-    if "navamsa" in engine_lower:
+    if "navamsa" in engine_lower or "derived" in engine_lower:
         if is_positive:
             return "deepens stability and spiritual foundation for lasting outcomes"
         elif is_negative:
