@@ -455,9 +455,9 @@ def _generate_life_area_interpretation(
     
     interaction_text = _generate_signal_interaction_text(relevant_signals, area)
     
-    # FIX 2: Remove per-life-area dasha note - dasha is explained ONCE in overview only
-    # dasha_context = envelope.get("dasha_context", {})
-    # The dasha influence is now communicated in the overview section, not repeated here
+    # FIX 2: Get dasha_context for attribution only - do NOT add dasha_note to text
+    # Dasha influence is explained ONCE in overview, not repeated per life area
+    dasha_context = envelope.get("dasha_context", {})
     
     house_notes = []
     for sig in relevant_signals:

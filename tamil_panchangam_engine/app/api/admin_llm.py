@@ -176,14 +176,21 @@ def clear_interpretation_cache(request: ClearCacheRequest):
     try:
         with get_conn() as conn:
             if request.base_chart_id:
-                result = conn.execute(
+                count_result = conn.execute(
+                    "SELECT COUNT(*) FROM prediction_llm_interpretation WHERE base_chart_id = ?",
+                    [request.base_chart_id]
+                ).fetchone()
+                rows_deleted = count_result[0] if count_result else 0
+                conn.execute(
                     "DELETE FROM prediction_llm_interpretation WHERE base_chart_id = ?",
                     [request.base_chart_id]
                 )
-                rows_deleted = result.fetchone()[0] if result else 0
             else:
-                result = conn.execute("DELETE FROM prediction_llm_interpretation")
-                rows_deleted = result.fetchone()[0] if result else 0
+                count_result = conn.execute(
+                    "SELECT COUNT(*) FROM prediction_llm_interpretation"
+                ).fetchone()
+                rows_deleted = count_result[0] if count_result else 0
+                conn.execute("DELETE FROM prediction_llm_interpretation")
             
         logger.info(f"Cleared {rows_deleted} cached interpretations")
         return ClearCacheResponse(success=True, rows_deleted=rows_deleted)
