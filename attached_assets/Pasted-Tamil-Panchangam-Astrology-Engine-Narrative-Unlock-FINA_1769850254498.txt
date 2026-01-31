@@ -1,0 +1,103 @@
+Tamil Panchangam Astrology Engine — Narrative Unlock FINAL (v1.7)
+You are working inside the existing Tamil Panchangam Astrology Engine
+(FastAPI + DuckDB + React + PDF).
+All astrology engines, synthesis, and scoring are locked.
+ 
+🎯 OBJECTIVE
+Make LLM-generated life-area narratives:
+•	Rich, multi-sentence, and human
+•	Fully grounded in existing deterministic signals
+•	Free of repetition and mechanical astrology language
+•	Aligned with weekly / monthly / yearly depth expectations
+Target output must resemble the provided Career (Monthly) gold-standard mock.
+ 
+🚫 NON-NEGOTIABLES
+•	Do NOT compute astrology in the LLM
+•	Do NOT add new astrological inputs
+•	Do NOT change scores, weights, or signal generation
+•	Do NOT increase token caps
+•	Do NOT modify schema structure
+•	Do NOT add UI sections in this prompt
+ 
+🧱 PART 1 — ENSURE SEMANTIC INPUT EXISTS (DETERMINISTIC)
+File
+app/engines/synthesis_engine.py
+Action
+For every signal already produced, attach a deterministic semantic expansion:
+signal["interpretive_hint"] = generate_interpretive_hint(
+    engine=signal["engine"],
+    polarity=signal["polarity"],
+    strength=signal["weight"],
+    life_area=life_area_name
+)
+Create helper (if not already present)
+app/engines/interpretive_hints.py
+def generate_interpretive_hint(engine, polarity, strength, life_area):
+    if polarity == "positive":
+        return "supports progress by making circumstances more receptive and timing easier to work with"
+    if polarity == "negative":
+        return "introduces friction that requires patience, restraint, or adjusted expectations"
+    return "adds a subtle influence that shapes how this area unfolds"
+✔ Deterministic
+✔ No astrology
+✔ No randomness
+✔ Cache-safe
+ 
+🧱 PART 2 — FAIL FAST IF SEMANTIC INPUT IS MISSING (CRITICAL)
+File
+app/llm/payload_builder.py
+Add this hard guardrail immediately before calling the LLM:
+for area in payload["life_areas"]:
+    for signal in area["signals"]:
+        if not signal.get("interpretive_hint"):
+            raise RuntimeError(
+                f"LLM blocked: missing interpretive_hint in {area['name']}"
+            )
+Behavior
+•	Skip LLM
+•	Use deterministic interpretation
+•	Log fallback reason
+This guarantees the LLM never runs without semantic material.
+ 
+🧱 PART 3 — FORCE LLM TO WRITE LIKE THE MOCK (MOST IMPORTANT)
+File
+app/llm/prompts/interpretation_prompt_v1.txt
+Replace (or augment) the narrative rules with the following verbatim:
+NARRATIVE CONSTRUCTION RULES (MANDATORY)
+
+Each life-area section must read as a complete, standalone explanation.
+
+You are given interpretive hints that already translate astrology into meaning.
+You MUST use these interpretive hints as the primary source of descriptive detail.
+
+If interpretive hints are present:
+- Do NOT explain astrology mechanics
+- Do NOT mention planets, yogas, dashas, gochara, or engine names
+- Do NOT restate polarity labels or numeric scores
+- Do NOT use phrases like “Mars influence”, “Gochara supports”, or “Rahu-Ketu axis”
+
+Synthesize the hints into natural language that explains:
+- What the person is likely to experience
+- How it may feel
+- What kind of approach works best
+
+Write in calm, grounded, observational language.
+Avoid advice clichés and coaching tone.
+ 
+🧱 PART 4 — DEPTH CONTROL (LOCKED AND ENFORCED)
+Still in the same prompt file, add:
+TIME WINDOW DEPTH REQUIREMENTS
+
+Weekly:
+- 2–3 sentences per life area
+- Immediate tone and short-term manifestations only
+
+Monthly:
+- 4–6 sentences per life area
+- Blend near-term experiences with developing patterns
+
+Yearly:
+- 5–7 sentences per life area
+- Emphasize sustained themes and long arcs
+
+You MUST meet these ranges.

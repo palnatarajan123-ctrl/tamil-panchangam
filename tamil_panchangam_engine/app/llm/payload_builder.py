@@ -197,13 +197,11 @@ def build_llm_payload(
                 })
     
     if missing_hints:
-        logger.warning(
-            f"Missing interpretive_hint in {len(missing_hints)} signals: "
-            f"{missing_hints[:3]}... fallback_reason=missing_interpretive_hint"
+        # PART 2: Fail-fast - raise RuntimeError to skip LLM and use deterministic fallback
+        raise RuntimeError(
+            f"LLM blocked: missing interpretive_hint in {len(missing_hints)} signal(s): "
+            f"{missing_hints[:3]}{'...' if len(missing_hints) > 3 else ''}"
         )
-        # Mark payload for fallback handling
-        payload["_fallback_required"] = True
-        payload["_fallback_reason"] = "missing_interpretive_hint"
     
     return payload
 

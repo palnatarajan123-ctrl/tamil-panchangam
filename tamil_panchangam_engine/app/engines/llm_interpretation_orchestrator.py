@@ -425,6 +425,17 @@ def generate_llm_interpretation(
             deterministic_interpretation, "dasha_payload_leak"
         )
         return result
+    except RuntimeError as e:
+        # PART 2: Fail-fast - missing interpretive_hint triggers fallback to deterministic
+        logger.warning(f"LLM blocked (interpretive_hint missing): {e}")
+        result["llm_interpretation"] = deterministic_interpretation
+        result["llm_metadata"]["fallback_reason"] = "missing_interpretive_hint"
+        _persist_interpretation(
+            base_chart_id, period_type, period_key, feature_name,
+            prompt_version, None, None, 0, 0, 0,
+            deterministic_interpretation, "missing_interpretive_hint"
+        )
+        return result
     
     # FIX 1: Hard-stop check for "None" placeholder leakage (exact spec compliance)
     payload_json = json.dumps(payload)
