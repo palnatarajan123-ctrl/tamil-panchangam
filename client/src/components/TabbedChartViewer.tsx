@@ -22,31 +22,36 @@ interface TabbedChartViewerProps {
   onTabChange?: (tab: string) => void;
 }
 
-const CHART_INFO: Record<string, { title: string; subtitle: string; purpose: string }> = {
+const CHART_INFO: Record<string, { title: string; subtitle: string; purpose: string; description: string }> = {
   D1: {
     title: "Rasi Chart (D1)",
     subtitle: "Core Birth Chart",
-    purpose: "Foundation of all predictions"
+    purpose: "Foundation of all predictions",
+    description: "The primary birth chart showing planetary positions at the exact moment of birth. All other charts derive from this foundation."
   },
   D2: {
     title: "Hora Chart (D2)",
     subtitle: "Wealth & Sustenance",
-    purpose: "Financial capacity and resources"
+    purpose: "Financial capacity and resources",
+    description: "Divides each sign into 2 parts (Sun/Moon horas). Sun hora indicates self-earned wealth; Moon hora suggests inherited or accumulated wealth."
   },
   D7: {
     title: "Saptamsa (D7)",
     subtitle: "Creativity & Children",
-    purpose: "Creative potential and progeny"
+    purpose: "Creative potential and progeny",
+    description: "Divides each sign into 7 parts, revealing creative abilities and matters related to children and artistic pursuits."
   },
   D9: {
     title: "Navamsa (D9)",
     subtitle: "Dharma & Maturity",
-    purpose: "Spiritual growth and marriage"
+    purpose: "Spiritual growth and marriage",
+    description: "The most important divisional chart after D1. Shows spiritual evolution, marriage quality, and how planetary promises manifest in the second half of life."
   },
   D10: {
     title: "Dasamsa (D10)",
     subtitle: "Career & Authority",
-    purpose: "Professional life and status"
+    purpose: "Professional life and status",
+    description: "Divides each sign into 10 parts, revealing career potential, professional achievements, and societal recognition."
   },
 };
 
@@ -118,10 +123,13 @@ export function TabbedChartViewer({ charts, onTabChange }: TabbedChartViewerProp
                     lagna={data.lagna}
                     planets={data.planets}
                     dignity={data.dignity}
-                    size={360}
+                    size={340}
                     title={info.title}
                     subtitle={info.subtitle}
                   />
+                  <p className="text-xs text-muted-foreground text-center max-w-md mt-2">
+                    {info.description}
+                  </p>
                 </div>
               </CardContent>
             </TabsContent>

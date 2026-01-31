@@ -324,7 +324,9 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
         styles['BodyText']
     ))
     
-    elements.append(Paragraph("Active Dasha Period", styles['SubsectionTitle']))
+    # Use KeepTogether to prevent heading/table separation
+    dasha_elements = []
+    dasha_elements.append(Paragraph("Active Dasha Period", styles['SubsectionTitle']))
     
     dasha = data.dasha_context
     dasha_table = [
@@ -349,11 +351,14 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
         ('TOPPADDING', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
     ]))
-    elements.append(table)
+    dasha_elements.append(table)
+    elements.append(KeepTogether(dasha_elements))
     
     elements.append(Spacer(1, 0.3*inch))
     
-    elements.append(Paragraph("Current Transits (Gochara)", styles['SubsectionTitle']))
+    # Use KeepTogether to prevent heading/table separation
+    transit_elements = []
+    transit_elements.append(Paragraph("Current Transits (Gochara)", styles['SubsectionTitle']))
     
     transit = data.transit_context
     transit_table = [
@@ -372,11 +377,14 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
         ('TOPPADDING', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
     ]))
-    elements.append(table)
+    transit_elements.append(table)
+    elements.append(KeepTogether(transit_elements))
     
     elements.append(Spacer(1, 0.3*inch))
     
-    elements.append(Paragraph("Nakshatra & Timing", styles['SubsectionTitle']))
+    # Use KeepTogether to prevent heading/table separation
+    timing_elements = []
+    timing_elements.append(Paragraph("Nakshatra & Timing", styles['SubsectionTitle']))
     
     timing = data.nakshatra_timing
     timing_table = [
@@ -396,11 +404,14 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
         ('TOPPADDING', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
     ]))
-    elements.append(table)
+    timing_elements.append(table)
+    elements.append(KeepTogether(timing_elements))
     
     elements.append(Spacer(1, 0.3*inch))
     
-    elements.append(Paragraph("Pakshi / Rhythm Context", styles['SubsectionTitle']))
+    # Use KeepTogether to prevent heading/table separation
+    pakshi_elements = []
+    pakshi_elements.append(Paragraph("Pakshi / Rhythm Context", styles['SubsectionTitle']))
     
     pakshi = data.pakshi_rhythm
     pakshi_table = [
@@ -418,7 +429,8 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
         ('TOPPADDING', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
     ]))
-    elements.append(table)
+    pakshi_elements.append(table)
+    elements.append(KeepTogether(pakshi_elements))
     
     elements.append(PageBreak())
     
@@ -723,7 +735,8 @@ def _build_divisional_charts(data: CanonicalReportData, styles) -> List:
     
     elements.append(Paragraph(
         "Divisional charts (Vargas) refine the birth chart analysis by examining "
-        "specific life areas. These follow the Classical Parashara method.",
+        "specific life areas. These follow the Classical Parashara method with "
+        "arc-second precision for accurate planet placement.",
         styles['BodyText']
     ))
     
@@ -731,21 +744,48 @@ def _build_divisional_charts(data: CanonicalReportData, styles) -> List:
     
     # Dasamsa (D10) - Career
     if has_d10:
-        elements.append(Paragraph("<b>Dasamsa (D10)</b> - Career & Authority", styles['SubsectionTitle']))
-        elements.append(_render_chart_from_svg(data.chart_images.d10_dasamsa, "D10"))
-        elements.append(Spacer(1, 0.2*inch))
+        d10_elements = []
+        d10_elements.append(Paragraph("<b>Dasamsa (D10)</b> - Career & Authority", styles['SubsectionTitle']))
+        d10_elements.append(Paragraph(
+            "The Dasamsa divides each sign into 10 parts, revealing career potential, "
+            "professional achievements, and societal status. Strong placements here "
+            "indicate success in one's profession and public recognition.",
+            styles['BodyText']
+        ))
+        d10_elements.append(Spacer(1, 0.1*inch))
+        d10_elements.append(_render_chart_from_svg(data.chart_images.d10_dasamsa, "D10"))
+        d10_elements.append(Spacer(1, 0.3*inch))
+        elements.append(KeepTogether(d10_elements))
     
     # Hora (D2) - Wealth
     if has_d2:
-        elements.append(Paragraph("<b>Hora (D2)</b> - Wealth & Sustenance", styles['SubsectionTitle']))
-        elements.append(_render_chart_from_svg(data.chart_images.d2_hora, "D2"))
-        elements.append(Spacer(1, 0.2*inch))
+        d2_elements = []
+        d2_elements.append(Paragraph("<b>Hora (D2)</b> - Wealth & Sustenance", styles['SubsectionTitle']))
+        d2_elements.append(Paragraph(
+            "The Hora chart divides each sign into 2 parts (Sun and Moon horas), "
+            "indicating wealth accumulation capacity and financial sustenance. "
+            "Planets in Sun hora suggest self-earned wealth; Moon hora suggests inherited or accumulated wealth.",
+            styles['BodyText']
+        ))
+        d2_elements.append(Spacer(1, 0.1*inch))
+        d2_elements.append(_render_chart_from_svg(data.chart_images.d2_hora, "D2"))
+        d2_elements.append(Spacer(1, 0.3*inch))
+        elements.append(KeepTogether(d2_elements))
     
     # Saptamsa (D7) - Creativity & Children
     if has_d7:
-        elements.append(Paragraph("<b>Saptamsa (D7)</b> - Creativity & Children", styles['SubsectionTitle']))
-        elements.append(_render_chart_from_svg(data.chart_images.d7_saptamsa, "D7"))
-        elements.append(Spacer(1, 0.2*inch))
+        d7_elements = []
+        d7_elements.append(Paragraph("<b>Saptamsa (D7)</b> - Creativity & Children", styles['SubsectionTitle']))
+        d7_elements.append(Paragraph(
+            "The Saptamsa divides each sign into 7 parts, showing creative potential, "
+            "progeny matters, and artistic abilities. This chart is particularly "
+            "important for understanding one's relationship with children and creative pursuits.",
+            styles['BodyText']
+        ))
+        d7_elements.append(Spacer(1, 0.1*inch))
+        d7_elements.append(_render_chart_from_svg(data.chart_images.d7_saptamsa, "D7"))
+        d7_elements.append(Spacer(1, 0.3*inch))
+        elements.append(KeepTogether(d7_elements))
     
     elements.append(PageBreak())
     

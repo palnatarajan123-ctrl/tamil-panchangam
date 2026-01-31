@@ -384,12 +384,14 @@ export function MonthlyPredictionView({
               </div>
             )}
 
-            {prediction.practicesAndReflection.reflectionQuestion && (
+            {(prediction.practicesAndReflection.reflectionGuidance || prediction.practicesAndReflection.reflectionQuestion) && (
               <div className="flex items-start gap-3 bg-muted/50 p-4 rounded-lg" data-testid="section-reflection">
                 <MessageCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Reflection Question</p>
-                  <p className="text-sm italic">{prediction.practicesAndReflection.reflectionQuestion}</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Reflection & Guidance</p>
+                  <p className="text-sm">
+                    {prediction.practicesAndReflection.reflectionGuidance || prediction.practicesAndReflection.reflectionQuestion}
+                  </p>
                 </div>
               </div>
             )}

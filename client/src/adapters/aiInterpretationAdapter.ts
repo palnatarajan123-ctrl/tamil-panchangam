@@ -35,6 +35,7 @@ export interface PracticesViewModel {
   dailyPractice?: string;
   weeklyPractice?: string;
   reflectionQuestion?: string;
+  reflectionGuidance?: string;
 }
 
 // V2 Closing
@@ -120,6 +121,7 @@ export interface AIInterpretationV2 {
     daily_practice?: string;
     weekly_practice?: string;
     reflection_question?: string;
+    reflection_guidance?: string;
   };
   closing: {
     key_takeaways?: string[];
@@ -243,6 +245,9 @@ export function adaptAIInterpretationV2(
     }
     if (aiInterpretation.practices_and_reflection.reflection_question) {
       practices.reflectionQuestion = aiInterpretation.practices_and_reflection.reflection_question;
+    }
+    if (aiInterpretation.practices_and_reflection.reflection_guidance) {
+      practices.reflectionGuidance = aiInterpretation.practices_and_reflection.reflection_guidance;
     }
     if (Object.keys(practices).length > 0) {
       result.practicesAndReflection = practices;
