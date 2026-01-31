@@ -56,8 +56,8 @@ OUTPUT: Return ONLY this JSON (no markdown, no prose outside JSON):
     "personal_growth": { "...same structure..." }
   },
   "practices_and_reflection": {
-    "daily_practice": "Simple daily habit (5-10 minutes)",
-    "weekly_practice": "Weekly reflection or reset activity",
+    "daily_practice": "[GENERATE: A specific, personalized daily practice (5-10 minutes) based on the person's chart and current planetary influences. NOT generic. Examples: 'Chant Sun mantra before sunrise to strengthen career confidence', 'Light a ghee lamp facing east to balance Saturn's influence']",
+    "weekly_practice": "[GENERATE: A specific weekly reflection or reset activity tailored to this person's current transits and life areas. NOT generic. Examples: 'Review financial decisions each Sunday aligned with Jupiter's benefic transit', 'Write gratitude notes on Thursdays to honor Jupiter']",
     "reflection_guidance": "A short reflective guidance paragraph (2-3 sentences) focused on mindset, self-observation, and intentional response. Do not ask questions. Provide calm, grounded wisdom."
   },
   "closing": {

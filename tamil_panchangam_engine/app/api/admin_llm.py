@@ -159,3 +159,34 @@ def toggle_llm(request: ToggleRequest):
         success=True,
         llm_enabled=request.enabled
     )
+
+
+class ClearCacheRequest(BaseModel):
+    base_chart_id: Optional[str] = None
+
+
+class ClearCacheResponse(BaseModel):
+    success: bool
+    rows_deleted: int
+
+
+@router.post("/clear-cache", response_model=ClearCacheResponse)
+def clear_interpretation_cache(request: ClearCacheRequest):
+    """Clear cached LLM interpretations. If base_chart_id provided, clears only that chart's cache."""
+    try:
+        with get_conn() as conn:
+            if request.base_chart_id:
+                result = conn.execute(
+                    "DELETE FROM prediction_llm_interpretation WHERE base_chart_id = ?",
+                    [request.base_chart_id]
+                )
+                rows_deleted = result.fetchone()[0] if result else 0
+            else:
+                result = conn.execute("DELETE FROM prediction_llm_interpretation")
+                rows_deleted = result.fetchone()[0] if result else 0
+            
+        logger.info(f"Cleared {rows_deleted} cached interpretations")
+        return ClearCacheResponse(success=True, rows_deleted=rows_deleted)
+    except Exception as e:
+        logger.error(f"Failed to clear cache: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

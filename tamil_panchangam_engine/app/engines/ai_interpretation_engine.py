@@ -360,12 +360,25 @@ def _get_relevant_signals_for_area(signals: List[Dict], area: str, score_data: D
     return sorted_signals[:3]
 
 
+def _safe_get_planet(signal: Dict, fallback: str) -> str:
+    """Safely get planet name, handling None values properly."""
+    planet = signal.get("planet")
+    if planet and planet != "None" and str(planet).strip():
+        return str(planet)
+    source = signal.get("source")
+    if source and source != "None" and str(source).strip():
+        return str(source)
+    return fallback
+
+
 def _generate_signal_interaction_text(signals: List[Dict], area: str) -> str:
     """Generate text explaining how signals interact."""
     if len(signals) < 2:
         if signals:
             s = signals[0]
-            return f"The primary influence comes from {s.get('planet', s.get('source', 'planetary'))} energy through {s.get('rationale', 'chart activation')}."
+            planet = _safe_get_planet(s, "planetary")
+            rationale = s.get("rationale") or "chart activation"
+            return f"The primary influence comes from {planet} energy through {rationale}."
         return ""
     
     vocab = LIFE_AREA_VOCABULARY.get(area, LIFE_AREA_VOCABULARY["career"])
@@ -376,22 +389,22 @@ def _generate_signal_interaction_text(signals: List[Dict], area: str) -> str:
     if pos_signals and neg_signals:
         pos = pos_signals[0]
         neg = neg_signals[0]
-        pos_planet = pos.get("planet", pos.get("source", "benefic forces"))
-        neg_planet = neg.get("planet", neg.get("source", "challenging aspects"))
+        pos_planet = _safe_get_planet(pos, "benefic forces")
+        neg_planet = _safe_get_planet(neg, "challenging aspects")
         
         templates = [
             f"Although {pos_planet} supports {random.choice(vocab['positive'])}, {neg_planet}'s influence creates {random.choice(vocab['negative'])}.",
             f"The supportive energy of {pos_planet} is partially offset by {neg_planet}, requiring balanced effort.",
-            f"While {pos.get('rationale', 'positive aspects')} opens doors, {neg.get('rationale', 'challenges')} demands careful navigation."
+            f"While {pos.get('rationale') or 'positive aspects'} opens doors, {neg.get('rationale') or 'challenges'} demands careful navigation."
         ]
         return random.choice(templates)
     elif len(pos_signals) >= 2:
-        p1 = pos_signals[0].get("planet", "benefic influences")
-        p2 = pos_signals[1].get("planet", "supportive transits")
+        p1 = _safe_get_planet(pos_signals[0], "benefic influences")
+        p2 = _safe_get_planet(pos_signals[1], "supportive transits")
         return f"The combined influence of {p1} and {p2} creates a favorable environment for {random.choice(vocab['positive'])}."
     elif len(neg_signals) >= 2:
-        n1 = neg_signals[0].get("planet", "challenging aspects")
-        n2 = neg_signals[1].get("planet", "karmic pressure")
+        n1 = _safe_get_planet(neg_signals[0], "challenging aspects")
+        n2 = _safe_get_planet(neg_signals[1], "karmic pressure")
         return f"Both {n1} and {n2} bring intensity, requiring patience with {random.choice(vocab['negative'])}."
     else:
         return f"Mixed influences create a period of {random.choice(vocab['neutral'])}."
@@ -442,12 +455,9 @@ def _generate_life_area_interpretation(
     
     interaction_text = _generate_signal_interaction_text(relevant_signals, area)
     
-    dasha_context = envelope.get("dasha_context", {})
-    dasha_note = ""
-    maha = dasha_context.get("maha_lord") or dasha_context.get("maha")
-    antar = dasha_context.get("antar_lord") or dasha_context.get("antar")
-    if maha and antar:
-        dasha_note = f"The {maha}-{antar} dasha period colors all experiences in this domain."
+    # FIX 2: Remove per-life-area dasha note - dasha is explained ONCE in overview only
+    # dasha_context = envelope.get("dasha_context", {})
+    # The dasha influence is now communicated in the overview section, not repeated here
     
     house_notes = []
     for sig in relevant_signals:
@@ -456,12 +466,11 @@ def _generate_life_area_interpretation(
             house_int = int(house)
             theme = HOUSE_THEMES.get(house_int, "")
             if theme:
-                planet = sig.get("planet", "Planetary influence")
+                planet = _safe_get_planet(sig, "Planetary influence")
                 house_notes.append(f"{planet}'s activation of the {house_int}th house ({theme}) shapes outcomes.")
     
     deeper_parts = [interaction_text]
-    if dasha_note:
-        deeper_parts.append(dasha_note)
+    # FIX 2: No dasha_note added here - prevents repetition across life areas
     if house_notes:
         deeper_parts.append(house_notes[0])
     

@@ -1,0 +1,76 @@
+Status check against the three surgical fixes
+1️⃣ “None” placeholder bug ❌ NOT FIXED
+This is still clearly present multiple times.
+Examples from this report:
+•	Career
+“Although None supports career momentum, Mars's influence creates professional obstacles.”
+•	Finance
+“The supportive energy of None is partially offset by Mars…”
+•	Health
+“Although None supports vitality surge, Mars's influence creates stamina challenges.”
+This tells us with certainty:
+•	Null signal objects are still entering the LLM payload
+•	The sanitation guard (sanitize_signals) was not applied or not applied everywhere
+•	The hard-stop assertion ("None" in payload_json) is not active
+📌 Conclusion:
+Fix #1 failed to deploy or failed to execute. This is a blocker.
+ 
+2️⃣ Dasha repetition across life areas ❌ NOT FIXED
+Every single life area still contains:
+“The Rahu–Mercury dasha period colors all experiences in this domain.”
+Appears in:
+•	Career
+•	Finance
+•	Relationships
+•	Health
+•	Personal Growth
+This means:
+•	active_dasha is still being injected per life-area
+•	Or the LLM prompt rule is being ignored because the structure still allows it
+📌 Conclusion:
+Fix #2 did not structurally take effect.
+The payload must still include dasha context inside each life area.
+ 
+3️⃣ Practices & Reflection wiring ⚠️ PARTIALLY FIXED
+This one is mixed — some progress, but not complete.
+✅ What is fixed
+•	Reflection & Guidance is now an answer, not a question
+✔ This is good.
+❌ What is still wrong
+•	Daily Practice and Weekly Practice are still static boilerplate:
+“Spend 5–10 minutes in quiet meditation…”
+“Reflect on your progress and adjust your goals…”
+These are not LLM-generated, and they are not logged outputs.
+This violates the requirement:
+“Practices & Reflection should be generated in the same LLM call and rendered from stored output.”
+📌 Conclusion:
+Fix #3 is only half done.
+ 
+Why this happened (important insight)
+Based on the evidence, the most likely causes are:
+1.	Code was written but not wired
+o	Helper exists but not applied to all signal paths
+2.	Prompt updated but payload structure not changed
+o	Prompt rules alone cannot stop repetition
+3.	Reflection added visually but not sourced from LLM output
+o	UI/PDF still pulling from a static template
+This is not an LLM problem.
+This is payload discipline + render-source discipline.
+ 
+One-glance verdict
+Fix	Status	Blocking?
+“None” placeholder	❌ Not fixed	🔴 Yes
+Dasha repetition	❌ Not fixed	🔴 Yes
+Practices wiring	⚠️ Partial	🟠 Yes
+ 
+What you should do next (very specific)
+Before doing anything else, I strongly recommend:
+1.	Add a temporary DEBUG log that prints the final LLM payload JSON
+→ You will immediately see "None" and repeated dasha fields
+2.	Search the codebase for:
+o	active_dasha
+o	summary: None
+o	Daily Practice
+3.	Confirm one source of truth:
+o	If it appears in PDF → it must exist in prediction_llm_interpretation
+
