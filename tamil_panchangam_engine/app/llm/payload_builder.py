@@ -24,15 +24,15 @@ MAX_PROMPT_TOKENS = {
 }
 
 MAX_COMPLETION_TOKENS = {
-    "weekly": 700,
-    "monthly": 1000,
-    "yearly": 1400
+    "weekly": 1000,
+    "monthly": 2000,
+    "yearly": 2500
 }
 
 MAX_TOTAL_TOKENS = {
-    "weekly": 1400,
-    "monthly": 2100,
-    "yearly": 3200
+    "weekly": 1800,
+    "monthly": 3200,
+    "yearly": 4500
 }
 
 LIFE_AREA_LIMITS = {
