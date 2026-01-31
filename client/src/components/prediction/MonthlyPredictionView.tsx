@@ -56,11 +56,10 @@ function getScoreColor(score: number): string {
 
 interface LifeAreaCardProps {
   area: LifeAreaViewModel;
-  showAttribution: boolean;
   isV2: boolean;
 }
 
-function LifeAreaCard({ area, showAttribution, isV2 }: LifeAreaCardProps) {
+function LifeAreaCard({ area, isV2 }: LifeAreaCardProps) {
   return (
     <AccordionItem value={area.key} data-testid={`accordion-item-${area.key}`}>
       <AccordionTrigger data-testid={`accordion-trigger-${area.key}`}>
@@ -116,54 +115,6 @@ function LifeAreaCard({ area, showAttribution, isV2 }: LifeAreaCardProps) {
             <p className="text-muted-foreground">{area.deeperExplanation}</p>
           </div>
         )}
-
-        {showAttribution && area.attribution && (
-          <div className="border-t pt-3 space-y-2" data-testid={`section-attribution-${area.key}`}>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Astrological Attribution
-            </p>
-
-            <div className="flex flex-wrap gap-2 text-xs">
-              {area.attribution.planets && area.attribution.planets.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <Star className="h-3 w-3" />
-                  <span>{area.attribution.planets.join(", ")}</span>
-                </div>
-              )}
-
-              {area.attribution.dasha && (
-                <div className="flex items-center gap-1">
-                  <Zap className="h-3 w-3" />
-                  <span>Dasha: {area.attribution.dasha}</span>
-                </div>
-              )}
-            </div>
-
-            {area.attribution.engines && area.attribution.engines.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Engines: {area.attribution.engines.join(", ")}
-              </p>
-            )}
-
-            {area.attribution.signalsUsed && area.attribution.signalsUsed.length > 0 && (
-              <div className="mt-2">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Signals:</p>
-                <div className="flex flex-wrap gap-1">
-                  {area.attribution.signalsUsed.map((signal, idx) => (
-                    <Badge 
-                      key={idx} 
-                      variant="outline" 
-                      className="text-xs"
-                      data-testid={`badge-signal-${area.key}-${idx}`}
-                    >
-                      {signal.engine} ({signal.valence}{signal.weight != null ? `, ${signal.weight.toFixed(2)}` : ""})
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </AccordionContent>
     </AccordionItem>
   );
@@ -180,8 +131,7 @@ export function MonthlyPredictionView({
     return null;
   }
 
-  const { lifeAreas, explainabilityLevel } = prediction;
-  const showAttribution = explainabilityLevel === "full";
+  const { lifeAreas } = prediction;
   const isV2 = prediction.engineVersion === "ai-interpretation-v2.0";
 
   const periodLabel =
@@ -260,6 +210,36 @@ export function MonthlyPredictionView({
                       </li>
                     ))}
                   </ul>
+                </div>
+              </>
+            )}
+
+            {prediction.overview.attributionSummary && (
+              <>
+                <Separator />
+                <div className="space-y-2" data-testid="section-attribution-summary">
+                  <p className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                    <Star className="h-4 w-4" />
+                    Astrological Influences
+                  </p>
+                  <div className="flex flex-wrap gap-2 text-sm">
+                    {prediction.overview.attributionSummary.activeDasha && (
+                      <Badge variant="outline" className="flex items-center gap-1" data-testid="badge-dasha">
+                        <Zap className="h-3 w-3" />
+                        {prediction.overview.attributionSummary.activeDasha}
+                      </Badge>
+                    )}
+                    {prediction.overview.attributionSummary.activePlanets.map((planet, idx) => (
+                      <Badge key={idx} variant="secondary" data-testid={`badge-planet-${idx}`}>
+                        {planet}
+                      </Badge>
+                    ))}
+                  </div>
+                  {prediction.overview.attributionSummary.activeEngines.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Sources: {prediction.overview.attributionSummary.activeEngines.join(", ")}
+                    </p>
+                  )}
                 </div>
               </>
             )}
@@ -344,7 +324,7 @@ export function MonthlyPredictionView({
         <CardContent>
           <Accordion type="single" collapsible className="w-full" data-testid="accordion-life-areas">
             {lifeAreas.map(area => (
-              <LifeAreaCard key={area.key} area={area} showAttribution={showAttribution} isV2={isV2} />
+              <LifeAreaCard key={area.key} area={area} isV2={isV2} />
             ))}
           </Accordion>
         </CardContent>

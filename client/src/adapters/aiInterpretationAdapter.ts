@@ -28,6 +28,14 @@ export interface OverviewViewModel {
   energyPattern: string;
   keyFocus?: string[];
   avoidOrBeMindful?: string[];
+  attributionSummary?: AttributionSummaryViewModel;
+}
+
+// Attribution Summary (consolidated from all life areas)
+export interface AttributionSummaryViewModel {
+  activePlanets: string[];
+  activeDasha?: string;
+  activeEngines: string[];
 }
 
 // V2 Practices & Reflection
@@ -233,6 +241,33 @@ export function adaptAIInterpretationV2(
     if (aiInterpretation.overview.avoid_or_be_mindful?.length) {
       result.overview.avoidOrBeMindful = aiInterpretation.overview.avoid_or_be_mindful;
     }
+    
+    // Aggregate attribution from all life areas into summary
+    if (showAttribution && deterministicInterpretation?.life_areas) {
+      const allPlanets = new Set<string>();
+      const allEngines = new Set<string>();
+      let dasha: string | undefined;
+      
+      Object.values(deterministicInterpretation.life_areas).forEach((area: any) => {
+        if (area.attribution) {
+          area.attribution.planets?.forEach((p: string) => allPlanets.add(p));
+          area.attribution.engines?.forEach((e: string) => allEngines.add(e));
+          if (area.attribution.dasha && area.attribution.dasha !== "X") {
+            dasha = area.attribution.dasha;
+          }
+        }
+      });
+      
+      if (allPlanets.size > 0 || allEngines.size > 0 || dasha) {
+        result.overview.attributionSummary = {
+          activePlanets: Array.from(allPlanets),
+          activeEngines: Array.from(allEngines),
+        };
+        if (dasha) {
+          result.overview.attributionSummary.activeDasha = dasha;
+        }
+      }
+    }
   }
 
   if (showPractices && aiInterpretation.practices_and_reflection) {
@@ -289,27 +324,8 @@ export function adaptAIInterpretationV2(
         viewModel.oneAction = area.one_action;
       }
 
-      if (showAttribution && deterministicInterpretation?.life_areas?.[key]?.attribution) {
-        const attrData = deterministicInterpretation.life_areas[key].attribution;
-        const attribution: LifeAreaAttribution = {};
-
-        if (attrData.planets && attrData.planets.length > 0) {
-          attribution.planets = attrData.planets;
-        }
-        if (attrData.dasha && attrData.dasha !== "X") {
-          attribution.dasha = attrData.dasha;
-        }
-        if (attrData.engines && attrData.engines.length > 0) {
-          attribution.engines = attrData.engines;
-        }
-        if (attrData.signals_used && attrData.signals_used.length > 0) {
-          attribution.signalsUsed = attrData.signals_used;
-        }
-
-        if (Object.keys(attribution).length > 0) {
-          viewModel.attribution = attribution;
-        }
-      }
+      // NOTE: Attribution is now shown in overview summary, not per life area
+      // Removed per-area attribution to reduce repetition
 
       return viewModel;
     });
