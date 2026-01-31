@@ -1,0 +1,124 @@
+Tamil Panchangam Astrology Engine — Surgical Fix (v1.2)
+You are working inside the existing Tamil Panchangam Astrology Engine
+(FastAPI + DuckDB + React + PDF).
+⚠️ STRICT SCOPE
+Fix ONLY the three issues listed below.
+Do NOT refactor, enhance, or touch anything else.
+ 
+🎯 OBJECTIVES (ONLY THESE)
+1.	Fix "None" placeholder appearing in prediction narratives
+2.	Eliminate repetitive dasha phrasing across life areas
+3.	Wire Practices & Reflection generation correctly using the existing LLM call (no new calls)
+ 
+🚫 NON-NEGOTIABLES
+•	Do NOT change astrology calculations
+•	Do NOT change scores, signals, or charts
+•	Do NOT add new UI sections
+•	Do NOT add new LLM calls
+•	Do NOT increase token budgets
+•	Do NOT modify PDF layout beyond rendering existing stored fields
+ 
+🧱 FIX 1 — "None" PLACEHOLDER BUG (MANDATORY)
+Problem
+Null or empty signal contributors are leaking into the LLM payload, causing text like:
+“None supports …”
+ 
+REQUIRED CHANGES
+A. Sanitize signals before payload construction
+File:
+app/llm/payload_builder.py
+Add and apply this helper:
+def sanitize_signals(signals: list[dict]) -> list[dict]:
+    return [
+        s for s in signals
+        if s
+        and s.get("summary")
+        and s.get("rationale")
+        and str(s.get("summary")).lower() != "none"
+    ]
+Apply this to every life-area signal list before passing to the LLM.
+ 
+B. Hard-stop invalid payloads
+Immediately before the LLM call:
+payload_json = json.dumps(payload)
+
+if "None" in payload_json:
+    logger.error("Invalid placeholder detected in LLM payload")
+    raise ValueError("Invalid LLM payload: placeholder leakage")
+On exception:
+•	Skip LLM
+•	Fall back to deterministic interpretation
+•	Log fallback_reason="invalid_payload_none_leak"
+ 
+🧱 FIX 2 — DASHA REPETITION ELIMINATION (MANDATORY)
+Problem
+Identical or near-identical dasha sentences appear in every life area.
+ 
+REQUIRED CHANGES
+A. Prompt-level instruction (LLM discipline)
+File:
+app/llm/prompts/interpretation_prompt_v1.txt
+Add this rule near the top:
+If a dasha or bhukti influence applies broadly, explain it ONCE in the Overall Theme.
+Do NOT repeat similar dasha-related phrasing across individual life areas unless the effect is uniquely specific to that area.
+ 
+B. Payload restructuring (critical)
+File:
+app/llm/payload_builder.py
+•	Include active_dasha ONLY under:
+"overall_context"
+•	Explicitly REMOVE active_dasha from:
+o	career
+o	finance
+o	relationships
+o	health
+o	personal_growth
+This structurally prevents repetition without relying on the LLM to “behave.”
+ 
+🧱 FIX 3 — PRACTICES & REFLECTION GENERATION (MANDATORY)
+Problem
+“Practices & Reflection” is partially static and not wired to the LLM output.
+ 
+REQUIRED CHANGES
+A. Generate reflection in the EXISTING LLM CALL (no new calls)
+File:
+app/llm/payload_builder.py
+Add to the LLM input payload:
+"reflection_instruction": "Provide a concise reflective guidance paragraph based on this prediction window. Do not ask questions. Do not give step-by-step instructions. Use calm, grounded language."
+This must be part of the same LLM request used for interpretation.
+ 
+B. Persist reflection output
+Database change (DuckDB):
+ALTER TABLE prediction_llm_interpretation
+ADD COLUMN IF NOT EXISTS reflection_text TEXT;
+Parse and store the reflection text separately from the main interpretation JSON.
+ 
+C. PDF rendering rule (NO logic change)
+•	In the Practices & Reflection section:
+o	Render ONLY reflection_text
+o	Do NOT render prompt questions
+o	Do NOT generate content during PDF creation
+If reflection_text is missing:
+•	Render nothing
+•	Do NOT fallback to a static template
+ 
+🧪 VALIDATION CHECKS (MANDATORY)
+After implementation, verify:
+•	❌ No occurrence of "None supports", "None indicates", or "None suggests"
+•	❌ No repeated dasha sentences across life areas
+•	✅ Dasha explanation appears once in Overall Theme
+•	✅ Practices & Reflection contains a completed paragraph, not a question
+•	✅ No additional LLM calls were introduced
+ 
+🧠 FINAL NOTE
+This prompt fixes:
+•	A credibility-breaking bug
+•	A narrative quality flaw
+•	A wiring completeness issue
+It does not change:
+•	Astrology
+•	Scoring
+•	Architecture
+•	UX scope
+Once this is implemented, your reports will cross the line from
+“impressive prototype” → “professionally publishable.”

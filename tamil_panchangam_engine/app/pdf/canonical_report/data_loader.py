@@ -124,7 +124,7 @@ def load_cached_llm_interpretation(
     try:
         with get_conn() as conn:
             result = conn.execute("""
-                SELECT content_json FROM prediction_llm_interpretation
+                SELECT content_json, reflection_text FROM prediction_llm_interpretation
                 WHERE base_chart_id = ?
                 AND period_type = ?
                 AND period_key = ?
@@ -134,7 +134,14 @@ def load_cached_llm_interpretation(
             """, [base_chart_id, period_type, period_key, feature_name]).fetchone()
             
             if result and result[0]:
-                return _safe_json(result[0], {})
+                content = _safe_json(result[0], {})
+                # FIX 3: Inject stored reflection_text into response
+                if result[1]:  # reflection_text column
+                    # Ensure practices_and_reflection has the stored text
+                    if "practices_and_reflection" not in content:
+                        content["practices_and_reflection"] = {}
+                    content["practices_and_reflection"]["reflection_guidance"] = result[1]
+                return content
     except Exception as e:
         logger.warning(f"Failed to load cached LLM interpretation: {e}")
     

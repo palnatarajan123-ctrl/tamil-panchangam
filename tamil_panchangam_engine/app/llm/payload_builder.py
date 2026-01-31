@@ -13,7 +13,7 @@ Token Guardrails (HARD LIMITS - no exceptions):
 
 import json
 import logging
-from typing import Dict, Any, List, Literal
+from typing import Dict, Any, List, Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -47,14 +47,38 @@ def estimate_tokens(text: str) -> int:
     return len(text) // 4
 
 
-def _trim_signal(signal: Dict[str, Any]) -> Dict[str, str]:
-    """Extract only summary and rationale from a signal."""
+def sanitize_signals(signals: list) -> list:
+    """
+    Sanitize signals before payload construction.
+    Remove null, empty, or invalid signals that would leak "None" text.
+    """
+    return [
+        s for s in signals
+        if s
+        and s.get("summary")
+        and s.get("rationale")
+        and str(s.get("summary", "")).lower() != "none"
+        and str(s.get("rationale", "")).lower() != "none"
+    ]
+
+
+def _trim_signal(signal: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """Extract only summary and rationale from a signal. Returns None if invalid."""
     key = signal.get("key", "")
     rationale = signal.get("rationale", "")
     
+    # Skip if key or rationale is None or empty
+    if not key or not rationale:
+        return None
+    
+    # Convert key to readable summary
     summary = key.replace("_", " ").title()[:40]
     if len(rationale) > 80:
         rationale = rationale[:77] + "..."
+    
+    # Final check: skip if either ends up as "None"
+    if summary.lower() == "none" or rationale.lower() == "none":
+        return None
     
     return {
         "summary": summary,
@@ -112,8 +136,14 @@ def build_llm_payload(
     life_areas = []
     for area_name, score in sorted_areas:
         signals = top_signals_by_life_area.get(area_name, [])[:signals_per_area]
+        # Trim each signal and filter out None results
         trimmed_signals = [_trim_signal(s) for s in signals]
+        trimmed_signals = [s for s in trimmed_signals if s is not None]
+        # Apply final sanitization
+        trimmed_signals = sanitize_signals(trimmed_signals)
         
+        # FIX 2: Do NOT include active_dasha in individual life areas
+        # Dasha is in overall_context only - prevents repetitive phrasing
         life_areas.append({
             "name": area_name,
             "score": score,
@@ -122,7 +152,8 @@ def build_llm_payload(
         })
     
     payload = {
-        "context": {
+        # FIX 2: Dasha included ONLY under "overall_context" as per spec
+        "overall_context": {
             "period_type": period_type,
             "period_label": period_label,
             "lagna": lagna,
@@ -133,6 +164,12 @@ def build_llm_payload(
             },
             "explainability_mode": explainability_mode
         },
+        # FIX 3: Add reflection instruction to existing LLM call
+        "reflection_instruction": (
+            "Provide a concise reflective guidance paragraph based on this prediction window. "
+            "Do not ask questions. Do not give step-by-step instructions. "
+            "Use calm, grounded language."
+        ),
         "life_areas": life_areas
     }
     

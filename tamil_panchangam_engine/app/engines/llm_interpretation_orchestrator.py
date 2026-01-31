@@ -148,6 +148,25 @@ def _check_cache(
     return None
 
 
+def _extract_reflection_text(content_json: Dict[str, Any]) -> Optional[str]:
+    """Extract reflection_text from LLM response for separate storage."""
+    # Check v2 format first
+    practices = content_json.get("practices_and_reflection", {})
+    if isinstance(practices, dict):
+        reflection = practices.get("reflection_guidance")
+        if reflection and isinstance(reflection, str) and reflection.strip():
+            return reflection.strip()
+    
+    # Check v1 format (if any)
+    window_summary = content_json.get("window_summary", {})
+    if isinstance(window_summary, dict):
+        reflection = window_summary.get("reflection")
+        if reflection and isinstance(reflection, str) and reflection.strip():
+            return reflection.strip()
+    
+    return None
+
+
 def _persist_interpretation(
     base_chart_id: str,
     period_type: str,
@@ -165,19 +184,23 @@ def _persist_interpretation(
     """Persist LLM interpretation and token usage."""
     try:
         interpretation_id = str(uuid.uuid4())
+        
+        # FIX 3: Extract reflection_text for separate storage
+        reflection_text = _extract_reflection_text(content_json) if not fallback_reason else None
+        
         with get_conn() as conn:
             conn.execute("""
                 INSERT INTO prediction_llm_interpretation (
                     id, base_chart_id, period_type, period_key, feature_name,
                     provider, model, prompt_version, prompt_tokens,
                     completion_tokens, total_tokens, content_json,
-                    fallback_reason, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    fallback_reason, reflection_text, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """, [
                 interpretation_id, base_chart_id, period_type, period_key,
                 feature_name, provider, model, prompt_version, prompt_tokens,
                 completion_tokens, total_tokens, json.dumps(content_json),
-                fallback_reason
+                fallback_reason, reflection_text
             ])
             
             if total_tokens > 0 and not fallback_reason:
@@ -391,6 +414,23 @@ def generate_llm_interpretation(
         top_signals_by_life_area=payload_inputs["top_signals_by_life_area"],
         explainability_mode=explainability_mode
     )
+    
+    # FIX 1: Hard-stop check for "None" placeholder leakage (exact spec compliance)
+    payload_json = json.dumps(payload)
+    try:
+        if "None" in payload_json:
+            logger.error("Invalid placeholder detected in LLM payload")
+            raise ValueError("Invalid LLM payload: placeholder leakage")
+    except ValueError:
+        # On exception: Skip LLM, fall back to deterministic, log fallback_reason
+        result["llm_interpretation"] = deterministic_interpretation
+        result["llm_metadata"]["fallback_reason"] = "invalid_payload_none_leak"
+        _persist_interpretation(
+            base_chart_id, period_type, period_key, feature_name,
+            prompt_version, None, None, 0, 0, 0,
+            deterministic_interpretation, "invalid_payload_none_leak"
+        )
+        return result
     
     is_valid, reason, estimated_tokens = validate_payload_size(payload, period_type)
     if not is_valid:

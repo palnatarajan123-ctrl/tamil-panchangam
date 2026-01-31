@@ -56,9 +56,19 @@ def bootstrap():
         total_tokens INTEGER,
         content_json JSON,
         fallback_reason TEXT,
+        reflection_text TEXT,
         created_at TIMESTAMP NOT NULL
     );
     """)
+    
+    # Add reflection_text column if missing (for existing tables)
+    try:
+        con.execute("""
+            ALTER TABLE prediction_llm_interpretation 
+            ADD COLUMN IF NOT EXISTS reflection_text TEXT;
+        """)
+    except Exception:
+        pass  # Column already exists or DB doesn't support IF NOT EXISTS
 
     con.execute("""
     CREATE TABLE IF NOT EXISTS llm_token_usage (
