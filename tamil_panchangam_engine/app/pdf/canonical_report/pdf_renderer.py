@@ -517,6 +517,38 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
         ))
         elements.append(Spacer(1, 0.2*inch))
     
+    # Aggregated Astrological Attribution - shown once in prediction section header
+    all_planets = set()
+    all_engines = set()
+    dasha_str = None
+    for area in data.prediction_areas:
+        if area.attribution:
+            for p in area.attribution.planets:
+                all_planets.add(p)
+            for e in area.attribution.engines:
+                all_engines.add(e)
+            if area.attribution.dasha and area.attribution.dasha != "X":
+                dasha_str = area.attribution.dasha
+    
+    if all_planets or all_engines or dasha_str:
+        attr_parts = []
+        if dasha_str:
+            attr_parts.append(f"Dasha: {dasha_str}")
+        if all_planets:
+            attr_parts.append(f"Planets: {', '.join(sorted(all_planets))}")
+        if all_engines:
+            attr_parts.append(f"Engines: {', '.join(sorted(all_engines))}")
+        
+        elements.append(Paragraph(
+            f"<font size='9' color='gray'>ASTROLOGICAL INFLUENCES</font>",
+            styles['BodyText']
+        ))
+        elements.append(Paragraph(
+            f"<font size='8' color='gray'>{' | '.join(attr_parts)}</font>",
+            styles['BodyText']
+        ))
+        elements.append(Spacer(1, 0.2*inch))
+    
     scores_data = [["Life Area", "Score", "Outlook"]]
     for area in data.prediction_areas:
         scores_data.append([
@@ -581,37 +613,7 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
                 styles['BodyText']
             ))
         
-        if area.attribution:
-            attr = area.attribution
-            attr_lines = []
-            
-            main_parts = []
-            if attr.planets:
-                main_parts.append(f"Planets: {', '.join(attr.planets)}")
-            if attr.dasha:
-                main_parts.append(f"Dasha: {attr.dasha}")
-            if main_parts:
-                attr_lines.append(" | ".join(main_parts))
-            
-            if attr.engines:
-                attr_lines.append(f"Engines: {', '.join(attr.engines)}")
-            
-            if attr.signals:
-                signal_strs = []
-                for sig in attr.signals:
-                    signal_strs.append(f"{sig.engine} ({sig.direction}, {sig.weight:.2f})")
-                attr_lines.append(f"Signals: {' | '.join(signal_strs)}")
-            
-            if attr_lines:
-                area_elements.append(Paragraph(
-                    f"<font size='9' color='gray'>ASTROLOGICAL ATTRIBUTION</font>",
-                    styles['BodyText']
-                ))
-                for line in attr_lines:
-                    area_elements.append(Paragraph(
-                        f"<font size='8' color='gray'>{line}</font>",
-                        styles['BodyText']
-                    ))
+        # NOTE: Attribution is now shown in prediction section header, not per life area
         
         area_elements.append(Spacer(1, 0.2*inch))
         elements.append(KeepTogether(area_elements))
