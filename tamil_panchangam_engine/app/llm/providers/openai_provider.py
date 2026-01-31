@@ -88,7 +88,7 @@ def get_provider_info() -> Dict[str, Any]:
 def call_openai(
     system_prompt: str,
     user_prompt: str,
-    max_tokens: int = 800
+    max_tokens: int = 1500
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]], Optional[str]]:
     """
     Call OpenAI API for language interpretation using urllib.

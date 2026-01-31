@@ -12,12 +12,12 @@ GLOBAL RULES
 - Do NOT add advice unrelated to the provided signals.
 - Output STRICT JSON matching the provided schema.
 - No markdown. No prose outside JSON.
-- Total output must be under 800 tokens.
+- Total output must be under 1500 tokens.
 
 NARRATIVE DEPTH RULES (CRITICAL)
 You are expected to write FULL PARAGRAPHS, not one-liners.
 
-PARAGRAPH LENGTH BY SECTION (within 800 token limit)
+PARAGRAPH LENGTH BY SECTION (within 1500 token limit)
 - Overall Theme: 6–8 sentences
 - Each Life Area: 4–6 sentences
 - Reflection / Practices: 4–5 sentences
