@@ -305,6 +305,36 @@ export function MonthlyPredictionView({
                 </div>
               </>
             )}
+
+            {prediction.windowSummary.attributionSummary && (
+              <>
+                <Separator />
+                <div className="space-y-2" data-testid="section-attribution-summary-v1">
+                  <p className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                    <Star className="h-4 w-4" />
+                    Astrological Influences
+                  </p>
+                  <div className="flex flex-wrap gap-2 text-sm">
+                    {prediction.windowSummary.attributionSummary.activeDasha && (
+                      <Badge variant="outline" className="flex items-center gap-1" data-testid="badge-dasha-v1">
+                        <Zap className="h-3 w-3" />
+                        {prediction.windowSummary.attributionSummary.activeDasha}
+                      </Badge>
+                    )}
+                    {prediction.windowSummary.attributionSummary.activePlanets.map((planet, idx) => (
+                      <Badge key={idx} variant="secondary" data-testid={`badge-planet-v1-${idx}`}>
+                        {planet}
+                      </Badge>
+                    ))}
+                  </div>
+                  {prediction.windowSummary.attributionSummary.activeEngines.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Sources: {prediction.windowSummary.attributionSummary.activeEngines.join(", ")}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

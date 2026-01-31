@@ -59,6 +59,7 @@ export interface WindowSummaryViewModel {
   outcomeMode: string;
   dominantForces?: DominantForce[];
   timingGuidance?: string;
+  attributionSummary?: AttributionSummaryViewModel;
 }
 
 export interface LifeAreaAttribution {
@@ -376,6 +377,33 @@ export function adaptAIInterpretation(
     windowSummary.timingGuidance = aiInterpretation.window_summary.timing_guidance;
   }
 
+  // Aggregate attribution from all life areas into summary (v1)
+  if (showAttribution) {
+    const allPlanets = new Set<string>();
+    const allEngines = new Set<string>();
+    let dasha: string | undefined;
+    
+    Object.values(aiInterpretation.life_areas).forEach((area: any) => {
+      if (area.attribution) {
+        area.attribution.planets?.forEach((p: string) => allPlanets.add(p));
+        area.attribution.engines?.forEach((e: string) => allEngines.add(e));
+        if (area.attribution.dasha && area.attribution.dasha !== "X") {
+          dasha = area.attribution.dasha;
+        }
+      }
+    });
+    
+    if (allPlanets.size > 0 || allEngines.size > 0 || dasha) {
+      windowSummary.attributionSummary = {
+        activePlanets: Array.from(allPlanets),
+        activeEngines: Array.from(allEngines),
+      };
+      if (dasha) {
+        windowSummary.attributionSummary.activeDasha = dasha;
+      }
+    }
+  }
+
   const lifeAreas: LifeAreaViewModel[] = LIFE_AREA_ORDER
     .filter(key => key in aiInterpretation.life_areas)
     .map(key => {
@@ -393,33 +421,8 @@ export function adaptAIInterpretation(
         viewModel.deeperExplanation = area.deeper_explanation;
       }
 
-      if (showAttribution && area.attribution) {
-        const attribution: LifeAreaAttribution = {};
-
-        if (area.attribution.planets && area.attribution.planets.length > 0) {
-          attribution.planets = area.attribution.planets;
-        }
-
-        if (area.attribution.dasha && area.attribution.dasha !== "X") {
-          attribution.dasha = area.attribution.dasha;
-        }
-
-        if (area.attribution.engines && area.attribution.engines.length > 0) {
-          attribution.engines = area.attribution.engines;
-        }
-
-        if (
-          showSignalsUsed &&
-          area.attribution.signals_used &&
-          area.attribution.signals_used.length > 0
-        ) {
-          attribution.signalsUsed = area.attribution.signals_used;
-        }
-
-        if (Object.keys(attribution).length > 0) {
-          viewModel.attribution = attribution;
-        }
-      }
+      // NOTE: Attribution is now shown in window summary, not per life area
+      // Removed per-area attribution to reduce repetition
 
       return viewModel;
     });
