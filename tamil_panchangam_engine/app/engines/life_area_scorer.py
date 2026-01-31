@@ -17,6 +17,7 @@ class LifeAreaSignalContribution:
     strength: float
     confidence: float
     rationale: str
+    interpretive_hint: str = ""
 
 
 def _clamp(x: float, lo: float, hi: float) -> float:
@@ -129,6 +130,7 @@ class LifeAreaScorer:
                         strength=strength,
                         confidence=conf,
                         rationale=str(s.get("rationale") or ""),
+                        interpretive_hint=str(s.get("interpretive_hint") or ""),
                     )
                 )
 
@@ -155,6 +157,7 @@ class LifeAreaScorer:
                     "contrib": round(c.contrib, 3),
                     "weights": c.weight_breakdown,
                     "rationale": c.rationale,
+                    "interpretive_hint": c.interpretive_hint,
                 }
                 for c in contributions[:top_k]
             ],
