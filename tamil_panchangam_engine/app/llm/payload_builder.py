@@ -185,6 +185,26 @@ def build_llm_payload(
         "active_dasha" not in area for area in payload["life_areas"]
     ), "Dasha leaked into life-area payload"
     
+    # PART 1: Fail-fast assertion - ensure interpretive hints are present
+    # Skip LLM if hints are missing, fall back to deterministic interpretation
+    missing_hints = []
+    for area in payload["life_areas"]:
+        for signal in area.get("signals", []):
+            if "interpretive_hint" not in signal or not signal.get("interpretive_hint"):
+                missing_hints.append({
+                    "area": area.get("name"),
+                    "signal": signal.get("summary", "unknown")
+                })
+    
+    if missing_hints:
+        logger.warning(
+            f"Missing interpretive_hint in {len(missing_hints)} signals: "
+            f"{missing_hints[:3]}... fallback_reason=missing_interpretive_hint"
+        )
+        # Mark payload for fallback handling
+        payload["_fallback_required"] = True
+        payload["_fallback_reason"] = "missing_interpretive_hint"
+    
     return payload
 
 

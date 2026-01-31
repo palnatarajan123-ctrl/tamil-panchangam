@@ -1,0 +1,77 @@
+PROMPT
+Tamil Panchangam Astrology Engine — Enforce Interpretive Hints + Narrative Unlock (v1.6 FINAL)
+You are working inside the existing Tamil Panchangam Astrology Engine
+(FastAPI + DuckDB + React + PDF).
+ 
+🎯 GOALS (ONLY THESE)
+1.	Guarantee interpretive hints are present in the LLM payload
+2.	Force the LLM to use interpretive hints as the primary descriptive material
+3.	Unlock multi-sentence, non-repetitive life-area narratives
+4.	Do NOT change astrology, scoring, or add new LLM calls
+ 
+🚫 NON-NEGOTIABLES
+•	Do NOT add astrology mechanics (degrees, yogas, houses)
+•	Do NOT recompute predictions
+•	Do NOT increase temperature or token caps
+•	Do NOT modify JSON schema
+•	Do NOT change PDF layout in this prompt
+•	Do NOT add new sections
+ 
+🧱 PART 1 — GUARANTEE INTERPRETIVE HINTS ARE PRESENT (MANDATORY)
+File
+app/llm/payload_builder.py
+Add a fail-fast assertion immediately after building the payload:
+for area in payload["life_areas"]:
+    for signal in area["signals"]:
+        if "interpretive_hint" not in signal or not signal["interpretive_hint"]:
+            raise ValueError(
+                f"Missing interpretive_hint for signal {signal.get('engine')} in {area.get('name')}"
+            )
+Behavior on failure
+•	Skip LLM
+•	Fall back to deterministic interpretation
+•	Log: fallback_reason="missing_interpretive_hint"
+This ensures the LLM never runs blind again.
+ 
+🧱 PART 2 — FORCE LLM TO USE INTERPRETIVE HINTS (CRITICAL)
+File
+app/llm/prompts/interpretation_prompt_v1.txt
+Add the following block verbatim, near the top under GLOBAL RULES:
+INTERPRETIVE HINT PRIORITY (NON-OPTIONAL)
+
+Each signal includes an interpretive hint.
+You MUST use these interpretive hints as the primary source of descriptive detail.
+
+If interpretive hints are present:
+- Do NOT rely on engine names (e.g., Gochara, Drishti) to explain meaning.
+- Do NOT restate polarity labels or numeric weights.
+- Integrate interpretive hints naturally into full sentences.
+- If multiple hints exist, synthesize them into a coherent narrative.
+
+Failure to use interpretive hints is an error.
+This removes the LLM’s escape hatch of reusing mechanical phrasing.
+ 
+🧱 PART 3 — LIFT STRUCTURAL NARRATIVE CONSTRAINTS (MINIMAL)
+Still in the same prompt file, add:
+NARRATIVE STRUCTURE RULE (IMPORTANT)
+
+Life-area sections must stand on their own as complete explanations.
+Do NOT assume the reader will infer meaning from attribution blocks.
+The narrative paragraph must fully explain the life area on its own.
+This prevents the model from “deferring” explanation to the attribution section.
+ 
+ 
+🧠 PART 4 — ASTROLOGICAL ATTRIBUTION in life areas
+Move it to the Predictions Summary and drop them in the life areas. It is repetitive.
+ 
+✅ EXPECTED FINAL RESULT
+After this prompt:
+•	Life-area narratives expand naturally
+•	Interpretive hints drive richness
+•	Repetition collapses
+•	No astrology hallucination
+•	No fluff
+•	No coaching clichés
+•	Weekly vs monthly vs yearly depth feels correct
+This is the final unlock.
+

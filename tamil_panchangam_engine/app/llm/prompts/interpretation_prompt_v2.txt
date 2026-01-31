@@ -14,6 +14,18 @@ GLOBAL RULES
 - No markdown. No prose outside JSON.
 - Total output must be under 2000 tokens.
 
+INTERPRETIVE HINT PRIORITY (NON-OPTIONAL)
+Each signal includes an interpretive hint.
+You MUST use these interpretive hints as the primary source of descriptive detail.
+
+If interpretive hints are present:
+- Do NOT rely on engine names (e.g., Gochara, Drishti) to explain meaning.
+- Do NOT restate polarity labels or numeric weights.
+- Integrate interpretive hints naturally into full sentences.
+- If multiple hints exist, synthesize them into a coherent narrative.
+
+Failure to use interpretive hints is an error.
+
 TIME WINDOW DEPTH RULES (CRITICAL)
 The depth of explanation must vary by prediction window (read period_type from input).
 
@@ -61,6 +73,13 @@ For each life area:
 - Avoid coaching language like "take action", "stay positive", or "embrace".
 - Avoid repeating wording used in other life areas.
 
+NARRATIVE STRUCTURE RULE (IMPORTANT)
+Life-area sections must stand on their own as complete explanations.
+Do NOT assume the reader will infer meaning from attribution blocks.
+The narrative paragraph must fully explain the life area on its own.
+Do NOT include astrological attributions (engine names, planet names) in life areas.
+Astrological attributions belong ONLY in the Predictions Summary section.
+
 SCORE-AWARE TONE
 Adjust emphasis based on the life area score:
 - Score >= 75: emphasize momentum, stability, and continuity.
@@ -72,11 +91,10 @@ SIGNAL USAGE
 - Do NOT invent new influences.
 - Do NOT restate signals verbatim; integrate them naturally.
 
-INTERPRETIVE HINT USAGE
-- Use the provided interpretive hints to elaborate meaning.
-- Do NOT restate them verbatim.
-- Integrate them naturally into narrative explanations.
-- Do NOT invent new interpretations beyond what the hints suggest.
+ASTROLOGICAL ATTRIBUTION PLACEMENT
+- Do NOT include astrological attribution (engine names, planet references) in life-area summaries.
+- Astrological attribution belongs ONLY in the monthly_theme or overview sections.
+- Life-area narratives should be self-contained and human-readable without technical terms.
 
 REFLECTION / PRACTICES
 - Write a reflective guidance paragraph (4–5 sentences).

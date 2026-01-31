@@ -1,0 +1,121 @@
+Tamil Panchangam Astrology Engine — Enforce Interpretive Hints + Narrative Unlock (v1.6 FINAL)
+You are working inside the existing Tamil Panchangam Astrology Engine
+(FastAPI + DuckDB + React + PDF).
+ 
+🎯 GOALS (ONLY THESE)
+1.	Guarantee interpretive hints are present in the LLM payload
+2.	Force the LLM to use interpretive hints as the primary descriptive material
+3.	Unlock multi-sentence, non-repetitive life-area narratives
+4.	Do NOT change astrology, scoring, or add new LLM calls
+ 
+🚫 NON-NEGOTIABLES
+•	Do NOT add astrology mechanics (degrees, yogas, houses)
+•	Do NOT recompute predictions
+•	Do NOT increase temperature or token caps
+•	Do NOT modify JSON schema
+•	Do NOT change PDF layout in this prompt
+•	Do NOT add new sections
+ 
+🧱 PART 1 — GUARANTEE INTERPRETIVE HINTS ARE PRESENT (MANDATORY)
+File
+app/llm/payload_builder.py
+Add a fail-fast assertion immediately after building the payload:
+for area in payload["life_areas"]:
+    for signal in area["signals"]:
+        if "interpretive_hint" not in signal or not signal["interpretive_hint"]:
+            raise ValueError(
+                f"Missing interpretive_hint for signal {signal.get('engine')} in {area.get('name')}"
+            )
+Behavior on failure
+•	Skip LLM
+•	Fall back to deterministic interpretation
+•	Log: fallback_reason="missing_interpretive_hint"
+This ensures the LLM never runs blind again.
+ 
+🧱 PART 2 — FORCE LLM TO USE INTERPRETIVE HINTS (CRITICAL)
+File
+app/llm/prompts/interpretation_prompt_v1.txt
+Add the following block verbatim, near the top under GLOBAL RULES:
+INTERPRETIVE HINT PRIORITY (NON-OPTIONAL)
+
+Each signal includes an interpretive hint.
+You MUST use these interpretive hints as the primary source of descriptive detail.
+
+If interpretive hints are present:
+- Do NOT rely on engine names (e.g., Gochara, Drishti) to explain meaning.
+- Do NOT restate polarity labels or numeric weights.
+- Integrate interpretive hints naturally into full sentences.
+- If multiple hints exist, synthesize them into a coherent narrative.
+
+Failure to use interpretive hints is an error.
+This removes the LLM’s escape hatch of reusing mechanical phrasing.
+ 
+🧱 PART 3 — LIFT STRUCTURAL NARRATIVE CONSTRAINTS (MINIMAL)
+Still in the same prompt file, add:
+NARRATIVE STRUCTURE RULE (IMPORTANT)
+
+Life-area sections must stand on their own as complete explanations.
+Do NOT assume the reader will infer meaning from attribution blocks.
+The narrative paragraph must fully explain the life area on its own.
+This prevents the model from “deferring” explanation to the attribution section.
+ 
+🧪 PART 4 — 3-STEP RUNTIME VERIFICATION CHECKLIST (MANDATORY)
+Run this every time you regenerate a report.
+✅ Step 1 — Payload inspection (2 minutes)
+Temporarily log:
+logger.info("SAMPLE LIFE AREA PAYLOAD: %s", payload["life_areas"][0])
+Confirm you see:
+•	interpretive_hint present
+•	Non-empty
+•	Semantically rich (plain English)
+If not → stop. Fix upstream.
+ 
+✅ Step 2 — Narrative depth check (visual)
+In the PDF:
+•	Each life area paragraph should be:
+o	Weekly: 2–3 sentences
+o	Monthly: 4–6 sentences
+o	Yearly: 5–7 sentences
+If you still see 2-sentence blurbs in monthly/yearly → enforcement is not active.
+ 
+✅ Step 3 — Repetition scan (search)
+Search the PDF for repeated phrases like:
+•	“Rahu–Ketu axis”
+•	“Mars influence”
+•	“favorable timing”
+They should:
+•	Appear sparingly
+•	Not appear in every life area
+•	Be paraphrased when they do
+ 
+🧠 PART 5 — OPPORTUNITY / WATCH OUT / ONE ACTION (DECISION)
+My strong recommendation: DROP THEM
+Here’s why:
+•	They force templating
+•	They cap narrative depth
+•	They read like generic coaching
+•	Your interpretive paragraphs now do the real work
+✅ What to do instead (cleanest)
+•	Keep only the paragraph
+•	Let guidance emerge organically
+•	Remove the three sub-sections entirely
+This will:
+•	Immediately reduce repetition
+•	Make reports feel more “astrologer-written”
+•	Improve perceived personalization
+If you’re not ready to drop them yet (acceptable fallback)
+•	Render them only when score ≥ 75
+•	Omit entirely otherwise
+But the cleanest end-state is no sub-bullets.
+ 
+✅ EXPECTED FINAL RESULT
+After this prompt:
+•	Life-area narratives expand naturally
+•	Interpretive hints drive richness
+•	Repetition collapses
+•	No astrology hallucination
+•	No fluff
+•	No coaching clichés
+•	Weekly vs monthly vs yearly depth feels correct
+This is the final unlock.
+
