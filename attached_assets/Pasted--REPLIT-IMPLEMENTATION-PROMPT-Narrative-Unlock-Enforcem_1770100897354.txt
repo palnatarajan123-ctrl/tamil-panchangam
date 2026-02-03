@@ -1,0 +1,84 @@
+📌 REPLIT IMPLEMENTATION PROMPT — “Narrative Unlock Enforcement v1.8”
+You are working in the existing Tamil Panchangam Astrology Engine (FastAPI + DuckDB + React + PDF).
+All astrology engines and synthesis are locked. Do not change scoring or calculations.
+GOALS (ONLY THESE)
+1.	Ensure interpretive_hint is present in every signal sent to the LLM and is persisted.
+2.	Enforce a strict ban on engine/planet language in life-area narratives.
+3.	Remove “Opportunity / Watch Out / One Action” from LLM generation and from PDF/UI rendering (paragraph-only).
+4.	Ensure prompt changes take effect by bumping prompt_version and preventing stale cache reuse (include window_type in cache key).
+ 
+1) Ensure interpretive_hint exists and flows end-to-end
+A. Attach interpretive_hint at the source (where signals are finalized)
+File: wherever you finalize life-area signals (commonly app/engines/synthesis_engine.py or a helper it calls).
+For every signal dict, add:
+signal["interpretive_hint"] = signal.get("interpretive_hint") or generate_interpretive_hint(
+    engine=signal.get("engine"),
+    polarity=signal.get("polarity"),
+    strength=signal.get("weight"),
+    life_area=life_area_name,
+)
+Confirm interpretive_hint is included in whatever object is stored in DuckDB for synthesis/prediction.
+B. Fail-fast before LLM call
+File: app/llm/payload_builder.py
+Immediately after payload is built (before provider call):
+missing = []
+for area in payload.get("life_areas", []):
+    for sig in area.get("signals", []):
+        if not sig.get("interpretive_hint"):
+            missing.append((area.get("name"), sig.get("engine"), sig.get("summary")))
+if missing:
+    logger.error("LLM blocked: missing interpretive_hint: %s", missing[:5])
+    raise RuntimeError("LLM blocked: interpretive_hint missing")
+C. Add a one-time debug log (temporary)
+Still in payload_builder.py:
+logger.info("DEBUG interpretive_hint sample: %s", payload["life_areas"][0]["signals"][:2])
+This is to confirm hints are really in payload.
+ 
+2) Enforce “no mechanics” in life-area narratives (strict prompt rule)
+File: app/llm/prompts/interpretation_prompt_v1.txt
+Add this block verbatim:
+STRICT WRITING RULES — LIFE AREAS
+
+Life-area narratives must be written ONLY from interpretive hints and the provided signal summaries/rationales.
+
+BANNED inside life-area narratives:
+- engine names (gochara, drishti, ashtakavarga, yogas, etc.)
+- planet names (Mars, Rahu, Ketu, Jupiter, etc.)
+- dasha terms (mahadasha, antardasha, bhukti, etc.)
+- phrases like “supports”, “influences”, “aspects”, “causes” tied to mechanics
+
+Allowed:
+- experiential meaning and practical manifestation, written in natural language
+- cautious, probabilistic tone
+
+If interpretive hints are provided, you MUST NOT explain mechanics.
+Also keep your depth rules:
+•	weekly 2–3
+•	monthly 4–6
+•	yearly 5–7
+ 
+3) Prevent stale cache reuse: bump prompt_version + include window_type
+A. Prompt version bump
+Set prompt_version to a new value, e.g.:
+•	weekly_v3_semantic_enforced
+•	monthly_v3_semantic_enforced
+•	yearly_v3_semantic_enforced
+Ensure prompt_version is passed to the orchestrator for every request.
+B. Cache key must include window_type
+Wherever you build cache key / lookup in DuckDB, ensure the key includes window_type.
+Example: change lookup from:
+(base_chart_id, year, month, prompt_version)
+to:
+(base_chart_id, window_type, year, month, prompt_version)
+Add column if needed:
+ALTER TABLE prediction_llm_interpretation
+ADD COLUMN IF NOT EXISTS window_type TEXT;
+Then update SELECT/INSERT to use window_type.
+ 
+Acceptance Criteria (must pass)
+1.	In yearly life-area narratives, no “gochara”, no planet names, no dasha terms.
+2.	Each yearly life area is a single cohesive paragraph of 5–7 sentences.
+3.	Opportunity/Watch-out/Action no longer appear in UI/PDF.
+4.	Debug log proves interpretive_hint exists in payload.
+5.	Regenerating yearly report produces clearly different writing (cache not stale).
+
