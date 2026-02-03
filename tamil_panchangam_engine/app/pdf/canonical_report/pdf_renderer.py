@@ -589,23 +589,7 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
                 styles['BodyText']
             ))
         
-        if area.opportunity:
-            area_elements.append(Paragraph(
-                f"<b>Opportunity:</b> {area.opportunity}", 
-                styles['BodyText']
-            ))
-        
-        if area.watch_out:
-            area_elements.append(Paragraph(
-                f"<b>Watch Out:</b> {area.watch_out}", 
-                styles['BodyText']
-            ))
-        
-        if area.one_action:
-            area_elements.append(Paragraph(
-                f"<b>One Action:</b> {area.one_action}", 
-                styles['BodyText']
-            ))
+        # v1.8: Removed Opportunity/Watch-out/One Action - paragraph-only format
         
         if area.guidance:
             area_elements.append(Paragraph(

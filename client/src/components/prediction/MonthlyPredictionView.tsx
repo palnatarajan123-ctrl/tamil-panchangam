@@ -80,35 +80,7 @@ function LifeAreaCard({ area, isV2 }: LifeAreaCardProps) {
       <AccordionContent className="space-y-4 text-sm">
         <p data-testid={`text-summary-${area.key}`}>{area.summary}</p>
 
-        {isV2 && area.opportunity && (
-          <div className="flex items-start gap-2 bg-green-50 dark:bg-green-950/30 p-3 rounded-md" data-testid={`text-opportunity-${area.key}`}>
-            <Target className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Opportunity</p>
-              <p className="text-green-800 dark:text-green-200">{area.opportunity}</p>
-            </div>
-          </div>
-        )}
-
-        {isV2 && area.watchOut && (
-          <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/30 p-3 rounded-md" data-testid={`text-watchout-${area.key}`}>
-            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">Watch Out</p>
-              <p className="text-amber-800 dark:text-amber-200">{area.watchOut}</p>
-            </div>
-          </div>
-        )}
-
-        {isV2 && area.oneAction && (
-          <div className="flex items-start gap-2 bg-blue-50 dark:bg-blue-950/30 p-3 rounded-md" data-testid={`text-action-${area.key}`}>
-            <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">One Action</p>
-              <p className="text-blue-800 dark:text-blue-200">{area.oneAction}</p>
-            </div>
-          </div>
-        )}
+        {/* v1.8: Removed Opportunity/Watch-out/One Action - paragraph-only format */}
 
         {!isV2 && area.deeperExplanation && (
           <div className="bg-muted/50 p-3 rounded-md" data-testid={`text-explanation-${area.key}`}>
