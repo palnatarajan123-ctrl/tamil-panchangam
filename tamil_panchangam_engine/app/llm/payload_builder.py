@@ -203,6 +203,13 @@ def build_llm_payload(
             f"{missing_hints[:3]}{'...' if len(missing_hints) > 3 else ''}"
         )
     
+    # DEBUG LOG (v1.8): Confirm interpretive_hint is present in payload
+    if payload.get("life_areas") and payload["life_areas"][0].get("signals"):
+        logger.info(
+            "DEBUG interpretive_hint sample: %s",
+            payload["life_areas"][0]["signals"][:2]
+        )
+    
     return payload
 
 

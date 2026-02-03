@@ -65,13 +65,31 @@ OVERALL THEME INSTRUCTIONS
 - Mention the active dasha ONLY here (once).
 - Do not restate this explanation elsewhere.
 
+STRICT WRITING RULES — LIFE AREAS
+
+Life-area narratives must be written ONLY from interpretive hints and the provided signal summaries/rationales.
+
+BANNED inside life-area narratives:
+- engine names (gochara, drishti, ashtakavarga, yogas, etc.)
+- planet names (Mars, Rahu, Ketu, Jupiter, Saturn, Venus, Mercury, Sun, Moon, etc.)
+- dasha terms (mahadasha, antardasha, bhukti, etc.)
+- phrases like "supports", "influences", "aspects", "causes" tied to mechanics
+- any astrological terminology whatsoever
+
+Allowed:
+- experiential meaning and practical manifestation, written in natural language
+- cautious, probabilistic tone
+
+If interpretive hints are provided, you MUST NOT explain mechanics.
+
 LIFE AREA INSTRUCTIONS
 For each life area:
-- Write a single cohesive paragraph (4–6 sentences).
-- Explain how the strongest signals combine, not as a list.
-- Describe how this influence may show up practically during the period.
+- Write a single cohesive paragraph (sentence count per depth rules).
+- Synthesize interpretive hints into natural language about experience and manifestation.
+- Describe how this may show up practically during the period.
 - Avoid coaching language like "take action", "stay positive", or "embrace".
 - Avoid repeating wording used in other life areas.
+- NO astrological terms, planet names, or engine names in life-area text.
 
 NARRATIVE STRUCTURE RULE (IMPORTANT)
 Life-area sections must stand on their own as complete explanations.
@@ -139,10 +157,7 @@ OUTPUT: Return ONLY this JSON (no markdown, no prose outside JSON):
     "career": {
       "score": 54,
       "outlook": "neutral",
-      "summary": "4-6 sentence cohesive paragraph explaining how signals combine and manifest practically",
-      "opportunity": "What can go well if handled consciously",
-      "watch_out": "What could create friction",
-      "one_action": "One grounded, practical action"
+      "summary": "Single cohesive paragraph (sentence count per depth rules). No mechanics, no planets, no engine names. Pure experiential language."
     },
     "finance": { "...same structure..." },
     "relationships": { "...same structure..." },

@@ -36,7 +36,14 @@ from app.llm.payload_builder import (
 logger = logging.getLogger(__name__)
 
 LLM_MONTHLY_TOKEN_BUDGET = 1_000_000
-PROMPT_VERSION = "interpretation_v2"
+
+# v1.8: Window-type-specific prompt versions to prevent stale cache reuse
+PROMPT_VERSION_BY_WINDOW = {
+    "weekly": "weekly_v3_semantic_enforced",
+    "monthly": "monthly_v3_semantic_enforced",
+    "yearly": "yearly_v3_semantic_enforced"
+}
+PROMPT_VERSION = "interpretation_v3_semantic_enforced"  # fallback
 
 
 def _load_prompt_template(version: str = "v2") -> str:
@@ -317,7 +324,7 @@ def generate_llm_interpretation(
     period_type: Literal["weekly", "monthly", "yearly"],
     period_key: str,
     feature_name: str = "prediction",
-    prompt_version: str = PROMPT_VERSION,
+    prompt_version: Optional[str] = None,
     explainability_mode: str = "standard"
 ) -> Dict[str, Any]:
     """
@@ -348,12 +355,15 @@ def generate_llm_interpretation(
         - llm_interpretation: The LLM-generated content (or deterministic fallback)
         - llm_metadata: Provider info, version, fallback reason
     """
+    # v1.8: Use window_type-specific prompt version to prevent stale cache
+    effective_prompt_version = prompt_version or PROMPT_VERSION_BY_WINDOW.get(period_type, PROMPT_VERSION)
+    
     result = {
         "llm_interpretation": None,
         "llm_metadata": {
             "provider": "none",
             "model": None,
-            "prompt_version": prompt_version,
+            "prompt_version": effective_prompt_version,
             "fallback_reason": None,
             "tokens_used": 0
         }
@@ -365,12 +375,12 @@ def generate_llm_interpretation(
         result["llm_metadata"]["fallback_reason"] = "llm_disabled"
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            prompt_version, None, None, 0, 0, 0,
+            effective_prompt_version, None, None, 0, 0, 0,
             deterministic_interpretation, "llm_disabled"
         )
         return result
     
-    cached = _check_cache(base_chart_id, period_type, period_key, feature_name, prompt_version)
+    cached = _check_cache(base_chart_id, period_type, period_key, feature_name, effective_prompt_version)
     if cached:
         result["llm_interpretation"] = cached
         result["llm_metadata"]["provider"] = "cache"
@@ -384,7 +394,7 @@ def generate_llm_interpretation(
         result["llm_metadata"]["fallback_reason"] = "budget_exceeded"
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            prompt_version, None, None, 0, 0, 0,
+            effective_prompt_version, None, None, 0, 0, 0,
             deterministic_interpretation, "budget_exceeded"
         )
         return result
@@ -395,7 +405,7 @@ def generate_llm_interpretation(
         result["llm_metadata"]["fallback_reason"] = "openai_key_missing"
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            prompt_version, None, None, 0, 0, 0,
+            effective_prompt_version, None, None, 0, 0, 0,
             deterministic_interpretation, "openai_key_missing"
         )
         return result
@@ -421,7 +431,7 @@ def generate_llm_interpretation(
         result["llm_metadata"]["fallback_reason"] = "dasha_payload_leak"
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            prompt_version, None, None, 0, 0, 0,
+            effective_prompt_version, None, None, 0, 0, 0,
             deterministic_interpretation, "dasha_payload_leak"
         )
         return result
@@ -432,7 +442,7 @@ def generate_llm_interpretation(
         result["llm_metadata"]["fallback_reason"] = "missing_interpretive_hint"
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            prompt_version, None, None, 0, 0, 0,
+            effective_prompt_version, None, None, 0, 0, 0,
             deterministic_interpretation, "missing_interpretive_hint"
         )
         return result
@@ -449,7 +459,7 @@ def generate_llm_interpretation(
         result["llm_metadata"]["fallback_reason"] = "invalid_payload_none_leak"
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            prompt_version, None, None, 0, 0, 0,
+            effective_prompt_version, None, None, 0, 0, 0,
             deterministic_interpretation, "invalid_payload_none_leak"
         )
         return result
@@ -461,7 +471,7 @@ def generate_llm_interpretation(
         result["llm_metadata"]["fallback_reason"] = reason
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            prompt_version, None, None, 0, 0, 0,
+            effective_prompt_version, None, None, 0, 0, 0,
             deterministic_interpretation, reason
         )
         return result
@@ -482,7 +492,7 @@ def generate_llm_interpretation(
         result["llm_metadata"]["fallback_reason"] = error
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            prompt_version, "openai", "gpt-4o-mini", 0, 0, 0,
+            effective_prompt_version, "openai", "gpt-4o-mini", 0, 0, 0,
             deterministic_interpretation, error
         )
         return result
@@ -493,7 +503,7 @@ def generate_llm_interpretation(
         result["llm_metadata"]["fallback_reason"] = "validation_failed"
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            prompt_version, "openai", usage_info.get("model"),
+            effective_prompt_version, "openai", usage_info.get("model"),
             usage_info.get("prompt_tokens", 0),
             usage_info.get("completion_tokens", 0),
             usage_info.get("total_tokens", 0),
@@ -508,7 +518,7 @@ def generate_llm_interpretation(
     
     _persist_interpretation(
         base_chart_id, period_type, period_key, feature_name,
-        prompt_version, "openai", usage_info.get("model"),
+        effective_prompt_version, "openai", usage_info.get("model"),
         usage_info.get("prompt_tokens", 0),
         usage_info.get("completion_tokens", 0),
         usage_info.get("total_tokens", 0),

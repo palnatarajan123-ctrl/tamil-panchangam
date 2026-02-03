@@ -5,22 +5,26 @@ INPUT FORMAT:
 - life_areas: each has name, score, strength, and signals with summary/rationale/interpretive_hint
 - reflection_instruction: guidance for generating the reflection paragraph
 
-NARRATIVE CONSTRUCTION RULES (MANDATORY)
-Each life-area section must read as a complete, standalone explanation.
+STRICT WRITING RULES — LIFE AREAS
 
-You are given interpretive hints that already translate astrology into meaning.
-You MUST use these interpretive hints as the primary source of descriptive detail.
+Life-area narratives must be written ONLY from interpretive hints and the provided signal summaries/rationales.
 
-If interpretive hints are present:
-- Do NOT explain astrology mechanics
-- Do NOT mention planets, yogas, dashas, gochara, or engine names in life areas
-- Do NOT restate polarity labels or numeric scores
-- Do NOT use phrases like "Mars influence", "Gochara supports", or "Rahu-Ketu axis"
+BANNED inside life-area narratives:
+- engine names (gochara, drishti, ashtakavarga, yogas, etc.)
+- planet names (Mars, Rahu, Ketu, Jupiter, Saturn, Venus, Mercury, Sun, Moon, etc.)
+- dasha terms (mahadasha, antardasha, bhukti, etc.)
+- phrases like "supports", "influences", "aspects", "causes" tied to mechanics
+- any astrological terminology whatsoever
 
-Synthesize the hints into natural language that explains:
-- What the person is likely to experience
-- How it may feel
-- What kind of approach works best
+Allowed:
+- experiential meaning and practical manifestation, written in natural language
+- cautious, probabilistic tone
+- what the person is likely to experience
+- how it may feel
+- what kind of approach works best
+
+If interpretive hints are provided, you MUST NOT explain mechanics.
+You MUST write purely from the interpretive hints, synthesizing them into natural paragraphs.
 
 Write in calm, grounded, observational language.
 Avoid advice clichés and coaching tone.
@@ -68,12 +72,10 @@ OUTPUT: Return ONLY this JSON (no markdown):
     "career": {
       "score": 54,
       "outlook": "neutral",
-      "summary": "One personalized sentence",
-      "deeper_explanation": "1-2 sentences",
-      "attribution": {"planets": [], "dasha": "Saturn/Venus", "engines": [], "signals_used": []}
+      "summary": "Single cohesive paragraph (sentence count per depth rules). No mechanics, no planets, no engine names."
     }
   },
-  "_visibility": {"level": "full", "show_dominant_forces": true, "show_timing_guidance": true, "show_deeper_explanation": true, "show_attribution": true, "show_signals_used": true}
+  "_visibility": {"level": "full", "show_dominant_forces": true, "show_timing_guidance": true}
 }
 
 Use scores/strength from input. Include all life_areas from input. Keep JSON complete.
