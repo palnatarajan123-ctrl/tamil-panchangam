@@ -69,6 +69,15 @@ def bootstrap():
         """)
     except Exception:
         pass  # Column already exists or DB doesn't support IF NOT EXISTS
+    
+    # v1.9: Add explainability_mode column for cache key differentiation
+    try:
+        con.execute("""
+            ALTER TABLE prediction_llm_interpretation 
+            ADD COLUMN IF NOT EXISTS explainability_mode TEXT;
+        """)
+    except Exception:
+        pass  # Column already exists
 
     con.execute("""
     CREATE TABLE IF NOT EXISTS llm_token_usage (

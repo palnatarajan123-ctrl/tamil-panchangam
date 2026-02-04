@@ -506,12 +506,13 @@ def synthesize_from_envelope(envelope: dict) -> dict:
             })
 
     # -------------------------------------------------
-    # ADD INTERPRETIVE HINTS TO ALL SIGNALS
+    # ADD INTERPRETIVE HINTS TO ALL SIGNALS (v1.9: non-optional enforcement)
     # -------------------------------------------------
     from app.engines.interpretive_hints import generate_interpretive_hint
     
     for signal in signals:
-        signal["interpretive_hint"] = generate_interpretive_hint(
+        # v1.9: Use existing hint if present, otherwise generate
+        signal["interpretive_hint"] = signal.get("interpretive_hint") or generate_interpretive_hint(
             engine=signal.get("source", ""),
             polarity=signal.get("valence", "mix"),
             strength=signal.get("strength", 0.5),

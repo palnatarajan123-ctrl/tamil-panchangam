@@ -1,0 +1,136 @@
+Tamil Panchangam Astrology Engine – Semantic Enforcement & Cache Reset (v1.9)
+
+You are working inside the existing Tamil Panchangam Astrology Engine
+(FastAPI + DuckDB + React + PDF).
+Astrology engines, synthesis logic, and scoring are locked.
+
+🎯 GOALS (ONLY THESE)
+
+Ensure interpretive_hint is present, persisted, and passed to the LLM
+
+Ban engine / planet language inside life-area narratives
+
+Remove deterministic mechanic lines from narrative sections
+
+Force fresh LLM generation by fixing cache keys and prompt versioning
+
+1️⃣ Enforce interpretive_hint at the source (non-optional)
+File
+app/engines/synthesis_engine.py
+
+
+Where life-area signals are finalized, add:
+
+signal["interpretive_hint"] = signal.get("interpretive_hint") or generate_interpretive_hint(
+    engine=signal["engine"],
+    polarity=signal["polarity"],
+    strength=signal["weight"],
+    life_area=life_area_name,
+)
+
+
+Confirm this object is what gets stored in DuckDB for predictions.
+
+2️⃣ Block LLM calls if interpretive_hint is missing
+File
+app/llm/payload_builder.py
+
+
+Immediately before the LLM call:
+
+for area in payload["life_areas"]:
+    for sig in area["signals"]:
+        if not sig.get("interpretive_hint"):
+            raise RuntimeError(
+                f"LLM blocked: interpretive_hint missing in {area['name']}"
+            )
+
+
+Add a temporary debug log:
+
+logger.info(
+    "DEBUG interpretive_hints sample: %s",
+    payload["life_areas"][0]["signals"]
+)
+
+3️⃣ Hard-ban engine & planet language in narratives
+File
+app/llm/prompts/interpretation_prompt_v1.txt
+
+
+Add this verbatim:
+
+STRICT LIFE-AREA WRITING RULE
+
+Life-area narratives must be written ONLY from interpretive hints and experiential meaning.
+
+You MUST NOT mention:
+- planets (Mars, Rahu, Ketu, etc.)
+- engines (gochara, drishti, ashtakavarga)
+- houses or aspects
+- phrases like “supports”, “offset by”, “influenced by” tied to mechanics
+
+All mechanics have already been translated into interpretive hints.
+
+4️⃣ Remove deterministic mechanic lines from life-area rendering
+Action
+
+In both:
+
+PDF generator
+
+UI life-area component
+
+Remove rendering of lines like:
+
+While Rahu-Ketu axis 5-11 (favorable) opens doors…
+The supportive energy of gochara is partially offset by Mars…
+
+
+These belong only in:
+
+Astrological Context
+
+Attribution sections
+
+Not inside life-area narratives
+
+5️⃣ Fix cache reuse (this is critical)
+A. Bump prompt_version
+
+Set new versions explicitly:
+
+monthly_v4_semantic_enforced
+
+yearly_v4_semantic_enforced
+
+Pass this into the orchestrator.
+
+B. Include window_type in cache key
+
+If cache lookup currently uses:
+
+(base_chart_id, year, month, prompt_version)
+
+
+Change it to:
+
+(base_chart_id, window_type, year, month, prompt_version)
+
+
+Update DuckDB if needed:
+
+ALTER TABLE prediction_llm_interpretation
+ADD COLUMN IF NOT EXISTS window_type TEXT;
+
+✅ Acceptance checklist (must all pass)
+
+No life-area paragraph mentions gochara, planets, or dashas
+
+Monthly life areas are 4–6 sentences
+
+No “While Rahu-Ketu…” lines after paragraphs
+
+Regenerating February changes the wording (no cache reuse)
+
+Output resembles the approved mock in tone and depth

@@ -37,13 +37,13 @@ logger = logging.getLogger(__name__)
 
 LLM_MONTHLY_TOKEN_BUDGET = 1_000_000
 
-# v1.8: Window-type-specific prompt versions to prevent stale cache reuse
+# v1.9: Window-type-specific prompt versions with detail level support
 PROMPT_VERSION_BY_WINDOW = {
-    "weekly": "weekly_v3_semantic_enforced",
-    "monthly": "monthly_v3_semantic_enforced",
-    "yearly": "yearly_v3_semantic_enforced"
+    "weekly": "weekly_v4_semantic_enforced",
+    "monthly": "monthly_v4_semantic_enforced",
+    "yearly": "yearly_v4_semantic_enforced"
 }
-PROMPT_VERSION = "interpretation_v3_semantic_enforced"  # fallback
+PROMPT_VERSION = "interpretation_v4_semantic_enforced"  # fallback
 
 
 def _load_prompt_template(version: str = "v2") -> str:
@@ -128,9 +128,10 @@ def _check_cache(
     period_type: str,
     period_key: str,
     feature_name: str,
-    prompt_version: str
+    prompt_version: str,
+    explainability_mode: str = "standard"
 ) -> Optional[Dict[str, Any]]:
-    """Check for cached LLM interpretation."""
+    """Check for cached LLM interpretation. Cache key includes explainability_mode (v1.9)."""
     try:
         with get_conn() as conn:
             result = conn.execute("""
@@ -140,12 +141,13 @@ def _check_cache(
                 AND period_key = ?
                 AND feature_name = ?
                 AND prompt_version = ?
+                AND COALESCE(explainability_mode, 'standard') = ?
                 ORDER BY created_at DESC
                 LIMIT 1
-            """, [base_chart_id, period_type, period_key, feature_name, prompt_version]).fetchone()
+            """, [base_chart_id, period_type, period_key, feature_name, prompt_version, explainability_mode]).fetchone()
             
             if result and result[0]:
-                logger.info(f"LLM cache hit: {base_chart_id}/{period_type}/{period_key}")
+                logger.info(f"LLM cache hit: {base_chart_id}/{period_type}/{period_key}/{explainability_mode}")
                 if isinstance(result[0], str):
                     return json.loads(result[0])
                 return result[0]
@@ -186,9 +188,10 @@ def _persist_interpretation(
     completion_tokens: int,
     total_tokens: int,
     content_json: Dict[str, Any],
-    fallback_reason: Optional[str]
+    fallback_reason: Optional[str],
+    explainability_mode: str = "standard"
 ) -> None:
-    """Persist LLM interpretation and token usage."""
+    """Persist LLM interpretation and token usage. Includes explainability_mode (v1.9)."""
     try:
         interpretation_id = str(uuid.uuid4())
         
@@ -201,13 +204,13 @@ def _persist_interpretation(
                     id, base_chart_id, period_type, period_key, feature_name,
                     provider, model, prompt_version, prompt_tokens,
                     completion_tokens, total_tokens, content_json,
-                    fallback_reason, reflection_text, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    fallback_reason, reflection_text, explainability_mode, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """, [
                 interpretation_id, base_chart_id, period_type, period_key,
                 feature_name, provider, model, prompt_version, prompt_tokens,
                 completion_tokens, total_tokens, json.dumps(content_json),
-                fallback_reason, reflection_text
+                fallback_reason, reflection_text, explainability_mode
             ])
             
             if total_tokens > 0 and not fallback_reason:
@@ -376,11 +379,11 @@ def generate_llm_interpretation(
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
             effective_prompt_version, None, None, 0, 0, 0,
-            deterministic_interpretation, "llm_disabled"
+            deterministic_interpretation, "llm_disabled", explainability_mode
         )
         return result
     
-    cached = _check_cache(base_chart_id, period_type, period_key, feature_name, effective_prompt_version)
+    cached = _check_cache(base_chart_id, period_type, period_key, feature_name, effective_prompt_version, explainability_mode)
     if cached:
         result["llm_interpretation"] = cached
         result["llm_metadata"]["provider"] = "cache"
@@ -395,7 +398,7 @@ def generate_llm_interpretation(
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
             effective_prompt_version, None, None, 0, 0, 0,
-            deterministic_interpretation, "budget_exceeded"
+            deterministic_interpretation, "budget_exceeded", explainability_mode
         )
         return result
     
@@ -406,7 +409,7 @@ def generate_llm_interpretation(
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
             effective_prompt_version, None, None, 0, 0, 0,
-            deterministic_interpretation, "openai_key_missing"
+            deterministic_interpretation, "openai_key_missing", explainability_mode
         )
         return result
     
@@ -432,7 +435,7 @@ def generate_llm_interpretation(
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
             effective_prompt_version, None, None, 0, 0, 0,
-            deterministic_interpretation, "dasha_payload_leak"
+            deterministic_interpretation, "dasha_payload_leak", explainability_mode
         )
         return result
     except RuntimeError as e:
@@ -443,7 +446,7 @@ def generate_llm_interpretation(
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
             effective_prompt_version, None, None, 0, 0, 0,
-            deterministic_interpretation, "missing_interpretive_hint"
+            deterministic_interpretation, "missing_interpretive_hint", explainability_mode
         )
         return result
     
@@ -460,7 +463,7 @@ def generate_llm_interpretation(
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
             effective_prompt_version, None, None, 0, 0, 0,
-            deterministic_interpretation, "invalid_payload_none_leak"
+            deterministic_interpretation, "invalid_payload_none_leak", explainability_mode
         )
         return result
     
@@ -472,7 +475,7 @@ def generate_llm_interpretation(
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
             effective_prompt_version, None, None, 0, 0, 0,
-            deterministic_interpretation, reason
+            deterministic_interpretation, reason, explainability_mode
         )
         return result
     
@@ -493,7 +496,7 @@ def generate_llm_interpretation(
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
             effective_prompt_version, "openai", "gpt-4o-mini", 0, 0, 0,
-            deterministic_interpretation, error
+            deterministic_interpretation, error, explainability_mode
         )
         return result
     
@@ -507,7 +510,7 @@ def generate_llm_interpretation(
             usage_info.get("prompt_tokens", 0),
             usage_info.get("completion_tokens", 0),
             usage_info.get("total_tokens", 0),
-            deterministic_interpretation, "validation_failed"
+            deterministic_interpretation, "validation_failed", explainability_mode
         )
         return result
     
@@ -522,7 +525,7 @@ def generate_llm_interpretation(
         usage_info.get("prompt_tokens", 0),
         usage_info.get("completion_tokens", 0),
         usage_info.get("total_tokens", 0),
-        llm_response, None
+        llm_response, None, explainability_mode
     )
     
     logger.info(
