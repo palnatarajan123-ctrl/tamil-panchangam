@@ -372,42 +372,36 @@ def _safe_get_planet(signal: Dict, fallback: str) -> str:
 
 
 def _generate_signal_interaction_text(signals: List[Dict], area: str) -> str:
-    """Generate text explaining how signals interact."""
-    if len(signals) < 2:
-        if signals:
-            s = signals[0]
-            planet = _safe_get_planet(s, "planetary")
-            rationale = s.get("rationale") or "chart activation"
-            return f"The primary influence comes from {planet} energy through {rationale}."
+    """Generate text explaining how signals interact using interpretive hints only.
+    
+    v1.9: Removed all mechanical language (planet names, engine names, rationales).
+    Now uses interpretive_hint field exclusively.
+    """
+    if not signals:
         return ""
     
-    vocab = LIFE_AREA_VOCABULARY.get(area, LIFE_AREA_VOCABULARY["career"])
+    # v1.9: Use interpretive hints instead of mechanical language
+    hints = [s.get("interpretive_hint") for s in signals if s.get("interpretive_hint")]
     
+    if hints:
+        # Combine up to 2 hints into a cohesive sentence
+        if len(hints) >= 2:
+            return f"{hints[0]} At the same time, {hints[1].lower() if hints[1][0].isupper() else hints[1]}"
+        return hints[0]
+    
+    # Fallback: use vocabulary without mechanical terms
+    vocab = LIFE_AREA_VOCABULARY.get(area, LIFE_AREA_VOCABULARY["career"])
     pos_signals = [s for s in signals if s.get("valence") == "pos"]
     neg_signals = [s for s in signals if s.get("valence") == "neg"]
     
     if pos_signals and neg_signals:
-        pos = pos_signals[0]
-        neg = neg_signals[0]
-        pos_planet = _safe_get_planet(pos, "benefic forces")
-        neg_planet = _safe_get_planet(neg, "challenging aspects")
-        
-        templates = [
-            f"Although {pos_planet} supports {random.choice(vocab['positive'])}, {neg_planet}'s influence creates {random.choice(vocab['negative'])}.",
-            f"The supportive energy of {pos_planet} is partially offset by {neg_planet}, requiring balanced effort.",
-            f"While {pos.get('rationale') or 'positive aspects'} opens doors, {neg.get('rationale') or 'challenges'} demands careful navigation."
-        ]
-        return random.choice(templates)
-    elif len(pos_signals) >= 2:
-        p1 = _safe_get_planet(pos_signals[0], "benefic influences")
-        p2 = _safe_get_planet(pos_signals[1], "supportive transits")
-        return f"The combined influence of {p1} and {p2} creates a favorable environment for {random.choice(vocab['positive'])}."
-    elif len(neg_signals) >= 2:
-        n1 = _safe_get_planet(neg_signals[0], "challenging aspects")
-        n2 = _safe_get_planet(neg_signals[1], "karmic pressure")
-        return f"Both {n1} and {n2} bring intensity, requiring patience with {random.choice(vocab['negative'])}."
+        return f"This period brings both opportunities for {random.choice(vocab['positive'])} and moments requiring {random.choice(vocab['negative'])}."
+    elif pos_signals:
+        return f"Conditions favor {random.choice(vocab['positive'])} during this period."
+    elif neg_signals:
+        return f"This period calls for patience and awareness around {random.choice(vocab['negative'])}."
     else:
-        return f"Mixed influences create a period of {random.choice(vocab['neutral'])}."
+        return f"A period of {random.choice(vocab['neutral'])} with balanced conditions."
 
 
 def _generate_life_area_interpretation(

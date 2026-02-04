@@ -44,6 +44,26 @@ Yearly:
 
 You MUST meet these ranges based on period_type.
 
+DETAIL LEVEL RULES (explainability_mode)
+The output depth must vary by explainability_mode (read from overall_context.explainability_mode).
+
+If explainability_mode = "minimal":
+- Each Life Area: 1-2 sentences (key point only)
+- Overview: 1-2 sentences
+- Focus on essential information only
+
+If explainability_mode = "standard" (default):
+- Each Life Area: 3-4 sentences
+- Overview: 2-3 sentences
+- Balanced detail with experiential depth
+
+If explainability_mode = "full":
+- Each Life Area: 5-7 sentences with rich experiential detail
+- Overview: 4-5 sentences
+- Maximum depth and richness in all narratives
+
+You MUST vary output length and detail based on explainability_mode. Different modes MUST produce visibly different outputs.
+
 DASHA RULE (CRITICAL - prevents repetition):
 If a dasha or bhukti influence applies broadly, explain it ONCE in the window_summary overview.
 Do NOT repeat similar dasha-related phrasing across individual life areas.

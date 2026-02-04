@@ -48,6 +48,32 @@ If period_type = "yearly":
 
 You MUST respect these sentence ranges based on period_type in the input.
 
+DETAIL LEVEL RULES (CRITICAL - explainability_mode)
+The output depth must vary by explainability_mode (read from overall_context.explainability_mode).
+
+If explainability_mode = "minimal":
+- Overall Theme: 2-3 sentences (brief overview only)
+- Each Life Area: 1-2 sentences (key point only)
+- Practices: Omit weekly_practice, keep daily_practice brief
+- Closing: 1-2 takeaways, brief encouragement
+- Focus on essential information only
+
+If explainability_mode = "standard" (default):
+- Overall Theme: 4-6 sentences
+- Each Life Area: 3-4 sentences
+- Practices: Include both daily and weekly
+- Closing: 2-3 takeaways, warm encouragement
+- Balanced detail with experiential depth
+
+If explainability_mode = "full":
+- Overall Theme: 6-8 sentences with nuanced synthesis
+- Each Life Area: 5-7 sentences with rich experiential detail
+- Practices: Detailed daily and weekly with specific guidance
+- Closing: 3 takeaways with elaborate encouragement
+- Maximum depth and richness in all narratives
+
+You MUST vary output length and detail based on explainability_mode. Different modes MUST produce visibly different outputs.
+
 NARRATIVE DEPTH RULES
 You are expected to write FULL PARAGRAPHS, not one-liners.
 
