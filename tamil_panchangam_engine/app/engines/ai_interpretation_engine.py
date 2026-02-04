@@ -428,20 +428,21 @@ def _generate_life_area_interpretation(
     
     verb = random.choice(vocab["verbs"])
     
+    # v1.9: Summary templates without mechanical astrological language
     summary_templates = {
         "positive": [
-            f"This period {verb} {outlook}, with planetary support aligning favorably.",
-            f"Strong astrological backing creates momentum for {outlook}.",
-            f"Favorable configurations actively support {outlook} throughout this window."
+            f"This period {verb} {outlook}, with conditions aligning favorably.",
+            f"Supportive circumstances create momentum for {outlook}.",
+            f"Favorable conditions actively support {outlook} throughout this window."
         ],
         "negative": [
-            f"Planetary tensions may manifest as {outlook}, requiring mindful navigation.",
-            f"Current configurations suggest {outlook}; strategic patience is advised.",
-            f"Challenging aspects point toward {outlook}, though remedial measures can help."
+            f"This period may bring {outlook}, requiring mindful navigation.",
+            f"Current conditions suggest {outlook}; strategic patience is advised.",
+            f"Challenges may arise around {outlook}, though careful attention can help."
         ],
         "neutral": [
-            f"A period of {outlook} emerges from balanced planetary influences.",
-            f"Mixed signals indicate {outlook} as the likely pattern.",
+            f"A period of {outlook} emerges from balanced conditions.",
+            f"Mixed circumstances indicate {outlook} as the likely pattern.",
             f"Neither strongly supported nor opposed, expect {outlook}."
         ]
     }
@@ -453,28 +454,28 @@ def _generate_life_area_interpretation(
     # Dasha influence is explained ONCE in overview, not repeated per life area
     dasha_context = envelope.get("dasha_context", {})
     
-    house_notes = []
-    for sig in relevant_signals:
-        house = sig.get("house")
-        if house is not None:
-            house_int = int(house)
-            theme = HOUSE_THEMES.get(house_int, "")
-            if theme:
-                planet = _safe_get_planet(sig, "Planetary influence")
-                house_notes.append(f"{planet}'s activation of the {house_int}th house ({theme}) shapes outcomes.")
+    # v1.9: Generate deeper_explanation using interpretive hints only (no mechanical language)
+    # Collect additional interpretive hints for deeper explanation
+    additional_hints = []
+    for sig in relevant_signals[1:3]:  # Use 2nd and 3rd signals if available
+        hint = sig.get("interpretive_hint")
+        if hint and hint not in additional_hints:
+            additional_hints.append(hint)
     
-    deeper_parts = [interaction_text]
-    # FIX 2: No dasha_note added here - prevents repetition across life areas
-    if house_notes:
-        deeper_parts.append(house_notes[0])
+    deeper_parts = [interaction_text] if interaction_text else []
+    deeper_parts.extend(additional_hints)
     
-    gochara = envelope.get("gochara", {})
-    if area == "career" and gochara.get("saturn", {}).get("phase") in ["janma_sani", "ashtama_sani"]:
-        deeper_parts.append("Saturn's current phase demands extra diligence in professional matters.")
-    elif area == "finance" and gochara.get("jupiter", {}).get("effect") == "favorable":
-        deeper_parts.append("Jupiter's favorable transit supports financial growth when action is taken.")
+    # v1.9: Use vocabulary fallback without mechanical terms
+    if not deeper_parts:
+        vocab = LIFE_AREA_VOCABULARY.get(area, LIFE_AREA_VOCABULARY["career"])
+        if valence == "positive":
+            deeper_parts.append(f"Favorable conditions support {random.choice(vocab['positive'])} this period.")
+        elif valence == "negative":
+            deeper_parts.append(f"This period calls for patience around {random.choice(vocab['negative'])}.")
+        else:
+            deeper_parts.append(f"A period of {random.choice(vocab['neutral'])} with balanced conditions.")
     
-    deeper_explanation = " ".join(deeper_parts[:4])
+    deeper_explanation = " ".join(deeper_parts[:3])
     
     planets_involved = []
     engines_used = []
