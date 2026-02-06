@@ -244,8 +244,8 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             period_type="monthly",
             period_key=period_key,
             feature_name="prediction",
-            prompt_version="interpretation_v1",
-            explainability_mode=payload.explainability_level or "standard"
+            explainability_mode=payload.explainability_level or "standard",
+            base_chart_payload=base_chart_payload,
         )
         interpretation["llm_interpretation"] = llm_result.get("llm_interpretation")
         interpretation["llm_metadata"] = llm_result.get("llm_metadata")

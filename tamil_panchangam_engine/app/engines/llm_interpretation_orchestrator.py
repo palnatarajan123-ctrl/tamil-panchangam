@@ -39,11 +39,11 @@ LLM_MONTHLY_TOKEN_BUDGET = 1_000_000
 
 # v1.9: Window-type-specific prompt versions with detail level support
 PROMPT_VERSION_BY_WINDOW = {
-    "weekly": "weekly_v4_semantic_enforced",
-    "monthly": "monthly_v4_semantic_enforced",
-    "yearly": "yearly_v4_semantic_enforced"
+    "weekly": "weekly_v5_siddhar",
+    "monthly": "monthly_v5_siddhar",
+    "yearly": "yearly_v5_siddhar"
 }
-PROMPT_VERSION = "interpretation_v4_semantic_enforced"  # fallback
+PROMPT_VERSION = "interpretation_v5_siddhar"  # fallback
 
 
 def _load_prompt_template(version: str = "v2") -> str:
@@ -278,10 +278,24 @@ def _score_to_strength(score: int) -> str:
 
 
 def _validate_llm_output(output: Dict[str, Any]) -> bool:
-    """Validate LLM output against schema (supports v1 and v2)."""
+    """Validate LLM output against schema (supports v1, v2, and v3)."""
     logger.debug(f"Validating LLM output keys: {list(output.keys())}")
     
     engine_version = output.get("engine_version", "")
+    
+    if engine_version == "ai-interpretation-v3.0":
+        required_keys = ["yearly_mantra", "dasha_transit_synthesis", "life_areas", "veda_remedy"]
+        if not all(k in output for k in required_keys):
+            present = [k for k in required_keys if k in output]
+            missing = [k for k in required_keys if k not in output]
+            logger.warning(f"LLM v3 output missing keys: {missing}. Present: {present}")
+            return False
+        
+        if not output.get("yearly_mantra"):
+            logger.warning("LLM v3 output missing yearly_mantra content")
+            return False
+        
+        return True
     
     if engine_version == "ai-interpretation-v2.0":
         required_keys = ["monthly_theme", "overview", "life_areas", "practices_and_reflection", "closing"]
@@ -328,35 +342,19 @@ def generate_llm_interpretation(
     period_key: str,
     feature_name: str = "prediction",
     prompt_version: Optional[str] = None,
-    explainability_mode: str = "standard"
+    explainability_mode: str = "standard",
+    base_chart_payload: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
-    Generate LLM-enhanced interpretation.
+    Generate LLM-enhanced interpretation (v3.0 Siddhar-Tradition Synthesizer).
     
     Orchestrates the full LLM interpretation flow:
     1. Check if LLM is enabled
     2. Check cache
     3. Enforce token limits and budget
-    4. Call OpenAI
+    4. Call OpenAI with enriched v3 payload
     5. Validate and persist
     6. Fallback to deterministic if needed
-    
-    Args:
-        base_chart_id: The chart identifier
-        envelope: Full prediction envelope data
-        synthesis: Synthesis output with scores and signals
-        deterministic_interpretation: Pre-computed deterministic interpretation
-        year: Prediction year
-        period_type: "weekly" | "monthly" | "yearly"
-        period_key: e.g. "2026-W03", "2026-01", "2026"
-        feature_name: e.g. "prediction"
-        prompt_version: e.g. "weekly_v1"
-        explainability_mode: "minimal" | "standard" | "full"
-        
-    Returns:
-        dict with:
-        - llm_interpretation: The LLM-generated content (or deterministic fallback)
-        - llm_metadata: Provider info, version, fallback reason
     """
     # v1.8: Use window_type-specific prompt version to prevent stale cache
     effective_prompt_version = prompt_version or PROMPT_VERSION_BY_WINDOW.get(period_type, PROMPT_VERSION)
@@ -414,7 +412,8 @@ def generate_llm_interpretation(
         return result
     
     payload_inputs = extract_payload_inputs(
-        envelope, synthesis, period_type, period_key
+        envelope, synthesis, period_type, period_key,
+        base_chart_payload=base_chart_payload
     )
     
     try:
@@ -429,7 +428,14 @@ def generate_llm_interpretation(
             explainability_mode=explainability_mode,
             transit_context=payload_inputs.get("transit_context"),
             dasha_timing=payload_inputs.get("dasha_timing"),
-            moon_rasi=payload_inputs.get("moon_rasi")
+            moon_rasi=payload_inputs.get("moon_rasi"),
+            birth_year=payload_inputs.get("birth_year"),
+            lagnadipathi_status=payload_inputs.get("lagnadipathi_status"),
+            saturn_phase=payload_inputs.get("saturn_phase"),
+            rahu_ketu_axis=payload_inputs.get("rahu_ketu_axis"),
+            yogas=payload_inputs.get("yogas"),
+            chandrashtama_periods=payload_inputs.get("chandrashtama_periods"),
+            nakshatra_pada=payload_inputs.get("nakshatra_pada"),
         )
     except AssertionError as e:
         logger.error(f"Dasha payload leak detected: {e}")
@@ -482,7 +488,7 @@ def generate_llm_interpretation(
         )
         return result
     
-    system_prompt = _load_prompt_template()
+    system_prompt = _load_prompt_template("v3")
     user_prompt = f"Generate interpretation:\n\n{json.dumps(payload, indent=2)}"
     
     max_completion = MAX_COMPLETION_TOKENS.get(period_type, 900)

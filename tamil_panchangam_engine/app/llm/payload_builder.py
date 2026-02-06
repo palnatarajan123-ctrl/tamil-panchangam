@@ -1,38 +1,70 @@
 # app/llm/payload_builder.py
 """
-LLM Payload Builder v1.0
+LLM Payload Builder v3.0 — Siddhar-Tradition Synthesizer
 
-Builds minimal "meaning-layer" payloads for LLM interpretation.
+Builds enriched "meaning-layer" payloads for LLM interpretation.
 NEVER passes raw astrology, full envelope, or full synthesis.
 
-Token Guardrails (HARD LIMITS - adjusted for Narrative Unlock v1.7):
-- Weekly:  max 1000 prompt tokens, 1500 completion, 2500 total
-- Monthly: max 1200 prompt tokens, 3000 completion, 5000 total
-- Yearly:  max 1500 prompt tokens, 3500 completion, 6000 total
+v3.0 additions:
+- Birth year for age-aware tone
+- Lagnadipathi (Ascendant Lord) status with placement and dignity
+- Saturn phase (Sade Sati / Ashtama Sani / Kantaka Sani)
+- Rahu-Ketu axis and karmic theme
+- Detected Yogas (Gaja Kesari, Dhana, etc.)
+- Chandrashtama (challenging Moon transit) periods
+
+Token Guardrails (HARD LIMITS):
+- Weekly:  max 1400 prompt tokens, 2000 completion, 3500 total
+- Monthly: max 2000 prompt tokens, 4000 completion, 7000 total
+- Yearly:  max 2500 prompt tokens, 5000 completion, 9000 total
 """
 
 import json
 import logging
+from datetime import date
 from typing import Dict, Any, List, Literal, Optional
 
 logger = logging.getLogger(__name__)
 
 MAX_PROMPT_TOKENS = {
-    "weekly": 1200,
-    "monthly": 1800,
-    "yearly": 2200
+    "weekly": 1400,
+    "monthly": 2000,
+    "yearly": 2500
 }
 
 MAX_COMPLETION_TOKENS = {
-    "weekly": 1800,
-    "monthly": 3500,
-    "yearly": 4500
+    "weekly": 2000,
+    "monthly": 4000,
+    "yearly": 5000
 }
 
 MAX_TOTAL_TOKENS = {
-    "weekly": 3000,
-    "monthly": 6000,
-    "yearly": 8000
+    "weekly": 3500,
+    "monthly": 7000,
+    "yearly": 9000
+}
+
+RASI_LORDS = {
+    "Aries": "Mars", "Taurus": "Venus", "Gemini": "Mercury",
+    "Cancer": "Moon", "Leo": "Sun", "Virgo": "Mercury",
+    "Libra": "Venus", "Scorpio": "Mars", "Sagittarius": "Jupiter",
+    "Capricorn": "Saturn", "Aquarius": "Saturn", "Pisces": "Jupiter"
+}
+
+PLANET_TAMIL = {
+    "Sun": "Surya", "Moon": "Chandra", "Mars": "Sevvai/Mangal",
+    "Mercury": "Budha", "Jupiter": "Guru", "Venus": "Sukra",
+    "Saturn": "Sani", "Rahu": "Rahu", "Ketu": "Ketu"
+}
+
+DIGNITY_SIGNS = {
+    "Sun": {"exalted": "Aries", "debilitated": "Libra"},
+    "Moon": {"exalted": "Taurus", "debilitated": "Scorpio"},
+    "Mars": {"exalted": "Capricorn", "debilitated": "Cancer"},
+    "Mercury": {"exalted": "Virgo", "debilitated": "Pisces"},
+    "Jupiter": {"exalted": "Cancer", "debilitated": "Capricorn"},
+    "Venus": {"exalted": "Pisces", "debilitated": "Virgo"},
+    "Saturn": {"exalted": "Libra", "debilitated": "Aries"},
 }
 
 LIFE_AREA_LIMITS = {
@@ -156,13 +188,20 @@ def build_llm_payload(
     explainability_mode: str = "standard",
     transit_context: Optional[Dict[str, Any]] = None,
     dasha_timing: Optional[Dict[str, str]] = None,
-    moon_rasi: Optional[str] = None
+    moon_rasi: Optional[str] = None,
+    birth_year: Optional[int] = None,
+    lagnadipathi_status: Optional[Dict[str, Any]] = None,
+    saturn_phase: Optional[str] = None,
+    rahu_ketu_axis: Optional[Dict[str, Any]] = None,
+    yogas: Optional[List[Dict[str, Any]]] = None,
+    chandrashtama_periods: Optional[List[Dict[str, Any]]] = None,
+    nakshatra_pada: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-    Build enriched LLM payload with astrological context for detailed interpretations.
+    Build enriched LLM payload v3.0 — Siddhar-Tradition Synthesizer.
     
-    v2.0: Now includes transit positions, house placements, dasha timing,
-    and Tamil astrology vocabulary so LLM can produce specific, actionable predictions.
+    v3.0: Adds birth year, lagnadipathi, Saturn phase, yogas, Rahu-Ketu axis,
+    Chandrashtama periods for deeply personal, strategic life-map predictions.
     """
     limits = LIFE_AREA_LIMITS.get(period_type, LIFE_AREA_LIMITS["monthly"])
     max_areas = limits["max_areas"]
@@ -177,14 +216,10 @@ def build_llm_payload(
     life_areas = []
     for area_name, score in sorted_areas:
         signals = top_signals_by_life_area.get(area_name, [])[:signals_per_area]
-        # Trim each signal and filter out None results
         trimmed_signals = [_trim_signal(s) for s in signals]
         trimmed_signals = [s for s in trimmed_signals if s is not None]
-        # Apply final sanitization
         trimmed_signals = sanitize_signals(trimmed_signals)
         
-        # FIX 2: Do NOT include active_dasha in individual life areas
-        # Dasha is in overall_context only - prevents repetitive phrasing
         life_areas.append({
             "name": area_name,
             "score": score,
@@ -192,31 +227,63 @@ def build_llm_payload(
             "signals": trimmed_signals
         })
     
-    # v2.0: Build enriched overall context with Tamil astrology references
     lagna_tamil = RASI_TAMIL.get(lagna, "")
     lagna_display = f"{lagna} ({lagna_tamil})" if lagna_tamil else lagna
     
     moon_rasi_tamil = RASI_TAMIL.get(moon_rasi, "") if moon_rasi else ""
     moon_display = f"{moon_rasi} ({moon_rasi_tamil})" if moon_rasi and moon_rasi_tamil else (moon_rasi or "Unknown")
     
+    nakshatra_display = moon_nakshatra
+    if nakshatra_pada:
+        nakshatra_display = f"{moon_nakshatra} (Pada {nakshatra_pada})"
+    
     overall_context: Dict[str, Any] = {
         "period_type": period_type,
         "period_label": period_label,
         "lagna": lagna_display,
         "moon_rasi": moon_display,
-        "moon_nakshatra": moon_nakshatra,
+        "moon_nakshatra": nakshatra_display,
+        "nakshatra_pada": nakshatra_pada,
         "active_dasha": {
             "mahadasha": active_dasha.get("mahadasha", "Unknown"),
-            "antardasha": active_dasha.get("antardasha", "Unknown")
+            "antardasha": active_dasha.get("antardasha", "Unknown"),
+            "nature": active_dasha.get("nature", "")
         },
         "explainability_mode": explainability_mode
     }
+    if not overall_context["active_dasha"]["nature"]:
+        del overall_context["active_dasha"]["nature"]
     
-    # v2.0: Include dasha timing for sub-period breakdowns
+    if birth_year:
+        current_year = date.today().year
+        age = current_year - birth_year
+        overall_context["birth_year"] = birth_year
+        overall_context["approximate_age"] = age
+        if age >= 50:
+            overall_context["life_stage"] = "senior — focus on legacy, health preservation, long-term financial security"
+        elif age >= 35:
+            overall_context["life_stage"] = "established — focus on career consolidation, family stability, wealth building"
+        elif age >= 22:
+            overall_context["life_stage"] = "emerging — focus on career foundation, relationships, skill acquisition"
+        else:
+            overall_context["life_stage"] = "formative — focus on education, self-discovery, foundational choices"
+    
+    if lagnadipathi_status:
+        lord_name = lagnadipathi_status.get("lord", "")
+        tamil_name = PLANET_TAMIL.get(lord_name, "")
+        lagnadipathi = {
+            "lord": f"{lord_name} ({tamil_name})" if tamil_name else lord_name,
+            "placed_in_house": lagnadipathi_status.get("house"),
+        }
+        if lagnadipathi_status.get("house_theme"):
+            lagnadipathi["house_theme"] = lagnadipathi_status["house_theme"]
+        if lagnadipathi_status.get("dignity"):
+            lagnadipathi["dignity"] = lagnadipathi_status["dignity"]
+        overall_context["lagnadipathi_status"] = lagnadipathi
+    
     if dasha_timing:
         overall_context["dasha_timing"] = dasha_timing
     
-    # v2.0: Include transit positions with house placements for specific predictions
     if transit_context:
         transits = {}
         for planet_name, transit_data in transit_context.items():
@@ -235,16 +302,57 @@ def build_llm_payload(
                 effect = transit_data.get("effect", "")
                 if effect:
                     transit_entry["effect"] = effect
+                phase = transit_data.get("phase", "")
+                if phase and phase != "neutral":
+                    transit_entry["phase"] = phase
                 transits[planet_name] = transit_entry
         if transits:
             overall_context["current_transits"] = transits
     
+    if saturn_phase and saturn_phase not in ("neutral", "unknown"):
+        phase_labels = {
+            "janma_sani": "Janma Sani (Saturn over natal Moon — karmic testing period)",
+            "ashtama_sani": "Ashtama Sani (Saturn in 8th from Moon — transformation and endurance)",
+            "kantaka_sani": "Kantaka Sani (Saturn in 4th/7th from Moon — domestic and partnership pressure)",
+        }
+        overall_context["saturn_phase"] = phase_labels.get(saturn_phase, saturn_phase)
+    
+    if rahu_ketu_axis:
+        axis_entry: Dict[str, Any] = {}
+        if rahu_ketu_axis.get("rahu_house"):
+            axis_entry["rahu_house"] = rahu_ketu_axis["rahu_house"]
+        if rahu_ketu_axis.get("ketu_house"):
+            axis_entry["ketu_house"] = rahu_ketu_axis["ketu_house"]
+        if rahu_ketu_axis.get("theme"):
+            axis_entry["karmic_theme"] = rahu_ketu_axis["theme"]
+        if axis_entry:
+            overall_context["rahu_ketu_axis"] = axis_entry
+    
+    if yogas:
+        yoga_summaries = []
+        for y in yogas[:4]:
+            name = y.get("name", "")
+            if name:
+                entry: Dict[str, Any] = {"name": name}
+                if y.get("effects"):
+                    effects = y["effects"]
+                    if isinstance(effects, list):
+                        entry["effects"] = ", ".join(effects[:3])
+                    elif isinstance(effects, str):
+                        entry["effects"] = effects[:100]
+                yoga_summaries.append(entry)
+        if yoga_summaries:
+            overall_context["yogas"] = yoga_summaries
+    
+    if chandrashtama_periods:
+        overall_context["chandrashtama_periods"] = chandrashtama_periods[:6]
+    
     payload = {
         "overall_context": overall_context,
-        "reflection_instruction": (
-            "Provide a concise reflective guidance paragraph based on this prediction window. "
-            "Do not ask questions. Do not give step-by-step instructions. "
-            "Use calm, grounded language."
+        "synthesis_instruction": (
+            "SYNTHESIZE, DON'T LIST: Do not repeat the data. Instead, explain the RESULT and IMPACT on life. "
+            "The engine provides the 'What' — you provide the 'So What?' "
+            "Use the individual's age/life_stage to tailor advice tone."
         ),
         "life_areas": life_areas
     }
@@ -314,17 +422,83 @@ def validate_payload_size(
     return True, "ok", estimated_prompt
 
 
+def _derive_lagnadipathi(lagna_rasi: str, ephemeris: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Derive Ascendant Lord status from lagna rasi and ephemeris data."""
+    lord = RASI_LORDS.get(lagna_rasi)
+    if not lord:
+        return None
+    
+    planets = ephemeris.get("planets", {})
+    planet_data = planets.get(lord, {})
+    if not planet_data:
+        return None
+    
+    planet_rasi = planet_data.get("rasi", "")
+    planet_house = planet_data.get("house")
+    
+    dignity = None
+    dig_info = DIGNITY_SIGNS.get(lord, {})
+    if planet_rasi == dig_info.get("exalted"):
+        dignity = "exalted"
+    elif planet_rasi == dig_info.get("debilitated"):
+        dignity = "debilitated"
+    elif planet_rasi == lagna_rasi:
+        dignity = "own_sign"
+    
+    result: Dict[str, Any] = {"lord": lord}
+    if planet_house is not None:
+        result["house"] = planet_house
+        house_theme = HOUSE_THEMES.get(planet_house, "")
+        if house_theme:
+            result["house_theme"] = house_theme
+    if dignity:
+        result["dignity"] = dignity
+    
+    return result
+
+
+def _extract_chandrashtama(chandra_gati: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Extract Chandrashtama (8th house Moon transit) periods from Chandra Gati data."""
+    periods = []
+    positions = chandra_gati.get("moon_positions", [])
+    for pos in positions:
+        house = pos.get("house_from_natal_moon") or pos.get("house_from_moon")
+        if house == 8:
+            entry: Dict[str, Any] = {}
+            if pos.get("date"):
+                entry["date"] = str(pos["date"])[:10]
+            if pos.get("rasi"):
+                entry["moon_in"] = pos["rasi"]
+            entry["warning"] = "Chandrashtama — emotionally sensitive period, avoid major decisions"
+            periods.append(entry)
+    
+    sensitive_days = chandra_gati.get("sensitive_days", [])
+    if not periods and sensitive_days:
+        for day_info in sensitive_days[:6]:
+            if isinstance(day_info, dict):
+                entry = {}
+                if day_info.get("date"):
+                    entry["date"] = str(day_info["date"])[:10]
+                entry["warning"] = "Sensitive Moon transit — exercise caution"
+                periods.append(entry)
+            elif isinstance(day_info, (int, str)):
+                periods.append({"day": str(day_info), "warning": "Sensitive Moon transit"})
+    
+    return periods
+
+
 def extract_payload_inputs(
     envelope: Dict[str, Any],
     synthesis: Dict[str, Any],
     period_type: str,
-    period_key: str
+    period_key: str,
+    base_chart_payload: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Extract enriched inputs from envelope and synthesis for LLM payload.
     
-    v2.0: Now includes transit positions, dasha timing, and moon rasi
-    for richer, more specific predictions.
+    v3.0: Now includes lagnadipathi, Saturn phase, yogas, Rahu-Ketu axis,
+    birth year, Chandrashtama, and nakshatra pada for Siddhar-tradition interpretations.
     """
     lagna = envelope.get("lagna", {})
     nakshatra = envelope.get("nakshatra_context", {})
@@ -334,14 +508,23 @@ def extract_payload_inputs(
     lagna_label = lagna.get("label", lagna.get("rasi", "Unknown"))
     moon_nakshatra = nakshatra.get("janma_nakshatra", "Unknown")
     moon_rasi = envelope.get("moon_rasi") or nakshatra.get("janma_rasi", "")
+    nakshatra_pada = nakshatra.get("janma_pada")
     
-    active_dasha = {
+    antar_lord = dasha.get("antar_lord", "Unknown")
+    antar_houses = dasha.get("antar_houses", [])
+    dasha_nature = ""
+    if antar_houses:
+        house_refs = [str(h) for h in antar_houses[:2]]
+        dasha_nature = f"{antar_lord} rules houses {', '.join(house_refs)}"
+    
+    active_dasha: Dict[str, Any] = {
         "mahadasha": dasha.get("maha_lord", "Unknown"),
-        "antardasha": dasha.get("antar_lord", "Unknown")
+        "antardasha": antar_lord,
     }
+    if dasha_nature:
+        active_dasha["nature"] = dasha_nature
     
-    # v2.0: Extract dasha timing for sub-period breakdowns
-    dasha_timing = {}
+    dasha_timing: Dict[str, Any] = {}
     antar = dasha.get("antar") or {}
     if antar.get("start"):
         dasha_timing["antardasha_start"] = str(antar["start"])[:10]
@@ -351,16 +534,79 @@ def extract_payload_inputs(
     if maha_balance:
         dasha_timing["mahadasha_balance"] = f"{maha_balance} years"
     
-    # v2.0: Extract transit context from gochara
-    transit_context = {}
-    for planet_key in ("jupiter", "saturn", "rahu", "ketu"):
-        planet_data = gochara.get(planet_key, {})
-        if isinstance(planet_data, dict) and planet_data.get("rasi"):
-            transit_context[planet_key.capitalize()] = {
-                "rasi": planet_data.get("rasi", ""),
-                "house_from_moon": planet_data.get("house_from_moon"),
-                "effect": planet_data.get("effect", "")
+    transit_context: Dict[str, Any] = {}
+    saturn_phase = None
+    rahu_ketu_axis = None
+    
+    jupiter_data = gochara.get("jupiter", {})
+    if isinstance(jupiter_data, dict) and jupiter_data.get("transit_rasi"):
+        transit_context["Jupiter"] = {
+            "rasi": jupiter_data["transit_rasi"],
+            "house_from_moon": jupiter_data.get("from_moon_house"),
+            "effect": jupiter_data.get("effect", "")
+        }
+    
+    saturn_data = gochara.get("saturn", {})
+    if isinstance(saturn_data, dict) and saturn_data.get("transit_rasi"):
+        transit_context["Saturn"] = {
+            "rasi": saturn_data["transit_rasi"],
+            "house_from_moon": saturn_data.get("from_moon_house"),
+            "effect": saturn_data.get("effect", ""),
+            "phase": saturn_data.get("phase", "")
+        }
+        saturn_phase = saturn_data.get("phase")
+    
+    rahu_ketu_data = gochara.get("rahu_ketu", {})
+    if isinstance(rahu_ketu_data, dict):
+        if rahu_ketu_data.get("rahu_rasi"):
+            transit_context["Rahu"] = {
+                "rasi": rahu_ketu_data["rahu_rasi"],
+                "house_from_moon": rahu_ketu_data.get("rahu_from_moon_house"),
+                "effect": rahu_ketu_data.get("effect", "")
             }
+        if rahu_ketu_data.get("ketu_rasi"):
+            transit_context["Ketu"] = {
+                "rasi": rahu_ketu_data["ketu_rasi"],
+                "house_from_moon": rahu_ketu_data.get("ketu_from_moon_house"),
+                "effect": rahu_ketu_data.get("effect", "")
+            }
+        rahu_ketu_axis = {
+            "rahu_house": rahu_ketu_data.get("rahu_from_moon_house"),
+            "ketu_house": rahu_ketu_data.get("ketu_from_moon_house"),
+            "axis": rahu_ketu_data.get("axis", ""),
+            "theme": rahu_ketu_data.get("theme", "")
+        }
+    
+    envelope_yogas = envelope.get("yogas", {})
+    yoga_list = []
+    if isinstance(envelope_yogas, dict):
+        present = envelope_yogas.get("present_yogas", [])
+        if isinstance(present, list):
+            yoga_list = [y for y in present if isinstance(y, dict) and y.get("present")]
+    elif isinstance(envelope_yogas, list):
+        yoga_list = [y for y in envelope_yogas if isinstance(y, dict) and y.get("present")]
+    
+    chandra_gati = envelope.get("chandra_gati", {})
+    chandrashtama_periods = _extract_chandrashtama(chandra_gati) if chandra_gati else []
+    
+    birth_year = None
+    lagnadipathi_status = None
+    if base_chart_payload:
+        birth_details = base_chart_payload.get("birth_details", {})
+        dob = birth_details.get("date_of_birth", "")
+        if dob:
+            try:
+                if isinstance(dob, str) and len(dob) >= 4:
+                    birth_year = int(dob[:4])
+                elif isinstance(dob, date):
+                    birth_year = dob.year
+            except (ValueError, TypeError):
+                pass
+        
+        ephemeris = base_chart_payload.get("ephemeris", {})
+        lagna_rasi_for_lord = ephemeris.get("lagna", {}).get("rasi", "")
+        if lagna_rasi_for_lord:
+            lagnadipathi_status = _derive_lagnadipathi(lagna_rasi_for_lord, ephemeris)
     
     life_area_scores = {}
     top_signals_by_life_area = {}
@@ -383,7 +629,14 @@ def extract_payload_inputs(
         "life_area_scores": life_area_scores,
         "top_signals_by_life_area": top_signals_by_life_area,
         "transit_context": transit_context if transit_context else None,
-        "dasha_timing": dasha_timing if dasha_timing else None
+        "dasha_timing": dasha_timing if dasha_timing else None,
+        "birth_year": birth_year,
+        "lagnadipathi_status": lagnadipathi_status,
+        "saturn_phase": saturn_phase,
+        "rahu_ketu_axis": rahu_ketu_axis,
+        "yogas": yoga_list if yoga_list else None,
+        "chandrashtama_periods": chandrashtama_periods if chandrashtama_periods else None,
+        "nakshatra_pada": nakshatra_pada,
     }
 
 
