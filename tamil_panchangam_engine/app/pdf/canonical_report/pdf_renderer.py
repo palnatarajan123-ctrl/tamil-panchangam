@@ -226,7 +226,8 @@ def _render_chart_from_svg(svg_data_uri: str, chart_type: str):
             svg_bytes = base64.b64decode(svg_b64)
             drawing = svg2rlg(BytesIO(svg_bytes))
             if drawing:
-                scale = 180 / max(drawing.width, drawing.height)
+                target_size = 300
+                scale = target_size / max(drawing.width, drawing.height)
                 drawing.width = drawing.width * scale
                 drawing.height = drawing.height * scale
                 drawing.scale(scale, scale)

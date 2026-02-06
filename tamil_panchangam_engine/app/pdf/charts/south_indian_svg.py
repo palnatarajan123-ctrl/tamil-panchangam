@@ -9,12 +9,12 @@ from typing import List, Dict, Optional
 from xml.sax.saxutils import escape
 
 from app.pdf.charts.chart_models import ChartSvgInput
-
-SVG_WIDTH = 520
-SVG_HEIGHT = 520
-GRID_SIZE = 4
-CELL_SIZE = 120
-GRID_PADDING = 20
+from app.pdf.charts.layout import (
+    CELL_SIZE, GRID_PADDING, GRID_SIZE,
+    SVG_WIDTH, SVG_HEIGHT,
+    SIGN_FONT_SIZE, PLANET_FONT_SIZE, TITLE_FONT_SIZE,
+    PLANET_VERTICAL_START_OFFSET, PLANET_VERTICAL_SPACING,
+)
 
 # Sign order (matches frontend SIGN_NAMES)
 SIGN_NAMES = [
@@ -131,16 +131,16 @@ def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
         # Sign label
         label_color = COLOR_LAGNA if is_lagna else COLOR_SIGN
         svg_elements.append(
-            f'<text x="{cx}" y="{y + 18}" text-anchor="middle" '
-            f'font-family="monospace" font-size="11" fill="{label_color}">'
+            f'<text x="{cx}" y="{y + 22}" text-anchor="middle" '
+            f'font-family="monospace" font-size="{SIGN_FONT_SIZE}" fill="{label_color}">'
             f'{escape(abbrev)}</text>'
         )
         
         # Lagna marker
         if is_lagna:
             svg_elements.append(
-                f'<text x="{cx}" y="{y + 32}" text-anchor="middle" '
-                f'font-family="sans-serif" font-size="10" font-weight="600" fill="{COLOR_LAGNA}">'
+                f'<text x="{cx}" y="{y + 40}" text-anchor="middle" '
+                f'font-family="sans-serif" font-size="{SIGN_FONT_SIZE - 2}" font-weight="600" fill="{COLOR_LAGNA}">'
                 f'Lagna</text>'
             )
         
@@ -155,9 +155,10 @@ def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
                 elif d == "debilitated":
                     planet_color = COLOR_DEBILITATED
             
+            py = y + PLANET_VERTICAL_START_OFFSET + idx * PLANET_VERTICAL_SPACING
             svg_elements.append(
-                f'<text x="{cx}" y="{y + 50 + idx * 16}" text-anchor="middle" '
-                f'font-family="sans-serif" font-size="13" font-weight="500" fill="{planet_color}">'
+                f'<text x="{cx}" y="{py}" text-anchor="middle" '
+                f'font-family="sans-serif" font-size="{PLANET_FONT_SIZE}" font-weight="500" fill="{planet_color}">'
                 f'{escape(planet)}</text>'
             )
     
@@ -174,13 +175,13 @@ def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
     subtitle = "D9 · Marriage & Dharma" if input.chart_type == "D9" else "South Indian"
     
     svg_elements.append(
-        f'<text x="{SVG_WIDTH/2}" y="{SVG_HEIGHT/2 - 8}" text-anchor="middle" '
-        f'font-family="sans-serif" font-size="14" font-weight="700" fill="{COLOR_TITLE}">'
+        f'<text x="{SVG_WIDTH/2}" y="{SVG_HEIGHT/2 - 10}" text-anchor="middle" '
+        f'font-family="sans-serif" font-size="{TITLE_FONT_SIZE}" font-weight="700" fill="{COLOR_TITLE}">'
         f'{escape(title)}</text>'
     )
     svg_elements.append(
-        f'<text x="{SVG_WIDTH/2}" y="{SVG_HEIGHT/2 + 12}" text-anchor="middle" '
-        f'font-family="sans-serif" font-size="11" fill="{COLOR_SUBTITLE}">'
+        f'<text x="{SVG_WIDTH/2}" y="{SVG_HEIGHT/2 + 14}" text-anchor="middle" '
+        f'font-family="sans-serif" font-size="{SIGN_FONT_SIZE}" fill="{COLOR_SUBTITLE}">'
         f'{escape(subtitle)}</text>'
     )
     

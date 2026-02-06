@@ -67,10 +67,11 @@ export function SouthIndianChart({
   dignity = {},
   title = "Rāsi Chart (D1)",      // ⬅️ default ONLY if caller forgets
   subtitle = "South Indian",
-  size = 360,
+  size = 480,
   className = "",
 }: ChartProps) {
   const cellSize = size / 4;
+  const scaleFactor = size / 480;
 
   const strokeColor = "hsl(var(--border) / 0.7)";
   const textColor = "hsl(var(--foreground))";
@@ -170,9 +171,9 @@ export function SouthIndianChart({
             {/* Sign Label */}
             <text
               x={x + cellSize / 2}
-              y={y + 12}
+              y={y + Math.round(16 * scaleFactor)}
               textAnchor="middle"
-              fontSize="9"
+              fontSize={Math.round(13 * scaleFactor)}
               fontFamily="var(--font-mono)"
               fill={isLagna ? primaryColor : mutedColor}
               fontWeight={isLagna ? "600" : "400"}
@@ -184,9 +185,9 @@ export function SouthIndianChart({
             {isLagna && (
               <text
                 x={x + cellSize / 2}
-                y={y + 24}
+                y={y + Math.round(32 * scaleFactor)}
                 textAnchor="middle"
-                fontSize="9"
+                fontSize={Math.round(12 * scaleFactor)}
                 fontWeight="600"
                 fill={primaryColor}
               >
@@ -195,14 +196,14 @@ export function SouthIndianChart({
             )}
 
             {/* Planets */}
-            <g transform={`translate(${x + cellSize / 2}, ${y + cellSize / 2 + 6})`}>
+            <g transform={`translate(${x + cellSize / 2}, ${y + cellSize / 2 + Math.round(4 * scaleFactor)})`}>
               {planetsHere.map((planet, idx) => (
                 <text
                   key={`${signName}-${planet}-${idx}`}
                   x={0}
-                  y={idx * 12}
+                  y={idx * Math.round(16 * scaleFactor)}
                   textAnchor="middle"
-                  fontSize="11"
+                  fontSize={Math.round(14 * scaleFactor)}
                   fontWeight="500"
                   fill={planetColor(planet)}
                 >
@@ -224,12 +225,12 @@ export function SouthIndianChart({
         rx="4"
       />
 
-      {/* ✅ CENTER LABEL — caller-controlled */}
+      {/* CENTER LABEL */}
       <text
         x={size / 2}
-        y={size / 2 - 6}
+        y={size / 2 - Math.round(8 * scaleFactor)}
         textAnchor="middle"
-        fontSize="13"
+        fontSize={Math.round(16 * scaleFactor)}
         fontWeight="700"
         fill="hsl(var(--foreground))"
       >
@@ -238,9 +239,9 @@ export function SouthIndianChart({
 
       <text
         x={size / 2}
-        y={size / 2 + 12}
+        y={size / 2 + Math.round(14 * scaleFactor)}
         textAnchor="middle"
-        fontSize="10"
+        fontSize={Math.round(12 * scaleFactor)}
         fill="hsl(var(--muted-foreground))"
       >
         {subtitle}

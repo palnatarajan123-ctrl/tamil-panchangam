@@ -59,8 +59,8 @@ def render_south_indian_chart_reportlab(
     planet_signs: Dict[str, List[str]],
     lagna_sign: Optional[str] = None,
     title: Optional[str] = None,
-    width: float = 180,
-    height: float = 180
+    width: float = 260,
+    height: float = 260
 ) -> Drawing:
     """
     Render a South Indian chart matching frontend logic.
@@ -91,7 +91,7 @@ def render_south_indian_chart_reportlab(
     if title:
         drawing.add(String(
             width / 2, height + 12, title,
-            fontName='Helvetica-Bold', fontSize=9,
+            fontName='Helvetica-Bold', fontSize=12,
             textAnchor='middle', fillColor=black
         ))
     
@@ -122,16 +122,16 @@ def render_south_indian_chart_reportlab(
         # Sign label
         label_color = COLOR_LAGNA if is_lagna else COLOR_SIGN
         drawing.add(String(
-            x + cell_size / 2, y - 10, abbrev,
-            fontName='Helvetica', fontSize=7,
+            x + cell_size / 2, y - 12, abbrev,
+            fontName='Helvetica', fontSize=10,
             textAnchor='middle', fillColor=label_color
         ))
         
         # Lagna marker
         if is_lagna:
             drawing.add(String(
-                x + cell_size / 2, y - 20, "Lagna",
-                fontName='Helvetica', fontSize=6,
+                x + cell_size / 2, y - 24, "Lagna",
+                fontName='Helvetica', fontSize=9,
                 textAnchor='middle', fillColor=COLOR_LAGNA
             ))
         
@@ -140,21 +140,21 @@ def render_south_indian_chart_reportlab(
         for idx, planet in enumerate(planets[:4]):
             abbrev_p = PLANET_ABBREVS.get(planet, planet[:2])
             drawing.add(String(
-                x + cell_size / 2, y - 32 - (idx * 10), abbrev_p,
-                fontName='Helvetica-Bold', fontSize=8,
+                x + cell_size / 2, y - 38 - (idx * 14), abbrev_p,
+                fontName='Helvetica-Bold', fontSize=11,
                 textAnchor='middle', fillColor=COLOR_PLANET
             ))
     
     # Center label
     cx, cy = width / 2, height / 2
     drawing.add(String(
-        cx, cy + 5, chart_type,
-        fontName='Helvetica-Bold', fontSize=12,
+        cx, cy + 6, chart_type,
+        fontName='Helvetica-Bold', fontSize=16,
         textAnchor='middle', fillColor=Color(0.4, 0.4, 0.4)
     ))
     drawing.add(String(
-        cx, cy - 8, "South Indian",
-        fontName='Helvetica', fontSize=7,
+        cx, cy - 10, "South Indian",
+        fontName='Helvetica', fontSize=10,
         textAnchor='middle', fillColor=Color(0.5, 0.5, 0.5)
     ))
     

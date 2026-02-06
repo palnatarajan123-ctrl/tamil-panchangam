@@ -69,7 +69,7 @@ export function HeroSection() {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent rounded-lg blur-3xl" />
               <div className="relative bg-card rounded-lg p-6 border">
-                <SouthIndianChart lagna={0} planets={samplePlanets} size={320} />
+                <SouthIndianChart lagna={0} planets={samplePlanets} size={420} />
                 <div className="mt-4 pt-4 border-t">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground font-mono">Drik Ganita</span>

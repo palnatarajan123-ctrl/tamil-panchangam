@@ -113,7 +113,7 @@ export function TabbedChartViewer({ charts, onTabChange }: TabbedChartViewerProp
           const info = CHART_INFO[key];
           return (
             <TabsContent key={key} value={key} className="mt-0">
-              <CardContent className="pt-6 pb-8">
+              <CardContent className="pt-6 pb-8 overflow-x-auto">
                 <div className="flex flex-col items-center gap-4">
                   <div className="text-center mb-2">
                     <h3 className="text-lg font-semibold">{info.title}</h3>
@@ -123,9 +123,10 @@ export function TabbedChartViewer({ charts, onTabChange }: TabbedChartViewerProp
                     lagna={data.lagna}
                     planets={data.planets}
                     dignity={data.dignity}
-                    size={340}
+                    size={480}
                     title={info.title}
                     subtitle={info.subtitle}
+                    className="max-w-full h-auto"
                   />
                   <p className="text-xs text-muted-foreground text-center max-w-md mt-2">
                     {info.description}

@@ -25,14 +25,15 @@ export function ChartPair({ d1, d9 }: ChartPairProps) {
         <CardHeader>
           <CardTitle>Rāsi Chart (D1)</CardTitle>
         </CardHeader>
-        <CardContent className="flex justify-center py-6">
+        <CardContent className="flex justify-center py-6 overflow-x-auto">
           <SouthIndianChart
             lagna={d1.lagna}
             planets={d1.planets}
             dignity={d1.dignity}
-            size={360}
+            size={480}
             title="Rāsi Chart (D1)"
             subtitle="South Indian"
+            className="max-w-full h-auto"
           />
         </CardContent>
       </Card>
@@ -42,14 +43,15 @@ export function ChartPair({ d1, d9 }: ChartPairProps) {
         <CardHeader>
           <CardTitle>Navamsa Chart (D9)</CardTitle>
         </CardHeader>
-        <CardContent className="flex justify-center py-6">
+        <CardContent className="flex justify-center py-6 overflow-x-auto">
           <SouthIndianChart
             lagna={d9.lagna}
             planets={d9.planets}
             dignity={d9.dignity}
-            size={360}
+            size={480}
             title="Navamsa Chart (D9)"
             subtitle="D9 · Marriage & Dharma"
+            className="max-w-full h-auto"
           />
         </CardContent>
       </Card>

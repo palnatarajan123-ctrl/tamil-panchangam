@@ -16,8 +16,8 @@ Determinism > Flexibility.
 # ===============================
 
 GRID_SIZE = 4                     # 4x4 grid
-CELL_SIZE = 120                   # pixels
-GRID_PADDING = 20                 # outer padding (pixels)
+CELL_SIZE = 155                   # pixels
+GRID_PADDING = 30                 # outer padding (pixels)
 
 SVG_WIDTH = GRID_SIZE * CELL_SIZE + (2 * GRID_PADDING)
 SVG_HEIGHT = GRID_SIZE * CELL_SIZE + (2 * GRID_PADDING)
@@ -26,9 +26,9 @@ SVG_HEIGHT = GRID_SIZE * CELL_SIZE + (2 * GRID_PADDING)
 # Typography
 # ===============================
 
-SIGN_FONT_SIZE = 12
-PLANET_FONT_SIZE = 14
-TITLE_FONT_SIZE = 16
+SIGN_FONT_SIZE = 15
+PLANET_FONT_SIZE = 17
+TITLE_FONT_SIZE = 20
 
 SIGN_FONT_FAMILY = "Helvetica"
 PLANET_FONT_FAMILY = "Helvetica-Bold"
@@ -139,8 +139,8 @@ def grid_cell_center(col: int, row: int) -> tuple[int, int]:
 # Planet Placement Within Cell
 # ===============================
 
-PLANET_VERTICAL_START_OFFSET = 30
-PLANET_VERTICAL_SPACING = 16
+PLANET_VERTICAL_START_OFFSET = 40
+PLANET_VERTICAL_SPACING = 20
 
 def planet_text_position(col: int, row: int, index: int) -> tuple[int, int]:
     """
