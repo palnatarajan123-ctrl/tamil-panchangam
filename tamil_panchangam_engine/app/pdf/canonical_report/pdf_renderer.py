@@ -470,7 +470,16 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
     
     elements.append(Paragraph("Predictions", styles['SectionTitle']))
     
-    if data.is_v2 and data.monthly_theme:
+    if data.is_v3 and data.yearly_mantra:
+        elements.append(Paragraph("Guiding Theme", styles['SubsectionTitle']))
+        elements.append(Paragraph(data.yearly_mantra, styles['BodyText']))
+        elements.append(Spacer(1, 0.3*inch))
+    
+    if data.is_v3 and data.dasha_transit_synthesis:
+        elements.append(Paragraph("Dasha-Transit Synthesis", styles['SubsectionTitle']))
+        elements.append(Paragraph(data.dasha_transit_synthesis, styles['BodyText']))
+        elements.append(Spacer(1, 0.3*inch))
+    elif data.is_v2 and data.monthly_theme:
         elements.append(Paragraph(
             f"<b>{data.monthly_theme.title}</b>",
             styles['SubsectionTitle']
@@ -478,7 +487,7 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
         elements.append(Paragraph(data.monthly_theme.narrative, styles['BodyText']))
         elements.append(Spacer(1, 0.3*inch))
     
-    if data.is_v2 and data.overview_v2:
+    if not data.is_v3 and data.is_v2 and data.overview_v2:
         elements.append(Paragraph("Energy & Focus", styles['SubsectionTitle']))
         elements.append(Paragraph(data.overview_v2.energy_pattern, styles['BodyText']))
         
@@ -495,7 +504,7 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
                 elements.append(Paragraph(f"• {item}", styles['BodyText']))
         
         elements.append(Spacer(1, 0.3*inch))
-    elif data.prediction_overview:
+    elif not data.is_v3 and data.prediction_overview:
         elements.append(Paragraph("Overview", styles['SubsectionTitle']))
         elements.append(Paragraph(data.prediction_overview, styles['BodyText']))
         elements.append(Spacer(1, 0.3*inch))
@@ -584,9 +593,7 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
         if area.interpretation:
             area_elements.append(Paragraph(area.interpretation, styles['BodyText']))
         
-        # v2.0: Skip deterministic deeper_explanation for LLM-enhanced reports
-        # since the LLM summary already contains rich astrological detail
-        if area.deeper_explanation and not data.is_v2:
+        if area.deeper_explanation and not data.is_v2 and not data.is_v3:
             area_elements.append(Paragraph(
                 f"<i>{area.deeper_explanation}</i>", 
                 styles['BodyText']
@@ -614,7 +621,36 @@ def _build_practices_reflection(data: CanonicalReportData, styles) -> List:
     """Build practices section."""
     elements = []
     
-    if data.is_v2 and data.practices_v2:
+    if data.is_v3 and data.veda_remedy:
+        elements.append(Paragraph("Veda Pariharam (Remedies)", styles['SectionTitle']))
+        
+        if data.veda_remedy.primary_remedy:
+            elements.append(Paragraph(
+                f"<b>Primary Remedy:</b> {data.veda_remedy.primary_remedy}", 
+                styles['BodyText']
+            ))
+        
+        if data.veda_remedy.supporting_practice:
+            elements.append(Spacer(1, 0.15*inch))
+            elements.append(Paragraph(
+                f"<b>Supporting Practice:</b> {data.veda_remedy.supporting_practice}", 
+                styles['BodyText']
+            ))
+        
+        if data.veda_remedy.specific_remedies:
+            elements.append(Spacer(1, 0.15*inch))
+            elements.append(Paragraph("<b>Additional Remedies:</b>", styles['BodyText']))
+            for remedy in data.veda_remedy.specific_remedies:
+                elements.append(Paragraph(f"• {remedy}", styles['BodyText']))
+        
+        if data.danger_windows:
+            elements.append(Spacer(1, 0.2*inch))
+            elements.append(Paragraph("<b>Mindfulness Windows:</b>", styles['BodyText']))
+            for window in data.danger_windows:
+                elements.append(Paragraph(f"• {window}", styles['BodyText']))
+        
+        elements.append(Spacer(1, 0.3*inch))
+    elif data.is_v2 and data.practices_v2:
         elements.append(Paragraph("Practices & Reflection", styles['SectionTitle']))
         
         if data.practices_v2.daily_practice:
@@ -629,8 +665,6 @@ def _build_practices_reflection(data: CanonicalReportData, styles) -> List:
                 styles['BodyText']
             ))
         
-        # FIX 3: Render ONLY reflection_guidance from LLM output
-        # Do NOT fallback to static template - render nothing if missing
         if data.practices_v2.reflection_guidance:
             elements.append(Spacer(1, 0.15*inch))
             elements.append(Paragraph(
@@ -641,7 +675,6 @@ def _build_practices_reflection(data: CanonicalReportData, styles) -> List:
                 data.practices_v2.reflection_guidance, 
                 styles['BodyText']
             ))
-        # No else fallback - if LLM didn't generate, section is omitted
         
         elements.append(Spacer(1, 0.3*inch))
     elif data.practices:
@@ -657,7 +690,20 @@ def _build_closing(data: CanonicalReportData, styles) -> List:
     """Build closing section."""
     elements = []
     
-    if data.is_v2 and data.closing_v2:
+    if data.is_v3 and data.closing_v3:
+        elements.append(Paragraph("Key Takeaways", styles['SectionTitle']))
+        
+        if data.closing_v3.key_takeaways:
+            for takeaway in data.closing_v3.key_takeaways:
+                elements.append(Paragraph(f"• {takeaway}", styles['BodyText']))
+            elements.append(Spacer(1, 0.2*inch))
+        
+        if data.closing_v3.encouragement:
+            elements.append(Paragraph(
+                f"<i>{data.closing_v3.encouragement}</i>",
+                styles['BodyText']
+            ))
+    elif data.is_v2 and data.closing_v2:
         elements.append(Paragraph("Key Takeaways", styles['SectionTitle']))
         
         if data.closing_v2.key_takeaways:

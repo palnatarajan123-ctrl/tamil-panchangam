@@ -1,5 +1,5 @@
 // client/src/adapters/aiInterpretationAdapter.ts
-// AI Interpretation Engine v1.0/v2.0 → Prediction UI View Model Adapter
+// AI Interpretation Engine v1.0/v2.0/v3.0 → Prediction UI View Model Adapter
 // 
 // This adapter is the SINGLE source of truth for mapping AI Interpretation
 // output to UI-ready view models. The UI renders ONLY what this adapter returns.
@@ -17,13 +17,11 @@ export interface DominantForce {
   description: string;
 }
 
-// V2 Monthly Theme
 export interface MonthlyThemeViewModel {
   title: string;
   narrative: string;
 }
 
-// V2 Overview (enhanced)
 export interface OverviewViewModel {
   energyPattern: string;
   keyFocus?: string[];
@@ -31,14 +29,12 @@ export interface OverviewViewModel {
   attributionSummary?: AttributionSummaryViewModel;
 }
 
-// Attribution Summary (consolidated from all life areas)
 export interface AttributionSummaryViewModel {
   activePlanets: string[];
   activeDasha?: string;
   activeEngines: string[];
 }
 
-// V2 Practices & Reflection
 export interface PracticesViewModel {
   dailyPractice?: string;
   weeklyPractice?: string;
@@ -46,13 +42,11 @@ export interface PracticesViewModel {
   reflectionGuidance?: string;
 }
 
-// V2 Closing
 export interface ClosingViewModel {
   keyTakeaways?: string[];
   encouragement?: string;
 }
 
-// V1 Window Summary (legacy)
 export interface WindowSummaryViewModel {
   momentum: string;
   overview: string;
@@ -73,7 +67,6 @@ export interface LifeAreaAttribution {
   }>;
 }
 
-// V2 Life Area (enhanced)
 export interface LifeAreaViewModel {
   key: string;
   label: string;
@@ -87,23 +80,60 @@ export interface LifeAreaViewModel {
   attribution?: LifeAreaAttribution;
 }
 
-// Unified Prediction View Model (supports v1 and v2)
+export interface VedaRemedyViewModel {
+  primaryRemedy: string;
+  supportingPractice?: string;
+  specificRemedies?: string[];
+}
+
 export interface PredictionViewModel {
   engineVersion: string;
   generatedAt: string;
-  // V2 fields
   monthlyTheme?: MonthlyThemeViewModel;
   overview?: OverviewViewModel;
   practicesAndReflection?: PracticesViewModel;
   closing?: ClosingViewModel;
-  // V1 legacy field
   windowSummary?: WindowSummaryViewModel;
-  // Shared
+  yearlyMantra?: string;
+  dashaTransitSynthesis?: string;
+  dangerWindows?: string[];
+  vedaRemedy?: VedaRemedyViewModel;
   lifeAreas: LifeAreaViewModel[];
   explainabilityLevel: ExplainabilityLevel;
 }
 
-// V2 Input Schema
+export interface AIInterpretationV3 {
+  engine_version: "ai-interpretation-v3.0";
+  generated_at: string;
+  yearly_mantra: string;
+  dasha_transit_synthesis: string;
+  life_areas: {
+    [key: string]: {
+      score: number;
+      outlook: string;
+      summary: string;
+    };
+  };
+  danger_windows?: string[];
+  veda_remedy: {
+    primary_remedy: string;
+    supporting_practice?: string;
+    specific_remedies?: string[];
+  };
+  closing: {
+    key_takeaways?: string[];
+    encouragement?: string;
+  };
+  _visibility?: {
+    level?: string;
+    show_yearly_mantra?: boolean;
+    show_dasha_synthesis?: boolean;
+    show_danger_windows?: boolean;
+    show_veda_remedy?: boolean;
+    show_closing?: boolean;
+  };
+}
+
 export interface AIInterpretationV2 {
   engine_version: "ai-interpretation-v2.0";
   generated_at: string;
@@ -145,7 +175,6 @@ export interface AIInterpretationV2 {
   };
 }
 
-// V1 Input Schema (legacy)
 export interface AIInterpretationV1 {
   engine_version: string;
   generated_at: string;
@@ -195,6 +224,10 @@ const LIFE_AREA_LABELS: Record<string, string> = {
 
 const LIFE_AREA_ORDER = ["career", "finance", "relationships", "health", "health_and_energy", "personal_growth"];
 
+function isV3Interpretation(obj: any): obj is AIInterpretationV3 {
+  return obj?.engine_version === "ai-interpretation-v3.0";
+}
+
 function isV2Interpretation(obj: any): obj is AIInterpretationV2 {
   return obj?.engine_version === "ai-interpretation-v2.0";
 }
@@ -204,6 +237,78 @@ function isV1Interpretation(obj: any): obj is AIInterpretationV1 {
     obj?.engine_version === "ai-interpretation-v1.0" ||
     (obj?.window_summary != null && obj?.life_areas != null)
   );
+}
+
+export function adaptAIInterpretationV3(
+  aiInterpretation: AIInterpretationV3,
+  level: ExplainabilityLevel = "full"
+): PredictionViewModel {
+  const visibility = aiInterpretation._visibility;
+  const showMantra = level !== "minimal" && (visibility?.show_yearly_mantra !== false);
+  const showSynthesis = level !== "minimal" && (visibility?.show_dasha_synthesis !== false);
+  const showDangerWindows = level !== "minimal" && (visibility?.show_danger_windows !== false);
+  const showRemedy = level !== "minimal" && (visibility?.show_veda_remedy !== false);
+  const showClosing = level !== "minimal" && (visibility?.show_closing !== false);
+
+  const result: PredictionViewModel = {
+    engineVersion: aiInterpretation.engine_version,
+    generatedAt: aiInterpretation.generated_at,
+    lifeAreas: [],
+    explainabilityLevel: level,
+  };
+
+  if (showMantra && aiInterpretation.yearly_mantra) {
+    result.yearlyMantra = aiInterpretation.yearly_mantra;
+  }
+
+  if (showSynthesis && aiInterpretation.dasha_transit_synthesis) {
+    result.dashaTransitSynthesis = aiInterpretation.dasha_transit_synthesis;
+  }
+
+  if (showDangerWindows && aiInterpretation.danger_windows?.length) {
+    result.dangerWindows = aiInterpretation.danger_windows;
+  }
+
+  if (showRemedy && aiInterpretation.veda_remedy) {
+    const remedy: VedaRemedyViewModel = {
+      primaryRemedy: aiInterpretation.veda_remedy.primary_remedy,
+    };
+    if (aiInterpretation.veda_remedy.supporting_practice) {
+      remedy.supportingPractice = aiInterpretation.veda_remedy.supporting_practice;
+    }
+    if (aiInterpretation.veda_remedy.specific_remedies?.length) {
+      remedy.specificRemedies = aiInterpretation.veda_remedy.specific_remedies;
+    }
+    result.vedaRemedy = remedy;
+  }
+
+  if (showClosing && aiInterpretation.closing) {
+    const closing: ClosingViewModel = {};
+    if (aiInterpretation.closing.key_takeaways?.length) {
+      closing.keyTakeaways = aiInterpretation.closing.key_takeaways;
+    }
+    if (aiInterpretation.closing.encouragement) {
+      closing.encouragement = aiInterpretation.closing.encouragement;
+    }
+    if (Object.keys(closing).length > 0) {
+      result.closing = closing;
+    }
+  }
+
+  result.lifeAreas = LIFE_AREA_ORDER
+    .filter(key => key in aiInterpretation.life_areas)
+    .map(key => {
+      const area = aiInterpretation.life_areas[key];
+      return {
+        key,
+        label: LIFE_AREA_LABELS[key] ?? key,
+        score: area.score,
+        outlook: area.outlook ?? "neutral",
+        summary: area.summary,
+      };
+    });
+
+  return result;
 }
 
 export function adaptAIInterpretationV2(
@@ -243,7 +348,6 @@ export function adaptAIInterpretationV2(
       result.overview.avoidOrBeMindful = aiInterpretation.overview.avoid_or_be_mindful;
     }
     
-    // Aggregate attribution from all life areas into summary
     if (showAttribution && deterministicInterpretation?.life_areas) {
       const allPlanets = new Set<string>();
       const allEngines = new Set<string>();
@@ -325,9 +429,6 @@ export function adaptAIInterpretationV2(
         viewModel.oneAction = area.one_action;
       }
 
-      // NOTE: Attribution is now shown in overview summary, not per life area
-      // Removed per-area attribution to reduce repetition
-
       return viewModel;
     });
 
@@ -377,7 +478,6 @@ export function adaptAIInterpretation(
     windowSummary.timingGuidance = aiInterpretation.window_summary.timing_guidance;
   }
 
-  // Aggregate attribution from all life areas into summary (v1)
   if (showAttribution) {
     const allPlanets = new Set<string>();
     const allEngines = new Set<string>();
@@ -421,9 +521,6 @@ export function adaptAIInterpretation(
         viewModel.deeperExplanation = area.deeper_explanation;
       }
 
-      // NOTE: Attribution is now shown in window summary, not per life area
-      // Removed per-area attribution to reduce repetition
-
       return viewModel;
     });
 
@@ -437,6 +534,9 @@ export function adaptAIInterpretation(
 }
 
 function isValidInterpretationShape(obj: any): boolean {
+  if (isV3Interpretation(obj)) {
+    return true;
+  }
   if (isV2Interpretation(obj)) {
     return true;
   }
@@ -454,11 +554,11 @@ export function hasValidAIInterpretation(details: any): boolean {
 }
 
 export interface ExtractedInterpretation {
-  primary: AIInterpretationV1 | AIInterpretationV2;
+  primary: AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3;
   deterministic?: AIInterpretationV1;
 }
 
-export function extractAIInterpretation(details: any): AIInterpretationV1 | AIInterpretationV2 | null {
+export function extractAIInterpretation(details: any): AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3 | null {
   if (!hasValidAIInterpretation(details)) {
     return null;
   }
@@ -493,12 +593,14 @@ export function extractInterpretationWithDeterministic(details: any): ExtractedI
   };
 }
 
-// Unified adapter that handles both v1 and v2
 export function adaptInterpretation(
-  interpretation: AIInterpretationV1 | AIInterpretationV2,
+  interpretation: AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3,
   level: ExplainabilityLevel = "full",
   deterministicInterpretation?: AIInterpretationV1
 ): PredictionViewModel {
+  if (isV3Interpretation(interpretation)) {
+    return adaptAIInterpretationV3(interpretation, level);
+  }
   if (isV2Interpretation(interpretation)) {
     return adaptAIInterpretationV2(interpretation, level, deterministicInterpretation);
   }

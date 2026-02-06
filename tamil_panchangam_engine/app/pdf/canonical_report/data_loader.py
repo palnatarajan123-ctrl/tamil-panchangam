@@ -31,6 +31,7 @@ from .models import (
     Overview,
     PracticesAndReflection,
     Closing,
+    VedaRemedy,
     MethodologyInfo,
 )
 
@@ -325,15 +326,23 @@ def _extract_prediction_areas(
     Extract prediction areas and practices from interpretation.
     
     Returns: (overview, areas, practices, is_v2, monthly_theme, overview_v2, practices_v2, closing_v2)
+    
+    Note: v3 fields (yearly_mantra, dasha_transit_synthesis, danger_windows, veda_remedy, closing_v3)
+    are extracted separately in build_report_data since this function signature is preserved for v1/v2 compat.
     """
     ai_interp = interpretation.get("ai_interpretation", {})
     
     llm_source = llm_interpretation if llm_interpretation else {}
     deterministic_source = ai_interp
     
-    is_v2 = llm_source.get("engine_version") == "ai-interpretation-v2.0"
+    engine_version = llm_source.get("engine_version", "")
+    is_v2 = engine_version == "ai-interpretation-v2.0"
+    is_v3 = engine_version == "ai-interpretation-v3.0"
     
-    if is_v2:
+    if is_v3:
+        overview = llm_source.get("dasha_transit_synthesis", "")
+        overview_v2_data = None
+    elif is_v2:
         overview_v2_data = llm_source.get("overview", {})
         overview = overview_v2_data.get("energy_pattern", "")
     else:
@@ -350,7 +359,7 @@ def _extract_prediction_areas(
     
     monthly_theme_data = llm_source.get("monthly_theme") if is_v2 else None
     practices_v2_data = llm_source.get("practices_and_reflection") if is_v2 else None
-    closing_v2_data = llm_source.get("closing") if is_v2 else None
+    closing_v2_data = llm_source.get("closing") if (is_v2 and not is_v3) else None
     
     llm_life_areas = llm_source.get("life_areas", {})
     det_life_areas = deterministic_source.get("life_areas", {})
@@ -545,6 +554,9 @@ def build_report_data(
         interpretation, llm_interpretation
     )
     
+    llm_src = llm_interpretation if llm_interpretation else {}
+    is_v3 = llm_src.get("engine_version") == "ai-interpretation-v3.0"
+    
     birth_details_data = payload.get("birth_details", {})
     
     monthly_theme = None
@@ -578,6 +590,32 @@ def build_report_data(
             encouragement=closing_v2_data.get("encouragement")
         )
     
+    yearly_mantra = None
+    dasha_transit_synthesis = None
+    danger_windows_list: List[str] = []
+    veda_remedy_obj = None
+    closing_v3 = None
+    
+    if is_v3:
+        yearly_mantra = llm_src.get("yearly_mantra")
+        dasha_transit_synthesis = llm_src.get("dasha_transit_synthesis")
+        danger_windows_list = llm_src.get("danger_windows", [])
+        
+        veda_data = llm_src.get("veda_remedy")
+        if veda_data and isinstance(veda_data, dict):
+            veda_remedy_obj = VedaRemedy(
+                primary_remedy=veda_data.get("primary_remedy", ""),
+                supporting_practice=veda_data.get("supporting_practice"),
+                specific_remedies=veda_data.get("specific_remedies", [])
+            )
+        
+        closing_v3_data = llm_src.get("closing")
+        if closing_v3_data and isinstance(closing_v3_data, dict):
+            closing_v3 = Closing(
+                key_takeaways=closing_v3_data.get("key_takeaways", []),
+                encouragement=closing_v3_data.get("encouragement")
+            )
+    
     return CanonicalReportData(
         report_type=report_type.title(),
         period_label=period_label,
@@ -598,7 +636,6 @@ def build_report_data(
             d1_planet_signs=_convert_planet_to_sign_mapping(rasi_planet_signs),
             d9_planet_signs=_convert_planet_to_sign_mapping(navamsa_planet_signs),
             lagna_sign=lagna_sign,
-            # Tier-1 divisional charts
             d2_hora=_generate_chart_svg(d2_planet_signs, "D2", "Hora (D2)", "") if d2_planet_signs else "",
             d7_saptamsa=_generate_chart_svg(d7_planet_signs, "D7", "Saptamsa (D7)", "") if d7_planet_signs else "",
             d10_dasamsa=_generate_chart_svg(d10_planet_signs, "D10", "Dasamsa (D10)", "") if d10_planet_signs else "",
@@ -629,6 +666,13 @@ def build_report_data(
         practices_v2=practices_v2,
         closing_v2=closing_v2,
         is_v2=is_v2,
+        
+        yearly_mantra=yearly_mantra,
+        dasha_transit_synthesis=dasha_transit_synthesis,
+        danger_windows=danger_windows_list,
+        veda_remedy=veda_remedy_obj,
+        closing_v3=closing_v3,
+        is_v3=is_v3,
         
         methodology=methodology,
     )

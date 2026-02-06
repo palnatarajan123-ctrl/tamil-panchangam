@@ -147,6 +147,13 @@ class MethodologyInfo(BaseModel):
     cusp_cases: List[str] = []
 
 
+class VedaRemedy(BaseModel):
+    """V3 veda remedy / pariharam section."""
+    primary_remedy: str
+    supporting_practice: Optional[str] = None
+    specific_remedies: List[str] = []
+
+
 class CanonicalReportData(BaseModel):
     """Complete data model for canonical PDF report."""
     
@@ -181,5 +188,12 @@ class CanonicalReportData(BaseModel):
     practices_v2: Optional[PracticesAndReflection] = None
     closing_v2: Optional[Closing] = None
     is_v2: bool = False
+    
+    yearly_mantra: Optional[str] = None
+    dasha_transit_synthesis: Optional[str] = None
+    danger_windows: List[str] = []
+    veda_remedy: Optional[VedaRemedy] = None
+    closing_v3: Optional[Closing] = None
+    is_v3: bool = False
     
     methodology: Optional[MethodologyInfo] = None

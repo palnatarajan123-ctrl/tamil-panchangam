@@ -30,6 +30,8 @@ import {
   MessageCircle,
   CheckCircle,
   Heart,
+  Shield,
+  Flame,
 } from "lucide-react";
 
 import type { PredictionViewModel, LifeAreaViewModel } from "@/adapters/aiInterpretationAdapter";
@@ -80,8 +82,6 @@ function LifeAreaCard({ area, isV2 }: LifeAreaCardProps) {
       <AccordionContent className="space-y-4 text-sm">
         <p data-testid={`text-summary-${area.key}`}>{area.summary}</p>
 
-        {/* v1.8: Removed Opportunity/Watch-out/One Action - paragraph-only format */}
-
         {!isV2 && area.deeperExplanation && (
           <div className="bg-muted/50 p-3 rounded-md" data-testid={`text-explanation-${area.key}`}>
             <p className="text-muted-foreground">{area.deeperExplanation}</p>
@@ -104,6 +104,7 @@ export function MonthlyPredictionView({
   }
 
   const { lifeAreas } = prediction;
+  const isV3 = prediction.engineVersion === "ai-interpretation-v3.0";
   const isV2 = prediction.engineVersion === "ai-interpretation-v2.0";
 
   const periodLabel =
@@ -115,6 +116,46 @@ export function MonthlyPredictionView({
 
   return (
     <div className="space-y-6" data-testid="section-prediction-view">
+
+      {/* ================= V3: YEARLY MANTRA ================= */}
+      {isV3 && prediction.yearlyMantra && (
+        <Card data-testid="card-yearly-mantra" className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Guiding Theme
+            </CardTitle>
+            <CardDescription>
+              Your spiritual and practical compass for this period
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-base leading-relaxed" data-testid="text-yearly-mantra">
+              {prediction.yearlyMantra}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ================= V3: DASHA-TRANSIT SYNTHESIS ================= */}
+      {isV3 && prediction.dashaTransitSynthesis && (
+        <Card data-testid="card-dasha-synthesis">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Dasha-Transit Synthesis
+            </CardTitle>
+            <CardDescription>
+              How your planetary periods and current transits interact
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-base leading-relaxed" data-testid="text-dasha-synthesis">
+              {prediction.dashaTransitSynthesis}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ================= V2: MONTHLY THEME ================= */}
       {isV2 && prediction.monthlyTheme && (
@@ -220,7 +261,7 @@ export function MonthlyPredictionView({
       )}
 
       {/* ================= V1: WINDOW SUMMARY (legacy) ================= */}
-      {!isV2 && prediction.windowSummary && (
+      {!isV2 && !isV3 && prediction.windowSummary && (
         <Card data-testid="card-window-summary">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -311,6 +352,31 @@ export function MonthlyPredictionView({
         </Card>
       )}
 
+      {/* ================= V3: DANGER WINDOWS ================= */}
+      {isV3 && prediction.dangerWindows && prediction.dangerWindows.length > 0 && (
+        <Card data-testid="card-danger-windows" className="border-amber-500/30 dark:border-amber-400/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              Mindfulness Windows
+            </CardTitle>
+            <CardDescription>
+              Periods requiring extra awareness and care
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2" data-testid="list-danger-windows">
+              {prediction.dangerWindows.map((window, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm" data-testid={`text-danger-window-${idx}`}>
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                  <span>{window}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ================= LIFE AREAS ================= */}
       <Card data-testid="card-life-areas">
         <CardHeader>
@@ -319,18 +385,71 @@ export function MonthlyPredictionView({
             Life Areas
           </CardTitle>
           <CardDescription>
-            {isV2 ? "Detailed insights with opportunities and actions" : "Area-wise influence and interpretation"}
+            {isV3 ? "Detailed astrological insights by life domain" : isV2 ? "Detailed insights with opportunities and actions" : "Area-wise influence and interpretation"}
           </CardDescription>
         </CardHeader>
 
         <CardContent>
           <Accordion type="single" collapsible className="w-full" data-testid="accordion-life-areas">
             {lifeAreas.map(area => (
-              <LifeAreaCard key={area.key} area={area} isV2={isV2} />
+              <LifeAreaCard key={area.key} area={area} isV2={isV2 || isV3} />
             ))}
           </Accordion>
         </CardContent>
       </Card>
+
+      {/* ================= V3: VEDA REMEDY (PARIHARAM) ================= */}
+      {isV3 && prediction.vedaRemedy && (
+        <Card data-testid="card-veda-remedy" className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Flame className="h-5 w-5 text-primary" />
+              Veda Pariharam (Remedies)
+            </CardTitle>
+            <CardDescription>
+              Deity-specific traditional remedies for this period
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            {prediction.vedaRemedy.primaryRemedy && (
+              <div className="flex items-start gap-3" data-testid="section-primary-remedy">
+                <Star className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Primary Remedy</p>
+                  <p className="text-sm">{prediction.vedaRemedy.primaryRemedy}</p>
+                </div>
+              </div>
+            )}
+
+            {prediction.vedaRemedy.supportingPractice && (
+              <div className="flex items-start gap-3" data-testid="section-supporting-practice">
+                <Calendar className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Supporting Practice</p>
+                  <p className="text-sm">{prediction.vedaRemedy.supportingPractice}</p>
+                </div>
+              </div>
+            )}
+
+            {prediction.vedaRemedy.specificRemedies && prediction.vedaRemedy.specificRemedies.length > 0 && (
+              <div className="flex items-start gap-3 bg-muted/50 p-4 rounded-md" data-testid="section-specific-remedies">
+                <BookOpen className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Additional Remedies</p>
+                  <ul className="space-y-1 text-sm">
+                    {prediction.vedaRemedy.specificRemedies.map((remedy, idx) => (
+                      <li key={idx} data-testid={`text-specific-remedy-${idx}`}>
+                        {remedy}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ================= V2: PRACTICES & REFLECTION ================= */}
       {isV2 && prediction.practicesAndReflection && (
@@ -367,7 +486,7 @@ export function MonthlyPredictionView({
             )}
 
             {(prediction.practicesAndReflection.reflectionGuidance || prediction.practicesAndReflection.reflectionQuestion) && (
-              <div className="flex items-start gap-3 bg-muted/50 p-4 rounded-lg" data-testid="section-reflection">
+              <div className="flex items-start gap-3 bg-muted/50 p-4 rounded-md" data-testid="section-reflection">
                 <MessageCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Reflection & Guidance</p>
@@ -381,8 +500,8 @@ export function MonthlyPredictionView({
         </Card>
       )}
 
-      {/* ================= V2: CLOSING ================= */}
-      {isV2 && prediction.closing && (
+      {/* ================= V2/V3: CLOSING ================= */}
+      {(isV2 || isV3) && prediction.closing && (
         <Card data-testid="card-closing" className="border-primary/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
