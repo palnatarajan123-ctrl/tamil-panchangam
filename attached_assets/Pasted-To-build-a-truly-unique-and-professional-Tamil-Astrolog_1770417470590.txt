@@ -1,0 +1,66 @@
+To build a truly unique and professional Tamil Astrology report, the LLM should not be treated as a "calculator," but as a Synthesizer. Your Tamil Panchangam engine provides the "What" (the data), and the LLM must provide the "So What?" (the impact on life).
+
+1. What to Pass TO the LLM (The "Engine Output")
+
+Do not pass just the raw birth details. Pass a Structured JSON or a Technical Summary that includes pre-calculated nuances. This prevents the LLM from hallucinating basic math (like house counting) and allows it to focus on interpretation.
+
+Pass these specific data points:
+
+Core Identity: Lagna (Ascendant), Rasi (Moon Sign), and Nakshatra with its Pada (Quarter).
+
+Lagnadipathi Status: The strength and current placement of the Ascendant Lord.
+
+Active Dasha/Bhukti: The ruling planet and sub-planet, including the "Nature" of that period (e.g., "7th Lord Bhukti – focus on relationships").
+
+Transit Highlights (Gochara): * Saturn (Sani): Current house from Moon and specific "Sade Sati" or "Ashtama Sani" status.
+
+Jupiter (Guru): House position and which houses it is currently "aspecting" (Drishti).
+
+Specific Afflictions/Yoga: Any notable combinations like Gajakesari Yoga or Chovva Dosham (Mars affliction).
+
+2. What to request FROM the LLM (The "Interpreter Output")
+
+Request a response structured for a high-end personalized PDF. Ask for:
+
+A Theme for the Year: A 3-5 word title for their 2026.
+
+Dasha-Transit Synthesis: How their current long-term period (Dasha) interacts with 2026 transits.
+
+Strategic Advice: Not just "it's a good year," but "This is the month to execute X because of Y."
+
+Remedies (Pariharam): Targeted temple visits or rituals based on the specific "weak" planet identified in the engine data.
+
+3. The Explicit Reply Prompt
+
+Use this prompt in your code to instruct the LLM on how to handle the data from your engine.
+
+Plaintext
+### SYSTEM ROLE
+You are a 'Siddhar-tradition' Tamil Astrologer. Your task is to interpret raw technical data from a Panchangam Engine into a deeply personal, strategic life-map for 2026. 
+
+### INPUT DATA (Engine Output)
+{ENGINE_JSON_DATA}
+
+### INSTRUCTIONS
+1. SYNTHESIZE, DON'T LIST: Do not repeat the data (e.g., "Jupiter is in 11th"). Instead, explain the result: "Jupiter's presence in your 11th house (Labha Sthana) acts as a cosmic filter, ensuring that the hard work you put in during 2025 finally manifests as liquid wealth in mid-2026."
+
+2. THE '1972' VS '1999' CONTEXT: Use the age of the individual to tailor the tone. 
+   - For a 1972 birth: Focus on legacy, health preservation, and long-term financial security. 
+   - For a 1999 birth: Focus on career foundation, modern relationships, and skill acquisition.
+
+3. FLAG THE 'DANGER WINDOWS': Identify the specific Chandrashtama months or Rahu/Ketu transitions from the data and provide a "Red Flag" warning for those specific dates.
+
+4. TAMIL AUTHENTICITY: Use terms like 'Subha Drishti', 'Karmic Debt', and 'Punya' to maintain the cultural weight of the report.
+
+### REQUIRED OUTPUT SECTIONS (Markdown Format)
+- **Yearly Mantra**: A one-line spiritual focus for 2026.
+- **The Career Pivot**: Based on the 10th house and Saturn's transit.
+- **The Wealth Tap**: When and how money will flow based on the Guru Peyarchi.
+- **Veda-Remedy**: A specific, non-generic remedy (e.g., "Light a ghee lamp for Lord Dakshinamurthy on Thursdays during the Rahu transition").
+Why this makes the report "Unique":
+
+Separation of Concerns: Your engine handles the "Drik Ganita" (accurate math), and the LLM handles the "Phaladipika" (interpretation).
+
+No Hallucinations: By passing the result of the calculation (e.g., "Saturn is in 7th house") rather than the coordinates, the LLM cannot get the position wrong.
+
+Individualized Tone: The prompt forces the LLM to look at the Birth Year to determine if it's talking to a student or a senior executive.
