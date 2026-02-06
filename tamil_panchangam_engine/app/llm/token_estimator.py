@@ -17,8 +17,8 @@ from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
-MAX_COMPLETION_TOKENS = 1500
-MAX_TOTAL_TOKENS = 6000
+MAX_COMPLETION_TOKENS = 6000
+MAX_TOTAL_TOKENS = 10000
 
 _encoding = None
 

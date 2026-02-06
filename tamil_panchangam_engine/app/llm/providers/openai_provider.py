@@ -130,10 +130,11 @@ def call_openai(
         
         ctx = ssl.create_default_context()
         
-        with urllib.request.urlopen(req, timeout=60, context=ctx) as response:
+        with urllib.request.urlopen(req, timeout=90, context=ctx) as response:
             response_data = json.loads(response.read().decode('utf-8'))
         
         content = response_data["choices"][0]["message"]["content"]
+        finish_reason = response_data["choices"][0].get("finish_reason", "unknown")
         usage = response_data.get("usage", {})
         
         usage_info = {
@@ -144,10 +145,17 @@ def call_openai(
             "provider": PROVIDER_NAME
         }
         
+        if finish_reason == "length":
+            logger.warning(
+                f"OpenAI response TRUNCATED (finish_reason=length). "
+                f"Used {usage_info['completion_tokens']} completion tokens out of {max_tokens} limit. "
+                f"Output is likely incomplete."
+            )
+        
         try:
             parsed_json = json.loads(content)
             logger.info(
-                f"OpenAI call success: {usage_info['total_tokens']} tokens"
+                f"OpenAI call success: {usage_info['total_tokens']} tokens (finish_reason={finish_reason})"
             )
             return parsed_json, usage_info, None
         except json.JSONDecodeError as e:
@@ -156,7 +164,7 @@ def call_openai(
             
             repaired = _repair_json(content)
             if repaired:
-                logger.info(f"JSON repair successful: {usage_info['total_tokens']} tokens")
+                logger.info(f"JSON repair successful: {usage_info['total_tokens']} tokens (finish_reason={finish_reason})")
                 return repaired, usage_info, None
             
             logger.error(f"OpenAI returned invalid JSON: {e}")

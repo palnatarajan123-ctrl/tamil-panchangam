@@ -33,15 +33,15 @@ MAX_PROMPT_TOKENS = {
 }
 
 MAX_COMPLETION_TOKENS = {
-    "weekly": 2000,
-    "monthly": 4000,
-    "yearly": 5000
+    "weekly": 3000,
+    "monthly": 6000,
+    "yearly": 8000
 }
 
 MAX_TOTAL_TOKENS = {
-    "weekly": 3500,
-    "monthly": 7000,
-    "yearly": 9000
+    "weekly": 5500,
+    "monthly": 10000,
+    "yearly": 13000
 }
 
 RASI_LORDS = {
