@@ -426,7 +426,10 @@ def generate_llm_interpretation(
             active_dasha=payload_inputs["active_dasha"],
             life_area_scores=payload_inputs["life_area_scores"],
             top_signals_by_life_area=payload_inputs["top_signals_by_life_area"],
-            explainability_mode=explainability_mode
+            explainability_mode=explainability_mode,
+            transit_context=payload_inputs.get("transit_context"),
+            dasha_timing=payload_inputs.get("dasha_timing"),
+            moon_rasi=payload_inputs.get("moon_rasi")
         )
     except AssertionError as e:
         logger.error(f"Dasha payload leak detected: {e}")

@@ -18,27 +18,49 @@ from typing import Dict, Any, List, Literal, Optional
 logger = logging.getLogger(__name__)
 
 MAX_PROMPT_TOKENS = {
-    "weekly": 1000,
-    "monthly": 1200,
-    "yearly": 1500
+    "weekly": 1200,
+    "monthly": 1800,
+    "yearly": 2200
 }
 
 MAX_COMPLETION_TOKENS = {
-    "weekly": 1500,
-    "monthly": 3000,
-    "yearly": 3500
+    "weekly": 1800,
+    "monthly": 3500,
+    "yearly": 4500
 }
 
 MAX_TOTAL_TOKENS = {
-    "weekly": 2500,
-    "monthly": 5000,
-    "yearly": 6000
+    "weekly": 3000,
+    "monthly": 6000,
+    "yearly": 8000
 }
 
 LIFE_AREA_LIMITS = {
-    "weekly": {"max_areas": 4, "signals_per_area": 1},
-    "monthly": {"max_areas": 5, "signals_per_area": 2},
+    "weekly": {"max_areas": 4, "signals_per_area": 2},
+    "monthly": {"max_areas": 5, "signals_per_area": 3},
     "yearly": {"max_areas": 7, "signals_per_area": 3}
+}
+
+HOUSE_THEMES = {
+    1: "Self & Personality (Thanu Bhava)",
+    2: "Wealth & Speech (Dhana Bhava)",
+    3: "Courage & Siblings (Sahaja Bhava)",
+    4: "Home & Happiness (Sukha Bhava)",
+    5: "Children & Intelligence (Putra Bhava)",
+    6: "Health & Enemies (Shatru Bhava)",
+    7: "Partnerships & Marriage (Kalatra Bhava)",
+    8: "Transformation & Longevity (Ayur Bhava)",
+    9: "Fortune & Dharma (Bhagya Bhava)",
+    10: "Career & Authority (Karma Bhava)",
+    11: "Gains & Aspirations (Labha Bhava)",
+    12: "Liberation & Loss (Vyaya Bhava)",
+}
+
+RASI_TAMIL = {
+    "Aries": "Mesham", "Taurus": "Rishabam", "Gemini": "Mithunam",
+    "Cancer": "Kadagam", "Leo": "Simmam", "Virgo": "Kanni",
+    "Libra": "Thulam", "Scorpio": "Viruchigam", "Sagittarius": "Dhanusu",
+    "Capricorn": "Makaram", "Aquarius": "Kumbam", "Pisces": "Meenam"
 }
 
 
@@ -63,32 +85,51 @@ def sanitize_signals(signals: list) -> list:
 
 
 def _trim_signal(signal: Dict[str, Any]) -> Optional[Dict[str, str]]:
-    """Extract summary, rationale, and interpretive_hint from a signal. Returns None if invalid."""
+    """Extract signal data for LLM, including astrological context for richer interpretations.
+    
+    v2.0: Now includes planet, house, and source fields so the LLM can reference
+    specific planetary positions and house activations in its narratives.
+    """
     key = signal.get("key", "")
     rationale = signal.get("rationale", "")
     interpretive_hint = signal.get("interpretive_hint", "")
     
-    # Skip if key or rationale is None or empty
     if not key or not rationale:
         return None
     
-    # Convert key to readable summary
     summary = key.replace("_", " ").title()[:40]
-    if len(rationale) > 80:
-        rationale = rationale[:77] + "..."
+    if len(rationale) > 120:
+        rationale = rationale[:117] + "..."
     
-    # Final check: skip if either ends up as "None"
     if summary.lower() == "none" or rationale.lower() == "none":
         return None
     
-    result = {
+    result: Dict[str, Any] = {
         "summary": summary,
         "rationale": rationale
     }
     
-    # Include interpretive_hint if available
     if interpretive_hint and str(interpretive_hint).lower() != "none":
         result["interpretive_hint"] = interpretive_hint
+    
+    # v2.0: Include astrological context for richer LLM narratives
+    planet = signal.get("planet") or signal.get("source_planet")
+    if not planet and "_" in key:
+        parts = key.split("_")
+        for part in parts:
+            if part in ("Jupiter", "Saturn", "Mars", "Venus", "Mercury", "Sun", "Moon", "Rahu", "Ketu"):
+                planet = part
+                break
+    if planet and str(planet).lower() != "none":
+        result["planet"] = str(planet)
+    
+    house = signal.get("house")
+    if house is not None and str(house).lower() != "none":
+        result["house"] = int(house)
+    
+    valence = signal.get("valence")
+    if valence and str(valence).lower() != "none":
+        result["valence"] = str(valence)
     
     return result
 
@@ -112,23 +153,16 @@ def build_llm_payload(
     active_dasha: Dict[str, str],
     life_area_scores: Dict[str, int],
     top_signals_by_life_area: Dict[str, List[Dict[str, Any]]],
-    explainability_mode: str = "standard"
+    explainability_mode: str = "standard",
+    transit_context: Optional[Dict[str, Any]] = None,
+    dasha_timing: Optional[Dict[str, str]] = None,
+    moon_rasi: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Build a minimal LLM payload with ONLY meaning-layer data.
+    Build enriched LLM payload with astrological context for detailed interpretations.
     
-    Args:
-        period_type: "weekly" | "monthly" | "yearly"
-        period_label: Human-readable period (e.g., "Week 5, 2026")
-        lagna: Lagna rasi label (e.g., "Capricorn")
-        moon_nakshatra: Moon's nakshatra (e.g., "Rohini")
-        active_dasha: {"mahadasha": "Saturn", "antardasha": "Venus"}
-        life_area_scores: {"career": 54, "finance": 56, ...}
-        top_signals_by_life_area: {"career": [signal1, signal2], ...}
-        explainability_mode: "minimal" | "standard" | "full"
-        
-    Returns:
-        Trimmed payload dict ready for LLM
+    v2.0: Now includes transit positions, house placements, dasha timing,
+    and Tamil astrology vocabulary so LLM can produce specific, actionable predictions.
     """
     limits = LIFE_AREA_LIMITS.get(period_type, LIFE_AREA_LIMITS["monthly"])
     max_areas = limits["max_areas"]
@@ -158,20 +192,55 @@ def build_llm_payload(
             "signals": trimmed_signals
         })
     
-    payload = {
-        # FIX 2: Dasha included ONLY under "overall_context" as per spec
-        "overall_context": {
-            "period_type": period_type,
-            "period_label": period_label,
-            "lagna": lagna,
-            "moon_nakshatra": moon_nakshatra,
-            "active_dasha": {
-                "mahadasha": active_dasha.get("mahadasha", "Unknown"),
-                "antardasha": active_dasha.get("antardasha", "Unknown")
-            },
-            "explainability_mode": explainability_mode
+    # v2.0: Build enriched overall context with Tamil astrology references
+    lagna_tamil = RASI_TAMIL.get(lagna, "")
+    lagna_display = f"{lagna} ({lagna_tamil})" if lagna_tamil else lagna
+    
+    moon_rasi_tamil = RASI_TAMIL.get(moon_rasi, "") if moon_rasi else ""
+    moon_display = f"{moon_rasi} ({moon_rasi_tamil})" if moon_rasi and moon_rasi_tamil else (moon_rasi or "Unknown")
+    
+    overall_context: Dict[str, Any] = {
+        "period_type": period_type,
+        "period_label": period_label,
+        "lagna": lagna_display,
+        "moon_rasi": moon_display,
+        "moon_nakshatra": moon_nakshatra,
+        "active_dasha": {
+            "mahadasha": active_dasha.get("mahadasha", "Unknown"),
+            "antardasha": active_dasha.get("antardasha", "Unknown")
         },
-        # FIX 3: Add reflection instruction to existing LLM call
+        "explainability_mode": explainability_mode
+    }
+    
+    # v2.0: Include dasha timing for sub-period breakdowns
+    if dasha_timing:
+        overall_context["dasha_timing"] = dasha_timing
+    
+    # v2.0: Include transit positions with house placements for specific predictions
+    if transit_context:
+        transits = {}
+        for planet_name, transit_data in transit_context.items():
+            if isinstance(transit_data, dict):
+                rasi = transit_data.get("rasi", "")
+                house = transit_data.get("house_from_moon")
+                rasi_tamil = RASI_TAMIL.get(rasi, "")
+                transit_entry: Dict[str, Any] = {
+                    "sign": f"{rasi} ({rasi_tamil})" if rasi_tamil else rasi
+                }
+                if house is not None:
+                    transit_entry["house_from_moon"] = house
+                    house_theme = HOUSE_THEMES.get(house, "")
+                    if house_theme:
+                        transit_entry["house_theme"] = house_theme
+                effect = transit_data.get("effect", "")
+                if effect:
+                    transit_entry["effect"] = effect
+                transits[planet_name] = transit_entry
+        if transits:
+            overall_context["current_transits"] = transits
+    
+    payload = {
+        "overall_context": overall_context,
         "reflection_instruction": (
             "Provide a concise reflective guidance paragraph based on this prediction window. "
             "Do not ask questions. Do not give step-by-step instructions. "
@@ -252,21 +321,46 @@ def extract_payload_inputs(
     period_key: str
 ) -> Dict[str, Any]:
     """
-    Extract the minimal inputs needed for build_llm_payload from envelope and synthesis.
+    Extract enriched inputs from envelope and synthesis for LLM payload.
     
-    This is the ONLY place where we touch envelope/synthesis to extract labels.
+    v2.0: Now includes transit positions, dasha timing, and moon rasi
+    for richer, more specific predictions.
     """
     lagna = envelope.get("lagna", {})
     nakshatra = envelope.get("nakshatra_context", {})
     dasha = envelope.get("dasha_context", {})
+    gochara = envelope.get("gochara", {})
     
     lagna_label = lagna.get("label", lagna.get("rasi", "Unknown"))
     moon_nakshatra = nakshatra.get("janma_nakshatra", "Unknown")
+    moon_rasi = envelope.get("moon_rasi") or nakshatra.get("janma_rasi", "")
     
     active_dasha = {
         "mahadasha": dasha.get("maha_lord", "Unknown"),
         "antardasha": dasha.get("antar_lord", "Unknown")
     }
+    
+    # v2.0: Extract dasha timing for sub-period breakdowns
+    dasha_timing = {}
+    antar = dasha.get("antar") or {}
+    if antar.get("start"):
+        dasha_timing["antardasha_start"] = str(antar["start"])[:10]
+    if antar.get("end"):
+        dasha_timing["antardasha_end"] = str(antar["end"])[:10]
+    maha_balance = dasha.get("balance_years")
+    if maha_balance:
+        dasha_timing["mahadasha_balance"] = f"{maha_balance} years"
+    
+    # v2.0: Extract transit context from gochara
+    transit_context = {}
+    for planet_key in ("jupiter", "saturn", "rahu", "ketu"):
+        planet_data = gochara.get(planet_key, {})
+        if isinstance(planet_data, dict) and planet_data.get("rasi"):
+            transit_context[planet_key.capitalize()] = {
+                "rasi": planet_data.get("rasi", ""),
+                "house_from_moon": planet_data.get("house_from_moon"),
+                "effect": planet_data.get("effect", "")
+            }
     
     life_area_scores = {}
     top_signals_by_life_area = {}
@@ -284,9 +378,12 @@ def extract_payload_inputs(
         "period_label": period_label,
         "lagna": lagna_label,
         "moon_nakshatra": moon_nakshatra,
+        "moon_rasi": moon_rasi,
         "active_dasha": active_dasha,
         "life_area_scores": life_area_scores,
-        "top_signals_by_life_area": top_signals_by_life_area
+        "top_signals_by_life_area": top_signals_by_life_area,
+        "transit_context": transit_context if transit_context else None,
+        "dasha_timing": dasha_timing if dasha_timing else None
     }
 
 

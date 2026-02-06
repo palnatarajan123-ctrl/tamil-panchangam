@@ -583,7 +583,9 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
         if area.interpretation:
             area_elements.append(Paragraph(area.interpretation, styles['BodyText']))
         
-        if area.deeper_explanation:
+        # v2.0: Skip deterministic deeper_explanation for LLM-enhanced reports
+        # since the LLM summary already contains rich astrological detail
+        if area.deeper_explanation and not data.is_v2:
             area_elements.append(Paragraph(
                 f"<i>{area.deeper_explanation}</i>", 
                 styles['BodyText']
