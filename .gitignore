@@ -42,3 +42,5 @@ replit.md
 *.log
 vite.config.ts.*
 server/public
+*.duckdb
+*.zip
