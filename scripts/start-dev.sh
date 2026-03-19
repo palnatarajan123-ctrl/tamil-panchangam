@@ -12,7 +12,7 @@ sleep 3
 
 # Start the frontend
 echo "Starting frontend on port 5000..."
-cd /home/runner/workspace && npx vite &
+npx vite &
 FRONTEND_PID=$!
 
 # Handle shutdown

@@ -1,5 +1,6 @@
 import app.db.sqlite_patch  # 🔴 MUST be first
 
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -21,13 +22,14 @@ from app.db.bootstrap import bootstrap
 
 
 # =====================================================
-# 🔒 FRONTEND PATH — HARD LOCK (NO AUTO DISCOVERY)
+# FRONTEND STATIC PATH
+# Set STATIC_DIR env var to override (e.g. in production).
+# Default: <project-root>/dist/public (two levels up from this file's package root)
 # =====================================================
-WORKSPACE_ROOT = Path("/home/runner/workspace")
-STATIC_DIR = WORKSPACE_ROOT / "dist" / "public"
+_default_static = Path(__file__).resolve().parents[2] / "dist" / "public"
+STATIC_DIR = Path(os.environ.get("STATIC_DIR", str(_default_static)))
 ASSETS_DIR = STATIC_DIR / "assets"
 
-print("🚀 WORKSPACE_ROOT:", WORKSPACE_ROOT)
 print("📦 STATIC_DIR:", STATIC_DIR)
 print("📦 ASSETS_DIR:", ASSETS_DIR)
 print("📂 STATIC_DIR exists:", STATIC_DIR.exists())
