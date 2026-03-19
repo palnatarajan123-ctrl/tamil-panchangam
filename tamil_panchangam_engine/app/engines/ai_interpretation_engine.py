@@ -541,9 +541,10 @@ def _generate_life_area_interpretation(
             sig_weight = round(float(sig_weight), 2)
         
         signals_used.append({
-            "engine": sig_engine,
-            "weight": sig_weight,
+            "key": sig_engine,
+            "strength": sig_weight,
             "valence": sig_valence or "neutral",
+            "rationale": sig.get("rationale") or None,
         })
     
     attribution = {
