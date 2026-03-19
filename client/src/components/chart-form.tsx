@@ -274,8 +274,11 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
     },
   });
 
+  // Default list shown before the user types (popular cities for this app's audience).
+  const DEFAULT_CITIES = CITIES_LOV.slice(0, 10);
+
   const filteredCities = useMemo(() => {
-    if (!citySearch || citySearch.length < 2) return [];
+    if (!citySearch || citySearch.length < 2) return DEFAULT_CITIES;
     const lower = citySearch.toLowerCase();
     return CITIES_LOV.filter(
       (c) =>
@@ -505,9 +508,9 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-full p-0" align="start">
-                          <Command>
+                          <Command shouldFilter={false}>
                             <CommandInput
-                              placeholder="Type city name (e.g., London, Tokyo, New York)..."
+                              placeholder="Search city (e.g., Chennai, London, New York)..."
                               value={citySearch}
                               onValueChange={setCitySearch}
                               data-testid="input-city-search"
@@ -515,27 +518,21 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
                             <CommandList>
                               <CommandEmpty>
                                 <div className="p-2 text-center">
-                                  {citySearch.length < 2 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                      Type at least 2 characters to search global cities
-                                    </p>
-                                  ) : (
-                                    <>
-                                      <p className="text-sm text-muted-foreground mb-2">City not found</p>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleManualEntry}
-                                        data-testid="button-manual-entry"
-                                      >
-                                        Enter coordinates manually
-                                      </Button>
-                                    </>
-                                  )}
+                                  <p className="text-sm text-muted-foreground mb-2">City not found</p>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleManualEntry}
+                                    data-testid="button-manual-entry"
+                                  >
+                                    Enter coordinates manually
+                                  </Button>
                                 </div>
                               </CommandEmpty>
-                              <CommandGroup>
+                              <CommandGroup
+                                heading={!citySearch || citySearch.length < 2 ? "Popular cities" : "Results"}
+                              >
                                 {filteredCities.map((city) => (
                                   <CommandItem
                                     key={`${city.city}-${city.country}`}

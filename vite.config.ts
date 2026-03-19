@@ -29,10 +29,11 @@ export default defineConfig({
     allowedHosts: true,
 
     proxy: {
+      // Forward /api/* to FastAPI unchanged.
+      // FastAPI routes are all mounted under /api (see main.py include_router calls).
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
 

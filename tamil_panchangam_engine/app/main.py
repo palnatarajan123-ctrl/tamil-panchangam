@@ -1,6 +1,8 @@
 import app.db.sqlite_patch  # 🔴 MUST be first
 
 import os
+from dotenv import load_dotenv
+load_dotenv()  # loads .env from project root (or nearest parent)
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -56,10 +58,10 @@ app.add_middleware(
 )
 
 # -----------------------------
-# API ROUTES
+# API ROUTES  (all under /api so frontend calls work in both dev and prod)
 # -----------------------------
-app.include_router(base_chart_router)
-app.include_router(prediction_router)
+app.include_router(base_chart_router,       prefix="/api")
+app.include_router(prediction_router,       prefix="/api")
 
 @app.on_event("startup")
 def startup_event():
@@ -67,45 +69,46 @@ def startup_event():
     bootstrap()
     load_charts_from_db()
 
-app.include_router(interpretation_router)
-app.include_router(ui_reports_router)
-app.include_router(ui_birth_chart_router)
-app.include_router(prediction_weekly_router)
-app.include_router(prediction_yearly_router)
+app.include_router(interpretation_router,   prefix="/api")
+app.include_router(ui_reports_router,       prefix="/api")
+app.include_router(ui_birth_chart_router,   prefix="/api")
+app.include_router(prediction_weekly_router, prefix="/api")
+app.include_router(prediction_yearly_router, prefix="/api")
 
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
 
-app.include_router(realtime_context_router)
-app.include_router(admin_llm_router)
-app.include_router(canonical_report_router)
+app.include_router(realtime_context_router, prefix="/api")
+app.include_router(admin_llm_router,        prefix="/api")
+app.include_router(canonical_report_router, prefix="/api")
 
 # =====================================================
-# FRONTEND SERVING (SAFE, MINIMAL)
+# FRONTEND SERVING (conditional — skipped in dev when dist/ not built yet)
 # =====================================================
 if not STATIC_DIR.exists():
-    raise RuntimeError(f"STATIC_DIR missing: {STATIC_DIR}")
+    print(f"⚠️  STATIC_DIR not found ({STATIC_DIR}). "
+          "Frontend static serving disabled. Run `npm run build` for production.")
+else:
+    # Serve assets EXACTLY
+    app.mount(
+        "/assets",
+        StaticFiles(directory=ASSETS_DIR),
+        name="assets",
+    )
 
-# Serve assets EXACTLY
-app.mount(
-    "/assets",
-    StaticFiles(directory=ASSETS_DIR),
-    name="assets",
-)
+    # Root entry
+    @app.get("/")
+    def serve_root():
+        index_file = STATIC_DIR / "index.html"
+        if not index_file.exists():
+            raise HTTPException(status_code=404, detail="index.html not found")
+        return FileResponse(index_file)
 
-# Root entry
-@app.get("/")
-def serve_root():
-    index_file = STATIC_DIR / "index.html"
-    if not index_file.exists():
-        raise RuntimeError(f"index.html missing at {index_file}")
-    return FileResponse(index_file)
-
-# SPA fallback (non-asset, non-API)
-@app.get("/{path:path}")
-def spa_fallback(path: str):
-    if "." in path:
-        raise HTTPException(status_code=404)
-    return FileResponse(STATIC_DIR / "index.html")
+    # SPA fallback (non-asset, non-API routes)
+    @app.get("/{path:path}")
+    def spa_fallback(path: str):
+        if path.startswith("api/") or "." in path:
+            raise HTTPException(status_code=404)
+        return FileResponse(STATIC_DIR / "index.html")

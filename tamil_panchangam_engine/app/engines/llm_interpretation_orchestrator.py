@@ -25,7 +25,7 @@ from typing import Dict, Any, Optional, Literal
 
 from app.db.duckdb import get_conn
 from app.llm.token_estimator import check_token_limits, get_max_completion_tokens
-from app.llm.providers import openai_provider
+from app.llm.providers import anthropic_provider as openai_provider  # openai_provider alias kept for internal references
 from app.llm.payload_builder import (
     build_llm_payload,
     validate_payload_size,
@@ -401,13 +401,13 @@ def generate_llm_interpretation(
         return result
     
     if not openai_provider.is_available():
-        logger.info("OpenAI not available - using deterministic fallback")
+        logger.info("Anthropic not available - using deterministic fallback")
         result["llm_interpretation"] = deterministic_interpretation
-        result["llm_metadata"]["fallback_reason"] = "openai_key_missing"
+        result["llm_metadata"]["fallback_reason"] = "anthropic_key_missing"
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
             effective_prompt_version, None, None, 0, 0, 0,
-            deterministic_interpretation, "openai_key_missing", explainability_mode
+            deterministic_interpretation, "anthropic_key_missing", explainability_mode
         )
         return result
     
@@ -499,38 +499,38 @@ def generate_llm_interpretation(
     usage_info = usage_info or {}
     
     if error:
-        logger.warning(f"OpenAI call failed: {error}")
+        logger.warning(f"Anthropic call failed: {error}")
         result["llm_interpretation"] = deterministic_interpretation
         result["llm_metadata"]["fallback_reason"] = error
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            effective_prompt_version, "openai", "gpt-4o-mini", 0, 0, 0,
+            effective_prompt_version, "anthropic", "claude-opus-4-6", 0, 0, 0,
             deterministic_interpretation, error, explainability_mode
         )
         return result
-    
+
     if llm_response is None or not _validate_llm_output(llm_response):
         logger.warning("LLM output validation failed or response is None")
         result["llm_interpretation"] = deterministic_interpretation
         result["llm_metadata"]["fallback_reason"] = "validation_failed"
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            effective_prompt_version, "openai", usage_info.get("model"),
+            effective_prompt_version, "anthropic", usage_info.get("model"),
             usage_info.get("prompt_tokens", 0),
             usage_info.get("completion_tokens", 0),
             usage_info.get("total_tokens", 0),
             deterministic_interpretation, "validation_failed", explainability_mode
         )
         return result
-    
+
     result["llm_interpretation"] = llm_response
-    result["llm_metadata"]["provider"] = "openai"
+    result["llm_metadata"]["provider"] = "anthropic"
     result["llm_metadata"]["model"] = usage_info.get("model")
     result["llm_metadata"]["tokens_used"] = usage_info.get("total_tokens", 0)
-    
+
     _persist_interpretation(
         base_chart_id, period_type, period_key, feature_name,
-        effective_prompt_version, "openai", usage_info.get("model"),
+        effective_prompt_version, "anthropic", usage_info.get("model"),
         usage_info.get("prompt_tokens", 0),
         usage_info.get("completion_tokens", 0),
         usage_info.get("total_tokens", 0),

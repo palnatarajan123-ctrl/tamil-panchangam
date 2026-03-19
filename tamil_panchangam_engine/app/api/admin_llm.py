@@ -26,7 +26,7 @@ from app.engines.llm_interpretation_orchestrator import (
     PROMPT_VERSION,
     LLM_MONTHLY_TOKEN_BUDGET
 )
-from app.llm.providers import openai_provider
+from app.llm.providers import anthropic_provider as openai_provider  # openai_provider alias kept for internal references
 
 logger = logging.getLogger(__name__)
 
