@@ -68,6 +68,7 @@ class SignalDetail(BaseModel):
     engine: str
     direction: str  # "pos" or "neg"
     weight: float
+    interpretive_hint: Optional[str] = None
 
 
 class SignalAttribution(BaseModel):

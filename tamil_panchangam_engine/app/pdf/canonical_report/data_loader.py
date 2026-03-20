@@ -386,10 +386,14 @@ def _extract_prediction_areas(
             llm_area_data = {"interpretation": llm_area_data}
         
         interpretation_text = (
-            llm_area_data.get("interpretation") or 
+            llm_area_data.get("interpretation") or
             llm_area_data.get("summary") or
             det_area_data.get("interpretation", det_area_data.get("summary", ""))
         )
+
+        if area_name == "career":
+            source_label = "llm" if (llm_area_data.get("interpretation") or llm_area_data.get("summary")) else "deterministic"
+            logger.debug(f"PDF career text source={source_label} preview={repr(interpretation_text[:100])}")
         
         deeper_explanation = (
             llm_area_data.get("deeper_explanation") or
@@ -409,10 +413,12 @@ def _extract_prediction_areas(
             if isinstance(signals_used, list):
                 for sig in signals_used:
                     if isinstance(sig, dict):
+                        sig_weight = sig.get("strength") or sig.get("weight") or 0
                         parsed_signals.append(SignalDetail(
-                            engine=sig.get("engine", "Unknown"),
-                            direction="pos" if sig.get("weight", 0) >= 0 else "neg",
-                            weight=sig.get("weight", 0)
+                            engine=sig.get("key") or sig.get("engine") or "Unknown",
+                            direction="pos" if sig_weight >= 0 else "neg",
+                            weight=sig_weight,
+                            interpretive_hint=sig.get("interpretive_hint") or sig.get("rationale") or None,
                         ))
             attribution = SignalAttribution(
                 dasha=attr_data.get("dasha", ""),

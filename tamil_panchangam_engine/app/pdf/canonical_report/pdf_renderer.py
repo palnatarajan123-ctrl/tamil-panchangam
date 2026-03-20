@@ -659,6 +659,19 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
                 styles['BodyText']
             ))
 
+        if area.attribution and area.attribution.signals:
+            area_elements.append(Spacer(1, 0.1*inch))
+            area_elements.append(Paragraph("<b>Signals</b>", styles['BodyText']))
+            for sig in area.attribution.signals:
+                sign = "+" if sig.direction == "pos" else "-"
+                sig_line = f"{sig.engine}  {sign}{abs(sig.weight):.2f}"
+                area_elements.append(Paragraph(sig_line, styles['BodyText']))
+                if sig.interpretive_hint:
+                    area_elements.append(Paragraph(
+                        f"<i>{sig.interpretive_hint}</i>",
+                        styles['BodyText']
+                    ))
+
         area_elements.append(Spacer(1, 0.25*inch))
         elements.append(KeepTogether(area_elements))
     
