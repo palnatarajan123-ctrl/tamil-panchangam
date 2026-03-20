@@ -8,7 +8,7 @@ from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.antar_explanation_engine import build_antar_explanation
 from app.engines.narrative_engine import build_narrative
 from app.services.birth_chart_builder import build_birth_chart_view_model
-from app.engines.gochara_engine import compute_gochara
+from app.engines.gochara_engine import compute_gochara, _longitude_to_rasi
 from app.engines.moon_transit_engine import compute_chandra_gati
 from app.engines.nakshatra_engine import compute_nakshatra_context
 from app.engines.ashtakavarga_engine import compute_ashtakavarga_validation
@@ -236,16 +236,30 @@ def build_monthly_prediction_envelope(
     }
 
     # -------------------------------------------------
-    # 7. GOCHARA (TRANSIT) ENGINE - EPIC Signal Expansion
+    # 7. DRISHTI ENGINE - computed early so Gochara L3 can use it
+    # -------------------------------------------------
+    logger.debug("DEBUG: Computing Drishti (aspects) [early, for Gochara L3]")
+    birth_moon_longitude = ephemeris.get("moon", {}).get("longitude_deg", 0.0)
+    natal_lagna_longitude = ephemeris.get("lagna", {}).get("longitude_deg", 0.0)
+    drishti = compute_drishti(
+        ephemeris=ephemeris,
+        houses=houses,
+        lagna_longitude=natal_lagna_longitude,
+    )
+
+    # -------------------------------------------------
+    # 7b. GOCHARA (TRANSIT) ENGINE - EPIC Signal Expansion
     # -------------------------------------------------
     logger.debug("DEBUG: Computing Gochara signals")
-    birth_moon_longitude = ephemeris.get("moon", {}).get("longitude_deg", 0.0)
+    natal_lagna_rasi_for_gochara = _longitude_to_rasi(natal_lagna_longitude) if natal_lagna_longitude else None
     gochara = compute_gochara(
         reference_date_utc=reference_date_utc,
         latitude=latitude,
         longitude=longitude,
         natal_moon_rasi=natal_moon_rasi,
         natal_moon_longitude=birth_moon_longitude if birth_moon_longitude else None,
+        natal_lagna_rasi=natal_lagna_rasi_for_gochara,
+        drishti_data=drishti,
     )
 
     # -------------------------------------------------
@@ -279,6 +293,8 @@ def build_monthly_prediction_envelope(
         saturn_transit_rasi=gochara.get("saturn", {}).get("transit_rasi", "Aries"),
         jupiter_transit_rasi=gochara.get("jupiter", {}).get("transit_rasi", "Aries"),
         birth_moon_rasi=natal_moon_rasi,
+        natal_positions=ephemeris,
+        lagna_longitude=natal_lagna_longitude,
     )
 
     # -------------------------------------------------
@@ -289,16 +305,6 @@ def build_monthly_prediction_envelope(
         gochara=gochara,
         nakshatra_context=nakshatra_context,
         ashtakavarga=ashtakavarga,
-    )
-
-    # -------------------------------------------------
-    # 12. DRISHTI ENGINE - Prompt 2
-    # -------------------------------------------------
-    logger.debug("DEBUG: Computing Drishti (aspects)")
-    drishti = compute_drishti(
-        ephemeris=ephemeris,
-        houses=houses,
-        lagna_longitude=ephemeris.get("lagna", {}).get("longitude_deg", 0.0),
     )
 
     # -------------------------------------------------

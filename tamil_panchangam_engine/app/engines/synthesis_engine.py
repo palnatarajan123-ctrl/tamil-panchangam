@@ -86,6 +86,10 @@ def synthesize_from_envelope(envelope: dict) -> dict:
         jup_cs = jup_gochara.get("conjunction_strength")
         # D-L2: scale by conjunction proximity — stronger near exact conjunction
         jup_strength = round(jup_base_strength * (0.5 + 0.5 * jup_cs), 3) if jup_cs is not None else jup_base_strength
+        # L3: drishti aspect bonus adjusts signal strength
+        jup_drishti_bonus = jup_gochara.get("drishti_aspect_bonus")
+        if jup_drishti_bonus is not None:
+            jup_strength = round(max(0.1, min(1.5, jup_strength * (1 + jup_drishti_bonus))), 3)
         signals.append({
             "key": "GOCHARA_JUPITER",
             "source": "gochara",
@@ -108,6 +112,10 @@ def synthesize_from_envelope(envelope: dict) -> dict:
         sat_cs = sat_gochara.get("conjunction_strength")
         # D-L2: scale by conjunction proximity
         sat_strength = round(sat_base_strength * (0.5 + 0.5 * sat_cs), 3) if sat_cs is not None else sat_base_strength
+        # L3: drishti aspect bonus adjusts signal strength
+        sat_drishti_bonus = sat_gochara.get("drishti_aspect_bonus")
+        if sat_drishti_bonus is not None:
+            sat_strength = round(max(0.1, min(1.5, sat_strength * (1 + sat_drishti_bonus))), 3)
         signals.append({
             "key": f"GOCHARA_SATURN_{sat_phase.upper()}",
             "source": "gochara",

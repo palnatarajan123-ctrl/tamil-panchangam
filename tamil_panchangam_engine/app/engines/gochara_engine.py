@@ -3,6 +3,7 @@ Gochara (Transit) Engine - EPIC Signal Expansion
 
 Computes planetary transit effects from Moon sign (Chandra Rasi) and Lagna.
 Evaluates Jupiter, Saturn, Rahu, Ketu transits with traditional classifications.
+L3: Drishti (natal aspect) bonus adjusts transit signal strength.
 """
 import logging
 from datetime import datetime
@@ -91,6 +92,38 @@ def _house_from_moon(transit_rasi: str, natal_moon_rasi: str) -> int:
     return ((transit_idx - moon_idx) % 12) + 1
 
 
+def _transit_natal_house(transit_rasi: str, natal_lagna_rasi: str) -> int:
+    """Calculate house position of transit planet from natal Lagna."""
+    lagna_idx = RASI_TO_INDEX.get(natal_lagna_rasi, 0)
+    transit_idx = RASI_TO_INDEX.get(transit_rasi, 0)
+    return ((transit_idx - lagna_idx) % 12) + 1
+
+
+def _drishti_bonus_for_transit_house(transit_house: int, drishti_data: Dict) -> float:
+    """
+    Compute drishti aspect bonus for the natal house a transit planet occupies.
+
+    Benefic natal aspects (Jupiter/Venus/Mercury effect='benefic') on that house
+    add +0.1 each; malefic aspects subtract 0.08 each.
+    Result clamped to [-0.25, +0.25].
+    """
+    house_aspects = drishti_data.get("house_aspects", {})
+    # Keys may be strings (JSON round-trip) or ints — try both
+    aspects_on_house = house_aspects.get(transit_house) or house_aspects.get(str(transit_house), [])
+    bonus = 0.0
+    for asp in aspects_on_house:
+        effect = asp.get("effect", "")
+        # Drishti engine uses "supportive" / "challenging" / "protective"
+        if effect == "supportive":
+            bonus += 0.10
+        elif effect == "challenging":
+            bonus -= 0.08
+    logger.debug(
+        f"DEBUG: Drishti bonus for house {transit_house}: aspects={aspects_on_house}, bonus={bonus:.3f}"
+    )
+    return round(max(-0.25, min(0.25, bonus)), 3)
+
+
 def _conjunction_strength(transit_long: float, natal_long: float, orb: float = 6.0) -> float:
     """
     Compute angular proximity between a transit planet and a natal point.
@@ -110,6 +143,7 @@ def compute_gochara(
     natal_moon_rasi: str,
     natal_lagna_rasi: Optional[str] = None,
     natal_moon_longitude: Optional[float] = None,
+    drishti_data: Optional[Dict] = None,
 ) -> Dict:
     """
     Compute Gochara (transit) effects for slow-moving planets.
@@ -164,6 +198,19 @@ def compute_gochara(
         rahu_cs = _conjunction_strength(rahu_long, natal_moon_longitude) if natal_moon_longitude is not None else None
         ketu_cs = _conjunction_strength(ketu_long, natal_moon_longitude) if natal_moon_longitude is not None else None
 
+        # L3: Drishti aspect bonus — natal aspects on the house occupied by transit planet
+        if drishti_data and natal_lagna_rasi:
+            jup_natal_house = _transit_natal_house(jup_rasi, natal_lagna_rasi)
+            sat_natal_house = _transit_natal_house(sat_rasi, natal_lagna_rasi)
+            rahu_natal_house = _transit_natal_house(rahu_rasi, natal_lagna_rasi)
+            ketu_natal_house = _transit_natal_house(ketu_rasi, natal_lagna_rasi)
+            jup_drishti_bonus = _drishti_bonus_for_transit_house(jup_natal_house, drishti_data)
+            sat_drishti_bonus = _drishti_bonus_for_transit_house(sat_natal_house, drishti_data)
+            rahu_drishti_bonus = _drishti_bonus_for_transit_house(rahu_natal_house, drishti_data)
+            ketu_drishti_bonus = _drishti_bonus_for_transit_house(ketu_natal_house, drishti_data)
+        else:
+            jup_drishti_bonus = sat_drishti_bonus = rahu_drishti_bonus = ketu_drishti_bonus = None
+
         jup_entry = {
             "transit_rasi": jup_rasi,
             "from_moon_house": jup_house_from_moon,
@@ -176,6 +223,8 @@ def compute_gochara(
         }
         if jup_cs is not None:
             jup_entry["conjunction_strength"] = jup_cs
+        if jup_drishti_bonus is not None:
+            jup_entry["drishti_aspect_bonus"] = jup_drishti_bonus
 
         sat_entry = {
             "transit_rasi": sat_rasi,
@@ -190,6 +239,8 @@ def compute_gochara(
         }
         if sat_cs is not None:
             sat_entry["conjunction_strength"] = sat_cs
+        if sat_drishti_bonus is not None:
+            sat_entry["drishti_aspect_bonus"] = sat_drishti_bonus
 
         rahu_ketu_entry = {
             "rahu_rasi": rahu_rasi,
@@ -209,6 +260,10 @@ def compute_gochara(
             rahu_ketu_entry["rahu_conjunction_strength"] = rahu_cs
         if ketu_cs is not None:
             rahu_ketu_entry["ketu_conjunction_strength"] = ketu_cs
+        if rahu_drishti_bonus is not None:
+            rahu_ketu_entry["rahu_drishti_bonus"] = rahu_drishti_bonus
+        if ketu_drishti_bonus is not None:
+            rahu_ketu_entry["ketu_drishti_bonus"] = ketu_drishti_bonus
 
         gochara = {
             "jupiter": jup_entry,
