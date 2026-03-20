@@ -1,5 +1,5 @@
 import { useParams, Link } from "wouter";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -59,11 +59,6 @@ const monthlySchema = z.object({
   month: z.string(),
 });
 
-const weeklySchema = z.object({
-  year: z.string(),
-  week: z.string(),
-});
-
 const yearlySchema = z.object({
   year: z.string(),
 });
@@ -77,8 +72,10 @@ export default function Predictions() {
   const [prediction, setPrediction] = useState<PredictionViewModel | null>(null);
   const [predictionError, setPredictionError] = useState<string | null>(null);
   const [predictionType, setPredictionType] = useState<
-    "monthly" | "weekly" | "yearly"
+    "monthly" | "yearly"
   >("monthly");
+  const [llmPending, setLlmPending] = useState(false);
+  const llmPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [lastPredictionParams, setLastPredictionParams] = useState<{
     year: number;
     month?: number;
@@ -108,16 +105,11 @@ export default function Predictions() {
 
   const form = useForm<any>({
     resolver: zodResolver(
-      predictionType === "monthly"
-        ? monthlySchema
-        : predictionType === "weekly"
-        ? weeklySchema
-        : yearlySchema
+      predictionType === "monthly" ? monthlySchema : yearlySchema
     ),
     defaultValues: {
       year: new Date().getFullYear().toString(),
       month: (new Date().getMonth() + 1).toString(),
-      week: "1",
     },
   });
 
@@ -133,9 +125,6 @@ export default function Predictions() {
 
       if (predictionType === "monthly") {
         payload.month = Number(v.month);
-      } else if (predictionType === "weekly") {
-        endpoint = "/api/prediction/weekly";
-        payload.week = Number(v.week);
       } else {
         endpoint = "/api/prediction/yearly";
       }
@@ -155,6 +144,45 @@ export default function Predictions() {
 
     onSuccess: (data, variables) => {
       setPredictionError(null);
+
+      // If LLM is still running in background, show spinner and poll
+      if (data.llm_status === "pending" && predictionType === "monthly") {
+        setLlmPending(true);
+        setPrediction(null);
+        setLastPredictionParams({
+          year: Number(variables.year),
+          month: Number(variables.month),
+        });
+        const pendingYear = Number(variables.year);
+        const pendingMonth = Number(variables.month);
+        llmPollRef.current = setInterval(async () => {
+          try {
+            const params = new URLSearchParams({
+              base_chart_id: baseChartId!,
+              year: pendingYear.toString(),
+              month: pendingMonth.toString(),
+            });
+            const res = await fetch(`/api/prediction/monthly/llm-status?${params}`);
+            if (!res.ok) return;
+            const json = await res.json();
+            if (json.status === "ready") {
+              clearInterval(llmPollRef.current!);
+              llmPollRef.current = null;
+              setLlmPending(false);
+              // Re-submit to get the merged prediction with LLM content
+              mutation.mutate(variables);
+            }
+          } catch (_) { /* ignore */ }
+        }, 3000);
+        return;
+      }
+
+      // Clear any previous polling
+      if (llmPollRef.current) {
+        clearInterval(llmPollRef.current);
+        llmPollRef.current = null;
+      }
+      setLlmPending(false);
 
       if (!hasValidAIInterpretation(data.details)) {
         setPrediction(null);
@@ -176,9 +204,9 @@ export default function Predictions() {
         return;
       }
 
-      const viewModel = adaptInterpretation(extracted.primary, "full", extracted.deterministic);
+      const viewModel = adaptInterpretation(extracted.primary, extracted.deterministic);
       setPrediction(viewModel);
-      
+
       // Extract calculation confidence from envelope
       const envelope = data.details?.envelope;
       if (envelope?.calculation_confidence) {
@@ -186,7 +214,7 @@ export default function Predictions() {
       } else {
         setCalculationConfidence(null);
       }
-      
+
       setLastPredictionParams({
         year: Number(variables.year),
         month: variables.month ? Number(variables.month) : undefined,
@@ -300,14 +328,16 @@ export default function Predictions() {
 
       {/* TABS */}
       <div className="flex gap-2 mb-6">
-        {["monthly", "weekly", "yearly"].map(t => (
+        {(["monthly", "yearly"] as const).map(t => (
           <Button
             key={t}
             variant={predictionType === t ? "default" : "outline"}
             onClick={() => {
-              setPredictionType(t as any);
+              setPredictionType(t);
               setPrediction(null);
               setPredictionError(null);
+              setLlmPending(false);
+              if (llmPollRef.current) { clearInterval(llmPollRef.current); llmPollRef.current = null; }
             }}
             data-testid={`button-tab-${t}`}
           >
@@ -366,21 +396,6 @@ export default function Predictions() {
                 />
               )}
 
-              {predictionType === "weekly" && (
-                <FormField
-                  control={form.control}
-                  name="week"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>ISO Week</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} data-testid="input-week" />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              )}
-
               <Button
                 type="submit"
                 className="md:col-span-3"
@@ -411,8 +426,17 @@ export default function Predictions() {
         </Card>
       )}
 
+      {/* LLM PENDING SPINNER */}
+      {llmPending && (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="text-base font-medium">Generating your interpretation…</p>
+          <p className="text-sm">This takes a few seconds</p>
+        </div>
+      )}
+
       {/* RESULT */}
-      {prediction && (
+      {prediction && !llmPending && (
         <>
           {/* Prediction Confidence - shown once below summary */}
           {calculationConfidence && (
@@ -451,8 +475,8 @@ export default function Predictions() {
           
           <MonthlyPredictionView prediction={prediction} period={predictionType} />
           
-          {/* PDF Download Button - Only for monthly and yearly */}
-          {(predictionType === "monthly" || predictionType === "yearly") && lastPredictionParams && (
+          {/* PDF Download Button */}
+          {lastPredictionParams && (
             <div className="mt-6 flex justify-center">
               <Button
                 onClick={handleDownloadPdf}

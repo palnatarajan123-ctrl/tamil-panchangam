@@ -1,6 +1,6 @@
 // client/src/adapters/aiInterpretationAdapter.ts
 // AI Interpretation Engine v1.0/v2.0/v3.0 → Prediction UI View Model Adapter
-// 
+//
 // This adapter is the SINGLE source of truth for mapping AI Interpretation
 // output to UI-ready view models. The UI renders ONLY what this adapter returns.
 //
@@ -8,9 +8,7 @@
 // - No fallback text generation
 // - No default values for missing interpretation data
 // - Omit fields if not present in AI Interpretation output
-// - Apply explainability filtering (minimal/standard/full)
-
-export type ExplainabilityLevel = "minimal" | "standard" | "full";
+// - Always behaves as "full" — no level selector
 
 export interface DominantForce {
   type: string;
@@ -100,7 +98,6 @@ export interface PredictionViewModel {
   dangerWindows?: string[];
   vedaRemedy?: VedaRemedyViewModel;
   lifeAreas: LifeAreaViewModel[];
-  explainabilityLevel: ExplainabilityLevel;
 }
 
 export interface AIInterpretationV3 {
@@ -126,7 +123,6 @@ export interface AIInterpretationV3 {
     encouragement?: string;
   };
   _visibility?: {
-    level?: string;
     show_yearly_mantra?: boolean;
     show_dasha_synthesis?: boolean;
     show_danger_windows?: boolean;
@@ -168,7 +164,6 @@ export interface AIInterpretationV2 {
     encouragement?: string;
   };
   _visibility?: {
-    level?: string;
     show_monthly_theme?: boolean;
     show_overview?: boolean;
     show_practices?: boolean;
@@ -208,7 +203,6 @@ export interface AIInterpretationV1 {
     };
   };
   _visibility?: {
-    level?: string;
     show_dominant_forces?: boolean;
     show_timing_guidance?: boolean;
     show_deeper_explanation?: boolean;
@@ -245,35 +239,28 @@ function isV1Interpretation(obj: any): obj is AIInterpretationV1 {
 
 export function adaptAIInterpretationV3(
   aiInterpretation: AIInterpretationV3,
-  level: ExplainabilityLevel = "full"
 ): PredictionViewModel {
   const visibility = aiInterpretation._visibility;
-  const showMantra = level !== "minimal" && (visibility?.show_yearly_mantra !== false);
-  const showSynthesis = level !== "minimal" && (visibility?.show_dasha_synthesis !== false);
-  const showDangerWindows = level !== "minimal" && (visibility?.show_danger_windows !== false);
-  const showRemedy = level !== "minimal" && (visibility?.show_veda_remedy !== false);
-  const showClosing = level !== "minimal" && (visibility?.show_closing !== false);
 
   const result: PredictionViewModel = {
     engineVersion: aiInterpretation.engine_version,
     generatedAt: aiInterpretation.generated_at,
     lifeAreas: [],
-    explainabilityLevel: level,
   };
 
-  if (showMantra && aiInterpretation.yearly_mantra) {
+  if (visibility?.show_yearly_mantra !== false && aiInterpretation.yearly_mantra) {
     result.yearlyMantra = aiInterpretation.yearly_mantra;
   }
 
-  if (showSynthesis && aiInterpretation.dasha_transit_synthesis) {
+  if (visibility?.show_dasha_synthesis !== false && aiInterpretation.dasha_transit_synthesis) {
     result.dashaTransitSynthesis = aiInterpretation.dasha_transit_synthesis;
   }
 
-  if (showDangerWindows && aiInterpretation.danger_windows?.length) {
+  if (visibility?.show_danger_windows !== false && aiInterpretation.danger_windows?.length) {
     result.dangerWindows = aiInterpretation.danger_windows;
   }
 
-  if (showRemedy && aiInterpretation.veda_remedy) {
+  if (visibility?.show_veda_remedy !== false && aiInterpretation.veda_remedy) {
     const remedy: VedaRemedyViewModel = {
       primaryRemedy: aiInterpretation.veda_remedy.primary_remedy,
     };
@@ -286,7 +273,7 @@ export function adaptAIInterpretationV3(
     result.vedaRemedy = remedy;
   }
 
-  if (showClosing && aiInterpretation.closing) {
+  if (visibility?.show_closing !== false && aiInterpretation.closing) {
     const closing: ClosingViewModel = {};
     if (aiInterpretation.closing.key_takeaways?.length) {
       closing.keyTakeaways = aiInterpretation.closing.key_takeaways;
@@ -317,31 +304,24 @@ export function adaptAIInterpretationV3(
 
 export function adaptAIInterpretationV2(
   aiInterpretation: AIInterpretationV2,
-  level: ExplainabilityLevel = "full",
   deterministicInterpretation?: AIInterpretationV1
 ): PredictionViewModel {
   const visibility = aiInterpretation._visibility;
-  const showTheme = level !== "minimal" && (visibility?.show_monthly_theme !== false);
-  const showOverview = level !== "minimal" && (visibility?.show_overview !== false);
-  const showPractices = level !== "minimal" && (visibility?.show_practices !== false);
-  const showClosing = level !== "minimal" && (visibility?.show_closing !== false);
-  const showAttribution = level === "full";
 
   const result: PredictionViewModel = {
     engineVersion: aiInterpretation.engine_version,
     generatedAt: aiInterpretation.generated_at,
     lifeAreas: [],
-    explainabilityLevel: level,
   };
 
-  if (showTheme && aiInterpretation.monthly_theme) {
+  if (visibility?.show_monthly_theme !== false && aiInterpretation.monthly_theme) {
     result.monthlyTheme = {
       title: aiInterpretation.monthly_theme.title,
       narrative: aiInterpretation.monthly_theme.narrative,
     };
   }
 
-  if (showOverview && aiInterpretation.overview) {
+  if (visibility?.show_overview !== false && aiInterpretation.overview) {
     result.overview = {
       energyPattern: aiInterpretation.overview.energy_pattern,
     };
@@ -351,12 +331,12 @@ export function adaptAIInterpretationV2(
     if (aiInterpretation.overview.avoid_or_be_mindful?.length) {
       result.overview.avoidOrBeMindful = aiInterpretation.overview.avoid_or_be_mindful;
     }
-    
-    if (showAttribution && deterministicInterpretation?.life_areas) {
+
+    if (deterministicInterpretation?.life_areas) {
       const allPlanets = new Set<string>();
       const allEngines = new Set<string>();
       let dasha: string | undefined;
-      
+
       Object.values(deterministicInterpretation.life_areas).forEach((area: any) => {
         if (area.attribution) {
           area.attribution.planets?.forEach((p: string) => allPlanets.add(p));
@@ -366,7 +346,7 @@ export function adaptAIInterpretationV2(
           }
         }
       });
-      
+
       if (allPlanets.size > 0 || allEngines.size > 0 || dasha) {
         result.overview.attributionSummary = {
           activePlanets: Array.from(allPlanets),
@@ -379,7 +359,7 @@ export function adaptAIInterpretationV2(
     }
   }
 
-  if (showPractices && aiInterpretation.practices_and_reflection) {
+  if (visibility?.show_practices !== false && aiInterpretation.practices_and_reflection) {
     const practices: PracticesViewModel = {};
     if (aiInterpretation.practices_and_reflection.daily_practice) {
       practices.dailyPractice = aiInterpretation.practices_and_reflection.daily_practice;
@@ -398,7 +378,7 @@ export function adaptAIInterpretationV2(
     }
   }
 
-  if (showClosing && aiInterpretation.closing) {
+  if (visibility?.show_closing !== false && aiInterpretation.closing) {
     const closing: ClosingViewModel = {};
     if (aiInterpretation.closing.key_takeaways?.length) {
       closing.keyTakeaways = aiInterpretation.closing.key_takeaways;
@@ -422,17 +402,9 @@ export function adaptAIInterpretationV2(
         outlook: area.outlook ?? "neutral",
         summary: area.summary,
       };
-
-      if (area.opportunity) {
-        viewModel.opportunity = area.opportunity;
-      }
-      if (area.watch_out) {
-        viewModel.watchOut = area.watch_out;
-      }
-      if (area.one_action) {
-        viewModel.oneAction = area.one_action;
-      }
-
+      if (area.opportunity) viewModel.opportunity = area.opportunity;
+      if (area.watch_out) viewModel.watchOut = area.watch_out;
+      if (area.one_action) viewModel.oneAction = area.one_action;
       return viewModel;
     });
 
@@ -441,28 +413,8 @@ export function adaptAIInterpretationV2(
 
 export function adaptAIInterpretation(
   aiInterpretation: AIInterpretationV1,
-  level: ExplainabilityLevel = "full"
 ): PredictionViewModel {
   const visibility = aiInterpretation._visibility;
-  
-  const backendLevel = visibility?.level as ExplainabilityLevel | undefined;
-  const backendShowDominant = backendLevel ? backendLevel !== "minimal" : true;
-  const backendShowTiming = backendLevel ? backendLevel !== "minimal" : true;
-  const backendShowDeeper = backendLevel ? backendLevel !== "minimal" : true;
-  const backendShowAttr = backendLevel ? backendLevel === "full" : true;
-  const backendShowSignals = backendLevel ? backendLevel === "full" : true;
-  
-  const uiShowDominant = level !== "minimal";
-  const uiShowTiming = level !== "minimal";
-  const uiShowDeeper = level !== "minimal";
-  const uiShowAttr = level === "full";
-  const uiShowSignals = level === "full";
-
-  const showDominantForces = uiShowDominant && (visibility?.show_dominant_forces ?? backendShowDominant);
-  const showTimingGuidance = uiShowTiming && (visibility?.show_timing_guidance ?? backendShowTiming);
-  const showDeeperExplanation = uiShowDeeper && (visibility?.show_deeper_explanation ?? backendShowDeeper);
-  const showAttribution = uiShowAttr && (visibility?.show_attribution ?? backendShowAttr);
-  const showSignalsUsed = uiShowSignals && (visibility?.show_signals_used ?? backendShowSignals);
 
   const windowSummary: WindowSummaryViewModel = {
     momentum: aiInterpretation.window_summary.momentum,
@@ -471,22 +423,22 @@ export function adaptAIInterpretation(
   };
 
   if (
-    showDominantForces &&
-    aiInterpretation.window_summary.dominant_forces &&
-    aiInterpretation.window_summary.dominant_forces.length > 0
+    visibility?.show_dominant_forces !== false &&
+    aiInterpretation.window_summary.dominant_forces?.length
   ) {
     windowSummary.dominantForces = aiInterpretation.window_summary.dominant_forces;
   }
 
-  if (showTimingGuidance && aiInterpretation.window_summary.timing_guidance) {
+  if (visibility?.show_timing_guidance !== false && aiInterpretation.window_summary.timing_guidance) {
     windowSummary.timingGuidance = aiInterpretation.window_summary.timing_guidance;
   }
 
-  if (showAttribution) {
+  // Attribution summary from all life areas
+  {
     const allPlanets = new Set<string>();
     const allEngines = new Set<string>();
     let dasha: string | undefined;
-    
+
     Object.values(aiInterpretation.life_areas).forEach((area: any) => {
       if (area.attribution) {
         area.attribution.planets?.forEach((p: string) => allPlanets.add(p));
@@ -496,15 +448,13 @@ export function adaptAIInterpretation(
         }
       }
     });
-    
+
     if (allPlanets.size > 0 || allEngines.size > 0 || dasha) {
       windowSummary.attributionSummary = {
         activePlanets: Array.from(allPlanets),
         activeEngines: Array.from(allEngines),
       };
-      if (dasha) {
-        windowSummary.attributionSummary.activeDasha = dasha;
-      }
+      if (dasha) windowSummary.attributionSummary.activeDasha = dasha;
     }
   }
 
@@ -521,16 +471,16 @@ export function adaptAIInterpretation(
         summary: area.summary,
       };
 
-      if (showDeeperExplanation && area.deeper_explanation) {
+      if (visibility?.show_deeper_explanation !== false && area.deeper_explanation) {
         viewModel.deeperExplanation = area.deeper_explanation;
       }
 
-      if (showAttribution && area.attribution) {
+      if (visibility?.show_attribution !== false && area.attribution) {
         const attr: LifeAreaAttribution = {};
         if (area.attribution.planets?.length) attr.planets = area.attribution.planets;
         if (area.attribution.dasha) attr.dasha = area.attribution.dasha;
         if (area.attribution.engines?.length) attr.engines = area.attribution.engines;
-        if (showSignalsUsed && area.attribution.signals_used?.length) {
+        if (visibility?.show_signals_used !== false && area.attribution.signals_used?.length) {
           attr.signalsUsed = area.attribution.signals_used.map((s: any) => ({
             engine: s.key ?? s.engine ?? "",
             weight: s.strength ?? s.weight ?? 0,
@@ -549,17 +499,12 @@ export function adaptAIInterpretation(
     generatedAt: aiInterpretation.generated_at,
     windowSummary,
     lifeAreas,
-    explainabilityLevel: level,
   };
 }
 
 function isValidInterpretationShape(obj: any): boolean {
-  if (isV3Interpretation(obj)) {
-    return true;
-  }
-  if (isV2Interpretation(obj)) {
-    return true;
-  }
+  if (isV3Interpretation(obj)) return true;
+  if (isV2Interpretation(obj)) return true;
   return (
     obj?.engine_version === "ai-interpretation-v1.0" &&
     obj?.window_summary != null &&
@@ -579,50 +524,35 @@ export interface ExtractedInterpretation {
 }
 
 export function extractAIInterpretation(details: any): AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3 | null {
-  if (!hasValidAIInterpretation(details)) {
-    return null;
-  }
-  
+  if (!hasValidAIInterpretation(details)) return null;
   const llmInterp = details.interpretation.llm_interpretation;
   const aiInterp = details.interpretation.ai_interpretation;
-  
-  if (isValidInterpretationShape(llmInterp)) {
-    return llmInterp;
-  }
-  
+  if (isValidInterpretationShape(llmInterp)) return llmInterp;
   return aiInterp;
 }
 
 export function extractInterpretationWithDeterministic(details: any): ExtractedInterpretation | null {
-  if (!hasValidAIInterpretation(details)) {
-    return null;
-  }
-  
+  if (!hasValidAIInterpretation(details)) return null;
   const llmInterp = details.interpretation.llm_interpretation;
   const aiInterp = details.interpretation.ai_interpretation;
-  
   if (isValidInterpretationShape(llmInterp)) {
     return {
       primary: llmInterp,
       deterministic: isV1Interpretation(aiInterp) ? aiInterp : undefined,
     };
   }
-  
-  return {
-    primary: aiInterp,
-  };
+  return { primary: aiInterp };
 }
 
 export function adaptInterpretation(
   interpretation: AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3,
-  level: ExplainabilityLevel = "full",
   deterministicInterpretation?: AIInterpretationV1
 ): PredictionViewModel {
   if (isV3Interpretation(interpretation)) {
-    return adaptAIInterpretationV3(interpretation, level);
+    return adaptAIInterpretationV3(interpretation);
   }
   if (isV2Interpretation(interpretation)) {
-    return adaptAIInterpretationV2(interpretation, level, deterministicInterpretation);
+    return adaptAIInterpretationV2(interpretation, deterministicInterpretation);
   }
-  return adaptAIInterpretation(interpretation as AIInterpretationV1, level);
+  return adaptAIInterpretation(interpretation as AIInterpretationV1);
 }

@@ -29,21 +29,6 @@ import { Separator } from "@/components/ui/separator";
 import { Download } from "lucide-react";
 
 /* -------------------------------------------------
-   Helpers
--------------------------------------------------- */
-
-// ISO week number (UTC-safe, deterministic)
-function getCurrentISOWeek(): number {
-  const d = new Date();
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(
-    (((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7
-  );
-}
-
-/* -------------------------------------------------
    Screen
 -------------------------------------------------- */
 
@@ -54,13 +39,12 @@ export default function PredictionScreen() {
   const now = new Date();
   const baseYear = now.getFullYear();
 
-  const [period, setPeriod] = useState<"monthly" | "weekly" | "yearly">("monthly");
+  const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
   const [year, setYear] = useState(baseYear);
 
   /**
    * Unified cursor:
    * - monthly → month (1–12)
-   * - weekly  → ISO week (1–53)
    * - yearly  → always 1
    */
   const [index, setIndex] = useState<number>(now.getMonth() + 1);
@@ -71,8 +55,6 @@ export default function PredictionScreen() {
   useEffect(() => {
     if (period === "monthly") {
       setIndex(now.getMonth() + 1);
-    } else if (period === "weekly") {
-      setIndex(getCurrentISOWeek());
     } else {
       setIndex(1);
     }
@@ -86,12 +68,12 @@ export default function PredictionScreen() {
     period,
     year,
     month: period === "monthly" ? index : undefined,
-    week: period === "weekly" ? index : undefined,
   });
 
   /* -------------------------------------------------
      LLM status polling — fires only for monthly when
-     the backend returns llm_status = "pending"
+     the backend returns llm_status = "pending".
+     MonthlyPredictionView is blocked until ready.
   -------------------------------------------------- */
   const llmPending = period === "monthly" && (data as any)?.llm_status === "pending";
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -137,7 +119,7 @@ export default function PredictionScreen() {
         </h1>
 
         <div className="flex gap-2">
-          {(["monthly", "weekly", "yearly"] as const).map((p) => (
+          {(["monthly", "yearly"] as const).map((p) => (
             <Button
               key={p}
               variant={period === p ? "default" : "ghost"}
@@ -163,15 +145,18 @@ export default function PredictionScreen() {
       />
 
       {isLoading && <div>Computing prediction…</div>}
-      {llmPending && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Enhancing with AI…
-        </div>
-      )}
       {error && <div className="text-red-600">{error.message}</div>}
 
-      {data && (
+      {/* LLM pending — block prediction view, show centered spinner */}
+      {llmPending && (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="text-base font-medium">Generating your interpretation…</p>
+          <p className="text-sm">This takes a few seconds</p>
+        </div>
+      )}
+
+      {data && !llmPending && (
         <>
           {/* -------------------------------------------------
               Download (only for monthly/yearly)
@@ -208,7 +193,7 @@ export default function PredictionScreen() {
             if (!extracted) return null;
             return (
               <MonthlyPredictionView
-                prediction={adaptInterpretation(extracted.primary, "full", extracted.deterministic)}
+                prediction={adaptInterpretation(extracted.primary, extracted.deterministic)}
                 period={period}
               />
             );

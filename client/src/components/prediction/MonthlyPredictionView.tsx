@@ -36,6 +36,27 @@ import {
 
 import type { PredictionViewModel, LifeAreaViewModel } from "@/adapters/aiInterpretationAdapter";
 
+function splitIntoParagraphs(text: string): string[] {
+  if (!text) return [];
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  const paragraphs: string[] = [];
+  for (let i = 0; i < sentences.length; i += 3) {
+    paragraphs.push(sentences.slice(i, i + 3).join(" ").trim());
+  }
+  return paragraphs;
+}
+
+function Paragraphs({ text, className }: { text: string; className?: string }) {
+  const paras = splitIntoParagraphs(text);
+  return (
+    <>
+      {paras.map((para, i) => (
+        <p key={i} className={`mb-3 leading-relaxed last:mb-0 ${className ?? ""}`}>{para}</p>
+      ))}
+    </>
+  );
+}
+
 type PredictionPeriod = "weekly" | "monthly" | "yearly";
 
 const OUTLOOK_COLORS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -80,11 +101,13 @@ function LifeAreaCard({ area, isV2 }: LifeAreaCardProps) {
       </AccordionTrigger>
 
       <AccordionContent className="space-y-4 text-sm">
-        <p data-testid={`text-summary-${area.key}`}>{area.summary}</p>
+        <div data-testid={`text-summary-${area.key}`}>
+          <Paragraphs text={area.summary} />
+        </div>
 
         {!isV2 && area.deeperExplanation && (
           <div className="bg-muted/50 p-3 rounded-md" data-testid={`text-explanation-${area.key}`}>
-            <p className="text-muted-foreground">{area.deeperExplanation}</p>
+            <Paragraphs text={area.deeperExplanation} className="text-muted-foreground" />
           </div>
         )}
       </AccordionContent>
@@ -130,9 +153,9 @@ export function MonthlyPredictionView({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-base leading-relaxed" data-testid="text-yearly-mantra">
-              {prediction.yearlyMantra}
-            </p>
+            <div data-testid="text-yearly-mantra" className="text-base">
+              <Paragraphs text={prediction.yearlyMantra} />
+            </div>
           </CardContent>
         </Card>
       )}
@@ -150,9 +173,9 @@ export function MonthlyPredictionView({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-base leading-relaxed" data-testid="text-dasha-synthesis">
-              {prediction.dashaTransitSynthesis}
-            </p>
+            <div data-testid="text-dasha-synthesis" className="text-base">
+              <Paragraphs text={prediction.dashaTransitSynthesis} />
+            </div>
           </CardContent>
         </Card>
       )}
@@ -167,9 +190,9 @@ export function MonthlyPredictionView({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-base leading-relaxed" data-testid="text-theme-narrative">
-              {prediction.monthlyTheme.narrative}
-            </p>
+            <div data-testid="text-theme-narrative" className="text-base">
+              <Paragraphs text={prediction.monthlyTheme.narrative} />
+            </div>
           </CardContent>
         </Card>
       )}
@@ -188,9 +211,9 @@ export function MonthlyPredictionView({
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <p className="text-base leading-relaxed" data-testid="text-energy-pattern">
-              {prediction.overview.energyPattern}
-            </p>
+            <div data-testid="text-energy-pattern" className="text-base">
+              <Paragraphs text={prediction.overview.energyPattern} />
+            </div>
 
             {prediction.overview.keyFocus && prediction.overview.keyFocus.length > 0 && (
               <div className="space-y-2" data-testid="section-key-focus">
@@ -285,9 +308,9 @@ export function MonthlyPredictionView({
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <p className="text-base leading-relaxed" data-testid="text-overview">
-              {prediction.windowSummary.overview}
-            </p>
+            <div data-testid="text-overview" className="text-base">
+              <Paragraphs text={prediction.windowSummary.overview} />
+            </div>
 
             {prediction.windowSummary.dominantForces && prediction.windowSummary.dominantForces.length > 0 && (
               <div className="space-y-2" data-testid="section-dominant-forces">
@@ -417,7 +440,7 @@ export function MonthlyPredictionView({
                 <Star className="h-5 w-5 text-primary mt-0.5 shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Primary Remedy</p>
-                  <p className="text-sm">{prediction.vedaRemedy.primaryRemedy}</p>
+                  <Paragraphs text={prediction.vedaRemedy.primaryRemedy} className="text-sm" />
                 </div>
               </div>
             )}
@@ -427,7 +450,7 @@ export function MonthlyPredictionView({
                 <Calendar className="h-5 w-5 text-primary mt-0.5 shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Supporting Practice</p>
-                  <p className="text-sm">{prediction.vedaRemedy.supportingPractice}</p>
+                  <Paragraphs text={prediction.vedaRemedy.supportingPractice} className="text-sm" />
                 </div>
               </div>
             )}
@@ -490,9 +513,10 @@ export function MonthlyPredictionView({
                 <MessageCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Reflection & Guidance</p>
-                  <p className="text-sm">
-                    {prediction.practicesAndReflection.reflectionGuidance || prediction.practicesAndReflection.reflectionQuestion}
-                  </p>
+                  <Paragraphs
+                    text={prediction.practicesAndReflection.reflectionGuidance || prediction.practicesAndReflection.reflectionQuestion || ""}
+                    className="text-sm"
+                  />
                 </div>
               </div>
             )}
@@ -525,9 +549,9 @@ export function MonthlyPredictionView({
             {prediction.closing.encouragement && (
               <>
                 <Separator />
-                <p className="text-base leading-relaxed text-muted-foreground italic" data-testid="text-encouragement">
-                  {prediction.closing.encouragement}
-                </p>
+                <div data-testid="text-encouragement" className="text-base text-muted-foreground italic">
+                  <Paragraphs text={prediction.closing.encouragement} />
+                </div>
               </>
             )}
           </CardContent>

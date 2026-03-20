@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { PeriodType } from "@/types/prediction";
 
-const periods: PeriodType[] = ["monthly", "weekly", "yearly"];
+const periods: PeriodType[] = ["monthly", "yearly"];
 
 export function PeriodSelector({
   value,
