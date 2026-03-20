@@ -73,6 +73,8 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
         month=payload.month,
     )
 
+    cache_hit = bool(existing)
+
     if existing:
         envelope = json.loads(existing["envelope"])
         synthesis = json.loads(existing["synthesis"])
@@ -87,12 +89,10 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             interpretation["llm_metadata"]["from_cache"] = True
             interpretation["llm_metadata"]["tokens_used"] = 0  # No new tokens spent
         
-        # Apply explainability filter to cached AI interpretation
-        explainability_level: str = payload.explainability_level or "full"
         if interpretation and "ai_interpretation" in interpretation:
             interpretation["ai_interpretation"] = apply_explainability(
                 interpretation["ai_interpretation"],
-                explainability_level  # type: ignore
+                "full"
             )
         
         # Add calculation confidence for cached predictions if missing
@@ -208,9 +208,8 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             ai_interpretation.get("window_summary", {}).get("momentum")
         )
 
-        # Apply explainability filter to AI interpretation
-        explainability_level: str = payload.explainability_level or "full"
-        ai_interpretation = apply_explainability(ai_interpretation, explainability_level)  # type: ignore
+        # Always use full detail level
+        ai_interpretation = apply_explainability(ai_interpretation, "full")
 
         # -------------------------------------------------
         # 7. Paraphrasing (legacy interpretation)
@@ -244,7 +243,7 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             period_type="monthly",
             period_key=period_key,
             feature_name="prediction",
-            explainability_mode=payload.explainability_level or "standard",
+            explainability_mode="full",
             base_chart_payload=base_chart_payload,
         )
         interpretation["llm_interpretation"] = llm_result.get("llm_interpretation")
@@ -296,4 +295,5 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
             "interpretation": interpretation,
         },
         explainability=explainability.model_dump(),
+        cache_hit=cache_hit,
     )

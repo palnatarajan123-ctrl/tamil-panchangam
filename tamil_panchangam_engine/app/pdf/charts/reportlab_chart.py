@@ -123,25 +123,35 @@ def render_south_indian_chart_reportlab(
         label_color = COLOR_LAGNA if is_lagna else COLOR_SIGN
         drawing.add(String(
             x + cell_size / 2, y - 12, abbrev,
-            fontName='Helvetica', fontSize=10,
+            fontName='Helvetica', fontSize=8,
             textAnchor='middle', fillColor=label_color
         ))
-        
-        # Lagna marker
+
+        # Lagna marker (asterisk keeps it compact)
         if is_lagna:
             drawing.add(String(
-                x + cell_size / 2, y - 24, "Lagna",
-                fontName='Helvetica', fontSize=9,
+                x + cell_size / 2, y - 22, "*Lag*",
+                fontName='Helvetica-Bold', fontSize=7,
                 textAnchor='middle', fillColor=COLOR_LAGNA
             ))
-        
-        # Planets in this sign
+
+        # Planets — positioned to stay within cell bounds.
+        # cell_size=65, cell occupies y (top) to y-cell_size (bottom).
+        # With lagna: planets start at y-32, spacing 9pt, cap at 3 planets.
+        # Without lagna: planets start at y-24, spacing 10pt, up to 4 planets.
         planets = planets_by_rasi.get(rasi_idx, [])
-        for idx, planet in enumerate(planets[:4]):
+        planet_start = y - (32 if is_lagna else 24)
+        planet_spacing = 9
+        max_planets = 3 if is_lagna else 4
+        cell_bottom = y - cell_size + 3  # 3pt safety margin
+        for idx, planet in enumerate(planets[:max_planets]):
+            py = planet_start - (idx * planet_spacing)
+            if py < cell_bottom:
+                break
             abbrev_p = PLANET_ABBREVS.get(planet, planet[:2])
             drawing.add(String(
-                x + cell_size / 2, y - 38 - (idx * 14), abbrev_p,
-                fontName='Helvetica-Bold', fontSize=11,
+                x + cell_size / 2, py, abbrev_p,
+                fontName='Helvetica-Bold', fontSize=8,
                 textAnchor='middle', fillColor=COLOR_PLANET
             ))
     

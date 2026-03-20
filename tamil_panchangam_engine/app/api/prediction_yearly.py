@@ -108,9 +108,8 @@ def generate_yearly_prediction(payload: dict, db=Depends(get_db)):
         month=1,
     )
 
-    # Apply explainability filter to AI interpretation
-    explainability_level = payload.get("explainability_level", "full")
-    ai_interpretation = apply_explainability(ai_interpretation, explainability_level)
+    # Always use full detail level
+    ai_interpretation = apply_explainability(ai_interpretation, "full")
 
     interpretation = paraphrase_interpretation(interpretation)
     interpretation["ai_interpretation"] = ai_interpretation
@@ -128,7 +127,7 @@ def generate_yearly_prediction(payload: dict, db=Depends(get_db)):
         period_type="yearly",
         period_key=period_key,
         feature_name="prediction",
-        explainability_mode=explainability_level,
+        explainability_mode="full",
         base_chart_payload=base_chart_payload,
     )
     interpretation["llm_interpretation"] = llm_result.get("llm_interpretation")

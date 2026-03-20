@@ -138,11 +138,6 @@ class MonthlyPredictionRequest(BaseModel):
 
     year: int = Field(..., ge=1900, le=2100)
     month: int = Field(..., ge=1, le=12)
-    
-    explainability_level: Optional[str] = Field(
-        default="full",
-        description="Explainability level: minimal, standard, or full"
-    )
 
     @validator("month")
     def validate_month(cls, v: int) -> int:
@@ -169,6 +164,9 @@ class MonthlyPredictionResponse(BaseModel):
 
     # EPIC-8 — derived explainability (not persisted)
     explainability: Optional[Dict[str, Any]] = None
+
+    # True when envelope+synthesis were returned from the prediction cache
+    cache_hit: bool = False
 
 
 # ============================================================

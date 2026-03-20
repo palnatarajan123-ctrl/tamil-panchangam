@@ -13,7 +13,6 @@ import {
   adaptInterpretation,
   extractInterpretationWithDeterministic,
   hasValidAIInterpretation,
-  type ExplainabilityLevel,
 } from "@/adapters/aiInterpretationAdapter";
 
 import { Button } from "@/components/ui/button";
@@ -25,14 +24,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Download, Eye, EyeOff, Layers } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Download } from "lucide-react";
 
 /* -------------------------------------------------
    Helpers
@@ -62,7 +54,6 @@ export default function PredictionScreen() {
 
   const [period, setPeriod] = useState<"monthly" | "weekly" | "yearly">("monthly");
   const [year, setYear] = useState(baseYear);
-  const [explainabilityLevel, setExplainabilityLevel] = useState<ExplainabilityLevel>("standard");
 
   /**
    * Unified cursor:
@@ -141,62 +132,27 @@ export default function PredictionScreen() {
           {/* -------------------------------------------------
               Download (only for monthly/yearly)
           -------------------------------------------------- */}
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            {(period === "monthly" || period === "yearly") && (
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={() => {
-                  const params = new URLSearchParams({
-                    base_chart_id: id,
-                    report_type: period,
-                    year: year.toString(),
-                  });
-                  if (period === "monthly") {
-                    params.append("month", index.toString());
-                  }
-                  window.open(`/api/reports/pdf?${params.toString()}`, "_blank");
-                }}
-                data-testid="button-download-pdf"
-              >
-                <Download className="h-4 w-4" />
-                Download Full Report (PDF)
-              </Button>
-            )}
-
-            <div className="flex items-center gap-2">
-              <Layers className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Detail Level:</span>
-              <Select
-                value={explainabilityLevel}
-                onValueChange={(v) => setExplainabilityLevel(v as ExplainabilityLevel)}
-              >
-                <SelectTrigger className="w-32" data-testid="select-explainability">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="minimal" data-testid="option-minimal">
-                    <div className="flex items-center gap-2">
-                      <EyeOff className="h-3 w-3" />
-                      Minimal
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="standard" data-testid="option-standard">
-                    <div className="flex items-center gap-2">
-                      <Eye className="h-3 w-3" />
-                      Standard
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="full" data-testid="option-full">
-                    <div className="flex items-center gap-2">
-                      <Layers className="h-3 w-3" />
-                      Full
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          {(period === "monthly" || period === "yearly") && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                const params = new URLSearchParams({
+                  base_chart_id: id,
+                  report_type: period,
+                  year: year.toString(),
+                });
+                if (period === "monthly") {
+                  params.append("month", index.toString());
+                }
+                window.open(`/api/reports/pdf?${params.toString()}`, "_blank");
+              }}
+              data-testid="button-download-pdf"
+            >
+              <Download className="h-4 w-4" />
+              Download Full Report (PDF)
+            </Button>
+          )}
 
           <Separator className="my-4" />
 
@@ -208,7 +164,7 @@ export default function PredictionScreen() {
             if (!extracted) return null;
             return (
               <MonthlyPredictionView
-                prediction={adaptInterpretation(extracted.primary, explainabilityLevel, extracted.deterministic)}
+                prediction={adaptInterpretation(extracted.primary, "full", extracted.deterministic)}
                 period={period}
               />
             );

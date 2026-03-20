@@ -6,6 +6,8 @@ Builds PDF from story elements (similar to HTML blocks).
 """
 
 import io
+import logging
+import re
 from typing import List
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -21,6 +23,7 @@ from reportlab.platypus import (
     PageBreak,
     Image,
     KeepTogether,
+    HRFlowable,
 )
 from reportlab.graphics.shapes import Drawing, Rect
 import base64
@@ -29,11 +32,17 @@ from .models import CanonicalReportData
 from .config import COLORS, MARGIN
 from io import BytesIO
 
+logger = logging.getLogger(__name__)
+
 try:
     from svglib.svglib import svg2rlg
     HAS_SVGLIB = True
 except ImportError:
     HAS_SVGLIB = False
+    logger.warning(
+        "svglib not installed — SVG charts will not render in PDF exports. "
+        "Run: pip install svglib==1.4.1"
+    )
 
 
 def _create_styles():
@@ -108,8 +117,30 @@ def _create_styles():
         textColor=colors.Color(*COLORS["text"]),
         alignment=TA_LEFT,
     ))
-    
+
+    styles.add(ParagraphStyle(
+        name='LifeAreaTitle',
+        parent=styles['Normal'],
+        fontSize=13,
+        fontName='Helvetica-Bold',
+        textColor=colors.Color(*COLORS["secondary"]),
+        spaceBefore=4,
+        spaceAfter=4,
+    ))
+
     return styles
+
+
+def _split_sentences(text: str, per_group: int = 2) -> list:
+    """Split text into groups of N sentences for paragraph-level readability."""
+    sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z"\u2018\u201c])', text.strip())
+    sentences = [s.strip() for s in sentences if s.strip()]
+    if not sentences:
+        return [text]
+    groups = []
+    for i in range(0, len(sentences), per_group):
+        groups.append(' '.join(sentences[i:i + per_group]))
+    return groups
 
 
 def _build_cover_page(data: CanonicalReportData, styles) -> List:
@@ -583,33 +614,45 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
     
     elements.append(Paragraph("Detailed Insights", styles['SubsectionTitle']))
     elements.append(Spacer(1, 0.15*inch))
-    
-    for area in data.prediction_areas:
-        area_elements = [
-            Paragraph(f"<b>{area.area}</b> ({area.score}/100 - {_score_to_label(area.score)})", 
-                     styles['BodyText']),
-        ]
-        
+
+    for i, area in enumerate(data.prediction_areas):
+        # Divider between sections (skip before the first)
+        if i > 0:
+            elements.append(HRFlowable(
+                width="100%", thickness=0.5,
+                color=colors.Color(0.82, 0.82, 0.82),
+                spaceBefore=6, spaceAfter=10,
+            ))
+
+        area_elements = []
+
+        # Heading: "Career — 65/100  ·  Favorable"
+        heading = f"{area.area} \u2014 {area.score}/100  \u00b7  {_score_to_label(area.score)}"
+        area_elements.append(Paragraph(heading, styles['LifeAreaTitle']))
+
+        # Interpretation split into 2-sentence paragraph groups
         if area.interpretation:
-            area_elements.append(Paragraph(area.interpretation, styles['BodyText']))
-        
+            groups = _split_sentences(area.interpretation, per_group=2)
+            for j, group in enumerate(groups):
+                if j == 0:
+                    # Bold the first sentence group as a visual lead-in
+                    area_elements.append(Paragraph(f"<b>{group}</b>", styles['BodyText']))
+                else:
+                    area_elements.append(Paragraph(group, styles['BodyText']))
+
         if area.deeper_explanation and not data.is_v2 and not data.is_v3:
             area_elements.append(Paragraph(
-                f"<i>{area.deeper_explanation}</i>", 
+                f"<i>{area.deeper_explanation}</i>",
                 styles['BodyText']
             ))
-        
-        # v1.8: Removed Opportunity/Watch-out/One Action - paragraph-only format
-        
+
         if area.guidance:
             area_elements.append(Paragraph(
-                f"<b>Guidance:</b> {area.guidance}", 
+                f"<b>Guidance:</b> {area.guidance}",
                 styles['BodyText']
             ))
-        
-        # NOTE: Attribution is now shown in prediction section header, not per life area
-        
-        area_elements.append(Spacer(1, 0.2*inch))
+
+        area_elements.append(Spacer(1, 0.25*inch))
         elements.append(KeepTogether(area_elements))
     
     elements.append(PageBreak())

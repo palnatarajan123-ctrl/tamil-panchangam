@@ -77,6 +77,7 @@ def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
             planets_by_rasi[rasi_idx] = planets
     
     # SVG Header
+    svg_elements.append('<?xml version="1.0" encoding="UTF-8"?>')
     svg_elements.append(
         f'<svg xmlns="http://www.w3.org/2000/svg" '
         f'width="{SVG_WIDTH}" height="{SVG_HEIGHT}" '
@@ -143,8 +144,11 @@ def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
                 f'font-family="sans-serif" font-size="{SIGN_FONT_SIZE - 2}" font-weight="600" fill="{COLOR_LAGNA}">'
                 f'Lagna</text>'
             )
-        
-        # Planets
+
+        # Planets — start below the lagna label when present to avoid overlap
+        # With lagna: baseline of "Lagna" text is y+40 (13px font), so planets start at y+58
+        # Without lagna: sign baseline is y+22 (15px font), planets start at y+42
+        planet_y_start = y + (58 if is_lagna else 42)
         planets = planets_by_rasi.get(rasi_idx, [])
         for idx, planet in enumerate(planets[:4]):
             planet_color = COLOR_PLANET
@@ -154,8 +158,8 @@ def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
                     planet_color = COLOR_EXALTED
                 elif d == "debilitated":
                     planet_color = COLOR_DEBILITATED
-            
-            py = y + PLANET_VERTICAL_START_OFFSET + idx * PLANET_VERTICAL_SPACING
+
+            py = planet_y_start + idx * PLANET_VERTICAL_SPACING
             svg_elements.append(
                 f'<text x="{cx}" y="{py}" text-anchor="middle" '
                 f'font-family="sans-serif" font-size="{PLANET_FONT_SIZE}" font-weight="500" fill="{planet_color}">'
