@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://RENDER_URL_PLACEHOLDER/api/:path*"
+      "destination": "https://tamil-panchangam-api.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
