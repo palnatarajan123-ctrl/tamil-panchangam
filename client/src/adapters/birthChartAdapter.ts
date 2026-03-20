@@ -124,6 +124,74 @@ export interface BirthChartUIModel {
       marakas?: string[];
     };
   };
+
+  yogas?: {
+    yogas: Array<{
+      name: string;
+      present: boolean;
+      strength: string;
+      effects: string[];
+      rationale: string;
+      category?: string;
+      planet?: string;
+      planets?: string[];
+      placement?: string;
+      house?: number;
+      moon_house?: number;
+      type?: string;
+    }>;
+    summary: {
+      total_yogas: number;
+      has_gaja_kesari: boolean;
+      has_dhana_yoga: boolean;
+      has_raja_yoga: boolean;
+      has_pancha_mahapurusha: boolean;
+      has_budhaditya: boolean;
+      has_kemadruma: boolean;
+      yoga_names: string[];
+    };
+  };
+
+  sade_sati?: {
+    moon_sign: number;
+    moon_sign_name: string;
+    current_saturn_sign: number | null;
+    current_saturn_sign_name: string;
+    saturn_house_from_moon: number | null;
+    reference_date: string;
+    alert_level: "high" | "medium" | "low" | "unknown";
+    sade_sati: {
+      active: boolean;
+      phase: number | null;
+      phase_name: string | null;
+      effects: string[];
+      remedies: string[];
+      current_phase_ends: string | null;
+      all_windows: Array<{
+        phase: number;
+        phase_name: string;
+        saturn_sign: number;
+        saturn_sign_name: string;
+        start_date: string;
+        end_date: string;
+      }>;
+      summary: string;
+    };
+    ashtama_shani: {
+      active: boolean;
+      effects: string[];
+      remedies: string[];
+      ends: string | null;
+      summary: string;
+    };
+    kantaka_shani: {
+      active: boolean;
+      effects: string[];
+      ends: string | null;
+      summary: string;
+    };
+    error: string | null;
+  };
 }
 
 /* ============================================================
@@ -319,5 +387,8 @@ export function adaptBirthChart(raw: any): BirthChartUIModel {
     },
 
     functional_roles: view.functional_roles ?? undefined,
+
+    yogas: view.yogas ?? undefined,
+    sade_sati: view.sade_sati ?? undefined,
   };
 }

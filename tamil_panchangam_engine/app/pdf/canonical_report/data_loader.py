@@ -667,6 +667,14 @@ def build_report_data(
     av_raw = envelope.get("ashtakavarga", {})
     sarvashtakavarga: Optional[Dict[str, int]] = av_raw.get("sarvashtakavarga") if isinstance(av_raw, dict) else None
 
+    # Yogas — from prediction envelope (computed at prediction time)
+    yogas_raw = envelope.get("yogas")
+    yogas_data = yogas_raw if isinstance(yogas_raw, dict) else None
+
+    # Sade Sati — from prediction envelope (computed at prediction time)
+    sade_sati_raw = envelope.get("sade_sati")
+    sade_sati_data = sade_sati_raw if isinstance(sade_sati_raw, dict) else None
+
     return CanonicalReportData(
         report_type=report_type.title(),
         period_label=period_label,
@@ -727,6 +735,8 @@ def build_report_data(
         
         methodology=methodology,
         sarvashtakavarga=sarvashtakavarga,
+        yogas_data=yogas_data,
+        sade_sati_data=sade_sati_data,
     )
 
 

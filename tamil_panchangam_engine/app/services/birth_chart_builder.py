@@ -2,6 +2,7 @@
 
 from typing import Dict, Any, List
 from app.engines.sade_sati_engine import compute_sade_sati
+from app.engines.yoga_engine import compute_yogas
 
 
 # -------------------------------------------------
@@ -316,6 +317,10 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
     sade_sati = compute_sade_sati(natal_moon_longitude=moon_lon_for_ss)
     base_chart["sade_sati"] = sade_sati
 
+    # Yogas — computed from ephemeris
+    yogas = compute_yogas(ephemeris=eph, houses={})
+    base_chart["yogas"] = yogas
+
     return {
         "identity": {
             "name": birth.get("name"),
@@ -376,6 +381,11 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
         # -----------------------------
         "functional_roles": base_chart.get("functional_roles", {}),
     
+        # -----------------------------
+        # Yogas
+        # -----------------------------
+        "yogas": yogas,
+
         # -----------------------------
         # Sade Sati
         # -----------------------------

@@ -23,6 +23,8 @@ import {
 
 import { StatusBadge } from "@/components/status-badge";
 import { DashaTimeline } from "@/components/DashaTimeline";
+import { YogasPanel } from "@/components/YogasPanel";
+import { SadeSatiPanel } from "@/components/SadeSatiPanel";
 import { ChartPair } from "@/components/ChartPair";
 import { TabbedChartViewer } from "@/components/TabbedChartViewer";
 import { 
@@ -236,6 +238,14 @@ export default function ChartDetail() {
                     : undefined
                 }
               />
+            </>
+          )}
+
+          {/* Yogas & Sade Sati — Only for D1 */}
+          {activeChartTab === "D1" && (
+            <>
+              <YogasPanel yogas={ui.yogas} />
+              <SadeSatiPanel sadeSati={ui.sade_sati} />
             </>
           )}
 

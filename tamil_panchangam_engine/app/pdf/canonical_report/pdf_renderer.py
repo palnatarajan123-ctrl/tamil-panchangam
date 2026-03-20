@@ -560,6 +560,231 @@ def _build_ashtakavarga_table(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def _build_yogas_section(data: CanonicalReportData, styles) -> List:
+    """Build Detected Yogas section for PDF."""
+    if not data.yogas_data:
+        return []
+
+    yogas_list = data.yogas_data.get("yogas", [])
+    present_yogas = [y for y in yogas_list if y.get("present")]
+
+    elements = []
+
+    yoga_elements = []
+    yoga_elements.append(Paragraph("Detected Yogas", styles['SectionTitle']))
+
+    if not present_yogas:
+        yoga_elements.append(Paragraph(
+            "No significant yogas detected in this chart.",
+            styles['BodyText']
+        ))
+        elements.append(KeepTogether(yoga_elements))
+        return elements
+
+    # Group yogas
+    YOGA_GROUPS = [
+        ("Raja & Authority Yogas", lambda y: (
+            y["name"] in ("Raja Yoga", "Neecha Bhanga Raja Yoga",
+                          "Harsha Yoga", "Sarala Yoga", "Vimala Yoga")
+            or "Viparita" in y.get("category", "")
+        )),
+        ("Pancha Mahapurusha", lambda y: (
+            y.get("category", "") == "Pancha Mahapurusha"
+            or any(n in y["name"] for n in ["Ruchaka", "Bhadra", "Hamsa", "Malavya", "Shasha"])
+        )),
+        ("Prosperity Yogas", lambda y: y["name"] in ("Dhana Yoga", "Chandra-Mangala Yoga")),
+        ("Intellect & Character", lambda y: y["name"] in ("Gaja Kesari Yoga", "Budhaditya Yoga")),
+        ("Challenging Yogas", lambda y: (
+            y["name"] == "Kemadruma Yoga" or y.get("category", "") == "Challenging Yoga"
+        )),
+    ]
+
+    assigned = set()
+    grouped: list = []
+    for group_label, matcher in YOGA_GROUPS:
+        matched = [y for i, y in enumerate(present_yogas) if i not in assigned and matcher(y)]
+        for y in matched:
+            assigned.add(present_yogas.index(y))
+        if matched:
+            grouped.append((group_label, matched))
+
+    rest = [y for i, y in enumerate(present_yogas) if i not in assigned]
+    if rest:
+        grouped.append(("Other Yogas", rest))
+
+    col_widths = [2.0 * inch, 1.0 * inch, 2.7 * inch]
+    header_row = ["Yoga", "Strength", "Key Effect"]
+
+    for group_label, yogas in grouped:
+        grp_elements = []
+        grp_elements.append(Paragraph(
+            f"<b>{group_label}</b>",
+            styles['SubsectionTitle']
+        ))
+
+        table_data = [header_row]
+        for y in yogas:
+            effect = y.get("effects", [""])[0] if y.get("effects") else ""
+            strength = y.get("strength", "moderate")
+            row = [y["name"], strength.title(), effect]
+            table_data.append(row)
+
+        table = Table(table_data, colWidths=col_widths)
+
+        style_cmds = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.Color(0.97, 0.97, 0.97)),
+        ]
+
+        # Italic for challenging yogas
+        is_challenging = group_label == "Challenging Yogas"
+        if is_challenging:
+            for row_i in range(1, len(table_data)):
+                style_cmds.append(("FONTNAME", (0, row_i), (-1, row_i), "Helvetica-Oblique"))
+                style_cmds.append(
+                    ("BACKGROUND", (0, row_i), (-1, row_i), colors.Color(1.0, 0.97, 0.88))
+                )
+
+        table.setStyle(TableStyle(style_cmds))
+        grp_elements.append(table)
+        grp_elements.append(Spacer(1, 0.2 * inch))
+        elements.append(KeepTogether(grp_elements))
+
+    elements.append(PageBreak())
+    return elements
+
+
+def _build_sade_sati_section(data: CanonicalReportData, styles) -> List:
+    """Build Sade Sati & Saturn Analysis section for PDF."""
+    if not data.sade_sati_data:
+        return []
+
+    elements = []
+    ss_root = data.sade_sati_data
+    ss = ss_root.get("sade_sati", {})
+    ashtama = ss_root.get("ashtama_shani", {})
+    kantaka = ss_root.get("kantaka_shani", {})
+    alert_level = ss_root.get("alert_level", "low")
+
+    section_elements = []
+    section_elements.append(Paragraph("Sade Sati & Saturn Analysis", styles['SectionTitle']))
+
+    moon_sign_name = ss_root.get("moon_sign_name", "")
+    saturn_sign_name = ss_root.get("current_saturn_sign_name", "")
+    house_from_moon = ss_root.get("saturn_house_from_moon")
+    context_line = f"Natal Moon: {moon_sign_name}"
+    if saturn_sign_name:
+        context_line += f" | Saturn currently in: {saturn_sign_name}"
+    if house_from_moon:
+        context_line += f" (H{house_from_moon} from Moon)"
+    section_elements.append(Paragraph(context_line, styles['BodyText']))
+    section_elements.append(Spacer(1, 0.15 * inch))
+
+    # Status
+    if alert_level == "low" and not ss.get("active") and not ashtama.get("active"):
+        section_elements.append(Paragraph(
+            "<b>Saturn Status: Clear</b> — Saturn is not in a challenging position from your Moon.",
+            styles['BodyText']
+        ))
+    else:
+        # Sade Sati
+        if ss.get("active"):
+            phase_name = ss.get("phase_name", "")
+            phase_ends = ss.get("current_phase_ends", "")
+            section_elements.append(Paragraph(
+                f"<b>Sade Sati Active — {phase_name}</b>",
+                styles['SubsectionTitle']
+            ))
+            if phase_ends:
+                section_elements.append(Paragraph(
+                    f"Current phase ends: {phase_ends}",
+                    styles['BodyText']
+                ))
+            effects = ss.get("effects", [])
+            if effects:
+                section_elements.append(Paragraph("<b>Influences:</b>", styles['BodyText']))
+                for eff in effects:
+                    section_elements.append(Paragraph(f"• {eff}", styles['BodyText']))
+            remedies = ss.get("remedies", [])
+            if remedies:
+                section_elements.append(Spacer(1, 0.1 * inch))
+                section_elements.append(Paragraph("<b>Suggested Remedies:</b>", styles['BodyText']))
+                for rem in remedies:
+                    section_elements.append(Paragraph(f"→ {rem}", styles['BodyText']))
+            section_elements.append(Spacer(1, 0.2 * inch))
+
+        # Ashtama Shani
+        if ashtama.get("active"):
+            section_elements.append(Paragraph(
+                "<b>Ashtama Shani Active — Saturn in 8th from Moon</b>",
+                styles['SubsectionTitle']
+            ))
+            effects = ashtama.get("effects", [])
+            for eff in effects:
+                section_elements.append(Paragraph(f"• {eff}", styles['BodyText']))
+            remedies = ashtama.get("remedies", [])
+            if remedies:
+                section_elements.append(Spacer(1, 0.1 * inch))
+                section_elements.append(Paragraph("<b>Suggested Remedies:</b>", styles['BodyText']))
+                for rem in remedies:
+                    section_elements.append(Paragraph(f"→ {rem}", styles['BodyText']))
+            section_elements.append(Spacer(1, 0.2 * inch))
+
+        # Kantaka Shani
+        if kantaka.get("active"):
+            section_elements.append(Paragraph(
+                "<b>Kantaka Shani — Saturn in 4th from Moon</b>",
+                styles['SubsectionTitle']
+            ))
+            effects = kantaka.get("effects", [])
+            for eff in effects:
+                section_elements.append(Paragraph(f"• {eff}", styles['BodyText']))
+            section_elements.append(Spacer(1, 0.2 * inch))
+
+    # Windows table
+    all_windows = ss.get("all_windows", [])
+    if all_windows:
+        section_elements.append(Paragraph("Upcoming Saturn Phase Windows", styles['SubsectionTitle']))
+        win_data = [["Phase", "Saturn Sign", "Period"]]
+        for w in all_windows:
+            phase_num = w.get("phase")
+            phase_label = (
+                "Rising (12th)" if phase_num == -1 else
+                "Peak (Moon sign)" if phase_num == 0 else
+                "Setting (2nd)"
+            )
+            win_data.append([
+                phase_label,
+                w.get("saturn_sign_name", ""),
+                f"{w.get('start_date', '')} – {w.get('end_date', '')}",
+            ])
+
+        win_table = Table(win_data, colWidths=[1.5 * inch, 1.7 * inch, 2.5 * inch])
+        win_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.Color(0.97, 0.97, 0.97)),
+        ]))
+        section_elements.append(win_table)
+
+    elements.append(KeepTogether(section_elements))
+    elements.append(PageBreak())
+    return elements
+
+
 def _score_to_label(score: int) -> str:
     """Convert score to human-readable label."""
     if score >= 75:
@@ -1088,6 +1313,8 @@ def render_pdf(data: CanonicalReportData) -> bytes:
     story.extend(_build_how_to_read(styles))
     story.extend(_build_natal_snapshot(data, styles))
     story.extend(_build_divisional_charts(data, styles))
+    story.extend(_build_yogas_section(data, styles))
+    story.extend(_build_sade_sati_section(data, styles))
     story.extend(_build_astrological_context(data, styles))
     story.extend(_build_predictions(data, styles))
     story.extend(_build_practices_reflection(data, styles))

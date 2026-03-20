@@ -205,3 +205,5 @@ class CanonicalReportData(BaseModel):
     
     methodology: Optional[MethodologyInfo] = None
     sarvashtakavarga: Optional[Dict[str, int]] = None
+    yogas_data: Optional[Dict[str, Any]] = None
+    sade_sati_data: Optional[Dict[str, Any]] = None
