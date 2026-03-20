@@ -403,4 +403,7 @@ def build_monthly_prediction_envelope(
         "functional_roles": functional_roles,
         "yogas": yogas,
         "event_windows": event_windows,
+
+        # ===== SADE SATI =====
+        "sade_sati": base_chart.get("sade_sati", {}),
     }

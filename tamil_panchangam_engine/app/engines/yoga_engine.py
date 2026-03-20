@@ -13,8 +13,28 @@ from typing import Dict, List, Any, Optional
 logger = logging.getLogger(__name__)
 
 KENDRA_FROM_POSITIONS = [1, 4, 7, 10]
+KENDRA_HOUSES = [1, 4, 7, 10]
+TRIKONA_HOUSES = [1, 5, 9]
 DUSTHANA_HOUSES = [6, 8, 12]
 DHANA_HOUSES = [2, 5, 9, 11]
+
+PANCHA_PLANETS = {
+    "Mars":    ("Ruchaka",   ["Courage, ambition, military success, strong physique"]),
+    "Mercury": ("Bhadra",    ["Intelligence, communication, business acumen, wit"]),
+    "Jupiter": ("Hamsa",     ["Wisdom, spirituality, prosperity, noble character"]),
+    "Venus":   ("Malavya",   ["Luxury, beauty, artistic talent, marital happiness"]),
+    "Saturn":  ("Shasha",    ["Discipline, longevity, service, judicial authority"]),
+}
+
+OWN_SIGNS = {
+    "Sun":     [5],
+    "Moon":    [4],
+    "Mars":    [1, 8],
+    "Mercury": [3, 6],
+    "Jupiter": [9, 12],
+    "Venus":   [2, 7],
+    "Saturn":  [10, 11],
+}
 
 EXALTATION_SIGNS = {
     "Sun": 1,       # Aries
@@ -256,6 +276,288 @@ def check_neecha_bhanga(
     return yogas
 
 
+def check_raja_yoga(
+    planets_data: Dict[str, Any],
+    lagna_lon: float
+) -> List[Dict[str, Any]]:
+    """
+    Raja Yoga: Lord of a Kendra (1,4,7,10) conjunct or mutually aspecting
+    lord of a Trikona (1,5,9). House 1 counts for both.
+    """
+    yogas = []
+    lagna_rasi = get_rasi_from_longitude(lagna_lon)
+
+    kendra_lords = {}
+    for house in KENDRA_HOUSES:
+        target_rasi = ((lagna_rasi - 1 + house - 1) % 12) + 1
+        lord = RASI_LORDS.get(target_rasi)
+        if lord and lord not in ["Rahu", "Ketu"]:
+            kendra_lords[house] = lord
+
+    trikona_lords = {}
+    for house in TRIKONA_HOUSES:
+        target_rasi = ((lagna_rasi - 1 + house - 1) % 12) + 1
+        lord = RASI_LORDS.get(target_rasi)
+        if lord and lord not in ["Rahu", "Ketu"]:
+            trikona_lords[house] = lord
+
+    seen_pairs: set = set()
+    for kh, klord in kendra_lords.items():
+        for th, tlord in trikona_lords.items():
+            if klord == tlord:
+                continue
+            pair_key = tuple(sorted([klord, tlord]))
+            if pair_key in seen_pairs:
+                continue
+            if klord not in planets_data or tlord not in planets_data:
+                continue
+
+            klon = planets_data[klord].get("longitude_deg", 0)
+            tlon = planets_data[tlord].get("longitude_deg", 0)
+            khouse = get_house_from_lagna(klon, lagna_lon)
+            thouse = get_house_from_lagna(tlon, lagna_lon)
+
+            if khouse == thouse:
+                seen_pairs.add(pair_key)
+                yogas.append({
+                    "name": "Raja Yoga",
+                    "present": True,
+                    "type": "conjunction",
+                    "planets": [klord, tlord],
+                    "houses_involved": [kh, th],
+                    "strength": "strong",
+                    "effects": [
+                        "Authority and recognition",
+                        "Career success and status",
+                        "Leadership positions",
+                        "Royal favour or institutional support"
+                    ],
+                    "rationale": (
+                        f"Kendra lord {klord} (H{kh}) conjunct Trikona lord "
+                        f"{tlord} (H{th}) in H{khouse}"
+                    )
+                })
+            else:
+                distance = abs(khouse - thouse)
+                if distance == 6:
+                    seen_pairs.add(pair_key)
+                    yogas.append({
+                        "name": "Raja Yoga",
+                        "present": True,
+                        "type": "mutual_aspect",
+                        "planets": [klord, tlord],
+                        "houses_involved": [kh, th],
+                        "strength": "moderate",
+                        "effects": [
+                            "Professional elevation",
+                            "Recognition through effort",
+                            "Gradual rise in status"
+                        ],
+                        "rationale": (
+                            f"Kendra lord {klord} (H{kh}) mutually aspecting "
+                            f"Trikona lord {tlord} (H{th})"
+                        )
+                    })
+    return yogas
+
+
+def check_pancha_mahapurusha(
+    planets_data: Dict[str, Any],
+    lagna_lon: float
+) -> List[Dict[str, Any]]:
+    """
+    Pancha Mahapurusha Yoga: Mars/Mercury/Jupiter/Venus/Saturn in own sign
+    or exaltation AND placed in a Kendra (1,4,7,10) from Lagna.
+    """
+    yogas = []
+    lagna_rasi = get_rasi_from_longitude(lagna_lon)
+
+    for planet, (yoga_name, effects) in PANCHA_PLANETS.items():
+        if planet not in planets_data:
+            continue
+        plon = planets_data[planet].get("longitude_deg", 0)
+        prasi = get_rasi_from_longitude(plon)
+        phouse = get_house_from_lagna(plon, lagna_lon)
+
+        in_own    = prasi in OWN_SIGNS.get(planet, [])
+        in_exalt  = prasi == EXALTATION_SIGNS.get(planet)
+        in_kendra = phouse in KENDRA_HOUSES
+
+        if (in_own or in_exalt) and in_kendra:
+            strength = "very strong" if in_exalt else "strong"
+            placement = "exaltation" if in_exalt else "own sign"
+            yogas.append({
+                "name": f"{yoga_name} Yoga",
+                "category": "Pancha Mahapurusha",
+                "present": True,
+                "planet": planet,
+                "placement": placement,
+                "house": phouse,
+                "strength": strength,
+                "effects": effects,
+                "rationale": (
+                    f"{planet} in {placement} (sign {prasi}) "
+                    f"placed in kendra H{phouse}"
+                )
+            })
+    return yogas
+
+
+def check_budhaditya_yoga(
+    planets_data: Dict[str, Any],
+    lagna_lon: float
+) -> Optional[Dict[str, Any]]:
+    """
+    Budhaditya Yoga: Sun and Mercury in the same sign.
+    """
+    if "Sun" not in planets_data or "Mercury" not in planets_data:
+        return None
+
+    sun_lon  = planets_data["Sun"].get("longitude_deg", 0)
+    merc_lon = planets_data["Mercury"].get("longitude_deg", 0)
+
+    sun_rasi  = get_rasi_from_longitude(sun_lon)
+    merc_rasi = get_rasi_from_longitude(merc_lon)
+
+    if sun_rasi != merc_rasi:
+        return None
+
+    house = get_house_from_lagna(sun_lon, lagna_lon)
+    orb   = abs(sun_lon - merc_lon) % 360
+    if orb > 180:
+        orb = 360 - orb
+
+    combust = orb <= 14
+    strength = "moderate" if combust else "strong"
+
+    return {
+        "name": "Budhaditya Yoga",
+        "present": True,
+        "planets": ["Sun", "Mercury"],
+        "house": house,
+        "combust_mercury": combust,
+        "strength": strength,
+        "effects": [
+            "Sharp intellect and analytical mind",
+            "Eloquence and communication skills",
+            "Success in academics and writing",
+            "Respected for intelligence"
+        ],
+        "rationale": (
+            f"Sun and Mercury conjunct in sign {sun_rasi} (H{house})"
+            + (" – Mercury combust, moderate strength" if combust else "")
+        )
+    }
+
+
+def check_chandra_mangala_yoga(
+    planets_data: Dict[str, Any],
+    lagna_lon: float
+) -> Optional[Dict[str, Any]]:
+    """
+    Chandra-Mangala Yoga: Moon and Mars in the same sign or mutual 7th aspect.
+    """
+    if "Moon" not in planets_data or "Mars" not in planets_data:
+        return None
+
+    moon_lon = planets_data["Moon"].get("longitude_deg", 0)
+    mars_lon = planets_data["Mars"].get("longitude_deg", 0)
+
+    moon_rasi = get_rasi_from_longitude(moon_lon)
+    mars_rasi = get_rasi_from_longitude(mars_lon)
+    moon_house = get_house_from_lagna(moon_lon, lagna_lon)
+    mars_house = get_house_from_lagna(mars_lon, lagna_lon)
+
+    if moon_rasi == mars_rasi:
+        return {
+            "name": "Chandra-Mangala Yoga",
+            "present": True,
+            "type": "conjunction",
+            "planets": ["Moon", "Mars"],
+            "house": moon_house,
+            "strength": "strong",
+            "effects": [
+                "Wealth through enterprise and boldness",
+                "Business acumen and drive",
+                "Emotional courage",
+                "Financial independence"
+            ],
+            "rationale": f"Moon and Mars conjunct in sign {moon_rasi} (H{moon_house})"
+        }
+
+    distance = abs(moon_house - mars_house)
+    if distance == 6:
+        return {
+            "name": "Chandra-Mangala Yoga",
+            "present": True,
+            "type": "mutual_aspect",
+            "planets": ["Moon", "Mars"],
+            "houses": [moon_house, mars_house],
+            "strength": "moderate",
+            "effects": [
+                "Ambitious emotional drive",
+                "Wealth through persistence",
+                "Competitive instinct"
+            ],
+            "rationale": f"Moon (H{moon_house}) and Mars (H{mars_house}) in mutual 7th aspect"
+        }
+    return None
+
+
+def check_kemadruma_yoga(
+    planets_data: Dict[str, Any],
+    lagna_lon: float
+) -> Optional[Dict[str, Any]]:
+    """
+    Kemadruma Yoga: Moon has no planets in the 2nd or 12th sign from it.
+    Cancelled if Moon is in kendra from Lagna.
+    """
+    if "Moon" not in planets_data:
+        return None
+
+    moon_lon  = planets_data["Moon"].get("longitude_deg", 0)
+    moon_rasi = get_rasi_from_longitude(moon_lon)
+    moon_house = get_house_from_lagna(moon_lon, lagna_lon)
+
+    second_from_moon  = (moon_rasi % 12) + 1
+    twelfth_from_moon = ((moon_rasi - 2) % 12) + 1
+
+    PHYSICAL_PLANETS = ["Sun", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"]
+    flanking_occupied = False
+    for planet in PHYSICAL_PLANETS:
+        if planet not in planets_data:
+            continue
+        prasi = get_rasi_from_longitude(planets_data[planet].get("longitude_deg", 0))
+        if prasi in [second_from_moon, twelfth_from_moon]:
+            flanking_occupied = True
+            break
+
+    if flanking_occupied:
+        return None
+
+    if moon_house in KENDRA_HOUSES:
+        return None  # Cancelled by kendra placement
+
+    return {
+        "name": "Kemadruma Yoga",
+        "category": "Challenging Yoga",
+        "present": True,
+        "planet": "Moon",
+        "moon_house": moon_house,
+        "strength": "moderate",
+        "effects": [
+            "Emotional isolation or loneliness at times",
+            "Need for inner resilience",
+            "Self-reliance in emotional matters",
+            "Periods of introspection"
+        ],
+        "rationale": (
+            f"Moon in H{moon_house} with no planets flanking "
+            f"(signs {twelfth_from_moon} and {second_from_moon} empty)"
+        )
+    }
+
+
 def compute_yogas(
     ephemeris: Dict[str, Any],
     houses: Dict[int, Any]
@@ -295,15 +597,33 @@ def compute_yogas(
         
         neecha_bhanga = check_neecha_bhanga(planets_data)
         all_yogas.extend(neecha_bhanga)
-        
+
+        raja_yogas = check_raja_yoga(planets_data, lagna_lon)
+        all_yogas.extend(raja_yogas)
+
+        pancha_yogas = check_pancha_mahapurusha(planets_data, lagna_lon)
+        all_yogas.extend(pancha_yogas)
+
+        budhaditya = check_budhaditya_yoga(planets_data, lagna_lon)
+        if budhaditya:
+            all_yogas.append(budhaditya)
+
+        chandra_mangala = check_chandra_mangala_yoga(planets_data, lagna_lon)
+        if chandra_mangala:
+            all_yogas.append(chandra_mangala)
+
+        kemadruma = check_kemadruma_yoga(planets_data, lagna_lon)
+        if kemadruma:
+            all_yogas.append(kemadruma)
+
         present_yogas = [y for y in all_yogas if y.get("present")]
-        
+
         has_gaja_kesari = any(y["name"] == "Gaja Kesari Yoga" for y in present_yogas)
         has_dhana = any(y["name"] == "Dhana Yoga" for y in present_yogas)
         has_raja = any("Raja" in y.get("name", "") or "Raja" in y.get("category", "") for y in present_yogas)
-        
+
         logger.debug(f"DEBUG: Yogas computed - {len(present_yogas)} yogas found")
-        
+
         return {
             "yogas": present_yogas,
             "summary": {
@@ -311,11 +631,16 @@ def compute_yogas(
                 "has_gaja_kesari": has_gaja_kesari,
                 "has_dhana_yoga": has_dhana,
                 "has_raja_yoga": has_raja,
+                "has_pancha_mahapurusha": any(
+                    "Pancha Mahapurusha" in y.get("category", "") for y in present_yogas
+                ),
+                "has_budhaditya": any(y["name"] == "Budhaditya Yoga" for y in present_yogas),
+                "has_kemadruma": any(y["name"] == "Kemadruma Yoga" for y in present_yogas),
                 "yoga_names": list(set(y["name"] for y in present_yogas)),
             },
             "error": None
         }
-        
+
     except Exception as e:
         logger.error(f"DEBUG: Yoga computation error: {e}")
         return {
@@ -325,6 +650,9 @@ def compute_yogas(
                 "has_gaja_kesari": False,
                 "has_dhana_yoga": False,
                 "has_raja_yoga": False,
+                "has_pancha_mahapurusha": False,
+                "has_budhaditya": False,
+                "has_kemadruma": False,
                 "yoga_names": [],
             },
             "error": str(e)

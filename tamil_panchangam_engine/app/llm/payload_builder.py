@@ -195,7 +195,8 @@ def build_llm_payload(
     rahu_ketu_axis: Optional[Dict[str, Any]] = None,
     yogas: Optional[List[Dict[str, Any]]] = None,
     chandrashtama_periods: Optional[List[Dict[str, Any]]] = None,
-    nakshatra_pada: Optional[int] = None
+    nakshatra_pada: Optional[int] = None,
+    sade_sati_data: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Build enriched LLM payload v3.0 — Siddhar-Tradition Synthesizer.
@@ -346,7 +347,29 @@ def build_llm_payload(
     
     if chandrashtama_periods:
         overall_context["chandrashtama_periods"] = chandrashtama_periods[:6]
-    
+
+    if sade_sati_data:
+        ss = sade_sati_data.get("sade_sati", {})
+        ashtama = sade_sati_data.get("ashtama_shani", {})
+        kantaka = sade_sati_data.get("kantaka_shani", {})
+        if ss.get("active"):
+            overall_context["sade_sati"] = {
+                "active": True,
+                "phase": ss.get("phase_name"),
+                "alert_level": sade_sati_data.get("alert_level"),
+                "effects": ss.get("effects", [])[:3],
+            }
+        if ashtama.get("active"):
+            overall_context["ashtama_shani"] = {
+                "active": True,
+                "effects": ashtama.get("effects", [])[:3],
+            }
+        if kantaka.get("active"):
+            overall_context["kantaka_shani"] = {
+                "active": True,
+                "effects": kantaka.get("effects", [])[:3],
+            }
+
     payload = {
         "overall_context": overall_context,
         "synthesis_instruction": (
@@ -577,6 +600,8 @@ def extract_payload_inputs(
             "theme": rahu_ketu_data.get("theme", "")
         }
     
+    envelope_sade_sati = envelope.get("sade_sati", {})
+
     envelope_yogas = envelope.get("yogas", {})
     yoga_list = []
     if isinstance(envelope_yogas, dict):
@@ -637,6 +662,7 @@ def extract_payload_inputs(
         "yogas": yoga_list if yoga_list else None,
         "chandrashtama_periods": chandrashtama_periods if chandrashtama_periods else None,
         "nakshatra_pada": nakshatra_pada,
+        "sade_sati_data": envelope_sade_sati if envelope_sade_sati else None,
     }
 
 

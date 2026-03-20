@@ -1,6 +1,7 @@
 # app/services/birth_chart_builder.py
 
 from typing import Dict, Any, List
+from app.engines.sade_sati_engine import compute_sade_sati
 
 
 # -------------------------------------------------
@@ -310,6 +311,11 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
     # ✅ SAFE — Navamsa surfaced if present
     navamsa = base_chart.get("divisional_charts", {}).get("D9")
 
+    # Sade Sati — computed from natal Moon longitude
+    moon_lon_for_ss = eph.get("moon", {}).get("longitude_deg", 0.0)
+    sade_sati = compute_sade_sati(natal_moon_longitude=moon_lon_for_ss)
+    base_chart["sade_sati"] = sade_sati
+
     return {
         "identity": {
             "name": birth.get("name"),
@@ -370,6 +376,11 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
         # -----------------------------
         "functional_roles": base_chart.get("functional_roles", {}),
     
+        # -----------------------------
+        # Sade Sati
+        # -----------------------------
+        "sade_sati": sade_sati,
+
         "notes": [
             "Birth chart is computed using sidereal (Lahiri) calculations.",
             "All values are immutable and derived from stored ephemeris only.",
