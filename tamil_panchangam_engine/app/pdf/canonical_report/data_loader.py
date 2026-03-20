@@ -257,19 +257,38 @@ def _extract_dasha_context(envelope: Dict[str, Any]) -> DashaContext:
     )
 
 
+def _bindu_label(bindus: int) -> str:
+    """Human-readable bindu strength label."""
+    if bindus >= 7:
+        return "Very Strong"
+    if bindus >= 5:
+        return "Strong"
+    if bindus >= 3:
+        return "Moderate"
+    return "Very Weak"
+
+
 def _extract_transit_context(envelope: Dict[str, Any]) -> TransitContext:
     """Extract transit context from prediction envelope (gochara)."""
     gochara = envelope.get("gochara", {})
-    
+    ashtakavarga = envelope.get("ashtakavarga", {})
+
     jupiter = gochara.get("jupiter", {})
     saturn = gochara.get("saturn", {})
     rahu_ketu = gochara.get("rahu_ketu", {})
-    
+
     jupiter_sign = jupiter.get("transit_rasi", "Unknown")
     saturn_sign = saturn.get("transit_rasi", "Unknown")
     rahu_sign = rahu_ketu.get("rahu_rasi", "Unknown")
     ketu_sign = rahu_ketu.get("ketu_rasi", "Unknown")
-    
+
+    jup_av = ashtakavarga.get("jupiter", {})
+    sat_av = ashtakavarga.get("saturn", {})
+    jup_bindus = jup_av.get("bindus") if jup_av.get("bindus") is not None else jup_av.get("bindu")
+    sat_bindus = sat_av.get("bindus") if sat_av.get("bindus") is not None else sat_av.get("bindu")
+    jup_drishti_bonus = jupiter.get("drishti_aspect_bonus")
+    sat_drishti_bonus = saturn.get("drishti_aspect_bonus")
+
     def _phase_label(d: dict, phase_key: str = "phase") -> str:
         phase = d.get(phase_key, "")
         retro = d.get("is_retrograde", False)
@@ -282,10 +301,21 @@ def _extract_transit_context(envelope: Dict[str, Any]) -> TransitContext:
             suffix += " [R]"
         return suffix
 
+    def _bindu_suffix(bindus) -> str:
+        if bindus is None:
+            return ""
+        return f" — {bindus}/8 bindus ({_bindu_label(bindus)})"
+
     return TransitContext(
-        jupiter_transit=f"Jupiter in {jupiter_sign}{_phase_label(jupiter)}",
-        saturn_transit=f"Saturn in {saturn_sign}{_phase_label(saturn, 'transit_phase')}",
+        jupiter_transit=f"Jupiter in {jupiter_sign}{_phase_label(jupiter)}{_bindu_suffix(jup_bindus)}",
+        saturn_transit=f"Saturn in {saturn_sign}{_phase_label(saturn, 'transit_phase')}{_bindu_suffix(sat_bindus)}",
         rahu_ketu_axis=f"Rahu in {rahu_sign}{_phase_label(rahu_ketu, 'rahu_phase')}, Ketu in {ketu_sign}{_phase_label(rahu_ketu, 'ketu_phase')}",
+        jupiter_rasi=jupiter_sign,
+        saturn_rasi=saturn_sign,
+        jupiter_bindus=jup_bindus,
+        saturn_bindus=sat_bindus,
+        jupiter_drishti_bonus=jup_drishti_bonus,
+        saturn_drishti_bonus=sat_drishti_bonus,
     )
 
 
@@ -634,6 +664,9 @@ def build_report_data(
                 encouragement=closing_v3_data.get("encouragement")
             )
     
+    av_raw = envelope.get("ashtakavarga", {})
+    sarvashtakavarga: Optional[Dict[str, int]] = av_raw.get("sarvashtakavarga") if isinstance(av_raw, dict) else None
+
     return CanonicalReportData(
         report_type=report_type.title(),
         period_label=period_label,
@@ -693,6 +726,7 @@ def build_report_data(
         is_v3=is_v3,
         
         methodology=methodology,
+        sarvashtakavarga=sarvashtakavarga,
     )
 
 

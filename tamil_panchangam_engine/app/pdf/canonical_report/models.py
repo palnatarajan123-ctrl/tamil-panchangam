@@ -47,6 +47,12 @@ class TransitContext(BaseModel):
     jupiter_transit: str
     saturn_transit: str
     rahu_ketu_axis: str
+    jupiter_rasi: str = ""
+    saturn_rasi: str = ""
+    jupiter_bindus: Optional[int] = None
+    saturn_bindus: Optional[int] = None
+    jupiter_drishti_bonus: Optional[float] = None
+    saturn_drishti_bonus: Optional[float] = None
 
 
 class NakshatraTimingContext(BaseModel):
@@ -198,3 +204,4 @@ class CanonicalReportData(BaseModel):
     is_v3: bool = False
     
     methodology: Optional[MethodologyInfo] = None
+    sarvashtakavarga: Optional[Dict[str, int]] = None

@@ -195,6 +195,7 @@ export default function PredictionScreen() {
               <MonthlyPredictionView
                 prediction={adaptInterpretation(extracted.primary, extracted.deterministic)}
                 period={period}
+                envelope={data.details?.envelope}
               />
             );
           })()}

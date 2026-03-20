@@ -81,6 +81,7 @@ export default function Predictions() {
     month?: number;
   } | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [envelopeData, setEnvelopeData] = useState<any>(null);
   const [calculationConfidence, setCalculationConfidence] = useState<{
     level: string;
     cusp_cases: Array<{ planet: string; position: string }>;
@@ -207,8 +208,9 @@ export default function Predictions() {
       const viewModel = adaptInterpretation(extracted.primary, extracted.deterministic);
       setPrediction(viewModel);
 
-      // Extract calculation confidence from envelope
+      // Extract calculation confidence and envelope
       const envelope = data.details?.envelope;
+      setEnvelopeData(envelope || null);
       if (envelope?.calculation_confidence) {
         setCalculationConfidence(envelope.calculation_confidence);
       } else {
@@ -337,6 +339,7 @@ export default function Predictions() {
               setPrediction(null);
               setPredictionError(null);
               setLlmPending(false);
+              setEnvelopeData(null);
               if (llmPollRef.current) { clearInterval(llmPollRef.current); llmPollRef.current = null; }
             }}
             data-testid={`button-tab-${t}`}
@@ -473,7 +476,7 @@ export default function Predictions() {
             </Card>
           )}
           
-          <MonthlyPredictionView prediction={prediction} period={predictionType} />
+          <MonthlyPredictionView prediction={prediction} period={predictionType} envelope={envelopeData} />
           
           {/* PDF Download Button */}
           {lastPredictionParams && (

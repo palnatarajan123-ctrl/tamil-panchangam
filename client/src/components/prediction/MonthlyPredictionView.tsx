@@ -59,6 +59,28 @@ function Paragraphs({ text, className }: { text: string; className?: string }) {
 
 type PredictionPeriod = "weekly" | "monthly" | "yearly";
 
+function binduLabel(n: number): string {
+  if (n >= 7) return "Very Strong";
+  if (n >= 5) return "Strong";
+  if (n >= 3) return "Moderate";
+  return "Very Weak";
+}
+
+function getDrishtiNote(engine: string, envelope: any): string | null {
+  if (!envelope) return null;
+  let bonus: number | undefined;
+  if (engine.includes("GOCHARA_JUPITER")) {
+    bonus = envelope?.gochara?.jupiter?.drishti_aspect_bonus;
+  } else if (engine.includes("GOCHARA_SATURN")) {
+    bonus = envelope?.gochara?.saturn?.drishti_aspect_bonus;
+  }
+  if (bonus == null || Math.abs(bonus) < 0.15) return null;
+  const pct = Math.round(Math.abs(bonus) * 100);
+  return bonus < 0
+    ? `Weakened by natal aspects (\u2212${pct}%)`
+    : `Strengthened by natal aspects (+${pct}%)`;
+}
+
 const OUTLOOK_COLORS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   positive: "default",
   neutral: "secondary",
@@ -80,15 +102,16 @@ function getScoreColor(score: number): string {
 interface LifeAreaCardProps {
   area: LifeAreaViewModel;
   isV2: boolean;
+  envelope?: any;
 }
 
-function LifeAreaCard({ area, isV2 }: LifeAreaCardProps) {
+function LifeAreaCard({ area, isV2, envelope }: LifeAreaCardProps) {
   return (
     <AccordionItem value={area.key} data-testid={`accordion-item-${area.key}`}>
       <AccordionTrigger data-testid={`accordion-trigger-${area.key}`}>
         <div className="flex items-center gap-3 flex-wrap">
           <span className="font-medium">{area.label}</span>
-          <Badge 
+          <Badge
             variant={OUTLOOK_COLORS[area.outlook] ?? "secondary"}
             data-testid={`badge-outlook-${area.key}`}
           >
@@ -110,6 +133,29 @@ function LifeAreaCard({ area, isV2 }: LifeAreaCardProps) {
             <Paragraphs text={area.deeperExplanation} className="text-muted-foreground" />
           </div>
         )}
+
+        {!isV2 && area.attribution?.signalsUsed && area.attribution.signalsUsed.length > 0 && (
+          <div className="space-y-2 pt-2 border-t border-border/40" data-testid={`section-signals-${area.key}`}>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Signals</p>
+            {area.attribution.signalsUsed.map((sig, idx) => {
+              const sign = sig.weight >= 0 ? "+" : "";
+              const drishtiNote = getDrishtiNote(sig.engine, envelope);
+              return (
+                <div key={idx} className="space-y-0.5">
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {sig.engine}  {sign}{sig.weight.toFixed(2)}
+                  </span>
+                  {sig.interpretiveHint && (
+                    <p className="text-xs text-muted-foreground italic pl-2">{sig.interpretiveHint}</p>
+                  )}
+                  {drishtiNote && (
+                    <p className="text-xs text-muted-foreground/70 italic pl-2">{drishtiNote}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </AccordionContent>
     </AccordionItem>
   );
@@ -118,9 +164,11 @@ function LifeAreaCard({ area, isV2 }: LifeAreaCardProps) {
 export function MonthlyPredictionView({
   prediction,
   period = "monthly",
+  envelope,
 }: {
   prediction: PredictionViewModel | null;
   period?: PredictionPeriod;
+  envelope?: any;
 }) {
   if (!prediction) {
     return null;
@@ -400,6 +448,54 @@ export function MonthlyPredictionView({
         </Card>
       )}
 
+      {/* ================= TRANSIT STRENGTH (ENHANCEMENT A) ================= */}
+      {envelope?.gochara && (
+        <Card data-testid="card-transit-strength">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Activity className="h-4 w-4" />
+              Transit Influences
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              {(() => {
+                const jup = envelope.gochara.jupiter;
+                const bindus = envelope.ashtakavarga?.jupiter?.bindus;
+                return (
+                  <div className="space-y-1" data-testid="transit-jupiter">
+                    <span className="font-medium">Jupiter in {jup?.transit_rasi}</span>
+                    {bindus != null && (
+                      <div>
+                        <Badge variant="outline" className="text-xs">
+                          {bindus}/8 bindus · {binduLabel(bindus)}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              {(() => {
+                const sat = envelope.gochara.saturn;
+                const bindus = envelope.ashtakavarga?.saturn?.bindus;
+                return (
+                  <div className="space-y-1" data-testid="transit-saturn">
+                    <span className="font-medium">Saturn in {sat?.transit_rasi}</span>
+                    {bindus != null && (
+                      <div>
+                        <Badge variant="outline" className="text-xs">
+                          {bindus}/8 bindus · {binduLabel(bindus)}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ================= LIFE AREAS ================= */}
       <Card data-testid="card-life-areas">
         <CardHeader>
@@ -415,7 +511,7 @@ export function MonthlyPredictionView({
         <CardContent>
           <Accordion type="single" collapsible className="w-full" data-testid="accordion-life-areas">
             {lifeAreas.map(area => (
-              <LifeAreaCard key={area.key} area={area} isV2={isV2 || isV3} />
+              <LifeAreaCard key={area.key} area={area} isV2={isV2 || isV3} envelope={envelope} />
             ))}
           </Accordion>
         </CardContent>
