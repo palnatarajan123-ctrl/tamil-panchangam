@@ -1,5 +1,6 @@
 import { useParams } from "wouter";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePrediction } from "@/hooks/usePrediction";
 
 import { MonthlyPredictionView } from "@/components/prediction/MonthlyPredictionView";
@@ -16,6 +17,7 @@ import {
 } from "@/adapters/aiInterpretationAdapter";
 
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -78,6 +80,7 @@ export default function PredictionScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
+  const queryClient = useQueryClient();
   const { data, isLoading, error } = usePrediction({
     baseChartId: id,
     period,
@@ -85,6 +88,41 @@ export default function PredictionScreen() {
     month: period === "monthly" ? index : undefined,
     week: period === "weekly" ? index : undefined,
   });
+
+  /* -------------------------------------------------
+     LLM status polling — fires only for monthly when
+     the backend returns llm_status = "pending"
+  -------------------------------------------------- */
+  const llmPending = period === "monthly" && (data as any)?.llm_status === "pending";
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!llmPending) {
+      if (pollRef.current) clearInterval(pollRef.current);
+      return;
+    }
+    pollRef.current = setInterval(async () => {
+      try {
+        const params = new URLSearchParams({
+          base_chart_id: id,
+          year: year.toString(),
+          month: index.toString(),
+        });
+        const res = await fetch(`/api/prediction/monthly/llm-status?${params}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.status === "ready") {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          queryClient.invalidateQueries({
+            queryKey: ["prediction", id, "monthly", year, index, undefined],
+          });
+        }
+      } catch (_) { /* ignore */ }
+    }, 3000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [llmPending]);
 
   const dashaContext = data?.details?.envelope?.dasha_context;
 
@@ -125,6 +163,12 @@ export default function PredictionScreen() {
       />
 
       {isLoading && <div>Computing prediction…</div>}
+      {llmPending && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Enhancing with AI…
+        </div>
+      )}
       {error && <div className="text-red-600">{error.message}</div>}
 
       {data && (

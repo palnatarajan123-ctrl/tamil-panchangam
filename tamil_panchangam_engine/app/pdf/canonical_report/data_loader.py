@@ -631,7 +631,7 @@ def build_report_data(
         birth_reference=_extract_birth_reference(payload),
         
         chart_images=ChartImages(
-            d1_rasi=_generate_chart_svg(rasi_planet_signs, "D1", "Rāsi Chart (D1)", lagna_sign),
+            d1_rasi=_generate_chart_svg(rasi_planet_signs, "D1", "Rasi Chart (D1)", lagna_sign),
             d9_navamsa=_generate_chart_svg(navamsa_planet_signs, "D9", "Navamsa Chart (D9)", d9_lagna_sign),
             d1_planet_signs=_convert_planet_to_sign_mapping(rasi_planet_signs),
             d9_planet_signs=_convert_planet_to_sign_mapping(navamsa_planet_signs),

@@ -175,8 +175,8 @@ def render_south_indian_chart_svg(input: ChartSvgInput) -> str:
     )
     
     # Center label
-    title = input.title or ("Navamsa Chart (D9)" if input.chart_type == "D9" else "Rāsi Chart (D1)")
-    subtitle = "D9 · Marriage & Dharma" if input.chart_type == "D9" else "South Indian"
+    title = input.title or ("Navamsa Chart (D9)" if input.chart_type == "D9" else "Rasi Chart (D1)")
+    subtitle = "D9 - Marriage & Dharma" if input.chart_type == "D9" else "South Indian"
     
     svg_elements.append(
         f'<text x="{SVG_WIDTH/2}" y="{SVG_HEIGHT/2 - 10}" text-anchor="middle" '

@@ -15,10 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group";
-import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -46,7 +42,6 @@ import {
   Loader2,
   TrendingUp,
   Activity,
-  Eye,
 } from "lucide-react";
 
 import { apiRequest } from "@/lib/queryClient";
@@ -56,7 +51,6 @@ import {
   extractInterpretationWithDeterministic,
   hasValidAIInterpretation,
   type PredictionViewModel,
-  type ExplainabilityLevel,
 } from "@/adapters/aiInterpretationAdapter";
 
 const OUTLOOK_COLORS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -74,7 +68,6 @@ function getScoreColor(score: number): string {
 
 export default function ChartDetail() {
   const { id: chartId } = useParams<{ id: string }>();
-  const [explainabilityLevel, setExplainabilityLevel] = useState<ExplainabilityLevel>("standard");
   const [rawInterpretation, setRawInterpretation] = useState<any>(null);
   const [activeChartTab, setActiveChartTab] = useState<string>("D1");
 
@@ -120,13 +113,10 @@ export default function ChartDetail() {
 
   const generatePrediction = useMutation({
     mutationFn: async () => {
-      // Always request "full" from backend to get complete data
-      // Frontend adapter will filter based on user's explainabilityLevel selection
       const res = await apiRequest("POST", "/api/prediction/monthly", {
         base_chart_id: chartId,
         year: currentYear,
         month: currentMonth,
-        explainability_level: "full",
       });
       if (!res.ok) throw new Error("Failed to generate prediction");
       return res.json();
@@ -142,7 +132,7 @@ export default function ChartDetail() {
     ? (() => {
         const extracted = extractInterpretationWithDeterministic({ interpretation: rawInterpretation.interpretation });
         if (!extracted) return null;
-        return adaptInterpretation(extracted.primary, explainabilityLevel, extracted.deterministic);
+        return adaptInterpretation(extracted.primary, "full", extracted.deterministic);
       })()
     : null;
 
@@ -267,30 +257,6 @@ export default function ChartDetail() {
                   </CardDescription>
                 </div>
 
-                {prediction && (
-                  <ToggleGroup
-                    type="single"
-                    value={explainabilityLevel}
-                    onValueChange={(val) => {
-                      if (val) {
-                        setExplainabilityLevel(val as ExplainabilityLevel);
-                      }
-                    }}
-                    className="border rounded-md"
-                    data-testid="toggle-explainability"
-                  >
-                    <ToggleGroupItem value="minimal" size="sm" data-testid="toggle-minimal">
-                      <Eye className="h-3 w-3 mr-1" />
-                      Minimal
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="standard" size="sm" data-testid="toggle-standard">
-                      Standard
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="full" size="sm" data-testid="toggle-full">
-                      Full
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                )}
               </div>
             </CardHeader>
 
@@ -384,8 +350,8 @@ export default function ChartDetail() {
                               <p data-testid={`text-summary-${area.key}`}>
                                 {area.summary}
                               </p>
-                              {explainabilityLevel !== "minimal" && area.deeperExplanation && (
-                                <div 
+                              {area.deeperExplanation && (
+                                <div
                                   className="bg-muted/50 p-3 rounded-md"
                                   data-testid={`text-explanation-${area.key}`}
                                 >
@@ -394,8 +360,7 @@ export default function ChartDetail() {
                                   </p>
                                 </div>
                               )}
-                              {/* Attribution - shown in standard and full modes */}
-                              {explainabilityLevel !== "minimal" && area.attribution && (
+                              {area.attribution && (
                                 <div 
                                   className="border-t pt-3 mt-2"
                                   data-testid={`attribution-${area.key}`}
@@ -423,8 +388,7 @@ export default function ChartDetail() {
                                         ))}
                                       </div>
                                     )}
-                                    {/* Signals - only shown in full mode */}
-                                    {explainabilityLevel === "full" && area.attribution.signalsUsed && area.attribution.signalsUsed.length > 0 && (
+                                    {area.attribution.signalsUsed && area.attribution.signalsUsed.length > 0 && (
                                       <div className="border-t pt-2 mt-2">
                                         <span className="font-medium">Signals:</span>
                                         <div className="grid grid-cols-2 gap-1 mt-1">

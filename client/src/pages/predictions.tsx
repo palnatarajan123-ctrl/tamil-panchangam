@@ -11,7 +11,6 @@ import {
   extractInterpretationWithDeterministic,
   hasValidAIInterpretation,
   type PredictionViewModel,
-  type ExplainabilityLevel,
 } from "@/adapters/aiInterpretationAdapter";
 
 import {
@@ -80,7 +79,6 @@ export default function Predictions() {
   const [predictionType, setPredictionType] = useState<
     "monthly" | "weekly" | "yearly"
   >("monthly");
-  const [explainabilityLevel] = useState<ExplainabilityLevel>("full");
   const [lastPredictionParams, setLastPredictionParams] = useState<{
     year: number;
     month?: number;
@@ -178,7 +176,7 @@ export default function Predictions() {
         return;
       }
 
-      const viewModel = adaptInterpretation(extracted.primary, explainabilityLevel, extracted.deterministic);
+      const viewModel = adaptInterpretation(extracted.primary, "full", extracted.deterministic);
       setPrediction(viewModel);
       
       // Extract calculation confidence from envelope

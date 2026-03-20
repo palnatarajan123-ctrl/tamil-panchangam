@@ -168,6 +168,9 @@ class MonthlyPredictionResponse(BaseModel):
     # True when envelope+synthesis were returned from the prediction cache
     cache_hit: bool = False
 
+    # "pending" while LLM runs in background; "ready" or absent when done
+    llm_status: Optional[str] = None
+
 
 # ============================================================
 # ============================================================

@@ -1,8 +1,11 @@
 # app/api/prediction.py
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from datetime import datetime
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.db.duckdb import get_conn
 
@@ -31,8 +34,98 @@ from app.models.schema import (
 router = APIRouter(prefix="/prediction", tags=["Prediction"])
 
 
+def _run_llm_background(
+    base_chart_id: str,
+    envelope: dict,
+    synthesis: dict,
+    ai_interpretation: dict,
+    year: int,
+    month: int,
+    base_chart_payload: dict,
+) -> None:
+    """
+    Background task: generate LLM interpretation and update the persisted prediction.
+    Runs after the HTTP response has been sent.
+    """
+    period_key = f"{year}-{month:02d}"
+    try:
+        llm_result = generate_llm_interpretation(
+            base_chart_id=base_chart_id,
+            envelope=envelope,
+            synthesis=synthesis,
+            deterministic_interpretation=ai_interpretation,
+            year=year,
+            period_type="monthly",
+            period_key=period_key,
+            feature_name="prediction",
+            explainability_mode="full",
+            base_chart_payload=base_chart_payload,
+        )
+        # Re-fetch the saved prediction and merge in LLM result
+        existing = get_monthly_prediction(
+            base_chart_id=base_chart_id, year=year, month=month
+        )
+        if existing:
+            interp = (
+                json.loads(existing["interpretation"])
+                if existing.get("interpretation")
+                else {}
+            )
+            interp["llm_interpretation"] = llm_result.get("llm_interpretation")
+            interp["llm_metadata"] = llm_result.get("llm_metadata")
+            with get_conn() as conn:
+                save_monthly_prediction(
+                    conn,
+                    base_chart_id=base_chart_id,
+                    year=year,
+                    month=month,
+                    status="ok",
+                    envelope=json.loads(existing["envelope"]),
+                    synthesis=json.loads(existing["synthesis"]),
+                    interpretation=interp,
+                    engine_version="monthly-prediction-v2",
+                )
+    except Exception as e:
+        logger.error(f"Background LLM task failed for {base_chart_id}/{period_key}: {e}")
+
+
+@router.get("/monthly/llm-status")
+def get_monthly_llm_status(base_chart_id: str, year: int, month: int):
+    """
+    Polling endpoint: returns whether the LLM interpretation is ready
+    for a given monthly prediction.
+    """
+    from app.engines.llm_interpretation_orchestrator import PROMPT_VERSION_BY_WINDOW
+    period_key = f"{year}-{month:02d}"
+    prompt_version = PROMPT_VERSION_BY_WINDOW.get("monthly", "interpretation_v5_siddhar")
+    with get_conn() as conn:
+        result = conn.execute(
+            """
+            SELECT id, created_at, fallback_reason
+            FROM prediction_llm_interpretation
+            WHERE base_chart_id = ?
+              AND period_type = 'monthly'
+              AND period_key = ?
+              AND prompt_version = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            [base_chart_id, period_key, prompt_version],
+        ).fetchone()
+    if result:
+        return {
+            "status": "ready",
+            "created_at": str(result[1]),
+            "fallback_reason": result[2],
+        }
+    return {"status": "pending"}
+
+
 @router.post("/monthly", response_model=MonthlyPredictionResponse)
-def generate_monthly_prediction(payload: MonthlyPredictionRequest):
+def generate_monthly_prediction(
+    payload: MonthlyPredictionRequest,
+    background_tasks: BackgroundTasks,
+):
     """
     EPIC-4 + EPIC-6 + EPIC-8 + EPIC-3
     """
@@ -74,6 +167,7 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
     )
 
     cache_hit = bool(existing)
+    llm_status = None  # None = already present; "pending" = running in background
 
     if existing:
         envelope = json.loads(existing["envelope"])
@@ -231,26 +325,7 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
         interpretation["ai_interpretation"] = ai_interpretation
 
         # -------------------------------------------------
-        # 7b. LLM Interpretation (language-only enhancement)
-        # -------------------------------------------------
-        period_key = f"{payload.year}-{payload.month:02d}"
-        llm_result = generate_llm_interpretation(
-            base_chart_id=payload.base_chart_id,
-            envelope=envelope,
-            synthesis=synthesis,
-            deterministic_interpretation=ai_interpretation,
-            year=payload.year,
-            period_type="monthly",
-            period_key=period_key,
-            feature_name="prediction",
-            explainability_mode="full",
-            base_chart_payload=base_chart_payload,
-        )
-        interpretation["llm_interpretation"] = llm_result.get("llm_interpretation")
-        interpretation["llm_metadata"] = llm_result.get("llm_metadata")
-
-        # -------------------------------------------------
-        # 8. Persist
+        # 8. Persist immediately (without LLM — will update in background)
         # -------------------------------------------------
         with get_conn() as conn:
             save_monthly_prediction(
@@ -264,6 +339,21 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
                 interpretation=interpretation,
                 engine_version="monthly-prediction-v2",
             )
+
+        # -------------------------------------------------
+        # 7b. LLM Interpretation — run in background after response
+        # -------------------------------------------------
+        background_tasks.add_task(
+            _run_llm_background,
+            base_chart_id=payload.base_chart_id,
+            envelope=envelope,
+            synthesis=synthesis,
+            ai_interpretation=ai_interpretation,
+            year=payload.year,
+            month=payload.month,
+            base_chart_payload=base_chart_payload,
+        )
+        llm_status = "pending"
 
     # -------------------------------------------------
     # 8. Explainability
@@ -296,4 +386,5 @@ def generate_monthly_prediction(payload: MonthlyPredictionRequest):
         },
         explainability=explainability.model_dump(),
         cache_hit=cache_hit,
+        llm_status=llm_status,
     )

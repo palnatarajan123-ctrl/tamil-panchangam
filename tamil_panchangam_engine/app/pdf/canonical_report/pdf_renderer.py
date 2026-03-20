@@ -295,17 +295,19 @@ def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
     
     elements.append(Spacer(1, 0.3*inch))
     
-    # Birth Chart (D1) with heading
-    elements.append(Paragraph("<b>Birth Chart (D1)</b>", styles['SubsectionTitle']))
-    d1_chart = _render_chart_from_svg(data.chart_images.d1_rasi, "D1")
-    elements.append(d1_chart)
-    elements.append(Spacer(1, 0.2*inch))
-    
-    # Navamsa (D9) with heading
-    elements.append(Paragraph("<b>Navamsa (D9)</b>", styles['SubsectionTitle']))
-    d9_chart = _render_chart_from_svg(data.chart_images.d9_navamsa, "D9")
-    elements.append(d9_chart)
-    elements.append(Spacer(1, 0.3*inch))
+    # Birth Chart (D1) with heading — keep heading and chart on same page
+    d1_elements = []
+    d1_elements.append(Paragraph("<b>Birth Chart (D1)</b>", styles['SubsectionTitle']))
+    d1_elements.append(_render_chart_from_svg(data.chart_images.d1_rasi, "D1"))
+    d1_elements.append(Spacer(1, 0.2*inch))
+    elements.append(KeepTogether(d1_elements))
+
+    # Navamsa (D9) with heading — keep heading and chart on same page
+    d9_elements = []
+    d9_elements.append(Paragraph("<b>Navamsa (D9)</b>", styles['SubsectionTitle']))
+    d9_elements.append(_render_chart_from_svg(data.chart_images.d9_navamsa, "D9"))
+    d9_elements.append(Spacer(1, 0.3*inch))
+    elements.append(KeepTogether(d9_elements))
     
     elements.append(Paragraph("Birth Reference", styles['SubsectionTitle']))
     
@@ -503,24 +505,28 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
     
     if data.is_v3 and data.yearly_mantra:
         elements.append(Paragraph("Guiding Theme", styles['SubsectionTitle']))
-        elements.append(Paragraph(data.yearly_mantra, styles['BodyText']))
+        for j, grp in enumerate(_split_sentences(data.yearly_mantra)):
+            elements.append(Paragraph(f"<b>{grp}</b>" if j == 0 else grp, styles['BodyText']))
         elements.append(Spacer(1, 0.3*inch))
-    
+
     if data.is_v3 and data.dasha_transit_synthesis:
         elements.append(Paragraph("Dasha-Transit Synthesis", styles['SubsectionTitle']))
-        elements.append(Paragraph(data.dasha_transit_synthesis, styles['BodyText']))
+        for j, grp in enumerate(_split_sentences(data.dasha_transit_synthesis)):
+            elements.append(Paragraph(f"<b>{grp}</b>" if j == 0 else grp, styles['BodyText']))
         elements.append(Spacer(1, 0.3*inch))
     elif data.is_v2 and data.monthly_theme:
         elements.append(Paragraph(
             f"<b>{data.monthly_theme.title}</b>",
             styles['SubsectionTitle']
         ))
-        elements.append(Paragraph(data.monthly_theme.narrative, styles['BodyText']))
+        for j, grp in enumerate(_split_sentences(data.monthly_theme.narrative)):
+            elements.append(Paragraph(f"<b>{grp}</b>" if j == 0 else grp, styles['BodyText']))
         elements.append(Spacer(1, 0.3*inch))
-    
+
     if not data.is_v3 and data.is_v2 and data.overview_v2:
         elements.append(Paragraph("Energy & Focus", styles['SubsectionTitle']))
-        elements.append(Paragraph(data.overview_v2.energy_pattern, styles['BodyText']))
+        for j, grp in enumerate(_split_sentences(data.overview_v2.energy_pattern)):
+            elements.append(Paragraph(f"<b>{grp}</b>" if j == 0 else grp, styles['BodyText']))
         
         if data.overview_v2.key_focus:
             elements.append(Spacer(1, 0.1*inch))
@@ -537,7 +543,8 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
         elements.append(Spacer(1, 0.3*inch))
     elif not data.is_v3 and data.prediction_overview:
         elements.append(Paragraph("Overview", styles['SubsectionTitle']))
-        elements.append(Paragraph(data.prediction_overview, styles['BodyText']))
+        for j, grp in enumerate(_split_sentences(data.prediction_overview)):
+            elements.append(Paragraph(f"<b>{grp}</b>" if j == 0 else grp, styles['BodyText']))
         elements.append(Spacer(1, 0.3*inch))
     
     # Prediction Confidence - shown once after summary, before life areas
@@ -626,8 +633,8 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
 
         area_elements = []
 
-        # Heading: "Career — 65/100  ·  Favorable"
-        heading = f"{area.area} \u2014 {area.score}/100  \u00b7  {_score_to_label(area.score)}"
+        # Heading: "Career - 65/100 | Favorable"
+        heading = f"{area.area} - {area.score}/100  |  {_score_to_label(area.score)}"
         area_elements.append(Paragraph(heading, styles['LifeAreaTitle']))
 
         # Interpretation split into 2-sentence paragraph groups
@@ -710,14 +717,9 @@ def _build_practices_reflection(data: CanonicalReportData, styles) -> List:
         
         if data.practices_v2.reflection_guidance:
             elements.append(Spacer(1, 0.15*inch))
-            elements.append(Paragraph(
-                "<b>Reflection & Guidance:</b>", 
-                styles['BodyText']
-            ))
-            elements.append(Paragraph(
-                data.practices_v2.reflection_guidance, 
-                styles['BodyText']
-            ))
+            elements.append(Paragraph("<b>Reflection & Guidance:</b>", styles['BodyText']))
+            for j, grp in enumerate(_split_sentences(data.practices_v2.reflection_guidance)):
+                elements.append(Paragraph(f"<b>{grp}</b>" if j == 0 else grp, styles['BodyText']))
         
         elements.append(Spacer(1, 0.3*inch))
     elif data.practices:
@@ -732,7 +734,9 @@ def _build_practices_reflection(data: CanonicalReportData, styles) -> List:
 def _build_closing(data: CanonicalReportData, styles) -> List:
     """Build closing section."""
     elements = []
-    
+
+    elements.append(PageBreak())
+
     if data.is_v3 and data.closing_v3:
         elements.append(Paragraph("Key Takeaways", styles['SectionTitle']))
         
@@ -742,27 +746,24 @@ def _build_closing(data: CanonicalReportData, styles) -> List:
             elements.append(Spacer(1, 0.2*inch))
         
         if data.closing_v3.encouragement:
-            elements.append(Paragraph(
-                f"<i>{data.closing_v3.encouragement}</i>",
-                styles['BodyText']
-            ))
+            for j, grp in enumerate(_split_sentences(data.closing_v3.encouragement)):
+                elements.append(Paragraph(f"<i>{grp}</i>", styles['BodyText']))
     elif data.is_v2 and data.closing_v2:
         elements.append(Paragraph("Key Takeaways", styles['SectionTitle']))
-        
+
         if data.closing_v2.key_takeaways:
             for takeaway in data.closing_v2.key_takeaways:
                 elements.append(Paragraph(f"• {takeaway}", styles['BodyText']))
             elements.append(Spacer(1, 0.2*inch))
-        
+
         if data.closing_v2.encouragement:
-            elements.append(Paragraph(
-                f"<i>{data.closing_v2.encouragement}</i>",
-                styles['BodyText']
-            ))
+            for j, grp in enumerate(_split_sentences(data.closing_v2.encouragement)):
+                elements.append(Paragraph(f"<i>{grp}</i>", styles['BodyText']))
     else:
         elements.append(Paragraph("Closing Note", styles['SectionTitle']))
-        
-        elements.append(Paragraph(data.closing_note, styles['BodyText']))
+
+        for j, grp in enumerate(_split_sentences(data.closing_note)):
+            elements.append(Paragraph(f"<b>{grp}</b>" if j == 0 else grp, styles['BodyText']))
         
         if data.closing_affirmation:
             elements.append(Spacer(1, 0.3*inch))
@@ -862,7 +863,9 @@ def _build_divisional_charts(data: CanonicalReportData, styles) -> List:
 def _build_methodology_appendix(data: CanonicalReportData, styles) -> List:
     """Build methodology appendix section."""
     elements = []
-    
+
+    elements.append(PageBreak())
+
     if not data.methodology:
         return elements
     
