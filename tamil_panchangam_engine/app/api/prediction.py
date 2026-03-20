@@ -92,32 +92,21 @@ def _run_llm_background(
 @router.get("/monthly/llm-status")
 def get_monthly_llm_status(base_chart_id: str, year: int, month: int):
     """
-    Polling endpoint: returns whether the LLM interpretation is ready
-    for a given monthly prediction.
+    Polling endpoint: returns "ready" only when llm_interpretation has been
+    merged into monthly_predictions (not just written to prediction_llm_interpretation).
+    This prevents the race where the frontend re-fetches before the merge completes.
     """
-    from app.engines.llm_interpretation_orchestrator import PROMPT_VERSION_BY_WINDOW
-    period_key = f"{year}-{month:02d}"
-    prompt_version = PROMPT_VERSION_BY_WINDOW.get("monthly", "interpretation_v5_siddhar")
-    with get_conn() as conn:
-        result = conn.execute(
-            """
-            SELECT id, created_at, fallback_reason
-            FROM prediction_llm_interpretation
-            WHERE base_chart_id = ?
-              AND period_type = 'monthly'
-              AND period_key = ?
-              AND prompt_version = ?
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            [base_chart_id, period_key, prompt_version],
-        ).fetchone()
-    if result:
-        return {
-            "status": "ready",
-            "created_at": str(result[1]),
-            "fallback_reason": result[2],
-        }
+    existing = get_monthly_prediction(
+        base_chart_id=base_chart_id, year=year, month=month
+    )
+    if existing and existing.get("interpretation"):
+        interp = (
+            json.loads(existing["interpretation"])
+            if isinstance(existing["interpretation"], str)
+            else existing["interpretation"]
+        )
+        if interp.get("llm_interpretation"):
+            return {"status": "ready"}
     return {"status": "pending"}
 
 
@@ -182,6 +171,31 @@ def generate_monthly_prediction(
         if interpretation and "llm_metadata" in interpretation:
             interpretation["llm_metadata"]["from_cache"] = True
             interpretation["llm_metadata"]["tokens_used"] = 0  # No new tokens spent
+
+        # Fallback: if llm_interpretation not yet merged into monthly_predictions,
+        # read it directly from prediction_llm_interpretation table
+        if interpretation and "llm_interpretation" not in interpretation:
+            period_key = f"{payload.year}-{payload.month:02d}"
+            with get_conn() as conn:
+                llm_row = conn.execute(
+                    """
+                    SELECT content_json FROM prediction_llm_interpretation
+                    WHERE base_chart_id = ?
+                      AND period_type = 'monthly'
+                      AND period_key = ?
+                    ORDER BY created_at DESC LIMIT 1
+                    """,
+                    [payload.base_chart_id, period_key],
+                ).fetchone()
+            if llm_row and llm_row[0]:
+                llm_data = (
+                    json.loads(llm_row[0])
+                    if isinstance(llm_row[0], str)
+                    else llm_row[0]
+                )
+                interpretation["llm_interpretation"] = (
+                    llm_data.get("llm_interpretation") or llm_data
+                )
         
         if interpretation and "ai_interpretation" in interpretation:
             interpretation["ai_interpretation"] = apply_explainability(

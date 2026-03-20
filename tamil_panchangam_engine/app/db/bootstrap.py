@@ -27,6 +27,20 @@ def bootstrap():
     """)
 
     con.execute("""
+    CREATE TABLE IF NOT EXISTS yearly_predictions (
+        id TEXT PRIMARY KEY,
+        base_chart_id TEXT,
+        year INTEGER,
+        status TEXT,
+        envelope JSON,
+        synthesis JSON,
+        interpretation JSON,
+        engine_version TEXT,
+        created_at TIMESTAMP
+    );
+    """)
+
+    con.execute("""
     CREATE TABLE IF NOT EXISTS weekly_predictions (
         id TEXT PRIMARY KEY,
         base_chart_id TEXT NOT NULL,

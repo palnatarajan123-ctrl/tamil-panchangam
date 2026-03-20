@@ -102,7 +102,7 @@ def load_yearly_prediction(base_chart_id: str, year: int) -> Dict[str, Any]:
         result = conn.execute("""
             SELECT * FROM yearly_predictions 
             WHERE base_chart_id = ? AND year = ?
-            ORDER BY generated_at DESC
+            ORDER BY created_at DESC
             LIMIT 1
         """, [base_chart_id, year]).fetchone()
         

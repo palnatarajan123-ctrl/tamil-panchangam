@@ -177,4 +177,5 @@ def generate_yearly_prediction(payload: dict, db=Depends(get_db)):
             if hasattr(explainability, "model_dump")
             else explainability
         ),
+        "llm_status": None,
     }
