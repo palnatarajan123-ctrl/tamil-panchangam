@@ -336,6 +336,7 @@ def create_base_chart(payload: BaseChartCreateRequest, force_recalculate: bool =
             payload=base_chart,
             locked=True,
         )
+        conn.commit()
 
     # Optional: keep in-memory copy for UI endpoints
     BASE_CHART_STORE[base_chart_id] = {
