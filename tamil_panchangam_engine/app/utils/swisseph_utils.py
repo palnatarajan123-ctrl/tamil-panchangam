@@ -30,6 +30,33 @@ def to_julian_day(dt_utc: datetime) -> float:
     )
 
 
+def compute_planet_longitude_with_speed(planet_name: str, dt_utc: datetime):
+    """
+    Compute sidereal longitude and daily speed for a planet.
+
+    Returns:
+        (longitude: float, speed_deg_per_day: float)
+        speed < 0 means retrograde motion.
+    """
+    jd = to_julian_day(dt_utc)
+
+    if planet_name == "Ketu":
+        rahu_id = PLANETS["Rahu"]
+        flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL | swe.FLG_SPEED
+        result, _ = swe.calc_ut(jd, rahu_id, flags)
+        long = (result[0] + 180) % 360
+        speed = -result[3]  # Ketu always moves opposite to Rahu
+        return long, speed
+
+    planet_id = PLANETS.get(planet_name)
+    if planet_id is None:
+        raise ValueError(f"Unknown planet: {planet_name}")
+
+    flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL | swe.FLG_SPEED
+    result, _ = swe.calc_ut(jd, planet_id, flags)
+    return result[0] % 360, result[3]
+
+
 def compute_planet_longitude(planet_name: str, dt_utc: datetime) -> float:
     """
     Compute sidereal longitude for a planet at a given UTC datetime.

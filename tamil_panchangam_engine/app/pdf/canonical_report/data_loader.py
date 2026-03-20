@@ -270,10 +270,22 @@ def _extract_transit_context(envelope: Dict[str, Any]) -> TransitContext:
     rahu_sign = rahu_ketu.get("rahu_rasi", "Unknown")
     ketu_sign = rahu_ketu.get("ketu_rasi", "Unknown")
     
+    def _phase_label(d: dict, phase_key: str = "phase") -> str:
+        phase = d.get(phase_key, "")
+        retro = d.get("is_retrograde", False)
+        suffix = ""
+        if phase == "entering":
+            suffix = " (Entering)"
+        elif phase == "exiting":
+            suffix = " (Exiting)"
+        if retro:
+            suffix += " [R]"
+        return suffix
+
     return TransitContext(
-        jupiter_transit=f"Jupiter in {jupiter_sign}",
-        saturn_transit=f"Saturn in {saturn_sign}",
-        rahu_ketu_axis=f"Rahu in {rahu_sign}, Ketu in {ketu_sign}",
+        jupiter_transit=f"Jupiter in {jupiter_sign}{_phase_label(jupiter)}",
+        saturn_transit=f"Saturn in {saturn_sign}{_phase_label(saturn, 'transit_phase')}",
+        rahu_ketu_axis=f"Rahu in {rahu_sign}{_phase_label(rahu_ketu, 'rahu_phase')}, Ketu in {ketu_sign}{_phase_label(rahu_ketu, 'ketu_phase')}",
     )
 
 

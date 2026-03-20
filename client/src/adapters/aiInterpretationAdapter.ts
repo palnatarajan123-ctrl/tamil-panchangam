@@ -64,6 +64,7 @@ export interface LifeAreaAttribution {
     engine: string;
     weight: number;
     valence: string;
+    interpretiveHint?: string;
   }>;
 }
 
@@ -196,9 +197,12 @@ export interface AIInterpretationV1 {
         dasha?: string;
         engines?: string[];
         signals_used?: Array<{
-          engine: string;
-          weight: number;
+          key?: string;
+          engine?: string;
+          weight?: number;
+          strength?: number;
           valence: string;
+          interpretive_hint?: string;
         }>;
       };
     };
@@ -519,6 +523,22 @@ export function adaptAIInterpretation(
 
       if (showDeeperExplanation && area.deeper_explanation) {
         viewModel.deeperExplanation = area.deeper_explanation;
+      }
+
+      if (showAttribution && area.attribution) {
+        const attr: LifeAreaAttribution = {};
+        if (area.attribution.planets?.length) attr.planets = area.attribution.planets;
+        if (area.attribution.dasha) attr.dasha = area.attribution.dasha;
+        if (area.attribution.engines?.length) attr.engines = area.attribution.engines;
+        if (showSignalsUsed && area.attribution.signals_used?.length) {
+          attr.signalsUsed = area.attribution.signals_used.map((s: any) => ({
+            engine: s.key ?? s.engine ?? "",
+            weight: s.strength ?? s.weight ?? 0,
+            valence: s.valence ?? "neutral",
+            ...(s.interpretive_hint ? { interpretiveHint: s.interpretive_hint } : {}),
+          }));
+        }
+        if (Object.keys(attr).length > 0) viewModel.attribution = attr;
       }
 
       return viewModel;

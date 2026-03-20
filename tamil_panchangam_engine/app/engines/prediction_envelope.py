@@ -239,11 +239,13 @@ def build_monthly_prediction_envelope(
     # 7. GOCHARA (TRANSIT) ENGINE - EPIC Signal Expansion
     # -------------------------------------------------
     logger.debug("DEBUG: Computing Gochara signals")
+    birth_moon_longitude = ephemeris.get("moon", {}).get("longitude_deg", 0.0)
     gochara = compute_gochara(
         reference_date_utc=reference_date_utc,
         latitude=latitude,
         longitude=longitude,
         natal_moon_rasi=natal_moon_rasi,
+        natal_moon_longitude=birth_moon_longitude if birth_moon_longitude else None,
     )
 
     # -------------------------------------------------
@@ -262,7 +264,6 @@ def build_monthly_prediction_envelope(
     # 9. NAKSHATRA CONTEXT + TARA BALA - EPIC Signal Expansion
     # -------------------------------------------------
     logger.debug("DEBUG: Computing Nakshatra context")
-    birth_moon_longitude = ephemeris.get("moon", {}).get("longitude_deg", 0.0)
     nakshatra_context = compute_nakshatra_context(
         reference_date_utc=reference_date_utc,
         birth_moon_longitude=birth_moon_longitude,

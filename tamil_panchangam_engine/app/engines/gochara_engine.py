@@ -7,7 +7,7 @@ Evaluates Jupiter, Saturn, Rahu, Ketu transits with traditional classifications.
 import logging
 from datetime import datetime
 from typing import Dict, Optional
-from app.utils.swisseph_utils import compute_planet_longitude
+from app.utils.swisseph_utils import compute_planet_longitude, compute_planet_longitude_with_speed
 
 logger = logging.getLogger(__name__)
 
@@ -64,11 +64,43 @@ def _longitude_to_rasi(longitude: float) -> str:
     return RASI_ORDER[rasi_index]
 
 
+def _transit_phase(degree_in_sign: float) -> str:
+    """Classify transit phase within a rasi."""
+    if degree_in_sign < 5.0:
+        return "entering"
+    if degree_in_sign > 25.0:
+        return "exiting"
+    return "transiting"
+
+
+def _days_in_sign(degree_in_sign: float, speed_deg_per_day: float) -> int:
+    """Estimate days remaining in current sign based on current speed."""
+    if abs(speed_deg_per_day) < 0.001:
+        return 999  # stationary — unknown
+    if speed_deg_per_day > 0:
+        return max(0, int((30.0 - degree_in_sign) / speed_deg_per_day))
+    else:
+        # Retrograde — will re-enter previous sign
+        return max(0, int(degree_in_sign / abs(speed_deg_per_day)))
+
+
 def _house_from_moon(transit_rasi: str, natal_moon_rasi: str) -> int:
     """Calculate house position from Moon sign."""
     moon_idx = RASI_TO_INDEX.get(natal_moon_rasi, 0)
     transit_idx = RASI_TO_INDEX.get(transit_rasi, 0)
     return ((transit_idx - moon_idx) % 12) + 1
+
+
+def _conjunction_strength(transit_long: float, natal_long: float, orb: float = 6.0) -> float:
+    """
+    Compute angular proximity between a transit planet and a natal point.
+
+    Returns a strength value 0.0–1.0:
+      1.0 = exact conjunction (0° distance)
+      0.0 = at or beyond the orb boundary
+    """
+    dist = abs((transit_long - natal_long + 180) % 360 - 180)
+    return max(0.0, round(1.0 - dist / orb, 3))
 
 
 def compute_gochara(
@@ -77,6 +109,7 @@ def compute_gochara(
     longitude: float,
     natal_moon_rasi: str,
     natal_lagna_rasi: Optional[str] = None,
+    natal_moon_longitude: Optional[float] = None,
 ) -> Dict:
     """
     Compute Gochara (transit) effects for slow-moving planets.
@@ -86,11 +119,16 @@ def compute_gochara(
     logger.debug(f"DEBUG: Gochara engine computing for {reference_date_utc}")
     
     try:
-        jup_long = compute_planet_longitude("Jupiter", reference_date_utc)
-        sat_long = compute_planet_longitude("Saturn", reference_date_utc)
-        rahu_long = compute_planet_longitude("Rahu", reference_date_utc)
+        jup_long, jup_speed = compute_planet_longitude_with_speed("Jupiter", reference_date_utc)
+        sat_long, sat_speed = compute_planet_longitude_with_speed("Saturn", reference_date_utc)
+        rahu_long, rahu_speed = compute_planet_longitude_with_speed("Rahu", reference_date_utc)
         ketu_long = (rahu_long + 180) % 360
-        
+
+        jup_deg = jup_long % 30
+        sat_deg = sat_long % 30
+        rahu_deg = rahu_long % 30
+        ketu_deg = ketu_long % 30
+
         jup_rasi = _longitude_to_rasi(jup_long)
         sat_rasi = _longitude_to_rasi(sat_long)
         rahu_rasi = _longitude_to_rasi(rahu_long)
@@ -120,29 +158,62 @@ def compute_gochara(
         elif rahu_house_from_moon in [3, 6, 11] or ketu_house_from_moon in [3, 6, 11]:
             rahu_ketu_effect = "favorable"
         
+        # D-L2: conjunction strength vs natal Moon (0.0–1.0, orb = 6°)
+        jup_cs = _conjunction_strength(jup_long, natal_moon_longitude) if natal_moon_longitude is not None else None
+        sat_cs = _conjunction_strength(sat_long, natal_moon_longitude) if natal_moon_longitude is not None else None
+        rahu_cs = _conjunction_strength(rahu_long, natal_moon_longitude) if natal_moon_longitude is not None else None
+        ketu_cs = _conjunction_strength(ketu_long, natal_moon_longitude) if natal_moon_longitude is not None else None
+
+        jup_entry = {
+            "transit_rasi": jup_rasi,
+            "from_moon_house": jup_house_from_moon,
+            "effect": jup_effect,
+            "longitude": round(jup_long, 2),
+            "degree_in_sign": round(jup_deg, 2),
+            "phase": _transit_phase(jup_deg),
+            "is_retrograde": jup_speed < 0,
+            "days_in_sign": _days_in_sign(jup_deg, jup_speed),
+        }
+        if jup_cs is not None:
+            jup_entry["conjunction_strength"] = jup_cs
+
+        sat_entry = {
+            "transit_rasi": sat_rasi,
+            "from_moon_house": sat_house_from_moon,
+            "phase": sat_phase,
+            "effect": sat_effect,
+            "longitude": round(sat_long, 2),
+            "degree_in_sign": round(sat_deg, 2),
+            "transit_phase": _transit_phase(sat_deg),
+            "is_retrograde": sat_speed < 0,
+            "days_in_sign": _days_in_sign(sat_deg, sat_speed),
+        }
+        if sat_cs is not None:
+            sat_entry["conjunction_strength"] = sat_cs
+
+        rahu_ketu_entry = {
+            "rahu_rasi": rahu_rasi,
+            "ketu_rasi": ketu_rasi,
+            "rahu_from_moon_house": rahu_house_from_moon,
+            "ketu_from_moon_house": ketu_house_from_moon,
+            "axis": rahu_axis_key,
+            "theme": rahu_ketu_theme,
+            "effect": rahu_ketu_effect,
+            "rahu_degree_in_sign": round(rahu_deg, 2),
+            "ketu_degree_in_sign": round(ketu_deg, 2),
+            "rahu_phase": _transit_phase(rahu_deg),
+            "ketu_phase": _transit_phase(ketu_deg),
+            "is_retrograde": True,  # Rahu/Ketu always retrograde by convention
+        }
+        if rahu_cs is not None:
+            rahu_ketu_entry["rahu_conjunction_strength"] = rahu_cs
+        if ketu_cs is not None:
+            rahu_ketu_entry["ketu_conjunction_strength"] = ketu_cs
+
         gochara = {
-            "jupiter": {
-                "transit_rasi": jup_rasi,
-                "from_moon_house": jup_house_from_moon,
-                "effect": jup_effect,
-                "longitude": round(jup_long, 2),
-            },
-            "saturn": {
-                "transit_rasi": sat_rasi,
-                "from_moon_house": sat_house_from_moon,
-                "phase": sat_phase,
-                "effect": sat_effect,
-                "longitude": round(sat_long, 2),
-            },
-            "rahu_ketu": {
-                "rahu_rasi": rahu_rasi,
-                "ketu_rasi": ketu_rasi,
-                "rahu_from_moon_house": rahu_house_from_moon,
-                "ketu_from_moon_house": ketu_house_from_moon,
-                "axis": rahu_axis_key,
-                "theme": rahu_ketu_theme,
-                "effect": rahu_ketu_effect,
-            },
+            "jupiter": jup_entry,
+            "saturn": sat_entry,
+            "rahu_ketu": rahu_ketu_entry,
             "computed_at": reference_date_utc.isoformat(),
         }
         

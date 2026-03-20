@@ -540,12 +540,15 @@ def _generate_life_area_interpretation(
         if isinstance(sig_weight, (int, float)):
             sig_weight = round(float(sig_weight), 2)
         
-        signals_used.append({
+        entry: dict = {
             "key": sig_engine,
             "strength": sig_weight,
             "valence": sig_valence or "neutral",
             "rationale": sig.get("rationale") or None,
-        })
+        }
+        if sig.get("interpretive_hint"):
+            entry["interpretive_hint"] = sig["interpretive_hint"]
+        signals_used.append(entry)
     
     attribution = {
         "planets": planets_involved,

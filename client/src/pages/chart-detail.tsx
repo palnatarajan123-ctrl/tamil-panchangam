@@ -391,16 +391,20 @@ export default function ChartDetail() {
                                     {area.attribution.signalsUsed && area.attribution.signalsUsed.length > 0 && (
                                       <div className="border-t pt-2 mt-2">
                                         <span className="font-medium">Signals:</span>
-                                        <div className="grid grid-cols-2 gap-1 mt-1">
+                                        <div className="flex flex-col gap-1 mt-1">
                                           {area.attribution.signalsUsed.map((sig, i) => (
-                                            <div 
-                                              key={i} 
-                                              className="flex justify-between bg-muted/30 px-2 py-0.5 rounded text-xs"
-                                            >
-                                              <span>{sig.engine}</span>
-                                              <span className={sig.valence === "positive" ? "text-green-600" : sig.valence === "negative" ? "text-red-600" : "text-muted-foreground"}>
-                                                {sig.weight > 0 ? "+" : ""}{sig.weight}
-                                              </span>
+                                            <div key={i} className="bg-muted/30 px-2 py-1 rounded text-xs">
+                                              <div className="flex justify-between">
+                                                <span>{sig.engine}</span>
+                                                <span className={sig.valence === "positive" ? "text-green-600" : sig.valence === "negative" ? "text-red-600" : "text-muted-foreground"}>
+                                                  {sig.weight > 0 ? "+" : ""}{sig.weight}
+                                                </span>
+                                              </div>
+                                              {sig.interpretiveHint && (
+                                                <p className="text-muted-foreground italic mt-0.5">
+                                                  {sig.interpretiveHint}
+                                                </p>
+                                              )}
                                             </div>
                                           ))}
                                         </div>

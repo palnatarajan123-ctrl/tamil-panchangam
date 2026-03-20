@@ -82,6 +82,10 @@ def synthesize_from_envelope(envelope: dict) -> dict:
     jup_effect = jup_gochara.get("effect", "neutral")
     jup_house = jup_gochara.get("from_moon_house", 0)
     if jup_effect != "neutral":
+        jup_base_strength = 0.8 if jup_effect == "favorable" else 0.6
+        jup_cs = jup_gochara.get("conjunction_strength")
+        # D-L2: scale by conjunction proximity — stronger near exact conjunction
+        jup_strength = round(jup_base_strength * (0.5 + 0.5 * jup_cs), 3) if jup_cs is not None else jup_base_strength
         signals.append({
             "key": "GOCHARA_JUPITER",
             "source": "gochara",
@@ -89,17 +93,21 @@ def synthesize_from_envelope(envelope: dict) -> dict:
             "planet": "Jupiter",
             "house": jup_house,
             "valence": "pos" if jup_effect == "favorable" else "neg",
-            "strength": 0.8 if jup_effect == "favorable" else 0.6,
+            "strength": jup_strength,
             "confidence": 0.85,
             "rationale": f"Jupiter transiting house {jup_house} from Moon ({jup_effect})",
         })
-    
+
     # Saturn Gochara Signal
     sat_gochara = gochara.get("saturn", {})
     sat_phase = sat_gochara.get("phase", "neutral")
     sat_effect = sat_gochara.get("effect", "neutral")
     sat_house = sat_gochara.get("from_moon_house", 0)
     if sat_phase != "neutral":
+        sat_base_strength = 0.9 if sat_phase in ["janma_sani", "ashtama_sani", "kantaka_sani"] else 0.5
+        sat_cs = sat_gochara.get("conjunction_strength")
+        # D-L2: scale by conjunction proximity
+        sat_strength = round(sat_base_strength * (0.5 + 0.5 * sat_cs), 3) if sat_cs is not None else sat_base_strength
         signals.append({
             "key": f"GOCHARA_SATURN_{sat_phase.upper()}",
             "source": "gochara",
@@ -107,7 +115,7 @@ def synthesize_from_envelope(envelope: dict) -> dict:
             "planet": "Saturn",
             "house": sat_house,
             "valence": "neg" if sat_effect == "challenging" else "pos",
-            "strength": 0.9 if sat_phase in ["janma_sani", "ashtama_sani", "kantaka_sani"] else 0.5,
+            "strength": sat_strength,
             "confidence": 0.90,
             "rationale": f"Saturn {sat_phase} phase, house {sat_house} from Moon",
         })
