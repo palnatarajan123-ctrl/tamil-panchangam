@@ -35,7 +35,7 @@ export default function MyCharts() {
   }, [authLoading, user, navigate]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["/api/user/charts"],
+    queryKey: ["/api/user/charts", user?.id],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/user/charts");
       return res.json();

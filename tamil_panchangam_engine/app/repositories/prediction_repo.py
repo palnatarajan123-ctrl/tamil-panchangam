@@ -57,8 +57,19 @@ def save_monthly_prediction(
     with get_conn() as conn:
         conn.execute(
             """
-            INSERT OR REPLACE INTO monthly_predictions
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO monthly_predictions
+            (id, base_chart_id, year, month, status, envelope, synthesis, interpretation, engine_version, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO UPDATE SET
+                base_chart_id = EXCLUDED.base_chart_id,
+                year = EXCLUDED.year,
+                month = EXCLUDED.month,
+                status = EXCLUDED.status,
+                envelope = EXCLUDED.envelope,
+                synthesis = EXCLUDED.synthesis,
+                interpretation = EXCLUDED.interpretation,
+                engine_version = EXCLUDED.engine_version,
+                created_at = EXCLUDED.created_at
             """,
             [
                 prediction_id,

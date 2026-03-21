@@ -50,7 +50,7 @@ def get_stats(_admin: dict = Depends(require_admin)):
         # Recent registrations (last 7 days)
         new_users_7d = conn.execute(
             """SELECT COUNT(*) FROM users
-               WHERE created_at >= CURRENT_DATE - INTERVAL 7 DAY"""
+               WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'"""
         ).fetchone()[0]
 
     return {

@@ -1,14 +1,7 @@
-# app/db/duckdb.py
+"""
+DB connection — now powered by Neon PostgreSQL.
+Kept as duckdb.py for backward compatibility with all existing imports.
+"""
+from app.db.postgres import get_conn  # noqa: F401
 
-import duckdb
-from pathlib import Path
-
-# 🔒 SINGLE SOURCE OF TRUTH
-DB_PATH = Path(__file__).resolve().parents[2] / "data" / "panchangam.duckdb"
-
-def get_conn():
-    """
-    Returns a DuckDB connection to the ONE canonical database file.
-    """
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    return duckdb.connect(str(DB_PATH))
+__all__ = ["get_conn"]

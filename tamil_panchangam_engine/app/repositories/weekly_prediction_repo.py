@@ -52,8 +52,19 @@ def save_weekly_prediction(
 
     con.execute(
         """
-        INSERT OR REPLACE INTO weekly_predictions
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO weekly_predictions
+        (id, base_chart_id, year, week, status, envelope, synthesis, interpretation, engine_version, generated_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (id) DO UPDATE SET
+            base_chart_id = EXCLUDED.base_chart_id,
+            year = EXCLUDED.year,
+            week = EXCLUDED.week,
+            status = EXCLUDED.status,
+            envelope = EXCLUDED.envelope,
+            synthesis = EXCLUDED.synthesis,
+            interpretation = EXCLUDED.interpretation,
+            engine_version = EXCLUDED.engine_version,
+            generated_at = EXCLUDED.generated_at
         """,
         [
             pid,

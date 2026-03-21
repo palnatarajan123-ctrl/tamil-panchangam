@@ -39,8 +39,18 @@ def save_yearly_prediction(
 
     con.execute(
         """
-        INSERT OR REPLACE INTO yearly_predictions
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO yearly_predictions
+        (id, base_chart_id, year, status, envelope, synthesis, interpretation, engine_version, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (id) DO UPDATE SET
+            base_chart_id = EXCLUDED.base_chart_id,
+            year = EXCLUDED.year,
+            status = EXCLUDED.status,
+            envelope = EXCLUDED.envelope,
+            synthesis = EXCLUDED.synthesis,
+            interpretation = EXCLUDED.interpretation,
+            engine_version = EXCLUDED.engine_version,
+            created_at = EXCLUDED.created_at
         """,
         [
             pid,

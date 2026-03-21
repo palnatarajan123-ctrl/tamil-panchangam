@@ -1,175 +1,225 @@
-from app.db.duckdb import get_conn
+"""
+PostgreSQL schema bootstrap.
+Creates all tables if they don't exist.
+"""
+import os
+import uuid
+import logging
+from app.db.postgres import get_conn
+
+logger = logging.getLogger(__name__)
+
 
 def bootstrap():
-    con = get_conn()
-
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS base_charts (
-        id TEXT PRIMARY KEY,
-        locked BOOLEAN,
-        payload JSON
-    );
-    """)
-
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS monthly_predictions (
-        id TEXT PRIMARY KEY,
-        base_chart_id TEXT,
-        year INTEGER,
-        month INTEGER,
-        status TEXT,
-        envelope JSON,
-        synthesis JSON,
-        interpretation JSON,
-        engine_version TEXT,
-        created_at TIMESTAMP
-    );
-    """)
-
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS yearly_predictions (
-        id TEXT PRIMARY KEY,
-        base_chart_id TEXT,
-        year INTEGER,
-        status TEXT,
-        envelope JSON,
-        synthesis JSON,
-        interpretation JSON,
-        engine_version TEXT,
-        created_at TIMESTAMP
-    );
-    """)
-
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS weekly_predictions (
-        id TEXT PRIMARY KEY,
-        base_chart_id TEXT NOT NULL,
-        year INTEGER NOT NULL,
-        week INTEGER NOT NULL,
-        status TEXT NOT NULL,
-        envelope JSON NOT NULL,
-        synthesis JSON NOT NULL,
-        interpretation JSON NOT NULL,
-        engine_version TEXT NOT NULL,
-        generated_at TIMESTAMP NOT NULL
-        );
-    """)
-
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS prediction_llm_interpretation (
-        id TEXT PRIMARY KEY,
-        base_chart_id TEXT NOT NULL,
-        period_type TEXT NOT NULL,
-        period_key TEXT NOT NULL,
-        feature_name TEXT NOT NULL,
-        provider TEXT,
-        model TEXT,
-        prompt_version TEXT NOT NULL,
-        prompt_tokens INTEGER,
-        completion_tokens INTEGER,
-        total_tokens INTEGER,
-        content_json JSON,
-        fallback_reason TEXT,
-        reflection_text TEXT,
-        created_at TIMESTAMP NOT NULL
-    );
-    """)
-    
-    # Add reflection_text column if missing (for existing tables)
+    conn = get_conn()
     try:
-        con.execute("""
-            ALTER TABLE prediction_llm_interpretation 
-            ADD COLUMN IF NOT EXISTS reflection_text TEXT;
+        # base_charts
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS base_charts (
+            id TEXT PRIMARY KEY,
+            locked BOOLEAN,
+            payload JSONB
+        )
         """)
-    except Exception:
-        pass  # Column already exists or DB doesn't support IF NOT EXISTS
-    
-    # v1.9: Add explainability_mode column for cache key differentiation
+
+        # monthly_predictions
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS monthly_predictions (
+            id TEXT PRIMARY KEY,
+            base_chart_id TEXT,
+            year INTEGER,
+            month INTEGER,
+            status TEXT,
+            envelope JSONB,
+            synthesis JSONB,
+            interpretation JSONB,
+            engine_version TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """)
+
+        # yearly_predictions
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS yearly_predictions (
+            id TEXT PRIMARY KEY,
+            base_chart_id TEXT,
+            year INTEGER,
+            status TEXT,
+            envelope JSONB,
+            synthesis JSONB,
+            interpretation JSONB,
+            engine_version TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+        """)
+
+        # weekly_predictions
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS weekly_predictions (
+            id TEXT PRIMARY KEY,
+            base_chart_id TEXT NOT NULL,
+            year INTEGER NOT NULL,
+            week INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            envelope JSONB NOT NULL,
+            synthesis JSONB NOT NULL,
+            interpretation JSONB NOT NULL,
+            engine_version TEXT NOT NULL,
+            generated_at TIMESTAMP NOT NULL
+        )
+        """)
+
+        # prediction_llm_interpretation
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS prediction_llm_interpretation (
+            id TEXT PRIMARY KEY,
+            base_chart_id TEXT NOT NULL,
+            period_type TEXT NOT NULL,
+            period_key TEXT NOT NULL,
+            feature_name TEXT NOT NULL,
+            provider TEXT,
+            model TEXT,
+            prompt_version TEXT NOT NULL,
+            prompt_tokens INTEGER,
+            completion_tokens INTEGER,
+            total_tokens INTEGER,
+            content_json JSONB,
+            fallback_reason TEXT,
+            reflection_text TEXT,
+            explainability_mode TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """)
+
+        # llm_token_usage
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS llm_token_usage (
+            id TEXT PRIMARY KEY,
+            feature_name TEXT NOT NULL,
+            prompt_version TEXT NOT NULL,
+            total_tokens INTEGER NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """)
+
+        # llm_config
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS llm_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """)
+
+        conn.execute("""
+        INSERT INTO llm_config (key, value, updated_at)
+        VALUES ('llm_enabled', 'false', NOW())
+        ON CONFLICT (key) DO NOTHING
+        """)
+
+        # users
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT,
+            google_id TEXT UNIQUE,
+            name TEXT NOT NULL,
+            avatar_url TEXT,
+            role TEXT NOT NULL DEFAULT 'user',
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            last_login_at TIMESTAMP
+        )
+        """)
+
+        # user_sessions
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            refresh_token_hash TEXT NOT NULL,
+            ip_address TEXT,
+            user_agent TEXT,
+            expires_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            revoked_at TIMESTAMP
+        )
+        """)
+
+        # user_charts
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_charts (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            base_chart_id TEXT NOT NULL,
+            nickname TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """)
+
+        # audit_log
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            action TEXT NOT NULL,
+            resource_type TEXT,
+            resource_id TEXT,
+            details JSONB,
+            ip_address TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """)
+
+        conn.commit()
+        logger.info("PostgreSQL schema bootstrapped successfully")
+    except Exception as e:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def seed_admin_from_env():
+    """Auto-create admin from env vars if not exists."""
+    import bcrypt
+
+    email = os.environ.get("ADMIN_EMAIL")
+    password = os.environ.get("ADMIN_PASSWORD")
+    name = os.environ.get("ADMIN_NAME", "Admin")
+
+    if not email or not password:
+        return
+
     try:
-        con.execute("""
-            ALTER TABLE prediction_llm_interpretation 
-            ADD COLUMN IF NOT EXISTS explainability_mode TEXT;
-        """)
-    except Exception:
-        pass  # Column already exists
-
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS llm_token_usage (
-        id TEXT PRIMARY KEY,
-        feature_name TEXT NOT NULL,
-        prompt_version TEXT NOT NULL,
-        total_tokens INTEGER NOT NULL,
-        created_at TIMESTAMP NOT NULL
-    );
-    """)
-
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS llm_config (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TIMESTAMP NOT NULL
-    );
-    """)
-
-    con.execute("""
-    INSERT INTO llm_config (key, value, updated_at) 
-    VALUES ('llm_enabled', 'false', CURRENT_TIMESTAMP)
-    ON CONFLICT (key) DO NOTHING;
-    """)
-
-    # ── Auth tables ────────────────────────────────────────────────────────────
-
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        email TEXT UNIQUE NOT NULL,
-        name TEXT NOT NULL,
-        password_hash TEXT,
-        google_id TEXT,
-        role TEXT NOT NULL DEFAULT 'user',
-        is_active BOOLEAN NOT NULL DEFAULT TRUE,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        last_login_at TIMESTAMP
-    );
-    """)
-
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS user_sessions (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        refresh_token_hash TEXT NOT NULL,
-        ip_address TEXT,
-        user_agent TEXT,
-        expires_at TIMESTAMP NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        revoked_at TIMESTAMP
-    );
-    """)
-
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS user_charts (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        base_chart_id TEXT NOT NULL,
-        nickname TEXT,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    """)
-
-    con.execute("""
-    CREATE TABLE IF NOT EXISTS audit_log (
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        action TEXT NOT NULL,
-        resource_type TEXT,
-        resource_id TEXT,
-        ip_address TEXT,
-        details JSON,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    """)
+        conn = get_conn()
+        try:
+            conn.execute("SELECT id FROM users WHERE email = %s", [email.lower()])
+            existing = conn.fetchone()
+            if not existing:
+                hashed = bcrypt.hashpw(
+                    password.encode("utf-8"),
+                    bcrypt.gensalt(),
+                ).decode("utf-8")
+                conn.execute(
+                    """
+                    INSERT INTO users (id, email, password_hash, name, role)
+                    VALUES (%s, %s, %s, %s, 'admin')
+                    """,
+                    [str(uuid.uuid4()), email.lower(), hashed, name],
+                )
+                conn.commit()
+                logger.info(f"Admin seeded: {email}")
+            else:
+                logger.info(f"Admin already exists: {email}")
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"Admin seed failed: {e}")
 
 
 if __name__ == "__main__":
     bootstrap()
-    print("✅ DuckDB schema initialized")
+    seed_admin_from_env()
+    print("PostgreSQL schema initialized")

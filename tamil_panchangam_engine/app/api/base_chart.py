@@ -84,6 +84,10 @@ router = APIRouter(prefix="/base-chart", tags=["Base Chart"])
 
 
 def _verify_turnstile(token: str) -> bool:
+    import os
+    # Bypass Turnstile for local development
+    if os.getenv("RENDER") is None and os.getenv("VERCEL") is None:
+        return True
     """Verify Cloudflare Turnstile token. Returns True if valid."""
     secret = os.getenv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA")
     try:
