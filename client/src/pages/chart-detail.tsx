@@ -26,6 +26,7 @@ import { DashaTimeline } from "@/components/DashaTimeline";
 import { YogasPanel } from "@/components/YogasPanel";
 import { SadeSatiPanel } from "@/components/SadeSatiPanel";
 import { ShadbalaPanel } from "@/components/ShadbalaPanel";
+import { NatalInterpretationPanel } from "@/components/NatalInterpretationPanel";
 import { ChartPair } from "@/components/ChartPair";
 import { TabbedChartViewer } from "@/components/TabbedChartViewer";
 import { 
@@ -251,7 +252,12 @@ export default function ChartDetail() {
             </>
           )}
 
-          {/* AI Interpretation Section - Only for D1 */}
+          {/* Natal Chart Reading - Only for D1 */}
+          {activeChartTab === "D1" && chartId && (
+            <NatalInterpretationPanel chartId={chartId} />
+          )}
+
+          {/* Monthly/Yearly AI Insights - Only for D1 */}
           {activeChartTab === "D1" && (
           <Card className="border-muted" data-testid="card-ai-interpretation">
             <CardHeader className="pb-4">
@@ -259,10 +265,10 @@ export default function ChartDetail() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-primary" />
-                    AI Interpretation
+                    Monthly / Yearly AI Insights
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    {prediction 
+                    {prediction
                       ? `${new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long', year: 'numeric' })} outlook`
                       : "Generate a prediction to see personalized insights"
                     }

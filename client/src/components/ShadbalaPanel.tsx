@@ -115,24 +115,24 @@ function PlanetRow({
         className="flex items-center gap-2 cursor-pointer group"
         onClick={() => setExpanded(!expanded)}
       >
-        {/* Planet name */}
-        <div className="flex items-center gap-1.5 w-28 shrink-0">
-          <span className="text-sm opacity-70">{PLANET_SYMBOL[planet]}</span>
-          <span className="text-xs font-medium">{planet}</span>
+        {/* Planet name + badges — fixed left column */}
+        <div className="flex items-center gap-1 shrink-0 min-w-[180px]">
+          <span className="text-sm opacity-70 shrink-0">{PLANET_SYMBOL[planet]}</span>
+          <span className="text-xs font-medium shrink-0">{planet}</span>
           {data.is_retrograde && <RetrogradeBadge />}
           <PlacementBadge placement={placement} />
         </div>
 
-        {/* Bar */}
-        <div className="flex-1 h-2.5 bg-muted/30 rounded-full overflow-hidden">
+        {/* Bar — flexible middle, min-w-0 prevents overflow */}
+        <div className="flex-1 min-w-0 h-2.5 bg-muted/30 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full ${barColor} transition-all`}
             style={{ width: `${pct}%` }}
           />
         </div>
 
-        {/* Label + value */}
-        <div className="flex items-center gap-1.5 w-36 shrink-0 justify-end">
+        {/* Label + value — fixed right column */}
+        <div className="flex items-center gap-1.5 w-32 shrink-0 justify-end">
           <span className={`text-[10px] font-medium ${textColor}`}>
             {data.strength_label}
           </span>

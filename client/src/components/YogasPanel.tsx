@@ -153,6 +153,11 @@ export function YogasPanel({ yogas }: { yogas: BirthChartUIModel["yogas"] }) {
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                     {group.label}
                   </p>
+                  {group.label === "Raja & Authority Yogas" && group.yogas.length >= 2 && (
+                    <p className="text-xs text-muted-foreground mb-2 italic">
+                      Multiple Raja Yoga formations indicate strong karmic support for authority and recognition through different planetary combinations. Each formation reinforces the other.
+                    </p>
+                  )}
                   <div className="grid gap-2 sm:grid-cols-2">
                     {group.yogas.map((yoga, i) => (
                       <YogaCard key={i} yoga={yoga} isChallenging={isChallenging} />
