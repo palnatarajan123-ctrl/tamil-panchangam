@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime, timezone
 from typing import Any, Dict
 import json
+from app.core.limiter import limiter
 
 from app.db.session import get_db
 from app.repositories.base_chart_repo import get_base_chart_by_id
@@ -39,8 +40,9 @@ def _normalize_confidence(synthesis: Dict[str, Any]) -> Dict[str, Any]:
     return synthesis
 
 
+@limiter.limit("10/hour")
 @router.post("/yearly")
-def generate_yearly_prediction(payload: dict, db=Depends(get_db)):
+def generate_yearly_prediction(request: Request, payload: dict, db=Depends(get_db)):
     """
     EPIC-9
     Yearly prediction endpoint.

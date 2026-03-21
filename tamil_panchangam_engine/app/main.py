@@ -3,11 +3,13 @@ import app.db.sqlite_patch  # 🔴 MUST be first
 import os
 from dotenv import load_dotenv
 load_dotenv()  # loads .env from project root (or nearest parent)
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pathlib import Path
+from slowapi.errors import RateLimitExceeded
+from app.core.limiter import limiter
 
 from app.api.base_chart import router as base_chart_router, load_charts_from_db
 from app.api.prediction import router as prediction_router
@@ -45,6 +47,34 @@ app = FastAPI(
     description="Drik Ganita based Tamil astrology with Lahiri ayanamsa",
     version="0.1.0",
 )
+
+# ─── Rate limiting ────────────────────────────────────────────────────────────
+app.state.limiter = limiter
+
+
+async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": "Too many requests. Please wait before trying again.",
+            "retry_after": "60 seconds",
+        },
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+
+
+# ─── Request size middleware (1 MB max) ───────────────────────────────────────
+@app.middleware("http")
+async def limit_request_size(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > 1_000_000:
+        return JSONResponse(
+            status_code=413,
+            content={"detail": "Request body too large. Maximum size is 1 MB."},
+        )
+    return await call_next(request)
 
 # -----------------------------
 # Middleware

@@ -4,6 +4,15 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error("Too many requests. Please wait a moment and try again.");
+    }
+    if (res.status === 403) {
+      throw new Error("Verification failed. Please complete the CAPTCHA and try again.");
+    }
+    if (res.status === 413) {
+      throw new Error("Request too large. Please reduce the size of your input.");
+    }
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }

@@ -6,10 +6,11 @@ THIS IS THE SINGLE ENTRY POINT FOR ALL PDF GENERATION.
 There must be NO other PDF generation endpoints.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 from typing import Optional
 import logging
+from app.core.limiter import limiter
 
 from app.pdf.canonical_report import build_canonical_report, REPORT_VERSION
 from app.pdf.canonical_report.report_builder import (
@@ -22,8 +23,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
 
+@limiter.limit("10/hour")
 @router.get("/pdf")
 def generate_pdf_report(
+    request: Request,
     base_chart_id: str = Query(..., description="Base chart UUID"),
     report_type: str = Query(..., description="Report type: 'monthly' or 'yearly'"),
     year: int = Query(..., description="Prediction year"),

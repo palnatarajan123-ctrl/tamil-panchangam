@@ -1,5 +1,6 @@
 import { useForm } from "react-hook-form";
 import { useState, useMemo } from "react";
+import { Turnstile } from "@marsidev/react-turnstile";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -254,11 +255,14 @@ interface ChartFormProps {
    Component
 ----------------------------------------------------- */
 
+const TURNSTILE_SITE_KEY = "1x00000000000000000000AA"; // Cloudflare test key (always passes)
+
 export function ChartForm({ onSuccess }: ChartFormProps) {
   const { toast } = useToast();
   const [cityOpen, setCityOpen] = useState(false);
   const [citySearch, setCitySearch] = useState("");
   const [isManualEntry, setIsManualEntry] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -320,6 +324,7 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
         latitude: parseFloat(values.latitude),
         longitude: parseFloat(values.longitude),
         timezone: values.timezone,
+        turnstile_token: turnstileToken,
       };
 
       const res = await apiRequest(
@@ -650,10 +655,20 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
               )}
             </div>
 
+            {/* CAPTCHA */}
+            <div className="flex justify-center">
+              <Turnstile
+                siteKey={TURNSTILE_SITE_KEY}
+                onSuccess={(token) => setTurnstileToken(token)}
+                onExpire={() => setTurnstileToken(null)}
+                onError={() => setTurnstileToken(null)}
+              />
+            </div>
+
             <Button
               type="submit"
               className="w-full"
-              disabled={createChartMutation.isPending}
+              disabled={createChartMutation.isPending || !turnstileToken}
               data-testid="button-generate-chart"
             >
               {createChartMutation.isPending ? (

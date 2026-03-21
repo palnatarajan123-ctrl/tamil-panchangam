@@ -2,9 +2,12 @@
 
 import logging
 import hashlib
-from fastapi import APIRouter, HTTPException
+import os
+import httpx
+from fastapi import APIRouter, HTTPException, Request
 from datetime import datetime
 from typing import List, Optional
+from app.core.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +79,20 @@ from app.repositories.base_chart_repo import get_base_chart_by_id
 
 
 router = APIRouter(prefix="/base-chart", tags=["Base Chart"])
+
+
+def _verify_turnstile(token: str) -> bool:
+    """Verify Cloudflare Turnstile token. Returns True if valid."""
+    secret = os.getenv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA")
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            resp = client.post(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data={"secret": secret, "response": token},
+            )
+            return resp.json().get("success", False)
+    except Exception:
+        return False
 
 
 def load_charts_from_db():
@@ -152,8 +169,9 @@ def get_birth_chart_ui(base_chart_id: str):
 # CREATE BASE CHART (EPIC-5 / 6.3)
 # ============================================================
 
+@limiter.limit("5/hour")
 @router.post("/create", response_model=BaseChartCreateResponse)
-def create_base_chart(payload: BaseChartCreateRequest, force_recalculate: bool = False):
+def create_base_chart(request: Request, payload: BaseChartCreateRequest, force_recalculate: bool = False):
     """
     Immutable birth chart creation with deduplication.
 
@@ -165,6 +183,13 @@ def create_base_chart(payload: BaseChartCreateRequest, force_recalculate: bool =
     Args:
         force_recalculate: If True, bypasses cache and recalculates ephemeris
     """
+
+    # -------------------------------------------------
+    # 0a. Turnstile verification
+    # -------------------------------------------------
+    token = payload.turnstile_token
+    if token and not _verify_turnstile(token):
+        raise HTTPException(status_code=403, detail="CAPTCHA verification failed. Please try again.")
 
     # -------------------------------------------------
     # 0. Check for existing chart with same birth data

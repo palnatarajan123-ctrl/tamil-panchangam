@@ -1,9 +1,10 @@
 # app/api/prediction.py
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from datetime import datetime
 import json
 import logging
+from app.core.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -110,8 +111,10 @@ def get_monthly_llm_status(base_chart_id: str, year: int, month: int):
     return {"status": "pending"}
 
 
+@limiter.limit("10/hour")
 @router.post("/monthly", response_model=MonthlyPredictionResponse)
 def generate_monthly_prediction(
+    request: Request,
     payload: MonthlyPredictionRequest,
     background_tasks: BackgroundTasks,
 ):

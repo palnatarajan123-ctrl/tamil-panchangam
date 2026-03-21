@@ -103,6 +103,10 @@ class BaseChartCreateRequest(BaseModel):
         description="Rahu/Ketu calculation method: 'mean' (traditional Tamil) or 'true' (astronomical)"
     )
 
+    turnstile_token: Optional[str] = Field(
+        default=None, description="Cloudflare Turnstile verification token"
+    )
+
 
 class BaseChartCreateResponse(BaseModel):
     base_chart_id: str
