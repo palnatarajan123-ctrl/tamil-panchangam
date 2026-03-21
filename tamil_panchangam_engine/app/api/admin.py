@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.auth import require_admin
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 
 logger = logging.getLogger(__name__)
 

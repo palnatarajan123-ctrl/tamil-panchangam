@@ -18,7 +18,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 from app.engines.llm_interpretation_orchestrator import (
     is_llm_enabled,
     set_llm_enabled,

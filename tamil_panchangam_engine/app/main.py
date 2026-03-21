@@ -105,7 +105,7 @@ def startup_event():
     try:
         import os, uuid
         from app.core.auth import hash_password
-        from app.db.duckdb import get_conn
+        from app.db.postgres import get_conn
         admin_email = os.environ.get('ADMIN_EMAIL')
         admin_password = os.environ.get('ADMIN_PASSWORD')
         admin_name = os.environ.get('ADMIN_NAME', 'Admin')

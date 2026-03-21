@@ -3,6 +3,15 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 import json
 
+def _safe_json(val):
+    """Accept both str (legacy DuckDB) and dict/list (Neon JSONB)."""
+    if val is None:
+        return None
+    if isinstance(val, (dict, list)):
+        return val
+    return json.loads(val)
+
+
 from app.db.session import get_db
 from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.repositories.prediction_repo import get_monthly_prediction
@@ -74,10 +83,10 @@ def generate_weekly_prediction(payload: dict, db=Depends(get_db)):
     )
 
     if existing:
-        envelope = json.loads(existing["envelope"])
-        synthesis = json.loads(existing["synthesis"])
+        envelope = _safe_json(existing["envelope"])
+        synthesis = _safe_json(existing["synthesis"])
         interpretation = (
-            json.loads(existing["interpretation"])
+            _safe_json(existing["interpretation"])
             if existing.get("interpretation")
             else {}
         )
@@ -130,7 +139,7 @@ def generate_weekly_prediction(payload: dict, db=Depends(get_db)):
         else base_chart_record.payload
     )
     base_chart_payload = (
-        json.loads(raw_payload)
+        _safe_json(raw_payload)
         if isinstance(raw_payload, str)
         else raw_payload
     )

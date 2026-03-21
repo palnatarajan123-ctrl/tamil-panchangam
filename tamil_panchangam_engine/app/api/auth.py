@@ -24,7 +24,7 @@ from app.core.auth import (
     verify_password,
 )
 from app.core.limiter import limiter
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 
 logger = logging.getLogger(__name__)
 

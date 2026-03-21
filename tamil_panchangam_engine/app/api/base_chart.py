@@ -75,7 +75,7 @@ from app.utils.time_utils import (
 )
 from app.utils.checksum import compute_chart_checksum
 from app.services.birth_chart_builder import build_birth_chart_view_model
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import insert_base_chart
 from app.repositories.base_chart_repo import get_base_chart_by_id
 

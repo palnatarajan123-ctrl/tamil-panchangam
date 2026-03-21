@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime
 import logging
 
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 from app.pdf.charts.south_indian_svg import render_south_indian_chart_svg
 from app.pdf.charts.chart_models import ChartSvgInput
 from app.engines.corner_case_detector import assess_calculation_confidence

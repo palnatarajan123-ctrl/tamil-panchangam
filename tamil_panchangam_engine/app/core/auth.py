@@ -13,7 +13,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 import bcrypt as _bcrypt_lib
 
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 
 logger = logging.getLogger(__name__)
 

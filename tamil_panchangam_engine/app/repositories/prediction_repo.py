@@ -1,8 +1,17 @@
 # app/repositories/prediction_repo.py
 
 import json
+
+def _safe_json(val):
+    """Accept both str (legacy DuckDB) and dict/list (Neon JSONB)."""
+    if val is None:
+        return None
+    if isinstance(val, (dict, list)):
+        return val
+    return json.loads(val)
+
 from datetime import datetime
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 
 
 # ============================================================

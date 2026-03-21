@@ -3,12 +3,21 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from datetime import datetime
 import json
+
+def _safe_json(val):
+    """Accept both str (legacy DuckDB) and dict/list (Neon JSONB)."""
+    if val is None:
+        return None
+    if isinstance(val, (dict, list)):
+        return val
+    return json.loads(val)
+
 import logging
 from app.core.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 
 from app.repositories.prediction_repo import (
     get_monthly_prediction,
@@ -68,7 +77,7 @@ def _run_llm_background(
         )
         if existing:
             interp = (
-                json.loads(existing["interpretation"])
+                _safe_json(existing["interpretation"])
                 if existing.get("interpretation")
                 else {}
             )
@@ -81,8 +90,8 @@ def _run_llm_background(
                     year=year,
                     month=month,
                     status="ok",
-                    envelope=json.loads(existing["envelope"]),
-                    synthesis=json.loads(existing["synthesis"]),
+                    envelope=_safe_json(existing["envelope"]),
+                    synthesis=_safe_json(existing["synthesis"]),
                     interpretation=interp,
                     engine_version="monthly-prediction-v2",
                 )
@@ -102,7 +111,7 @@ def get_monthly_llm_status(base_chart_id: str, year: int, month: int):
     )
     if existing and existing.get("interpretation"):
         interp = (
-            json.loads(existing["interpretation"])
+            _safe_json(existing["interpretation"])
             if isinstance(existing["interpretation"], str)
             else existing["interpretation"]
         )
@@ -146,7 +155,7 @@ def generate_monthly_prediction(
     base_chart_payload = (
         base_chart["payload"]
         if isinstance(base_chart["payload"], dict)
-        else json.loads(base_chart["payload"])
+        else _safe_json(base_chart["payload"])
     )
 
     # -------------------------------------------------
@@ -162,10 +171,10 @@ def generate_monthly_prediction(
     llm_status = None  # None = already present; "pending" = running in background
 
     if existing:
-        envelope = json.loads(existing["envelope"])
-        synthesis = json.loads(existing["synthesis"])
+        envelope = _safe_json(existing["envelope"])
+        synthesis = _safe_json(existing["synthesis"])
         interpretation = (
-            json.loads(existing["interpretation"])
+            _safe_json(existing["interpretation"])
             if existing.get("interpretation")
             else None
         )
@@ -192,7 +201,7 @@ def generate_monthly_prediction(
                 ).fetchone()
             if llm_row and llm_row[0]:
                 llm_data = (
-                    json.loads(llm_row[0])
+                    _safe_json(llm_row[0])
                     if isinstance(llm_row[0], str)
                     else llm_row[0]
                 )

@@ -1,5 +1,5 @@
 from datetime import datetime
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 
 
 def get_yearly_prediction(base_chart_id, year):

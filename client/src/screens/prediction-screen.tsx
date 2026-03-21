@@ -17,7 +17,7 @@ import {
 } from "@/adapters/aiInterpretationAdapter";
 
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download, Sparkles } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -26,7 +26,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Download } from "lucide-react";
+import { getAccessToken } from "@/lib/auth";
 
 /* -------------------------------------------------
    Screen
@@ -41,6 +41,8 @@ export default function PredictionScreen() {
 
   const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
   const [year, setYear] = useState(baseYear);
+  const [enhancing, setEnhancing] = useState(false);
+  const [llmDisabledMessage, setLlmDisabledMessage] = useState<string | null>(null);
 
   /**
    * Unified cursor:
@@ -108,6 +110,40 @@ export default function PredictionScreen() {
 
   const dashaContext = data?.details?.envelope?.dasha_context;
 
+  const fallbackReason = data?.details?.interpretation?.llm_metadata?.fallback_reason;
+  const showEnhanceButton =
+    fallbackReason === "llm_disabled" || fallbackReason === "anthropic_key_missing";
+
+  async function handleEnhanceWithAI() {
+    setEnhancing(true);
+    setLlmDisabledMessage(null);
+    try {
+      const token = getAccessToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const statusRes = await fetch("/api/admin/llm/status", { headers });
+      const statusJson = await statusRes.json();
+
+      if (!statusJson.llm_enabled) {
+        setLlmDisabledMessage("AI enhancement is currently disabled by admin");
+        return;
+      }
+
+      await fetch("/api/admin/llm/clear-cache", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ base_chart_id: id }),
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["prediction", id, period, year, index, undefined],
+      });
+    } finally {
+      setEnhancing(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* -------------------------------------------------
@@ -162,25 +198,43 @@ export default function PredictionScreen() {
               Download (only for monthly/yearly)
           -------------------------------------------------- */}
           {(period === "monthly" || period === "yearly") && (
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => {
-                const params = new URLSearchParams({
-                  base_chart_id: id,
-                  report_type: period,
-                  year: year.toString(),
-                });
-                if (period === "monthly") {
-                  params.append("month", index.toString());
-                }
-                window.open(`/api/reports/pdf?${params.toString()}`, "_blank");
-              }}
-              data-testid="button-download-pdf"
-            >
-              <Download className="h-4 w-4" />
-              Download Full Report (PDF)
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => {
+                  const params = new URLSearchParams({
+                    base_chart_id: id,
+                    report_type: period,
+                    year: year.toString(),
+                  });
+                  if (period === "monthly") {
+                    params.append("month", index.toString());
+                  }
+                  window.open(`/api/reports/pdf?${params.toString()}`, "_blank");
+                }}
+                data-testid="button-download-pdf"
+              >
+                <Download className="h-4 w-4" />
+                Download Full Report (PDF)
+              </Button>
+
+              {showEnhanceButton && (
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleEnhanceWithAI}
+                  disabled={enhancing || !!llmDisabledMessage}
+                  title={llmDisabledMessage ?? undefined}
+                >
+                  {enhancing
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Sparkles className="h-4 w-4" />
+                  }
+                  Enhance with AI
+                </Button>
+              )}
+            </div>
           )}
 
           <Separator className="my-4" />

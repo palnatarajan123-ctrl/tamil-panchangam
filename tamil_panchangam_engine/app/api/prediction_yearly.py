@@ -2,6 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime, timezone
 from typing import Any, Dict
 import json
+
+def _safe_json(val):
+    """Accept both str (legacy DuckDB) and dict/list (Neon JSONB)."""
+    if val is None:
+        return None
+    if isinstance(val, (dict, list)):
+        return val
+    return json.loads(val)
+
 from app.core.limiter import limiter
 
 from app.db.session import get_db
@@ -82,7 +91,7 @@ def generate_yearly_prediction(request: Request, payload: dict, db=Depends(get_d
     )
 
     base_chart_payload = (
-        json.loads(raw_payload)
+        _safe_json(raw_payload)
         if isinstance(raw_payload, str)
         else raw_payload
     )

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, HTTPException
 import json
 
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 from app.services.birth_chart_builder import build_birth_chart_view_model
 
 router = APIRouter(prefix="/ui", tags=["ui"])

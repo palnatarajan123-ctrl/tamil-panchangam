@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.core.limiter import limiter
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled
 from app.llm.providers import anthropic_provider

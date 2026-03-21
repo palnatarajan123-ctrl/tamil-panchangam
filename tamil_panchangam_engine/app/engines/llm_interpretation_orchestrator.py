@@ -23,7 +23,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional, Literal
 
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 from app.llm.token_estimator import check_token_limits, get_max_completion_tokens
 from app.llm.providers import anthropic_provider as openai_provider  # openai_provider alias kept for internal references
 from app.llm.payload_builder import (
@@ -135,7 +135,7 @@ def _check_cache(
     try:
         with get_conn() as conn:
             result = conn.execute("""
-                SELECT content_json FROM prediction_llm_interpretation
+                SELECT content_json, fallback_reason FROM prediction_llm_interpretation
                 WHERE base_chart_id = ?
                 AND period_type = ?
                 AND period_key = ?
@@ -147,6 +147,12 @@ def _check_cache(
             """, [base_chart_id, period_type, period_key, feature_name, prompt_version, explainability_mode]).fetchone()
             
             if result and result[0]:
+                fallback_reason = result[1] if len(result) > 1 else None
+                # If cached entry was only because LLM was disabled, skip it so
+                # LLM gets a real chance now that it may be enabled
+                if fallback_reason == "llm_disabled":
+                    logger.info(f"LLM cache skip (llm_disabled entry): {base_chart_id}/{period_type}/{period_key}")
+                    return None
                 logger.info(f"LLM cache hit: {base_chart_id}/{period_type}/{period_key}/{explainability_mode}")
                 if isinstance(result[0], str):
                     return json.loads(result[0])

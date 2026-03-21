@@ -9,7 +9,7 @@ This is separate from cached predictions - computed fresh on each request.
 from fastapi import APIRouter, HTTPException, Query
 import json
 
-from app.db.duckdb import get_conn
+from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.engines.realtime_context_engine import compute_realtime_context
 
