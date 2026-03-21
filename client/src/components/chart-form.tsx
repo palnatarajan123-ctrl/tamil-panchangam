@@ -255,7 +255,7 @@ interface ChartFormProps {
    Component
 ----------------------------------------------------- */
 
-const TURNSTILE_SITE_KEY = "1x00000000000000000000AA"; // Cloudflare test key (always passes)
+const TURNSTILE_SITE_KEY = "0x4AAAAAACuBMk9QffkMSOPv"; // Cloudflare test key (always passes)
 
 export function ChartForm({ onSuccess }: ChartFormProps) {
   const { toast } = useToast();
