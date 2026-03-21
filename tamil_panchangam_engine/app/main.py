@@ -101,6 +101,24 @@ app.include_router(prediction_router,       prefix="/api")
 def startup_event():
     """Bootstrap database and load charts on startup."""
     bootstrap()
+    # Auto-create admin from env vars on first startup
+    try:
+        import os, uuid
+        from app.core.auth import hash_password
+        from app.db.duckdb import get_conn
+        admin_email = os.environ.get('ADMIN_EMAIL')
+        admin_password = os.environ.get('ADMIN_PASSWORD')
+        admin_name = os.environ.get('ADMIN_NAME', 'Admin')
+        if admin_email and admin_password:
+            with get_conn() as conn:
+                existing = conn.execute('SELECT id FROM users WHERE email = ?', [admin_email]).fetchone()
+                if not existing:
+                    conn.execute('INSERT INTO users (id, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?)',
+                        [str(uuid.uuid4()), admin_email.lower(), hash_password(admin_password), admin_name, 'admin'])
+                    conn.commit()
+                    print(f'✅ Admin auto-seeded: {admin_email}')
+    except Exception as e:
+        print(f'⚠️  Admin seed skipped: {e}')
     load_charts_from_db()
 
 app.include_router(interpretation_router,   prefix="/api")
