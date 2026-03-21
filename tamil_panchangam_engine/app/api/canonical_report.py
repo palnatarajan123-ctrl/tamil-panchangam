@@ -15,6 +15,7 @@ from app.core.limiter import limiter
 from app.pdf.canonical_report import build_canonical_report, REPORT_VERSION
 from app.pdf.canonical_report.report_builder import (
     ReportBuildError,
+    build_birth_chart_report,
     get_report_filename,
 )
 
@@ -87,6 +88,43 @@ def generate_pdf_report(
     
     filename = get_report_filename(base_chart_id, report_type, year, month)
     
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Report-Version": REPORT_VERSION,
+        }
+    )
+
+
+@limiter.limit("5/hour")
+@router.get("/birth-chart-pdf")
+def generate_birth_chart_pdf(
+    request: Request,
+    base_chart_id: str = Query(..., description="Base chart UUID"),
+):
+    """
+    Generate a birth-chart-only PDF (no prediction required).
+
+    Includes: cover, natal snapshot, divisional charts, yogas,
+    sade sati, shadbala, methodology appendix.
+    """
+    try:
+        pdf_bytes = build_birth_chart_report(base_chart_id=base_chart_id)
+    except ReportBuildError as e:
+        logger.error(f"Birth chart PDF build failed: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error generating birth chart PDF: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate birth chart PDF. Please try again."
+        )
+
+    chart_short = base_chart_id[:8]
+    filename = f"natal_chart_{chart_short}.pdf"
+
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

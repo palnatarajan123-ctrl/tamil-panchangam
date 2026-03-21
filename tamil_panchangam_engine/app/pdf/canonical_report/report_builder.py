@@ -11,8 +11,8 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from .data_loader import build_report_data, ReportDataNotFoundError
-from .pdf_renderer import render_pdf
+from .data_loader import build_report_data, build_birth_chart_report_data, ReportDataNotFoundError
+from .pdf_renderer import render_pdf, render_birth_chart_pdf
 from .config import REPORT_VERSION
 
 logger = logging.getLogger(__name__)
@@ -77,6 +77,36 @@ def build_canonical_report(
     
     logger.info(f"Report generated: {len(pdf_bytes)} bytes")
     
+    return pdf_bytes
+
+
+def build_birth_chart_report(base_chart_id: str) -> bytes:
+    """
+    Build a birth-chart-only PDF (no prediction required).
+
+    Returns:
+        PDF bytes
+
+    Raises:
+        ReportBuildError: If chart data is missing or rendering fails
+    """
+    logger.info(f"Building birth chart PDF: {base_chart_id}")
+
+    try:
+        report_data = build_birth_chart_report_data(base_chart_id)
+    except ReportDataNotFoundError as e:
+        raise ReportBuildError(str(e))
+    except Exception as e:
+        logger.error(f"Failed to load birth chart data: {e}")
+        raise ReportBuildError(f"Failed to load birth chart data: {e}")
+
+    try:
+        pdf_bytes = render_birth_chart_pdf(report_data)
+    except Exception as e:
+        logger.error(f"Failed to render birth chart PDF: {e}")
+        raise ReportBuildError(f"Failed to render birth chart PDF: {e}")
+
+    logger.info(f"Birth chart PDF generated: {len(pdf_bytes)} bytes")
     return pdf_bytes
 
 

@@ -745,6 +745,162 @@ def build_report_data(
     )
 
 
+def load_natal_interpretation(base_chart_id: str) -> Optional[Dict[str, Any]]:
+    """Load cached natal LLM interpretation."""
+    return load_cached_llm_interpretation(
+        base_chart_id, "natal", "natal", "natal_interpretation"
+    )
+
+
+def _extract_dasha_context_from_payload(payload: Dict[str, Any]) -> DashaContext:
+    """Extract current dasha context directly from chart payload (no prediction envelope needed)."""
+    dashas = payload.get("dashas", {})
+    vimshottari = dashas.get("vimshottari", {})
+    current = vimshottari.get("current", {}) or {}
+
+    maha_lord = current.get("lord", "Unknown")
+    antar = current.get("antar", {}) or {}
+    antar_lord = antar.get("lord", "Unknown")
+
+    maha_end = current.get("end", "")
+    balance = "Unknown"
+    if maha_end:
+        try:
+            end_dt = datetime.fromisoformat(maha_end.replace("Z", "+00:00"))
+            years_left = (end_dt - datetime.now(end_dt.tzinfo)).days / 365.25
+            balance = f"{years_left:.1f} years remaining"
+        except Exception:
+            pass
+
+    return DashaContext(
+        mahadasha=maha_lord,
+        mahadasha_lord=maha_lord,
+        antardasha=antar_lord,
+        antardasha_lord=antar_lord,
+        dasha_balance=balance,
+    )
+
+
+def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
+    """
+    Build report data for a birth-chart-only PDF.
+
+    No prediction required — uses only base chart data from DB plus
+    the cached natal AI interpretation (if available).
+    """
+    chart = load_base_chart(base_chart_id)
+    payload = _safe_json(chart.get("payload"), {})
+
+    ephemeris = payload.get("ephemeris", {})
+    planets = ephemeris.get("planets", {})
+    rasi_planet_signs = {planet: data.get("rasi", "") for planet, data in planets.items()}
+
+    d9_data = payload.get("charts", {}).get("D9", {})
+    navamsa_planet_signs = {
+        planet: data.get("navamsa_sign", "")
+        for planet, data in d9_data.items()
+        if isinstance(data, dict)
+    }
+
+    lagna_data = ephemeris.get("lagna", {})
+    lagna_sign = lagna_data.get("rasi", "") if isinstance(lagna_data, dict) else ""
+    d9_lagna_sign = lagna_data.get("navamsa_sign", "Mesham") if isinstance(lagna_data, dict) else "Mesham"
+
+    divisional_charts = payload.get("divisional_charts", {})
+    d2_data = divisional_charts.get("D2", {}).get("planets", {})
+    d2_planet_signs = {planet: data.get("sign", "") for planet, data in d2_data.items() if isinstance(data, dict)}
+    d7_data = divisional_charts.get("D7", {}).get("planets", {})
+    d7_planet_signs = {planet: data.get("sign", "") for planet, data in d7_data.items() if isinstance(data, dict)}
+    d10_data = divisional_charts.get("D10", {}).get("planets", {})
+    d10_planet_signs = {planet: data.get("sign", "") for planet, data in d10_data.items() if isinstance(data, dict)}
+
+    # Yogas / Sade Sati / Shadbala live in the payload for birth chart context
+    yogas_raw = payload.get("yogas")
+    sade_sati_raw = payload.get("sade_sati")
+    shadbala_raw = payload.get("shadbala")
+
+    birth_details_data = payload.get("birth_details", {})
+    chart_metadata = payload.get("chart_metadata", {})
+
+    natal_interp = load_natal_interpretation(base_chart_id)
+    natal_text = ""
+    if natal_interp:
+        life_theme = natal_interp.get("life_theme", {})
+        if isinstance(life_theme, dict):
+            natal_text = life_theme.get("narrative", "")
+
+    try:
+        confidence_result = assess_calculation_confidence(ephemeris)
+        calc_confidence = confidence_result.get("level", "high")
+        cusp_cases = [
+            f"{c['planet']} ({c['position']} of sign)"
+            for c in confidence_result.get("cusp_cases", [])
+        ]
+    except Exception as e:
+        logger.warning(f"Failed to assess calculation confidence: {e}")
+        calc_confidence = "high"
+        cusp_cases = []
+
+    return CanonicalReportData(
+        report_type="Natal",
+        period_label="Natal Chart",
+        generated_at=datetime.now(),
+        birth_details=BirthDetails(
+            name=birth_details_data.get("name", "Chart Holder"),
+            date=birth_details_data.get("date_of_birth", "Unknown"),
+            time=birth_details_data.get("time_of_birth", "Unknown"),
+            place=birth_details_data.get("place_of_birth", "Unknown"),
+        ),
+        birth_reference=_extract_birth_reference(payload),
+        chart_images=ChartImages(
+            d1_rasi=_generate_chart_svg(rasi_planet_signs, "D1", "Rasi Chart (D1)", lagna_sign),
+            d9_navamsa=_generate_chart_svg(navamsa_planet_signs, "D9", "Navamsa Chart (D9)", d9_lagna_sign),
+            d1_planet_signs=_convert_planet_to_sign_mapping(rasi_planet_signs),
+            d9_planet_signs=_convert_planet_to_sign_mapping(navamsa_planet_signs),
+            lagna_sign=lagna_sign,
+            d2_hora=_generate_chart_svg(d2_planet_signs, "D2", "Hora (D2)", "") if d2_planet_signs else "",
+            d7_saptamsa=_generate_chart_svg(d7_planet_signs, "D7", "Saptamsa (D7)", "") if d7_planet_signs else "",
+            d10_dasamsa=_generate_chart_svg(d10_planet_signs, "D10", "Dasamsa (D10)", "") if d10_planet_signs else "",
+            d2_planet_signs=_convert_planet_to_sign_mapping(d2_planet_signs),
+            d7_planet_signs=_convert_planet_to_sign_mapping(d7_planet_signs),
+            d10_planet_signs=_convert_planet_to_sign_mapping(d10_planet_signs),
+        ),
+        core_life_themes=[],
+        dasha_context=_extract_dasha_context_from_payload(payload),
+        transit_context=TransitContext(
+            jupiter_transit="",
+            saturn_transit="",
+            rahu_ketu_axis="",
+        ),
+        nakshatra_timing=NakshatraTimingContext(
+            current_moon_nakshatra="",
+            tara_bala="",
+            chandra_gati="",
+            favorable_window="",
+        ),
+        pakshi_rhythm=PakshiRhythmContext(
+            dominant_pakshi="",
+            activity_phase="",
+        ),
+        prediction_overview=natal_text,
+        prediction_areas=[],
+        practices=[],
+        closing_note="",
+        llm_enhanced=natal_interp is not None,
+        methodology=MethodologyInfo(
+            ephemeris_source="Swiss Ephemeris",
+            ayanamsa=chart_metadata.get("ayanamsa", "Lahiri (Chitrapaksha)"),
+            node_type=chart_metadata.get("node_type", "Mean Node"),
+            division_method=chart_metadata.get("division_method", "Parashara"),
+            calculation_confidence=calc_confidence,
+            cusp_cases=cusp_cases,
+        ),
+        yogas_data=yogas_raw if isinstance(yogas_raw, dict) else None,
+        sade_sati_data=sade_sati_raw if isinstance(sade_sati_raw, dict) else None,
+        shadbala_data=shadbala_raw if isinstance(shadbala_raw, dict) else None,
+    )
+
+
 def _generate_closing_note(areas: list) -> str:
     """Generate contextual closing note based on prediction areas."""
     supportive_count = sum(1 for a in areas if a.score >= 65)

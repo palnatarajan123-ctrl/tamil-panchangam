@@ -1385,6 +1385,41 @@ def _build_methodology_appendix(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
+    """
+    Render a birth-chart-only PDF (no prediction sections).
+
+    Sections: cover → natal snapshot → divisional charts →
+              yogas → sade sati → shadbala → methodology.
+    """
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=MARGIN,
+        leftMargin=MARGIN,
+        topMargin=MARGIN,
+        bottomMargin=MARGIN,
+    )
+
+    styles = _create_styles()
+    story = []
+
+    story.extend(_build_cover_page(data, styles))
+    story.extend(_build_natal_snapshot(data, styles))
+    story.extend(_build_divisional_charts(data, styles))
+    story.extend(_build_yogas_section(data, styles))
+    story.extend(_build_sade_sati_section(data, styles))
+    story.extend(_build_shadbala_section(data, styles))
+    story.extend(_build_methodology_appendix(data, styles))
+
+    doc.build(story)
+
+    buffer.seek(0)
+    return buffer.read()
+
+
 def render_pdf(data: CanonicalReportData) -> bytes:
     """
     Render complete PDF from report data.

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Sparkles, BookOpen, ChevronDown, ChevronUp } from "lucide-react";
+import { Sparkles, BookOpen, ChevronDown, ChevronUp, Download, Loader2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -16,6 +16,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { getAccessToken } from "@/lib/auth";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -141,6 +143,28 @@ function NatalSkeleton() {
 // ── Panel ───────────────────────────────────────────────────────────────────
 
 export function NatalInterpretationPanel({ chartId }: { chartId: string }) {
+  const [downloading, setDownloading] = useState(false);
+
+  async function downloadPdf() {
+    setDownloading(true);
+    try {
+      const token = getAccessToken();
+      const res = await fetch(`/api/reports/birth-chart-pdf?base_chart_id=${chartId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `natal_chart_${chartId.slice(0, 8)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["/api/chart/natal-interpretation", chartId],
     queryFn: async () => {
@@ -158,11 +182,29 @@ export function NatalInterpretationPanel({ chartId }: { chartId: string }) {
   return (
     <Card className="border-muted" data-testid="card-natal-interpretation">
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5 text-primary" />
-          Natal Chart Reading
-        </CardTitle>
-        <CardDescription>Your lifelong astrological blueprint</CardDescription>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              Natal Chart Reading
+            </CardTitle>
+            <CardDescription>Your lifelong astrological blueprint</CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 shrink-0"
+            onClick={downloadPdf}
+            disabled={downloading}
+            title="Download natal chart as PDF"
+          >
+            {downloading
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <Download className="h-4 w-4" />
+            }
+            <span className="hidden sm:inline">PDF</span>
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent>
