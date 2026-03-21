@@ -3,11 +3,13 @@
 import logging
 import hashlib
 import os
+import uuid
 import httpx
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime
 from typing import List, Optional
 from app.core.limiter import limiter
+from app.core.auth import get_current_user_optional
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +173,12 @@ def get_birth_chart_ui(base_chart_id: str):
 
 @limiter.limit("5/hour")
 @router.post("/create", response_model=BaseChartCreateResponse)
-def create_base_chart(request: Request, payload: BaseChartCreateRequest, force_recalculate: bool = False):
+def create_base_chart(
+    request: Request,
+    payload: BaseChartCreateRequest,
+    force_recalculate: bool = False,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+):
     """
     Immutable birth chart creation with deduplication.
 
@@ -208,6 +215,27 @@ def create_base_chart(request: Request, payload: BaseChartCreateRequest, force_r
         if existing_chart_id:
             existing = BASE_CHART_STORE[existing_chart_id]
             logger.info(f"Returning existing chart {existing_chart_id} (fingerprint match)")
+            # Auto-save to user's collection if logged in (in case they didn't save before)
+            if current_user:
+                try:
+                    with get_conn() as conn:
+                        already = conn.execute(
+                            "SELECT id FROM user_charts WHERE user_id = ? AND base_chart_id = ?",
+                            [current_user["id"], existing_chart_id],
+                        ).fetchone()
+                        if not already:
+                            count = conn.execute(
+                                "SELECT COUNT(*) FROM user_charts WHERE user_id = ?",
+                                [current_user["id"]],
+                            ).fetchone()[0]
+                            if count < 10:
+                                conn.execute(
+                                    """INSERT INTO user_charts (id, user_id, base_chart_id, nickname, created_at)
+                                       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                                    [str(uuid.uuid4()), current_user["id"], existing_chart_id, payload.name],
+                                )
+                except Exception as e:
+                    logger.warning(f"Auto-save existing chart failed: {e}")
             return BaseChartCreateResponse(
                 base_chart_id=existing_chart_id,
                 checksum=existing["checksum"],
@@ -361,6 +389,21 @@ def create_base_chart(request: Request, payload: BaseChartCreateRequest, force_r
             payload=base_chart,
             locked=True,
         )
+        # Auto-save to user's collection if logged in
+        if current_user:
+            try:
+                count = conn.execute(
+                    "SELECT COUNT(*) FROM user_charts WHERE user_id = ?",
+                    [current_user["id"]],
+                ).fetchone()[0]
+                if count < 10:
+                    conn.execute(
+                        """INSERT INTO user_charts (id, user_id, base_chart_id, nickname, created_at)
+                           VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                        [str(uuid.uuid4()), current_user["id"], base_chart_id, payload.name],
+                    )
+            except Exception as e:
+                logger.warning(f"Auto-save to user_charts failed: {e}")
         conn.commit()
 
     # Optional: keep in-memory copy for UI endpoints

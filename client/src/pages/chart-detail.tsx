@@ -46,10 +46,13 @@ import {
   Loader2,
   TrendingUp,
   Activity,
+  Bookmark,
+  BookmarkCheck,
 } from "lucide-react";
 
 import { apiRequest } from "@/lib/queryClient";
 import { adaptBirthChart } from "@/adapters/birthChartAdapter";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   adaptInterpretation,
   extractInterpretationWithDeterministic,
@@ -74,6 +77,9 @@ export default function ChartDetail() {
   const { id: chartId } = useParams<{ id: string }>();
   const [rawInterpretation, setRawInterpretation] = useState<any>(null);
   const [activeChartTab, setActiveChartTab] = useState<string>("D1");
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const { user } = useAuth();
 
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -130,6 +136,15 @@ export default function ChartDetail() {
         setRawInterpretation(data.details);
       }
     },
+  });
+
+  const saveChartMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/user/charts", { base_chart_id: chartId });
+      return res.json();
+    },
+    onSuccess: () => setSaved(true),
+    onError: (err: Error) => setSaveError(err.message),
   });
 
   const prediction = rawInterpretation && hasValidAIInterpretation({ interpretation: rawInterpretation.interpretation })
@@ -194,6 +209,37 @@ export default function ChartDetail() {
         </div>
 
         <StatusBadge status="ok" />
+
+        {/* Save chart button (shown when logged in) */}
+        {user && !saved && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => saveChartMutation.mutate()}
+            disabled={saveChartMutation.isPending}
+          >
+            <Bookmark className="h-4 w-4" />
+            Save
+          </Button>
+        )}
+        {user && saved && (
+          <Button variant="ghost" size="sm" className="gap-2 text-green-500" disabled>
+            <BookmarkCheck className="h-4 w-4" />
+            Saved
+          </Button>
+        )}
+        {!user && (
+          <Link href="/login">
+            <Button variant="outline" size="sm" className="gap-2">
+              <Bookmark className="h-4 w-4" />
+              Save
+            </Button>
+          </Link>
+        )}
+        {saveError && (
+          <p className="text-xs text-destructive">{saveError}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

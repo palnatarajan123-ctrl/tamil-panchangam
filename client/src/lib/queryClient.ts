@@ -1,6 +1,7 @@
 export const API_BASE = "/api";
 
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { authHeaders, refreshAccessToken, clearTokens } from "./auth";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -27,12 +28,36 @@ export async function apiRequest(
     ? url
     : `/api${url.startsWith("/") ? url : `/${url}`}`;
 
-  const res = await fetch(fullUrl, {
+  const headers: Record<string, string> = {
+    ...authHeaders(),
+    ...(data ? { "Content-Type": "application/json" } : {}),
+  };
+
+  let res = await fetch(fullUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
+
+  // Auto-refresh on 401
+  if (res.status === 401) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      const retryHeaders: Record<string, string> = {
+        Authorization: `Bearer ${newToken}`,
+        ...(data ? { "Content-Type": "application/json" } : {}),
+      };
+      res = await fetch(fullUrl, {
+        method,
+        headers: retryHeaders,
+        body: data ? JSON.stringify(data) : undefined,
+        credentials: "include",
+      });
+    } else {
+      clearTokens();
+    }
+  }
 
   await throwIfResNotOk(res);
   return res;

@@ -1,16 +1,24 @@
 import { Link, useLocation } from "wouter";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Activity, BookOpen, Settings } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Sparkles, Activity, BookOpen, Settings, BookMarked, User, LogOut, BarChart2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function Navigation() {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
 
   const navItems = [
     { href: "/", label: "Generate Chart", icon: Sparkles },
   ];
 
-  
   const utilityItems = [
     { href: "/health", label: "Health Status", icon: Activity },
     { href: "/docs", label: "Documentation", icon: BookOpen },
@@ -49,6 +57,18 @@ export function Navigation() {
               </Link>
             );
           })}
+          {user && (
+            <Link href="/my-charts">
+              <Button
+                variant={location === "/my-charts" ? "secondary" : "ghost"}
+                size="sm"
+                className="gap-2"
+              >
+                <BookMarked className="h-4 w-4" />
+                <span className="hidden md:inline">My Charts</span>
+              </Button>
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-1">
@@ -67,6 +87,52 @@ export function Navigation() {
               </Link>
             );
           })}
+
+          {/* Auth area */}
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="hidden md:inline max-w-[100px] truncate">{user.name}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <div className="px-2 py-1.5">
+                  <p className="text-xs font-medium truncate">{user.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/my-charts" className="flex items-center gap-2 cursor-pointer">
+                    <BookMarked className="h-4 w-4" /> My Charts
+                  </Link>
+                </DropdownMenuItem>
+                {user.role === "admin" && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin" className="flex items-center gap-2 cursor-pointer">
+                      <BarChart2 className="h-4 w-4" /> Admin Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="flex items-center gap-2 text-destructive focus:text-destructive cursor-pointer"
+                  onClick={() => logout()}
+                >
+                  <LogOut className="h-4 w-4" /> Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link href="/login">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <User className="h-4 w-4" />
+                <span className="hidden md:inline">Sign in</span>
+              </Button>
+            </Link>
+          )}
+
           <ThemeToggle />
         </div>
       </div>

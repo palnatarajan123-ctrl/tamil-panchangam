@@ -4,6 +4,7 @@ import { queryClient } from "./lib/queryClient";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Navigation } from "@/components/navigation";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 import Home from "@/pages/home";
 import Predictions from "@/pages/predictions"; // legacy
@@ -12,6 +13,10 @@ import Docs from "@/pages/docs";
 import ChartDetail from "@/pages/chart-detail";
 import AdminLLM from "@/pages/admin-llm";
 import MethodologyPage from "@/pages/methodology";
+import Login from "@/pages/login";
+import Register from "@/pages/register";
+import MyCharts from "@/pages/my-charts";
+import AdminDashboard from "@/pages/admin/index";
 import NotFound from "@/pages/not-found";
 
 import PredictionScreen from "@/screens/prediction-screen";
@@ -53,6 +58,14 @@ function Router() {
       <Route path="/methodology" component={MethodologyPage} />
       <Route path="/admin/llm" component={AdminLLM} />
 
+      {/* Auth pages */}
+      <Route path="/login" component={Login} />
+      <Route path="/register" component={Register} />
+      <Route path="/my-charts" component={MyCharts} />
+
+      {/* Admin dashboard */}
+      <Route path="/admin" component={AdminDashboard} />
+
       {/* ---------------------------------
          Birth Chart (STRUCTURE)
          --------------------------------- */}
@@ -84,15 +97,17 @@ function Router() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <div className="min-h-screen bg-background">
-          <Navigation />
-          <main className="container mx-auto p-4">
-            <Router />
-          </main>
-        </div>
-        <Toaster />
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <div className="min-h-screen bg-background">
+            <Navigation />
+            <main className="container mx-auto p-4">
+              <Router />
+            </main>
+          </div>
+          <Toaster />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

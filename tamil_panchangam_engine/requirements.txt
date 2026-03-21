@@ -40,6 +40,10 @@ SQLAlchemy==2.0.48
 sqlmodel==0.0.37
 slowapi==0.1.9
 limits==3.7.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.9
+google-auth==2.29.0
 starlette==0.52.1
 svglib==1.4.1
 svgwrite==1.4.3

@@ -117,6 +117,59 @@ def bootstrap():
     ON CONFLICT (key) DO NOTHING;
     """)
 
+    # ── Auth tables ────────────────────────────────────────────────────────────
+
+    con.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        password_hash TEXT,
+        google_id TEXT,
+        role TEXT NOT NULL DEFAULT 'user',
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_login_at TIMESTAMP
+    );
+    """)
+
+    con.execute("""
+    CREATE TABLE IF NOT EXISTS user_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        refresh_token_hash TEXT NOT NULL,
+        ip_address TEXT,
+        user_agent TEXT,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        revoked_at TIMESTAMP
+    );
+    """)
+
+    con.execute("""
+    CREATE TABLE IF NOT EXISTS user_charts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        base_chart_id TEXT NOT NULL,
+        nickname TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    con.execute("""
+    CREATE TABLE IF NOT EXISTS audit_log (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        action TEXT NOT NULL,
+        resource_type TEXT,
+        resource_id TEXT,
+        ip_address TEXT,
+        details JSON,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+
 if __name__ == "__main__":
     bootstrap()
     print("✅ DuckDB schema initialized")
