@@ -14,6 +14,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Accordion,
   AccordionContent,
@@ -51,6 +61,7 @@ import {
 } from "lucide-react";
 
 import { apiRequest } from "@/lib/queryClient";
+import { getAccessToken } from "@/lib/auth";
 import { adaptBirthChart } from "@/adapters/birthChartAdapter";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
@@ -79,6 +90,8 @@ export default function ChartDetail() {
   const [activeChartTab, setActiveChartTab] = useState<string>("D1");
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [nickname, setNickname] = useState("");
   const { user } = useAuth();
 
   const now = new Date();
@@ -139,11 +152,25 @@ export default function ChartDetail() {
   });
 
   const saveChartMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/user/charts", { base_chart_id: chartId });
+    mutationFn: async (data: { nickname: string }) => {
+      const res = await fetch("/api/user/charts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
+        },
+        body: JSON.stringify({
+          base_chart_id: chartId,
+          nickname: data.nickname,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onSuccess: () => setSaved(true),
+    onSuccess: () => {
+      setSaved(true);
+      setShowSaveDialog(false);
+    },
     onError: (err: Error) => setSaveError(err.message),
   });
 
@@ -210,13 +237,16 @@ export default function ChartDetail() {
 
         <StatusBadge status="ok" />
 
-        {/* Save chart button (shown when logged in) */}
+        {/* Save chart button */}
         {user && !saved && (
           <Button
             variant="outline"
             size="sm"
             className="gap-2"
-            onClick={() => saveChartMutation.mutate()}
+            onClick={() => {
+              setNickname(ui.identity.name || "");
+              setShowSaveDialog(true);
+            }}
             disabled={saveChartMutation.isPending}
           >
             <Bookmark className="h-4 w-4" />
@@ -241,6 +271,44 @@ export default function ChartDetail() {
           <p className="text-xs text-destructive">{saveError}</p>
         )}
       </div>
+
+      {/* Save Chart Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save Chart</DialogTitle>
+            <DialogDescription>
+              Give this chart a nickname to find it easily later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="nickname">Nickname</Label>
+            <Input
+              id="nickname"
+              placeholder="e.g. Self, Amma, Husband, Son..."
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && nickname.trim()) {
+                  saveChartMutation.mutate({ nickname: nickname.trim() });
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowSaveDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => saveChartMutation.mutate({ nickname: nickname.trim() || (ui.identity.name ?? "Chart") })}
+              disabled={saveChartMutation.isPending}
+            >
+              {saveChartMutation.isPending ? "Saving…" : "Save Chart"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Charts */}

@@ -1,10 +1,11 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Navigation } from "@/components/navigation";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { useEffect, type ReactNode } from "react";
 
 import Home from "@/pages/home";
 import Predictions from "@/pages/predictions"; // legacy
@@ -25,6 +26,25 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
+
+/* -------------------------------------------------
+   ADMIN ROUTE GUARD
+-------------------------------------------------- */
+
+function AdminRoute({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && (!user || user.role !== "admin")) {
+      navigate("/");
+    }
+  }, [user, isLoading, navigate]);
+
+  if (isLoading) return null;
+  if (!user || user.role !== "admin") return null;
+  return <>{children}</>;
+}
 
 /* -------------------------------------------------
    ROUTER (ALL ROUTES LIVE HERE)
@@ -56,7 +76,9 @@ function Router() {
       <Route path="/health" component={Health} />
       <Route path="/docs" component={Docs} />
       <Route path="/methodology" component={MethodologyPage} />
-      <Route path="/admin/llm" component={AdminLLM} />
+      <Route path="/admin/llm">
+        <AdminRoute><AdminLLM /></AdminRoute>
+      </Route>
 
       {/* Auth pages */}
       <Route path="/login" component={Login} />
@@ -64,7 +86,9 @@ function Router() {
       <Route path="/my-charts" component={MyCharts} />
 
       {/* Admin dashboard */}
-      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/admin">
+        <AdminRoute><AdminDashboard /></AdminRoute>
+      </Route>
 
       {/* ---------------------------------
          Birth Chart (STRUCTURE)

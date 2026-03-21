@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BookOpen, Pencil, Trash2, Eye, Sparkles } from "lucide-react";
 
@@ -20,12 +20,19 @@ interface SavedChart {
 }
 
 export default function MyCharts() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   const qc = useQueryClient();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+
+  // Redirect to login when auth is resolved and user is not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/login");
+    }
+  }, [authLoading, user, navigate]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["/api/user/charts"],
@@ -55,18 +62,11 @@ export default function MyCharts() {
     },
   });
 
-  if (!user) {
+  if (authLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full">
-          <CardContent className="py-12 text-center space-y-4">
-            <Sparkles className="h-10 w-10 text-muted-foreground mx-auto" />
-            <p className="text-muted-foreground">Sign in to view your saved charts.</p>
-            <Link href="/login">
-              <Button>Sign in</Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="max-w-4xl mx-auto py-8 space-y-3">
+        <Skeleton className="h-8 w-48" />
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
       </div>
     );
   }

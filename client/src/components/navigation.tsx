@@ -22,7 +22,6 @@ export function Navigation() {
   const utilityItems = [
     { href: "/health", label: "Health Status", icon: Activity },
     { href: "/docs", label: "Documentation", icon: BookOpen },
-    { href: "/admin/llm", label: "LLM Admin", icon: Settings },
   ];
 
   return (
@@ -109,11 +108,18 @@ export function Navigation() {
                   </Link>
                 </DropdownMenuItem>
                 {user.role === "admin" && (
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin" className="flex items-center gap-2 cursor-pointer">
-                      <BarChart2 className="h-4 w-4" /> Admin Dashboard
-                    </Link>
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin" className="flex items-center gap-2 cursor-pointer">
+                        <BarChart2 className="h-4 w-4" /> Admin Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/llm" className="flex items-center gap-2 cursor-pointer">
+                        <Settings className="h-4 w-4" /> LLM Settings
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
