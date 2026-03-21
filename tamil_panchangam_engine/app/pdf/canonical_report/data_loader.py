@@ -675,6 +675,10 @@ def build_report_data(
     sade_sati_raw = envelope.get("sade_sati")
     sade_sati_data = sade_sati_raw if isinstance(sade_sati_raw, dict) else None
 
+    # Shadbala — from prediction envelope (computed at prediction time)
+    shadbala_raw = envelope.get("shadbala")
+    shadbala_data = shadbala_raw if isinstance(shadbala_raw, dict) else None
+
     return CanonicalReportData(
         report_type=report_type.title(),
         period_label=period_label,
@@ -737,6 +741,7 @@ def build_report_data(
         sarvashtakavarga=sarvashtakavarga,
         yogas_data=yogas_data,
         sade_sati_data=sade_sati_data,
+        shadbala_data=shadbala_data,
     )
 
 

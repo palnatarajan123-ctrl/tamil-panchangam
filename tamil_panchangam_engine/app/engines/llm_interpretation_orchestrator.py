@@ -437,6 +437,7 @@ def generate_llm_interpretation(
             chandrashtama_periods=payload_inputs.get("chandrashtama_periods"),
             nakshatra_pada=payload_inputs.get("nakshatra_pada"),
             sade_sati_data=payload_inputs.get("sade_sati_data"),
+            shadbala_data=payload_inputs.get("shadbala_data"),
         )
     except AssertionError as e:
         logger.error(f"Dasha payload leak detected: {e}")

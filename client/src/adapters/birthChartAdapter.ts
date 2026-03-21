@@ -192,6 +192,35 @@ export interface BirthChartUIModel {
     };
     error: string | null;
   };
+
+  shadbala?: {
+    planets: Record<string, {
+      total_shashtiamsas: number;
+      rupas: number;
+      percent_strength: number;
+      strength_label: "Very Strong" | "Strong" | "Moderate" | "Weak";
+      components: {
+        sthana_bala: { score: number; placement: string; house: number };
+        dig_bala: { score: number; peak_house: number; house: number };
+        chesta_bala: { score: number; motion: string };
+        naisargika_bala: { score: number };
+        drik_bala: { score: number };
+      };
+      is_retrograde: boolean;
+      sign: number;
+      house: number;
+    }>;
+    ranking: string[];
+    strongest_planet: string | null;
+    weakest_planet: string | null;
+    summary: {
+      strongest: string | null;
+      weakest: string | null;
+      very_strong_count: number;
+      weak_count: number;
+    };
+    error: string | null;
+  };
 }
 
 /* ============================================================
@@ -390,5 +419,6 @@ export function adaptBirthChart(raw: any): BirthChartUIModel {
 
     yogas: view.yogas ?? undefined,
     sade_sati: view.sade_sati ?? undefined,
+    shadbala: view.shadbala ?? undefined,
   };
 }

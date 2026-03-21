@@ -25,6 +25,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { DashaTimeline } from "@/components/DashaTimeline";
 import { YogasPanel } from "@/components/YogasPanel";
 import { SadeSatiPanel } from "@/components/SadeSatiPanel";
+import { ShadbalaPanel } from "@/components/ShadbalaPanel";
 import { ChartPair } from "@/components/ChartPair";
 import { TabbedChartViewer } from "@/components/TabbedChartViewer";
 import { 
@@ -246,6 +247,7 @@ export default function ChartDetail() {
             <>
               <YogasPanel yogas={ui.yogas} />
               <SadeSatiPanel sadeSati={ui.sade_sati} />
+              <ShadbalaPanel shadbala={ui.shadbala} />
             </>
           )}
 

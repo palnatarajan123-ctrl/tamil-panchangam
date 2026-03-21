@@ -406,4 +406,7 @@ def build_monthly_prediction_envelope(
 
         # ===== SADE SATI =====
         "sade_sati": base_chart.get("sade_sati", {}),
+
+        # ===== SHADBALA =====
+        "shadbala": base_chart.get("shadbala", {}),
     }

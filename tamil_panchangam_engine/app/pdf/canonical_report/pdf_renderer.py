@@ -785,6 +785,103 @@ def _build_sade_sati_section(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def _build_shadbala_section(data: CanonicalReportData, styles) -> List:
+    """Build Planetary Strength (Shadbala) section for PDF."""
+    if not data.shadbala_data or data.shadbala_data.get("error"):
+        return []
+
+    planets = data.shadbala_data.get("planets", {})
+    if not planets:
+        return []
+
+    summary = data.shadbala_data.get("summary", {})
+    SHADBALA_PLANET_ORDER = [
+        "Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"
+    ]
+
+    STRENGTH_COLORS = {
+        "Very Strong": colors.Color(0.13, 0.55, 0.13),   # dark green
+        "Strong":      colors.Color(0.20, 0.70, 0.20),   # green
+        "Moderate":    colors.Color(0.85, 0.65, 0.13),   # amber
+        "Weak":        colors.Color(0.80, 0.18, 0.18),   # red
+    }
+
+    section_elements = []
+    section_elements.append(Paragraph("Planetary Strength (Shadbala)", styles['SectionTitle']))
+
+    # Summary line
+    strongest = summary.get("strongest", "")
+    weakest = summary.get("weakest", "")
+    if strongest or weakest:
+        summary_line = ""
+        if strongest:
+            summary_line += f"Strongest: {strongest}"
+        if weakest:
+            summary_line += f"  |  Weakest: {weakest}"
+        section_elements.append(Paragraph(summary_line, styles['BodyText']))
+        section_elements.append(Spacer(1, 0.1 * inch))
+
+    # Table
+    table_data = [["Planet", "Strength", "Rupas", "Sthana", "Dig", "Chesta"]]
+    row_colors = []
+    for planet in SHADBALA_PLANET_ORDER:
+        pdata = planets.get(planet)
+        if not pdata:
+            continue
+        components = pdata.get("components", {})
+        sthana = components.get("sthana_bala", {}).get("score", 0)
+        dig    = components.get("dig_bala", {}).get("score", 0)
+        chesta = components.get("chesta_bala", {}).get("score", 0)
+        label  = pdata.get("strength_label", "Moderate")
+        retro  = " (R)" if pdata.get("is_retrograde") else ""
+        table_data.append([
+            f"{planet}{retro}",
+            label,
+            f"{pdata.get('rupas', 0):.2f}",
+            f"{sthana:.0f}",
+            f"{dig:.0f}",
+            f"{chesta:.0f}",
+        ])
+        row_colors.append(STRENGTH_COLORS.get(label, colors.black))
+
+    tbl = Table(
+        table_data,
+        colWidths=[1.3 * inch, 1.3 * inch, 0.9 * inch, 0.9 * inch, 0.9 * inch, 0.9 * inch],
+    )
+    tbl_style = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("ALIGN", (0, 0), (0, -1), "LEFT"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.Color(0.97, 0.97, 0.97)),
+    ]
+    # Color-code the Strength column per row
+    for i, c in enumerate(row_colors, start=1):
+        tbl_style.append(("TEXTCOLOR", (1, i), (1, i), c))
+        tbl_style.append(("FONTNAME", (1, i), (1, i), "Helvetica-Bold"))
+
+    tbl.setStyle(TableStyle(tbl_style))
+    section_elements.append(tbl)
+    section_elements.append(Spacer(1, 0.1 * inch))
+
+    # Footer note
+    section_elements.append(Paragraph(
+        "<i>Shadbala scores computed using Sthana, Dig, Chesta, Naisargika, and Drik Bala. "
+        "1 Rupa = 60 Shashtiamsas.</i>",
+        styles['BodyText']
+    ))
+
+    elements = []
+    elements.append(KeepTogether(section_elements))
+    elements.append(PageBreak())
+    return elements
+
+
 def _score_to_label(score: int) -> str:
     """Convert score to human-readable label."""
     if score >= 75:
@@ -1315,6 +1412,7 @@ def render_pdf(data: CanonicalReportData) -> bytes:
     story.extend(_build_divisional_charts(data, styles))
     story.extend(_build_yogas_section(data, styles))
     story.extend(_build_sade_sati_section(data, styles))
+    story.extend(_build_shadbala_section(data, styles))
     story.extend(_build_astrological_context(data, styles))
     story.extend(_build_predictions(data, styles))
     story.extend(_build_practices_reflection(data, styles))

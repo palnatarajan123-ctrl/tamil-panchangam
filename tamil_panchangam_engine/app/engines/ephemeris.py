@@ -143,23 +143,43 @@ def compute_sidereal_positions(
 
     planets = {}
     for name, planet_id in PLANETS.items():
-        lon = get_sidereal_longitude(jd, planet_id)
+        flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL | swe.FLG_SPEED
+        result, _ = swe.calc_ut(jd, planet_id, flags)
+        lon = result[0] % 360
+        speed = result[3]  # degrees per day, negative = retrograde
+
+        # Get equatorial coords for declination
+        eq_flags = swe.FLG_SWIEPH | swe.FLG_EQUATORIAL
+        eq_result, _ = swe.calc_ut(jd, planet_id, eq_flags)
+        declination = eq_result[1]  # degrees, negative = south
+
         planets[name] = {
             "longitude_deg": lon,
-            "rasi": get_rasi(lon)
+            "rasi": get_rasi(lon),
+            "speed_deg_per_day": speed,
+            "is_retrograde": speed < 0,
+            "declination": declination,
         }
 
     node_id = NODE_TYPES.get(node_type.lower(), swe.MEAN_NODE)
-    rahu_lon = get_sidereal_longitude(jd, node_id)
+    rahu_flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL | swe.FLG_SPEED
+    rahu_result, _ = swe.calc_ut(jd, node_id, rahu_flags)
+    rahu_lon = rahu_result[0] % 360
     planets["Rahu"] = {
         "longitude_deg": rahu_lon,
-        "rasi": get_rasi(rahu_lon)
+        "rasi": get_rasi(rahu_lon),
+        "speed_deg_per_day": rahu_result[3],
+        "is_retrograde": True,  # Rahu always retrograde
+        "declination": 0.0,
     }
-    
+
     ketu_lon = (rahu_lon + 180) % 360
     planets["Ketu"] = {
         "longitude_deg": ketu_lon,
-        "rasi": get_rasi(ketu_lon)
+        "rasi": get_rasi(ketu_lon),
+        "speed_deg_per_day": -rahu_result[3],
+        "is_retrograde": True,  # Ketu always retrograde
+        "declination": 0.0,
     }
 
     moon_lon = planets["Moon"]["longitude_deg"]

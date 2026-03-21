@@ -196,7 +196,8 @@ def build_llm_payload(
     yogas: Optional[List[Dict[str, Any]]] = None,
     chandrashtama_periods: Optional[List[Dict[str, Any]]] = None,
     nakshatra_pada: Optional[int] = None,
-    sade_sati_data: Optional[Dict[str, Any]] = None
+    sade_sati_data: Optional[Dict[str, Any]] = None,
+    shadbala_data: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Build enriched LLM payload v3.0 — Siddhar-Tradition Synthesizer.
@@ -369,6 +370,14 @@ def build_llm_payload(
                 "active": True,
                 "effects": kantaka.get("effects", [])[:3],
             }
+
+    if shadbala_data and not shadbala_data.get("error"):
+        overall_context["shadbala_summary"] = {
+            "strongest_planet": shadbala_data.get("strongest_planet"),
+            "weakest_planet": shadbala_data.get("weakest_planet"),
+            "ranking": shadbala_data.get("ranking", [])[:3],
+            "weak_count": shadbala_data.get("summary", {}).get("weak_count", 0),
+        }
 
     payload = {
         "overall_context": overall_context,
@@ -601,6 +610,7 @@ def extract_payload_inputs(
         }
     
     envelope_sade_sati = envelope.get("sade_sati", {})
+    envelope_shadbala = envelope.get("shadbala", {})
 
     envelope_yogas = envelope.get("yogas", {})
     yoga_list = []
@@ -663,6 +673,7 @@ def extract_payload_inputs(
         "chandrashtama_periods": chandrashtama_periods if chandrashtama_periods else None,
         "nakshatra_pada": nakshatra_pada,
         "sade_sati_data": envelope_sade_sati if envelope_sade_sati else None,
+        "shadbala_data": envelope_shadbala if envelope_shadbala else None,
     }
 
 

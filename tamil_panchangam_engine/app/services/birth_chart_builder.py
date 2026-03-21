@@ -3,6 +3,7 @@
 from typing import Dict, Any, List
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.yoga_engine import compute_yogas
+from app.engines.shadbala_engine import compute_shadbala
 
 
 # -------------------------------------------------
@@ -321,6 +322,14 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
     yogas = compute_yogas(ephemeris=eph, houses={})
     base_chart["yogas"] = yogas
 
+    # Shadbala — classical planetary strength scoring
+    lagna_lon = eph.get("lagna", {}).get("longitude_deg", 0.0)
+    shadbala = compute_shadbala(
+        planets_data=eph["planets"],
+        lagna_lon=lagna_lon
+    )
+    base_chart["shadbala"] = shadbala
+
     return {
         "identity": {
             "name": birth.get("name"),
@@ -390,6 +399,11 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
         # Sade Sati
         # -----------------------------
         "sade_sati": sade_sati,
+
+        # -----------------------------
+        # Shadbala
+        # -----------------------------
+        "shadbala": shadbala,
 
         "notes": [
             "Birth chart is computed using sidereal (Lahiri) calculations.",
