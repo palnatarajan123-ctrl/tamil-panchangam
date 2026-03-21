@@ -113,7 +113,7 @@ def bootstrap():
 
     con.execute("""
     INSERT INTO llm_config (key, value, updated_at) 
-    VALUES ('llm_enabled', 'true', CURRENT_TIMESTAMP)
+    VALUES ('llm_enabled', 'false', CURRENT_TIMESTAMP)
     ON CONFLICT (key) DO NOTHING;
     """)
 
