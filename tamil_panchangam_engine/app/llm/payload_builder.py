@@ -33,15 +33,15 @@ MAX_PROMPT_TOKENS = {
 }
 
 MAX_COMPLETION_TOKENS = {
-    "weekly": 3000,
-    "monthly": 6000,
-    "yearly": 8000
+    "weekly": 1500,
+    "monthly": 3000,
+    "yearly": 4000
 }
 
 MAX_TOTAL_TOKENS = {
-    "weekly": 5500,
-    "monthly": 10000,
-    "yearly": 13000
+    "weekly": 3500,
+    "monthly": 7000,
+    "yearly": 8000
 }
 
 RASI_LORDS = {
@@ -88,6 +88,21 @@ HOUSE_THEMES = {
     12: "Liberation & Loss (Vyaya Bhava)",
 }
 
+HOUSE_PLAIN = {
+    1:  "your identity, physical health, and overall vitality",
+    2:  "your money, savings, and how you communicate value",
+    3:  "your courage, communication, and short-term initiatives",
+    4:  "your home life, emotional security, and inner peace",
+    5:  "your creativity, self-expression, and confidence",
+    6:  "your health routines, work environment, and daily discipline",
+    7:  "your partnerships, close relationships, and commitments",
+    8:  "hidden matters, shared finances, and major transitions",
+    9:  "your luck, long-distance opportunities, and learning",
+    10: "your career, public reputation, and authority",
+    11: "your income streams, networks, and long-term goals",
+    12: "rest, background expenses, and inner withdrawal",
+}
+
 RASI_TAMIL = {
     "Aries": "Mesham", "Taurus": "Rishabam", "Gemini": "Mithunam",
     "Cancer": "Kadagam", "Leo": "Simmam", "Virgo": "Kanni",
@@ -130,8 +145,8 @@ def _trim_signal(signal: Dict[str, Any]) -> Optional[Dict[str, str]]:
         return None
     
     summary = key.replace("_", " ").title()[:40]
-    if len(rationale) > 120:
-        rationale = rationale[:117] + "..."
+    if len(rationale) > 250:
+        rationale = rationale[:247] + "..."
     
     if summary.lower() == "none" or rationale.lower() == "none":
         return None
@@ -157,7 +172,11 @@ def _trim_signal(signal: Dict[str, Any]) -> Optional[Dict[str, str]]:
     
     house = signal.get("house")
     if house is not None and str(house).lower() != "none":
-        result["house"] = int(house)
+        house_int = int(house)
+        result["house"] = house_int
+        house_plain = HOUSE_PLAIN.get(house_int)
+        if house_plain:
+            result["house_plain"] = house_plain
     
     valence = signal.get("valence")
     if valence and str(valence).lower() != "none":
@@ -422,11 +441,15 @@ def build_llm_payload(
                 })
     
     if missing_hints:
-        # PART 2: Fail-fast - raise RuntimeError to skip LLM and use deterministic fallback
-        raise RuntimeError(
-            f"LLM blocked: missing interpretive_hint in {len(missing_hints)} signal(s): "
-            f"{missing_hints[:3]}{'...' if len(missing_hints) > 3 else ''}"
+        logger.warning(
+            f"Missing interpretive_hint in {len(missing_hints)} "
+            f"signal(s) — filtering and proceeding: {missing_hints[:3]}"
         )
+        for area in payload["life_areas"]:
+            area["signals"] = [
+                s for s in area["signals"]
+                if s.get("interpretive_hint")
+            ]
     
     # DEBUG LOG (v1.8): Confirm interpretive_hint is present in payload
     if payload.get("life_areas") and payload["life_areas"][0].get("signals"):

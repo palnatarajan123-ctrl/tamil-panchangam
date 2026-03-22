@@ -39,11 +39,11 @@ LLM_MONTHLY_TOKEN_BUDGET = 1_000_000
 
 # v1.9: Window-type-specific prompt versions with detail level support
 PROMPT_VERSION_BY_WINDOW = {
-    "weekly": "weekly_v5_siddhar",
-    "monthly": "monthly_v5_siddhar",
-    "yearly": "yearly_v5_siddhar"
+    "weekly": "v4",
+    "monthly": "v4",
+    "yearly": "v4"
 }
-PROMPT_VERSION = "interpretation_v5_siddhar"  # fallback
+PROMPT_VERSION = "v4"  # fallback
 
 
 def _load_prompt_template(version: str = "v2") -> str:
@@ -290,6 +290,31 @@ def _validate_llm_output(output: Dict[str, Any]) -> bool:
     
     engine_version = output.get("engine_version", "")
     
+    if engine_version == "ai-interpretation-v4.0":
+        required_keys = [
+            "executive_summary", "why_this_period",
+            "life_areas", "remedies", "key_takeaways"
+        ]
+        if not all(k in output for k in required_keys):
+            missing = [k for k in required_keys if k not in output]
+            logger.warning(f"LLM v4 output missing keys: {missing}")
+            return False
+        exec_summary = output.get("executive_summary", {})
+        if not exec_summary.get("main_theme"):
+            logger.warning("LLM v4 output missing executive_summary.main_theme")
+            return False
+        life_areas = output.get("life_areas", {})
+        if not isinstance(life_areas, dict) or len(life_areas) < 2:
+            logger.warning(f"LLM v4 output has insufficient life_areas: {len(life_areas) if isinstance(life_areas, dict) else 'not a dict'}")
+            return False
+        for area_name, area_data in life_areas.items():
+            if not isinstance(area_data, dict):
+                continue
+            if not area_data.get("plain_english"):
+                logger.warning(f"LLM v4 output missing plain_english in {area_name}")
+                return False
+        return True
+
     if engine_version == "ai-interpretation-v3.0":
         required_keys = ["yearly_mantra", "dasha_transit_synthesis", "life_areas", "veda_remedy"]
         if not all(k in output for k in required_keys):
@@ -499,7 +524,7 @@ def generate_llm_interpretation(
         )
         return result
     
-    system_prompt = _load_prompt_template("v3")
+    system_prompt = _load_prompt_template("v4")
     user_prompt = f"Generate interpretation:\n\n{json.dumps(payload, indent=2)}"
     
     max_completion = MAX_COMPLETION_TOKENS.get(period_type, 900)
