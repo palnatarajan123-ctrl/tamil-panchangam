@@ -1,6 +1,6 @@
 import { aggregateInterpretation } from "../utils/aggregateInterpretation";
 
-export function InterpretationPanel({ interpretation }) {
+export function InterpretationPanel({ interpretation }: { interpretation: any }) {
   const summary = aggregateInterpretation(interpretation);
 
 

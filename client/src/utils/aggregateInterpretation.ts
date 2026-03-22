@@ -1,6 +1,6 @@
 export function aggregateInterpretation(areas: Record<string, any>) {
-  const positives = [];
-  const cautions = [];
+  const positives: string[] = [];
+  const cautions: string[] = [];
 
   Object.entries(areas).forEach(([area, data]) => {
     if (data.tone === "positive") positives.push(area);

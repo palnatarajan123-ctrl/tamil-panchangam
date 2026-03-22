@@ -69,10 +69,9 @@ type UnauthorizedBehavior = "returnNull" | "throw";
  * 🔒 GLOBAL QUERY NORMALIZATION LAYER
  * This guarantees consistent shapes across the app.
  */
-export const getQueryFn: <T>(options: {
+export const getQueryFn = <T>({ on401 }: {
   on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401 }) =>
+}): QueryFunction<T> =>
   async ({ queryKey }) => {
     const url = queryKey.join("/") as string;
 
