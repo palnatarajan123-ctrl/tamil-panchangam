@@ -102,10 +102,11 @@ function getScoreColor(score: number): string {
 interface LifeAreaCardProps {
   area: LifeAreaViewModel;
   isV2: boolean;
+  isV4: boolean;
   envelope?: any;
 }
 
-function LifeAreaCard({ area, isV2, envelope }: LifeAreaCardProps) {
+function LifeAreaCard({ area, isV2, isV4, envelope }: LifeAreaCardProps) {
   return (
     <AccordionItem value={area.key} data-testid={`accordion-item-${area.key}`}>
       <AccordionTrigger data-testid={`accordion-trigger-${area.key}`}>
@@ -128,7 +129,66 @@ function LifeAreaCard({ area, isV2, envelope }: LifeAreaCardProps) {
           <Paragraphs text={area.summary} />
         </div>
 
-        {!isV2 && area.deeperExplanation && (
+        {isV4 && area.realLifePatterns && (
+          <div className="bg-muted/50 p-3 rounded-md text-sm text-muted-foreground"
+            data-testid={`text-patterns-${area.key}`}>
+            <p className="text-xs font-medium uppercase tracking-wide mb-1">
+              What You May Notice
+            </p>
+            <p>{area.realLifePatterns}</p>
+          </div>
+        )}
+
+        {isV4 && ((area.doList?.length ?? 0) > 0 || (area.avoidList?.length ?? 0) > 0) && (
+          <div className="grid grid-cols-2 gap-3 pt-1"
+            data-testid={`section-do-avoid-${area.key}`}>
+            {(area.doList?.length ?? 0) > 0 && (
+              <div>
+                <p className="text-xs font-medium text-green-700 dark:text-green-400
+                   uppercase tracking-wide mb-2">
+                  Do
+                </p>
+                <ul className="space-y-1">
+                  {area.doList!.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm"
+                      data-testid={`text-do-${area.key}-${idx}`}>
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600
+                        dark:text-green-400 mt-0.5 shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {(area.avoidList?.length ?? 0) > 0 && (
+              <div>
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-400
+                   uppercase tracking-wide mb-2">
+                  Avoid
+                </p>
+                <ul className="space-y-1">
+                  {area.avoidList!.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm"
+                      data-testid={`text-avoid-${area.key}-${idx}`}>
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600
+                        dark:text-amber-400 mt-0.5 shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isV4 && area.astrologicalBasis && (
+          <p className="text-xs text-muted-foreground/70 italic pt-1 border-t border-border/30"
+            data-testid={`text-basis-${area.key}`}>
+            {area.astrologicalBasis}
+          </p>
+        )}
+
+        {!isV2 && !isV4 && area.deeperExplanation && (
           <div className="bg-muted/50 p-3 rounded-md" data-testid={`text-explanation-${area.key}`}>
             <Paragraphs text={area.deeperExplanation} className="text-muted-foreground" />
           </div>
@@ -175,6 +235,7 @@ export function MonthlyPredictionView({
   }
 
   const { lifeAreas } = prediction;
+  const isV4 = prediction.engineVersion === "ai-interpretation-v4.0";
   const isV3 = prediction.engineVersion === "ai-interpretation-v3.0";
   const isV2 = prediction.engineVersion === "ai-interpretation-v2.0";
 
@@ -187,6 +248,133 @@ export function MonthlyPredictionView({
 
   return (
     <div className="space-y-6" data-testid="section-prediction-view">
+
+      {/* ================= V4: EXECUTIVE SUMMARY ================= */}
+      {isV4 && prediction.executiveSummary && (
+        <Card data-testid="card-executive-summary"
+          className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Your {period === "yearly" ? "Year" : "Month"} at a Glance
+            </CardTitle>
+            <CardDescription>
+              {prediction.executiveSummary.yearInOneLine}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-base leading-relaxed">
+              {prediction.executiveSummary.mainTheme}
+            </p>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              {prediction.executiveSummary.strongestArea && (
+                <div className="bg-green-50 dark:bg-green-950/30 rounded-md p-3">
+                  <p className="text-xs font-medium text-green-700 dark:text-green-400
+                     uppercase tracking-wide mb-1">
+                    Strongest Area
+                  </p>
+                  <p className="text-sm">{prediction.executiveSummary.strongestArea}</p>
+                </div>
+              )}
+              {prediction.executiveSummary.watchArea && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-md p-3">
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400
+                     uppercase tracking-wide mb-1">
+                    Watch Area
+                  </p>
+                  <p className="text-sm">{prediction.executiveSummary.watchArea}</p>
+                </div>
+              )}
+            </div>
+            {prediction.executiveSummary.bestUse && (
+              <div className="bg-muted/50 rounded-md p-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase
+                   tracking-wide mb-1">
+                  Best Use of This Period
+                </p>
+                <p className="text-sm">{prediction.executiveSummary.bestUse}</p>
+              </div>
+            )}
+            {prediction.executiveSummary.oneLines &&
+             Object.keys(prediction.executiveSummary.oneLines).length > 0 && (
+              <div className="space-y-2 pt-1 border-t border-border/40">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Area Snapshot
+                </p>
+                {Object.entries(prediction.executiveSummary.oneLines).map(([key, line]) => (
+                  <div key={key} className="flex gap-2 text-sm">
+                    <span className="font-medium capitalize min-w-[110px] text-muted-foreground">
+                      {key.replace("_", " ")}
+                    </span>
+                    <span>{line}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ================= V4: WHY THIS PERIOD ================= */}
+      {isV4 && prediction.whyThisPeriod && (
+        <Card data-testid="card-why-this-period">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Why This Period Feels This Way
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-base leading-relaxed">
+              {prediction.whyThisPeriod.dashaPlain}
+            </p>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              {prediction.whyThisPeriod.transitPlain}
+            </p>
+            {prediction.whyThisPeriod.overlapSummary && (
+              <div className="bg-muted/50 rounded-md p-3 text-sm italic">
+                {prediction.whyThisPeriod.overlapSummary}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              {prediction.whyThisPeriod.supportive?.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-green-700 dark:text-green-400
+                     uppercase tracking-wide mb-2">
+                    Working For You
+                  </p>
+                  <ul className="space-y-1">
+                    {prediction.whyThisPeriod.supportive.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm">
+                        <CheckCircle className="h-3.5 w-3.5 text-green-600
+                          dark:text-green-400 mt-0.5 shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {prediction.whyThisPeriod.watchouts?.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400
+                     uppercase tracking-wide mb-2">
+                    Watch Out For
+                  </p>
+                  <ul className="space-y-1">
+                    {prediction.whyThisPeriod.watchouts.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600
+                          dark:text-amber-400 mt-0.5 shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ================= V3: YEARLY MANTRA ================= */}
       {isV3 && prediction.yearlyMantra && (
@@ -332,7 +520,7 @@ export function MonthlyPredictionView({
       )}
 
       {/* ================= V1: WINDOW SUMMARY (legacy) ================= */}
-      {!isV2 && !isV3 && prediction.windowSummary && (
+      {!isV2 && !isV3 && !isV4 && prediction.windowSummary && (
         <Card data-testid="card-window-summary">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -448,6 +636,36 @@ export function MonthlyPredictionView({
         </Card>
       )}
 
+      {/* ================= V4: CAUTION WINDOWS ================= */}
+      {isV4 && prediction.cautionWindows &&
+       prediction.cautionWindows.length > 0 && (
+        <Card data-testid="card-caution-windows-v4"
+          className="border-amber-500/30 dark:border-amber-400/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              Mindfulness Windows
+            </CardTitle>
+            <CardDescription>
+              Dates and patterns that call for extra care
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2" data-testid="list-caution-windows-v4">
+              {prediction.cautionWindows.map((window, idx) => (
+                <li key={idx}
+                  className="flex items-start gap-2 text-sm"
+                  data-testid={`text-caution-window-${idx}`}>
+                  <AlertTriangle className="h-4 w-4 text-amber-600
+                    dark:text-amber-400 mt-0.5 shrink-0" />
+                  <span>{window}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ================= TRANSIT STRENGTH (ENHANCEMENT A) ================= */}
       {envelope?.gochara && (
         <Card data-testid="card-transit-strength">
@@ -504,14 +722,15 @@ export function MonthlyPredictionView({
             Life Areas
           </CardTitle>
           <CardDescription>
-            {isV3 ? "Detailed astrological insights by life domain" : isV2 ? "Detailed insights with opportunities and actions" : "Area-wise influence and interpretation"}
+            {isV4 ? "Plain-English guidance for each life area" : isV3 ? "Detailed astrological insights by life domain" : isV2 ? "Detailed insights with opportunities and actions" : "Area-wise influence and interpretation"}
           </CardDescription>
         </CardHeader>
 
         <CardContent>
           <Accordion type="single" collapsible className="w-full" data-testid="accordion-life-areas">
             {lifeAreas.map(area => (
-              <LifeAreaCard key={area.key} area={area} isV2={isV2 || isV3} envelope={envelope} />
+              <LifeAreaCard key={area.key} area={area}
+                isV2={isV2 || isV3} isV4={isV4} envelope={envelope} />
             ))}
           </Accordion>
         </CardContent>
@@ -565,6 +784,86 @@ export function MonthlyPredictionView({
                   </ul>
                 </div>
               </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ================= V4: REMEDIES ================= */}
+      {isV4 && prediction.remediesV4 && (
+        <Card data-testid="card-remedies-v4" className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Flame className="h-5 w-5 text-primary" />
+              Remedies & Practices
+            </CardTitle>
+            <CardDescription>
+              Traditional remedies with practical alternatives
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {prediction.remediesV4.primary && (
+              <div className="space-y-3" data-testid="section-primary-remedy-v4">
+                <div className="flex items-start gap-3">
+                  <Star className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <div className="space-y-2 flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Primary Remedy
+                    </p>
+                    <p className="text-sm">
+                      {prediction.remediesV4.primary.traditional}
+                    </p>
+                    {prediction.remediesV4.primary.simplePractice && (
+                      <div className="bg-muted/50 rounded p-2">
+                        <p className="text-xs font-medium text-muted-foreground mb-0.5">
+                          Simple Alternative
+                        </p>
+                        <p className="text-sm">
+                          {prediction.remediesV4.primary.simplePractice}
+                        </p>
+                      </div>
+                    )}
+                    {prediction.remediesV4.primary.purpose && (
+                      <p className="text-xs text-muted-foreground italic">
+                        Purpose: {prediction.remediesV4.primary.purpose}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            {prediction.remediesV4.supporting &&
+             prediction.remediesV4.supporting.traditional && (
+              <>
+                <Separator />
+                <div className="flex items-start gap-3"
+                  data-testid="section-supporting-remedy-v4">
+                  <Calendar className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <div className="space-y-2 flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Supporting Practice
+                    </p>
+                    <p className="text-sm">
+                      {prediction.remediesV4.supporting.traditional}
+                    </p>
+                    {prediction.remediesV4.supporting.simplePractice && (
+                      <div className="bg-muted/50 rounded p-2">
+                        <p className="text-xs font-medium text-muted-foreground mb-0.5">
+                          Simple Alternative
+                        </p>
+                        <p className="text-sm">
+                          {prediction.remediesV4.supporting.simplePractice}
+                        </p>
+                      </div>
+                    )}
+                    {prediction.remediesV4.supporting.purpose && (
+                      <p className="text-xs text-muted-foreground italic">
+                        Purpose: {prediction.remediesV4.supporting.purpose}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -650,6 +949,32 @@ export function MonthlyPredictionView({
                 </div>
               </>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ================= V4: KEY TAKEAWAYS ================= */}
+      {isV4 && prediction.keyTakeawaysV4 &&
+       prediction.keyTakeawaysV4.length > 0 && (
+        <Card data-testid="card-takeaways-v4" className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Heart className="h-5 w-5 text-primary" />
+              Key Takeaways
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2" data-testid="section-takeaways-v4">
+              {prediction.keyTakeawaysV4.map((takeaway, idx) => (
+                <li key={idx}
+                  className="flex items-start gap-2"
+                  data-testid={`text-takeaway-v4-${idx}`}>
+                  <CheckCircle className="h-4 w-4 text-green-600
+                    dark:text-green-400 mt-0.5 shrink-0" />
+                  <span className="text-sm">{takeaway}</span>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}

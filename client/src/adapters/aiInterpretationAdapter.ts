@@ -77,6 +77,12 @@ export interface LifeAreaViewModel {
   watchOut?: string;
   oneAction?: string;
   attribution?: LifeAreaAttribution;
+  // v4 fields
+  plainEnglish?: string;
+  realLifePatterns?: string;
+  doList?: string[];
+  avoidList?: string[];
+  astrologicalBasis?: string;
 }
 
 export interface VedaRemedyViewModel {
@@ -98,6 +104,29 @@ export interface PredictionViewModel {
   dangerWindows?: string[];
   vedaRemedy?: VedaRemedyViewModel;
   lifeAreas: LifeAreaViewModel[];
+  // v4 fields
+  isV4?: boolean;
+  executiveSummary?: {
+    mainTheme: string;
+    yearInOneLine: string;
+    strongestArea: string;
+    watchArea: string;
+    bestUse: string;
+    oneLines: Record<string, string>;
+  };
+  whyThisPeriod?: {
+    dashaPlain: string;
+    transitPlain: string;
+    overlapSummary: string;
+    supportive: string[];
+    watchouts: string[];
+  };
+  remediesV4?: {
+    primary: { traditional: string; simplePractice: string; purpose: string };
+    supporting?: { traditional: string; simplePractice: string; purpose: string };
+  };
+  cautionWindows?: string[];
+  keyTakeawaysV4?: string[];
 }
 
 export interface AIInterpretationV3 {
@@ -171,6 +200,52 @@ export interface AIInterpretationV2 {
   };
 }
 
+export interface AIInterpretationV4 {
+  engine_version: "ai-interpretation-v4.0";
+  generated_at: string;
+  executive_summary?: {
+    main_theme: string;
+    year_in_one_line: string;
+    strongest_area: string;
+    watch_area: string;
+    best_use: string;
+    one_lines: Record<string, string>;
+  };
+  why_this_period?: {
+    dasha_plain: string;
+    transit_plain: string;
+    overlap_summary: string;
+    supportive: string[];
+    watchouts: string[];
+  };
+  life_areas: {
+    [key: string]: {
+      score: number;
+      outlook: string;
+      plain_english: string;
+      real_life_patterns?: string;
+      do?: string[];
+      avoid?: string[];
+      astrological_basis?: string;
+    };
+  };
+  remedies?: {
+    primary?: {
+      traditional: string;
+      simple_practice: string;
+      purpose: string;
+    };
+    supporting?: {
+      traditional: string;
+      simple_practice: string;
+      purpose: string;
+    };
+  };
+  caution_windows?: string[];
+  key_takeaways?: string[];
+  _visibility?: Record<string, boolean>;
+}
+
 export interface AIInterpretationV1 {
   engine_version: string;
   generated_at: string;
@@ -221,6 +296,10 @@ const LIFE_AREA_LABELS: Record<string, string> = {
 };
 
 const LIFE_AREA_ORDER = ["career", "finance", "relationships", "health", "health_and_energy", "personal_growth"];
+
+function isV4Interpretation(obj: any): obj is AIInterpretationV4 {
+  return obj?.engine_version === "ai-interpretation-v4.0";
+}
 
 function isV3Interpretation(obj: any): obj is AIInterpretationV3 {
   return obj?.engine_version === "ai-interpretation-v3.0";
@@ -503,6 +582,7 @@ export function adaptAIInterpretation(
 }
 
 function isValidInterpretationShape(obj: any): boolean {
+  if (isV4Interpretation(obj)) return !!(obj.executive_summary?.main_theme && obj.life_areas);
   if (isV3Interpretation(obj)) return true;
   if (isV2Interpretation(obj)) return true;
   return (
@@ -519,11 +599,11 @@ export function hasValidAIInterpretation(details: any): boolean {
 }
 
 export interface ExtractedInterpretation {
-  primary: AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3;
+  primary: AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3 | AIInterpretationV4;
   deterministic?: AIInterpretationV1;
 }
 
-export function extractAIInterpretation(details: any): AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3 | null {
+export function extractAIInterpretation(details: any): AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3 | AIInterpretationV4 | null {
   if (!hasValidAIInterpretation(details)) return null;
   const llmInterp = details.interpretation.llm_interpretation;
   const aiInterp = details.interpretation.ai_interpretation;
@@ -545,9 +625,83 @@ export function extractInterpretationWithDeterministic(details: any): ExtractedI
 }
 
 export function adaptInterpretation(
-  interpretation: AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3,
+  interpretation: AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3 | AIInterpretationV4,
   deterministicInterpretation?: AIInterpretationV1
 ): PredictionViewModel {
+  if (isV4Interpretation(interpretation)) {
+    const llm = interpretation;
+    const lifeAreaOrder = [
+      "career", "finance", "relationships", "health", "personal_growth"
+    ];
+    const V4_LIFE_AREA_LABELS: Record<string, string> = {
+      career: "Career",
+      finance: "Finance",
+      relationships: "Relationships",
+      health: "Health",
+      personal_growth: "Personal Growth",
+    };
+
+    const lifeAreas: LifeAreaViewModel[] = lifeAreaOrder
+      .filter(key => llm.life_areas?.[key])
+      .map(key => {
+        const area = llm.life_areas[key];
+        return {
+          key,
+          label: V4_LIFE_AREA_LABELS[key] ?? key,
+          score: area.score ?? 50,
+          outlook: area.outlook ?? "mixed",
+          summary: area.plain_english ?? "",
+          plainEnglish: area.plain_english ?? "",
+          realLifePatterns: area.real_life_patterns ?? "",
+          doList: area.do ?? [],
+          avoidList: area.avoid ?? [],
+          astrologicalBasis: area.astrological_basis ?? "",
+          deeperExplanation: "",
+          attribution: { signalsUsed: [] },
+        };
+      });
+
+    return {
+      engineVersion: "ai-interpretation-v4.0",
+      generatedAt: llm.generated_at ?? new Date().toISOString(),
+      isV4: true,
+      executiveSummary: llm.executive_summary ? {
+        mainTheme: llm.executive_summary.main_theme ?? "",
+        yearInOneLine: llm.executive_summary.year_in_one_line ?? "",
+        strongestArea: llm.executive_summary.strongest_area ?? "",
+        watchArea: llm.executive_summary.watch_area ?? "",
+        bestUse: llm.executive_summary.best_use ?? "",
+        oneLines: llm.executive_summary.one_lines ?? {},
+      } : undefined,
+      whyThisPeriod: llm.why_this_period ? {
+        dashaPlain: llm.why_this_period.dasha_plain ?? "",
+        transitPlain: llm.why_this_period.transit_plain ?? "",
+        overlapSummary: llm.why_this_period.overlap_summary ?? "",
+        supportive: llm.why_this_period.supportive ?? [],
+        watchouts: llm.why_this_period.watchouts ?? [],
+      } : undefined,
+      remediesV4: llm.remedies ? {
+        primary: {
+          traditional: llm.remedies.primary?.traditional ?? "",
+          simplePractice: llm.remedies.primary?.simple_practice ?? "",
+          purpose: llm.remedies.primary?.purpose ?? "",
+        },
+        supporting: llm.remedies.supporting?.traditional ? {
+          traditional: llm.remedies.supporting.traditional ?? "",
+          simplePractice: llm.remedies.supporting.simple_practice ?? "",
+          purpose: llm.remedies.supporting.purpose ?? "",
+        } : undefined,
+      } : undefined,
+      cautionWindows: llm.caution_windows ?? [],
+      keyTakeawaysV4: llm.key_takeaways ?? [],
+      lifeAreas,
+      yearlyMantra: undefined,
+      dashaTransitSynthesis: undefined,
+      vedaRemedy: undefined,
+      closing: undefined,
+    };
+  }
+
   if (isV3Interpretation(interpretation)) {
     return adaptAIInterpretationV3(interpretation);
   }
