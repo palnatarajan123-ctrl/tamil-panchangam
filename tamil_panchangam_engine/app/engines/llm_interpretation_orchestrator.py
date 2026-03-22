@@ -20,7 +20,7 @@ import uuid
 import logging
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Literal
 
 from app.db.postgres import get_conn
@@ -559,6 +559,7 @@ def generate_llm_interpretation(
         )
         return result
 
+    llm_response["generated_at"] = datetime.now(timezone.utc).isoformat()
     result["llm_interpretation"] = llm_response
     result["llm_metadata"]["provider"] = "anthropic"
     result["llm_metadata"]["model"] = usage_info.get("model")
