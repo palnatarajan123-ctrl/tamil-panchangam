@@ -111,8 +111,11 @@ export default function PredictionScreen() {
   const dashaContext = data?.details?.envelope?.dasha_context;
 
   const fallbackReason = data?.details?.interpretation?.llm_metadata?.fallback_reason;
+  const llmProvider = data?.details?.interpretation?.llm_metadata?.provider;
   const showEnhanceButton =
-    fallbackReason === "llm_disabled" || fallbackReason === "anthropic_key_missing";
+    (fallbackReason === "llm_disabled" || fallbackReason === "anthropic_key_missing") &&
+    llmProvider !== "anthropic" &&
+    llmProvider !== "cache";
 
   async function handleEnhanceWithAI() {
     setEnhancing(true);
