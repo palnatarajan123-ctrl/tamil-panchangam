@@ -148,6 +148,22 @@ def generate_yearly_prediction(request: Request, payload: dict, db=Depends(get_d
     interpretation["llm_interpretation"] = llm_result.get("llm_interpretation")
     interpretation["llm_metadata"] = llm_result.get("llm_metadata")
 
+    # --------------------------------------------------
+    # Overwrite guard: don't clobber a real Anthropic result with a fallback
+    # --------------------------------------------------
+    existing = get_yearly_prediction(base_chart_id=base_chart_id, year=int(year))
+    if existing:
+        existing_interp = (
+            existing["interpretation"]
+            if isinstance(existing["interpretation"], dict)
+            else json.loads(existing["interpretation"])
+        )
+        existing_meta = existing_interp.get("llm_metadata", {})
+        new_meta = interpretation.get("llm_metadata", {})
+        if existing_meta.get("provider") == "anthropic" and new_meta.get("fallback_reason"):
+            interpretation["llm_interpretation"] = existing_interp.get("llm_interpretation")
+            interpretation["llm_metadata"] = existing_interp.get("llm_metadata")
+
     explainability = build_explainability(
         dasha_context=envelope["dasha_context"],
         confidence=synthesis.get("confidence"),
