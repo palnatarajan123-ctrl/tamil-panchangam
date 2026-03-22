@@ -79,6 +79,7 @@ export default function PredictionScreen() {
   -------------------------------------------------- */
   const llmPending = (period === "monthly" || period === "yearly") && (data as any)?.llm_status === "pending";
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!llmPending) {
@@ -96,6 +97,7 @@ export default function PredictionScreen() {
         if (json.status === "ready") {
           clearInterval(pollRef.current!);
           pollRef.current = null;
+          if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
           queryClient.invalidateQueries({
             queryKey: period === "monthly"
               ? ["prediction", id, "monthly", year, index, undefined]
@@ -104,7 +106,21 @@ export default function PredictionScreen() {
         }
       } catch (_) { /* ignore */ }
     }, 3000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    pollTimeoutRef.current = setTimeout(() => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      queryClient.invalidateQueries({
+        queryKey: period === "monthly"
+          ? ["prediction", id, "monthly", year, index, undefined]
+          : ["prediction", id, "yearly", year],
+      });
+    }, 120000); // 2 minutes max
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [llmPending]);
 

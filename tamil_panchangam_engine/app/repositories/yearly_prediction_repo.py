@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from app.db.postgres import get_conn
 
@@ -35,6 +36,9 @@ def save_yearly_prediction(
     engine_version,
 ):
     pid = f"{base_chart_id}:{year}"
+    envelope = json.dumps(envelope) if isinstance(envelope, dict) else envelope
+    synthesis = json.dumps(synthesis) if isinstance(synthesis, dict) else synthesis
+    interpretation = json.dumps(interpretation) if isinstance(interpretation, dict) else interpretation
     with get_conn() as con:
         con.execute(
         """
