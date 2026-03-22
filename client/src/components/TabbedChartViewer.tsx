@@ -17,9 +17,17 @@ interface DivisionalCharts {
   D10?: ChartData;
 }
 
+interface KpSublordEntry {
+  longitude: number;
+  star_lord: string;
+  sub_lord: string;
+  sub_sub_lord: string;
+}
+
 interface TabbedChartViewerProps {
   charts: DivisionalCharts;
   onTabChange?: (tab: string) => void;
+  kpSublords?: Record<string, KpSublordEntry> | null;
 }
 
 const CHART_INFO: Record<string, { title: string; subtitle: string; purpose: string; description: string }> = {
@@ -55,7 +63,11 @@ const CHART_INFO: Record<string, { title: string; subtitle: string; purpose: str
   },
 };
 
-export function TabbedChartViewer({ charts, onTabChange }: TabbedChartViewerProps) {
+const KP_PLANET_ORDER = [
+  "Lagna", "Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"
+];
+
+export function TabbedChartViewer({ charts, onTabChange, kpSublords }: TabbedChartViewerProps) {
   const availableCharts = Object.entries(charts).filter(
     ([_, data]) => data && Object.keys(data.planets || {}).length > 0
   );
@@ -89,11 +101,14 @@ export function TabbedChartViewer({ charts, onTabChange }: TabbedChartViewerProp
     <Card className="border-muted" data-testid="card-tabbed-charts">
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <div className="border-b px-4 pt-4">
-          <TabsList className="grid w-full grid-cols-5 h-auto gap-1" data-testid="tabs-chart-selector">
+          <TabsList
+            className={`grid w-full h-auto gap-1 ${kpSublords ? "grid-cols-6" : "grid-cols-5"}`}
+            data-testid="tabs-chart-selector"
+          >
             {["D1", "D9", "D10", "D7", "D2"].map((chartKey) => {
               const chartData = charts[chartKey as keyof DivisionalCharts];
               const hasData = chartData && Object.keys(chartData.planets || {}).length > 0;
-              
+
               return (
                 <TabsTrigger
                   key={chartKey}
@@ -106,6 +121,15 @@ export function TabbedChartViewer({ charts, onTabChange }: TabbedChartViewerProp
                 </TabsTrigger>
               );
             })}
+            {kpSublords && (
+              <TabsTrigger
+                value="kp"
+                className="text-xs sm:text-sm py-2"
+                data-testid="tab-kp"
+              >
+                KP
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
@@ -136,6 +160,48 @@ export function TabbedChartViewer({ charts, onTabChange }: TabbedChartViewerProp
             </TabsContent>
           );
         })}
+
+        {kpSublords && (
+          <TabsContent value="kp" className="mt-0">
+            <CardContent className="pt-6 pb-8 overflow-x-auto">
+              <div className="space-y-3">
+                <div className="text-center mb-4">
+                  <h3 className="text-lg font-semibold">KP Sub-lords</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Krishnamurti Paddhati star-lord / sub-lord analysis
+                  </p>
+                </div>
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Planet</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Longitude</th>
+                      <th className="text-center py-2 px-3 font-medium text-muted-foreground">Star Lord</th>
+                      <th className="text-center py-2 px-3 font-medium text-muted-foreground">Sub Lord</th>
+                      <th className="text-center py-2 px-3 font-medium text-muted-foreground">Sub-Sub Lord</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {KP_PLANET_ORDER.filter((p) => kpSublords[p]).map((planet) => {
+                      const entry = kpSublords[planet];
+                      return (
+                        <tr key={planet} className="border-b border-border/40 hover:bg-muted/30">
+                          <td className="py-2 px-3 font-medium">{planet}</td>
+                          <td className="py-2 px-3 text-right font-mono text-xs">
+                            {entry.longitude.toFixed(2)}°
+                          </td>
+                          <td className="py-2 px-3 text-center">{entry.star_lord}</td>
+                          <td className="py-2 px-3 text-center font-medium text-primary">{entry.sub_lord}</td>
+                          <td className="py-2 px-3 text-center text-muted-foreground">{entry.sub_sub_lord}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </TabsContent>
+        )}
       </Tabs>
     </Card>
   );

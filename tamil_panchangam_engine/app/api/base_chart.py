@@ -20,12 +20,13 @@ def _compute_birth_fingerprint(
     latitude: float,
     longitude: float,
     node_type: str = "mean",
+    ayanamsa: str = "lahiri",
 ) -> str:
     """
     Compute a deterministic fingerprint for birth data.
-    Same birth data + node_type = same fingerprint = same chart (for cache sharing).
+    Same birth data + node_type + ayanamsa = same fingerprint = same chart (for cache sharing).
     """
-    data = f"{date_of_birth}|{time_of_birth}|{latitude:.4f}|{longitude:.4f}|{node_type}"
+    data = f"{date_of_birth}|{time_of_birth}|{latitude:.4f}|{longitude:.4f}|{node_type}|{ayanamsa}"
     return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 
@@ -206,12 +207,14 @@ def create_base_chart(
     # 0. Check for existing chart with same birth data
     # -------------------------------------------------
     node_type = payload.node_type or "mean"
+    ayanamsa = payload.ayanamsa or "lahiri"
     fingerprint = _compute_birth_fingerprint(
         date_of_birth=payload.date_of_birth.isoformat(),
         time_of_birth=payload.time_of_birth.strftime("%H:%M:%S"),
         latitude=payload.latitude,
         longitude=payload.longitude,
         node_type=node_type,
+        ayanamsa=ayanamsa,
     )
     
     if not force_recalculate:
@@ -274,14 +277,23 @@ def create_base_chart(
         )
 
     # -------------------------------------------------
-    # 3. Ephemeris (Sidereal – Lahiri)
+    # 3. Ephemeris (Sidereal)
     # -------------------------------------------------
     ephemeris = compute_sidereal_positions(
         birth_utc,
         payload.latitude,
         payload.longitude,
         node_type=node_type,
+        ayanamsa=ayanamsa,
     )
+
+    # -------------------------------------------------
+    # 3b. KP Sub-lords (only for KP ayanamsa)
+    # -------------------------------------------------
+    kp_sublords = None
+    if ayanamsa == "kp":
+        from app.engines.kp_sublords import compute_kp_sublords
+        kp_sublords = compute_kp_sublords(ephemeris)
 
     # -------------------------------------------------
     # 4. Panchangam at birth
@@ -367,7 +379,7 @@ def create_base_chart(
         
         # ✅ Metadata for audit
         "chart_metadata": {
-            "ayanamsa": "lahiri",
+            "ayanamsa": ayanamsa,
             "division_method": "parashara",
             "precision": "arc-second",
             "node_type": node_type,
@@ -378,6 +390,7 @@ def create_base_chart(
         },
         "pancha_pakshi_birth": pakshi,
         "functional_roles": functional_roles,
+        "kp_sublords": kp_sublords,
     }
 
     # -------------------------------------------------

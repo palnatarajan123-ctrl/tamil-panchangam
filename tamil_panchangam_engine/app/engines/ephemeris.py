@@ -50,11 +50,15 @@ NAKSHATRA_NAMES = [
     "Uttara Bhadrapada", "Revati"
 ]
 
+AYANAMSA_MODES = {
+    "lahiri": swe.SIDM_LAHIRI,
+    "kp": swe.SIDM_KRISHNAMURTI,
+}
+
 # -----------------------------
 # INITIALIZE SWISS EPHEMERIS
 # -----------------------------
 
-swe.set_sid_mode(swe.SIDM_LAHIRI)
 swe.set_ephe_path('.')  # use built-in ephemeris
 
 # -----------------------------
@@ -119,7 +123,8 @@ def compute_sidereal_positions(
     dt_utc: datetime,
     latitude: float,
     longitude: float,
-    node_type: str = "mean"
+    node_type: str = "mean",
+    ayanamsa: str = "lahiri",
 ) -> Dict:
     """
     MASTER FUNCTION
@@ -137,8 +142,8 @@ def compute_sidereal_positions(
 
     This output is AUTHORITATIVE.
     """
-    swe.set_sid_mode(swe.SIDM_LAHIRI)
-    
+    swe.set_sid_mode(AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
+
     jd = to_julian_day(dt_utc)
 
     planets = {}
@@ -187,6 +192,7 @@ def compute_sidereal_positions(
     return {
         "julian_day": jd,
         "node_type": node_type.lower(),
+        "ayanamsa": ayanamsa.lower(),
         "lagna": {
             "longitude_deg": compute_lagna(jd, latitude, longitude),
             "rasi": get_rasi(compute_lagna(jd, latitude, longitude))

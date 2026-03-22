@@ -51,4 +51,5 @@ def get_birth_chart_ui(
     return {
         "base_chart_id": base_chart_id,
         "view": view,
+        "kp_sublords": base_payload.get("kp_sublords"),
     }

@@ -63,7 +63,7 @@ export default function ChartDetail() {
 
 
   const {
-    data: rawView,
+    data: chartApiResponse,
     isLoading,
     error,
   } = useQuery({
@@ -76,12 +76,15 @@ export default function ChartDetail() {
       );
       const json = await res.json();
       if (!res.ok) throw new Error("Birth chart not found");
-      if (json?.data?.view) return json.data.view;
-      if (json?.view) return json.view;
-      if (json?.identity) return json;
+      // Return the full response so we can extract view + kp_sublords
+      if (json?.view || json?.data?.view) return json;
+      if (json?.identity) return { view: json };
       throw new Error("Invalid birth chart response shape");
     },
   });
+
+  const rawView = chartApiResponse?.data?.view ?? chartApiResponse?.view ?? null;
+  const kpSublords = chartApiResponse?.kp_sublords ?? null;
 
   const { data: realtimeContextData } = useQuery({
     queryKey: ["/api/realtime/context", chartId],
@@ -273,6 +276,7 @@ export default function ChartDetail() {
               D10: ui.divisionalCharts?.D10,
             }}
             onTabChange={setActiveChartTab}
+            kpSublords={kpSublords}
           />
 
           {/* Only show reference context and AI interpretation for D1 */}

@@ -263,6 +263,7 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
   const [citySearch, setCitySearch] = useState("");
   const [isManualEntry, setIsManualEntry] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [ayanamsa, setAyanamsa] = useState<"lahiri" | "kp">("lahiri");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -324,6 +325,7 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
         latitude: parseFloat(values.latitude),
         longitude: parseFloat(values.longitude),
         timezone: values.timezone,
+        ayanamsa,
         turnstile_token: turnstileToken,
       };
 
@@ -653,6 +655,38 @@ export function ChartForm({ onSuccess }: ChartFormProps) {
                   </button>
                 </p>
               )}
+            </div>
+
+            {/* Ayanamsa */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ayanamsa System</label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAyanamsa("lahiri")}
+                  className={`px-4 py-2 rounded border text-sm ${
+                    ayanamsa === "lahiri"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-border"
+                  }`}
+                >
+                  Lahiri (Traditional)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAyanamsa("kp")}
+                  className={`px-4 py-2 rounded border text-sm ${
+                    ayanamsa === "kp"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-border"
+                  }`}
+                >
+                  KP (Krishnamurti)
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                KP charts include sub-lord analysis. Lahiri is the traditional Tamil Panchangam standard.
+              </p>
             </div>
 
             {/* CAPTCHA */}

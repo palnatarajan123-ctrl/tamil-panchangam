@@ -5,8 +5,12 @@ Wraps the core ephemeris module for use by signal engines.
 from datetime import datetime
 import swisseph as swe
 
-swe.set_sid_mode(swe.SIDM_LAHIRI)
 swe.set_ephe_path('.')
+
+AYANAMSA_MODES = {
+    "lahiri": swe.SIDM_LAHIRI,
+    "kp": swe.SIDM_KRISHNAMURTI,
+}
 
 PLANETS = {
     "Sun": swe.SUN,
@@ -30,7 +34,7 @@ def to_julian_day(dt_utc: datetime) -> float:
     )
 
 
-def compute_planet_longitude_with_speed(planet_name: str, dt_utc: datetime):
+def compute_planet_longitude_with_speed(planet_name: str, dt_utc: datetime, ayanamsa: str = "lahiri"):
     """
     Compute sidereal longitude and daily speed for a planet.
 
@@ -38,6 +42,7 @@ def compute_planet_longitude_with_speed(planet_name: str, dt_utc: datetime):
         (longitude: float, speed_deg_per_day: float)
         speed < 0 means retrograde motion.
     """
+    swe.set_sid_mode(AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
     jd = to_julian_day(dt_utc)
 
     if planet_name == "Ketu":
@@ -57,17 +62,19 @@ def compute_planet_longitude_with_speed(planet_name: str, dt_utc: datetime):
     return result[0] % 360, result[3]
 
 
-def compute_planet_longitude(planet_name: str, dt_utc: datetime) -> float:
+def compute_planet_longitude(planet_name: str, dt_utc: datetime, ayanamsa: str = "lahiri") -> float:
     """
     Compute sidereal longitude for a planet at a given UTC datetime.
-    
+
     Args:
         planet_name: Name of planet (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu)
         dt_utc: UTC datetime
-        
+        ayanamsa: Ayanamsa system ("lahiri" or "kp")
+
     Returns:
         Sidereal longitude in degrees (0-360)
     """
+    swe.set_sid_mode(AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
     jd = to_julian_day(dt_utc)
     
     if planet_name == "Ketu":

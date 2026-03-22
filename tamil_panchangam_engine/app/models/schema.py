@@ -103,6 +103,11 @@ class BaseChartCreateRequest(BaseModel):
         description="Rahu/Ketu calculation method: 'mean' (traditional Tamil) or 'true' (astronomical)"
     )
 
+    ayanamsa: Optional[Literal["lahiri", "kp"]] = Field(
+        default="lahiri",
+        description="Ayanamsa system: lahiri (default) or kp (Krishnamurti)"
+    )
+
     turnstile_token: Optional[str] = Field(
         default=None, description="Cloudflare Turnstile verification token"
     )
