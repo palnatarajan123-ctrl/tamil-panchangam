@@ -179,7 +179,7 @@ class V4LifeArea(BaseModel):
     plain_english: str = ""
     do: List[str] = []
     avoid: List[str] = []
-    real_life_patterns: List[str] = []
+    real_life_patterns: str = ""
     astrological_basis: Optional[str] = None
 
 

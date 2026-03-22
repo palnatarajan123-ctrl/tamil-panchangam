@@ -1663,8 +1663,7 @@ def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
 
         if area.real_life_patterns:
             area_elements.append(Paragraph("WHAT THIS MAY LOOK LIKE", styles['V4SectionLabel']))
-            for pattern in area.real_life_patterns:
-                area_elements.append(Paragraph(f"• {pattern}", styles['BodyText']))
+            area_elements.append(Paragraph(area.real_life_patterns, styles['BodyText']))
             area_elements.append(Spacer(1, 0.08*inch))
 
         if area.astrological_basis:

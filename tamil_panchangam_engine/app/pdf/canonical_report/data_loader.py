@@ -691,7 +691,7 @@ def build_report_data(
                     plain_english=area_data.get("plain_english", ""),
                     do=area_data.get("do", []),
                     avoid=area_data.get("avoid", []),
-                    real_life_patterns=area_data.get("real_life_patterns", []),
+                    real_life_patterns=area_data.get("real_life_patterns", ""),
                     astrological_basis=area_data.get("astrological_basis"),
                 )
                 for area, area_data in life_areas_raw.items()
