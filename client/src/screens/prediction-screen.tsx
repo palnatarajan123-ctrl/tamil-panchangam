@@ -77,7 +77,7 @@ export default function PredictionScreen() {
      the backend returns llm_status = "pending".
      MonthlyPredictionView is blocked until ready.
   -------------------------------------------------- */
-  const llmPending = (period === "monthly" || period === "yearly") && (data as any)?.llm_status === "pending";
+  const llmPending = period === "monthly" && (data as any)?.llm_status === "pending";
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
