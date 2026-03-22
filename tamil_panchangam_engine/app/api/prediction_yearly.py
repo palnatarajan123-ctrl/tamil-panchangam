@@ -2,6 +2,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from datetime import datetime, timezone
 from typing import Any, Dict
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 def _safe_json(val):
     """Accept both str (legacy DuckDB) and dict/list (Neon JSONB)."""
@@ -74,21 +77,24 @@ def _run_yearly_llm_background(
         )
         existing = get_yearly_prediction(base_chart_id=base_chart_id, year=year)
         if existing:
-            interp = existing["interpretation"] if isinstance(existing["interpretation"], dict) else json.loads(existing["interpretation"])
-            interp["llm_interpretation"] = llm_result.get("llm_interpretation")
-            interp["llm_metadata"] = llm_result.get("llm_metadata")
-            save_yearly_prediction(
-                base_chart_id=base_chart_id,
-                year=year,
-                status="success",
-                envelope=existing["envelope"] if isinstance(existing["envelope"], dict) else json.loads(existing["envelope"]),
-                synthesis=existing["synthesis"] if isinstance(existing["synthesis"], dict) else json.loads(existing["synthesis"]),
-                interpretation=interp,
-                engine_version="v4.2",
-            )
+            try:
+                interp = existing["interpretation"] if isinstance(existing["interpretation"], dict) else json.loads(existing["interpretation"])
+                interp["llm_interpretation"] = llm_result.get("llm_interpretation")
+                interp["llm_metadata"] = llm_result.get("llm_metadata")
+                save_yearly_prediction(
+                    base_chart_id=base_chart_id,
+                    year=year,
+                    status="success",
+                    envelope=existing["envelope"] if isinstance(existing["envelope"], dict) else json.loads(existing["envelope"]),
+                    synthesis=existing["synthesis"] if isinstance(existing["synthesis"], dict) else json.loads(existing["synthesis"]),
+                    interpretation=interp,
+                    engine_version="v4.2",
+                )
+                logger.info(f"Yearly LLM merged successfully for {base_chart_id}/{year}")
+            except Exception as merge_err:
+                logger.error(f"Yearly LLM merge failed for {base_chart_id}/{year}: {merge_err}", exc_info=True)
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"Background yearly LLM failed for {base_chart_id}/{year}: {e}")
+        logger.error(f"Background yearly LLM failed for {base_chart_id}/{year}: {e}")
 
 
 @router.get("/yearly/llm-status")
