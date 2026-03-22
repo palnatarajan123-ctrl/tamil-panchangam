@@ -34,10 +34,9 @@ def save_yearly_prediction(
     interpretation,
     engine_version,
 ):
-    con = get_conn()
     pid = f"{base_chart_id}:{year}"
-
-    con.execute(
+    with get_conn() as con:
+        con.execute(
         """
         INSERT INTO yearly_predictions
         (id, base_chart_id, year, status, envelope, synthesis, interpretation, engine_version, created_at)
