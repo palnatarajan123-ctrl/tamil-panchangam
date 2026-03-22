@@ -34,6 +34,12 @@ from .models import (
     VedaRemedy,
     MethodologyInfo,
     KpSublordsData,
+    V4ExecutiveSummary,
+    V4WhyThisPeriod,
+    V4LifeArea,
+    V4Remedy,
+    V4Remedies,
+    V4CautionWindow,
 )
 
 logger = logging.getLogger(__name__)
@@ -614,6 +620,7 @@ def build_report_data(
     
     llm_src = llm_interpretation if llm_interpretation else {}
     is_v3 = llm_src.get("engine_version") == "ai-interpretation-v3.0"
+    is_v4 = llm_src.get("engine_version") == "ai-interpretation-v4.0"
     
     birth_details_data = payload.get("birth_details", {})
     
@@ -648,12 +655,85 @@ def build_report_data(
             encouragement=closing_v2_data.get("encouragement")
         )
     
+    # v4 fields
+    v4_executive_summary_obj = None
+    v4_why_this_period_obj = None
+    v4_life_areas_obj = None
+    v4_remedies_obj = None
+    v4_caution_windows_list: List[V4CautionWindow] = []
+    v4_key_takeaways_list: List[str] = []
+
+    if is_v4:
+        exec_data = llm_src.get("executive_summary")
+        if exec_data and isinstance(exec_data, dict):
+            v4_executive_summary_obj = V4ExecutiveSummary(
+                main_theme=exec_data.get("main_theme", ""),
+                one_lines=exec_data.get("one_lines", {}),
+                strongest_area=exec_data.get("strongest_area"),
+                watch_area=exec_data.get("watch_area"),
+                best_use=exec_data.get("best_use"),
+            )
+
+        why_data = llm_src.get("why_this_period")
+        if why_data and isinstance(why_data, dict):
+            v4_why_this_period_obj = V4WhyThisPeriod(
+                dasha_plain=why_data.get("dasha_plain"),
+                transit_plain=why_data.get("transit_plain"),
+                overlap_summary=why_data.get("overlap_summary"),
+                supportive=why_data.get("supportive", []),
+                watchouts=why_data.get("watchouts", []),
+            )
+
+        life_areas_raw = llm_src.get("life_areas")
+        if life_areas_raw and isinstance(life_areas_raw, dict):
+            v4_life_areas_obj = {
+                area: V4LifeArea(
+                    plain_english=area_data.get("plain_english", ""),
+                    do=area_data.get("do", []),
+                    avoid=area_data.get("avoid", []),
+                    real_life_patterns=area_data.get("real_life_patterns", []),
+                    astrological_basis=area_data.get("astrological_basis"),
+                )
+                for area, area_data in life_areas_raw.items()
+                if isinstance(area_data, dict)
+            }
+
+        remedies_raw = llm_src.get("remedies")
+        if remedies_raw and isinstance(remedies_raw, dict):
+            primary_raw = remedies_raw.get("primary")
+            primary_obj = None
+            if primary_raw and isinstance(primary_raw, dict):
+                primary_obj = V4Remedy(
+                    name=primary_raw.get("name", ""),
+                    simple_practice=primary_raw.get("simple_practice"),
+                    why=primary_raw.get("why"),
+                )
+            supporting_list = []
+            for sup in remedies_raw.get("supporting", []):
+                if isinstance(sup, dict):
+                    supporting_list.append(V4Remedy(
+                        name=sup.get("name", ""),
+                        simple_practice=sup.get("simple_practice"),
+                        why=sup.get("why"),
+                    ))
+            v4_remedies_obj = V4Remedies(primary=primary_obj, supporting=supporting_list)
+
+        for cw in llm_src.get("caution_windows", []):
+            if isinstance(cw, dict):
+                v4_caution_windows_list.append(V4CautionWindow(
+                    period=cw.get("period", ""),
+                    concern=cw.get("concern"),
+                    action=cw.get("action"),
+                ))
+
+        v4_key_takeaways_list = llm_src.get("key_takeaways", [])
+
     yearly_mantra = None
     dasha_transit_synthesis = None
     danger_windows_list: List[str] = []
     veda_remedy_obj = None
     closing_v3 = None
-    
+
     if is_v3:
         yearly_mantra = llm_src.get("yearly_mantra")
         dasha_transit_synthesis = llm_src.get("dasha_transit_synthesis")
@@ -766,7 +846,15 @@ def build_report_data(
         veda_remedy=veda_remedy_obj,
         closing_v3=closing_v3,
         is_v3=is_v3,
-        
+
+        is_v4=is_v4,
+        v4_executive_summary=v4_executive_summary_obj,
+        v4_why_this_period=v4_why_this_period_obj,
+        v4_life_areas=v4_life_areas_obj,
+        v4_remedies=v4_remedies_obj,
+        v4_caution_windows=v4_caution_windows_list,
+        v4_key_takeaways=v4_key_takeaways_list,
+
         methodology=methodology,
         sarvashtakavarga=sarvashtakavarga,
         yogas_data=yogas_data,

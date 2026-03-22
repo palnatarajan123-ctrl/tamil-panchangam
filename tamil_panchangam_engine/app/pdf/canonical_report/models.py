@@ -161,6 +161,53 @@ class VedaRemedy(BaseModel):
     specific_remedies: List[str] = []
 
 
+class V4Remedy(BaseModel):
+    """Single v4 remedy entry."""
+    name: str
+    simple_practice: Optional[str] = None
+    why: Optional[str] = None
+
+
+class V4Remedies(BaseModel):
+    """V4 remedies section."""
+    primary: Optional[V4Remedy] = None
+    supporting: List[V4Remedy] = []
+
+
+class V4LifeArea(BaseModel):
+    """V4 life area with plain-English content."""
+    plain_english: str = ""
+    do: List[str] = []
+    avoid: List[str] = []
+    real_life_patterns: List[str] = []
+    astrological_basis: Optional[str] = None
+
+
+class V4ExecutiveSummary(BaseModel):
+    """V4 executive summary."""
+    main_theme: str = ""
+    one_lines: Dict[str, str] = {}
+    strongest_area: Optional[str] = None
+    watch_area: Optional[str] = None
+    best_use: Optional[str] = None
+
+
+class V4WhyThisPeriod(BaseModel):
+    """V4 explanation of why this period feels the way it does."""
+    dasha_plain: Optional[str] = None
+    transit_plain: Optional[str] = None
+    overlap_summary: Optional[str] = None
+    supportive: List[str] = []
+    watchouts: List[str] = []
+
+
+class V4CautionWindow(BaseModel):
+    """V4 caution window."""
+    period: str = ""
+    concern: Optional[str] = None
+    action: Optional[str] = None
+
+
 class KpSublordsData(BaseModel):
     """KP Sub-lord data for PDF rendering. Only present for KP charts."""
     entries: List[Dict[str, Any]] = []  # list of {planet, longitude, star_lord, sub_lord, sub_sub_lord}
@@ -214,3 +261,11 @@ class CanonicalReportData(BaseModel):
     sade_sati_data: Optional[Dict[str, Any]] = None
     shadbala_data: Optional[Dict[str, Any]] = None
     kp_sublords: Optional[KpSublordsData] = None
+
+    is_v4: bool = False
+    v4_executive_summary: Optional[V4ExecutiveSummary] = None
+    v4_why_this_period: Optional[V4WhyThisPeriod] = None
+    v4_life_areas: Optional[Dict[str, V4LifeArea]] = None
+    v4_remedies: Optional[V4Remedies] = None
+    v4_caution_windows: List[V4CautionWindow] = []
+    v4_key_takeaways: List[str] = []

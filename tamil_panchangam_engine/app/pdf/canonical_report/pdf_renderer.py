@@ -128,6 +128,35 @@ def _create_styles():
         spaceAfter=4,
     ))
 
+    styles.add(ParagraphStyle(
+        name='V4SectionLabel',
+        parent=styles['Normal'],
+        fontSize=9,
+        fontName='Helvetica-Bold',
+        textColor=colors.Color(*COLORS["primary"]),
+        spaceBefore=8,
+        spaceAfter=2,
+        textTransform='uppercase',
+    ))
+
+    styles.add(ParagraphStyle(
+        name='V4DoItem',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.Color(0.13, 0.45, 0.20),
+        leftIndent=12,
+        spaceAfter=2,
+    ))
+
+    styles.add(ParagraphStyle(
+        name='V4AvoidItem',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.Color(0.70, 0.20, 0.20),
+        leftIndent=12,
+        spaceAfter=2,
+    ))
+
     return styles
 
 
@@ -1481,6 +1510,245 @@ def _build_methodology_appendix(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def _build_v4_executive_summary(data: CanonicalReportData, styles) -> List:
+    """Build v4 executive summary section."""
+    elements = []
+    es = data.v4_executive_summary
+    if not es:
+        return elements
+
+    elements.append(Paragraph("What This Period Means For You", styles['SectionTitle']))
+
+    if es.main_theme:
+        elements.append(Paragraph(f"<b>{es.main_theme}</b>", styles['BodyText']))
+        elements.append(Spacer(1, 0.15*inch))
+
+    if es.strongest_area or es.watch_area:
+        cols = []
+        if es.strongest_area:
+            cols.append(["Strongest Area", es.strongest_area.title()])
+        if es.watch_area:
+            cols.append(["Needs Attention", es.watch_area.title()])
+        if es.best_use:
+            cols.append(["Best Use of This Period", es.best_use])
+        if cols:
+            t = Table(cols, colWidths=[2.2*inch, 3.5*inch])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.Color(*COLORS["primary"])),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.white),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ]))
+            elements.append(t)
+            elements.append(Spacer(1, 0.2*inch))
+
+    if es.one_lines:
+        elements.append(Paragraph("Area Snapshot", styles['SubsectionTitle']))
+        snapshot_data = [["Life Area", "In One Line"]]
+        for area, line in es.one_lines.items():
+            snapshot_data.append([area.replace("_", " ").title(), line])
+        snap_table = Table(snapshot_data, colWidths=[1.8*inch, 3.9*inch])
+        snap_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["secondary"])),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        elements.append(snap_table)
+        elements.append(Spacer(1, 0.2*inch))
+
+    return elements
+
+
+def _build_v4_why_this_period(data: CanonicalReportData, styles) -> List:
+    """Build v4 'why this period' plain-English explanation."""
+    elements = []
+    w = data.v4_why_this_period
+    if not w:
+        return elements
+
+    elements.append(Paragraph("Why This Period Feels This Way", styles['SubsectionTitle']))
+
+    if w.dasha_plain:
+        elements.append(Paragraph("<b>Your Dasha (Life Chapter):</b>", styles['BodyText']))
+        elements.append(Paragraph(w.dasha_plain, styles['BodyText']))
+        elements.append(Spacer(1, 0.1*inch))
+
+    if w.transit_plain:
+        elements.append(Paragraph("<b>Current Planetary Climate:</b>", styles['BodyText']))
+        elements.append(Paragraph(w.transit_plain, styles['BodyText']))
+        elements.append(Spacer(1, 0.1*inch))
+
+    if w.overlap_summary:
+        elements.append(Paragraph("<b>Combined Effect:</b>", styles['BodyText']))
+        elements.append(Paragraph(w.overlap_summary, styles['BodyText']))
+        elements.append(Spacer(1, 0.15*inch))
+
+    if w.supportive or w.watchouts:
+        cols_data = [["What Supports You", "What Needs Care"]]
+        max_rows = max(len(w.supportive), len(w.watchouts))
+        for i in range(max_rows):
+            s = f"✓ {w.supportive[i]}" if i < len(w.supportive) else ""
+            wt = f"⚠ {w.watchouts[i]}" if i < len(w.watchouts) else ""
+            cols_data.append([s, wt])
+        t = Table(cols_data, colWidths=[2.85*inch, 2.85*inch])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 0.2*inch))
+
+    return elements
+
+
+def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
+    """Build v4 life areas with plain-English do/avoid content."""
+    elements = []
+    if not data.v4_life_areas:
+        return elements
+
+    elements.append(Paragraph("Life Area Guidance", styles['SectionTitle']))
+
+    area_order = ["career", "finance", "relationships", "health", "personal_growth"]
+    areas_to_render = [a for a in area_order if a in data.v4_life_areas]
+    areas_to_render += [a for a in data.v4_life_areas if a not in area_order]
+
+    for i, area_key in enumerate(areas_to_render):
+        area = data.v4_life_areas[area_key]
+        area_elements = []
+
+        if i > 0:
+            area_elements.append(HRFlowable(
+                width="100%", thickness=0.5,
+                color=colors.Color(0.82, 0.82, 0.82),
+                spaceBefore=6, spaceAfter=10,
+            ))
+
+        area_elements.append(Paragraph(
+            area_key.replace("_", " ").title(),
+            styles['LifeAreaTitle']
+        ))
+
+        if area.plain_english:
+            area_elements.append(Paragraph(area.plain_english, styles['BodyText']))
+            area_elements.append(Spacer(1, 0.1*inch))
+
+        if area.do:
+            area_elements.append(Paragraph("DO", styles['V4SectionLabel']))
+            for item in area.do:
+                area_elements.append(Paragraph(f"✓  {item}", styles['V4DoItem']))
+            area_elements.append(Spacer(1, 0.08*inch))
+
+        if area.avoid:
+            area_elements.append(Paragraph("AVOID", styles['V4SectionLabel']))
+            for item in area.avoid:
+                area_elements.append(Paragraph(f"✗  {item}", styles['V4AvoidItem']))
+            area_elements.append(Spacer(1, 0.08*inch))
+
+        if area.real_life_patterns:
+            area_elements.append(Paragraph("WHAT THIS MAY LOOK LIKE", styles['V4SectionLabel']))
+            for pattern in area.real_life_patterns:
+                area_elements.append(Paragraph(f"• {pattern}", styles['BodyText']))
+            area_elements.append(Spacer(1, 0.08*inch))
+
+        if area.astrological_basis:
+            area_elements.append(Paragraph(
+                f"<font color='gray' size='9'><i>Astrological basis: {area.astrological_basis}</i></font>",
+                styles['BodyText']
+            ))
+
+        area_elements.append(Spacer(1, 0.2*inch))
+        elements.append(KeepTogether(area_elements))
+
+    elements.append(PageBreak())
+    return elements
+
+
+def _build_v4_remedies(data: CanonicalReportData, styles) -> List:
+    """Build v4 remedies section."""
+    elements = []
+    rem = data.v4_remedies
+    if not rem:
+        return elements
+
+    elements.append(Paragraph("Remedies & Practices", styles['SubsectionTitle']))
+
+    if rem.primary:
+        elements.append(Paragraph(f"<b>Primary:</b> {rem.primary.name}", styles['BodyText']))
+        if rem.primary.simple_practice:
+            elements.append(Paragraph(
+                f"<i>Practice: {rem.primary.simple_practice}</i>",
+                styles['BodyText']
+            ))
+        if rem.primary.why:
+            elements.append(Paragraph(
+                f"<font color='gray' size='9'>{rem.primary.why}</font>",
+                styles['BodyText']
+            ))
+        elements.append(Spacer(1, 0.1*inch))
+
+    for sup in rem.supporting:
+        elements.append(Paragraph(f"• <b>{sup.name}</b>", styles['BodyText']))
+        if sup.simple_practice:
+            elements.append(Paragraph(
+                f"  <i>{sup.simple_practice}</i>",
+                styles['BodyText']
+            ))
+
+    if data.v4_caution_windows:
+        elements.append(Spacer(1, 0.2*inch))
+        elements.append(Paragraph("Caution Windows", styles['SubsectionTitle']))
+        for cw in data.v4_caution_windows:
+            cw_parts = [f"<b>{cw.period}</b>"]
+            if cw.concern:
+                cw_parts.append(cw.concern)
+            if cw.action:
+                cw_parts.append(f"<i>{cw.action}</i>")
+            elements.append(Paragraph(" — ".join(cw_parts), styles['BodyText']))
+
+    elements.append(Spacer(1, 0.2*inch))
+    return elements
+
+
+def _build_v4_key_takeaways(data: CanonicalReportData, styles) -> List:
+    """Build v4 key takeaways closing section."""
+    elements = []
+    if not data.v4_key_takeaways:
+        return elements
+
+    elements.append(Paragraph("Key Takeaways", styles['SectionTitle']))
+    for takeaway in data.v4_key_takeaways:
+        elements.append(Paragraph(f"✓  {takeaway}", styles['BodyText']))
+    elements.append(Spacer(1, 0.3*inch))
+
+    if data.llm_enhanced:
+        elements.append(Paragraph(
+            "This report includes AI-enhanced interpretations based on classical Tamil astrology principles.",
+            styles['MutedText']
+        ))
+    elements.append(Paragraph(
+        "Generated by Tamil Panchangam Astrology Engine",
+        styles['MutedText']
+    ))
+    return elements
+
+
 def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
     """
     Render a birth-chart-only PDF (no prediction sections).
@@ -1542,22 +1810,39 @@ def render_pdf(data: CanonicalReportData) -> bytes:
     styles = _create_styles()
     
     story = []
-    
+
     story.extend(_build_cover_page(data, styles))
     story.extend(_build_how_to_read(styles))
     story.extend(_build_natal_snapshot(data, styles))
     if data.kp_sublords:
         story.extend(_build_kp_sublords_section(data, styles))
-    story.extend(_build_divisional_charts(data, styles))
-    story.extend(_build_yogas_section(data, styles))
-    story.extend(_build_sade_sati_section(data, styles))
-    story.extend(_build_shadbala_section(data, styles))
-    story.extend(_build_astrological_context(data, styles))
-    story.extend(_build_predictions(data, styles))
-    story.extend(_build_practices_reflection(data, styles))
-    story.extend(_build_closing(data, styles))
+
+    if data.is_v4:
+        # v4: human meaning first, technical appendix at end
+        story.extend(_build_v4_executive_summary(data, styles))
+        story.extend(_build_v4_why_this_period(data, styles))
+        story.extend(_build_v4_life_areas(data, styles))
+        story.extend(_build_v4_remedies(data, styles))
+        story.extend(_build_v4_key_takeaways(data, styles))
+        # Technical sections always rendered
+        story.extend(_build_divisional_charts(data, styles))
+        story.extend(_build_yogas_section(data, styles))
+        story.extend(_build_sade_sati_section(data, styles))
+        story.extend(_build_shadbala_section(data, styles))
+        story.extend(_build_astrological_context(data, styles))
+        story.extend(_build_predictions(data, styles))
+    else:
+        story.extend(_build_divisional_charts(data, styles))
+        story.extend(_build_yogas_section(data, styles))
+        story.extend(_build_sade_sati_section(data, styles))
+        story.extend(_build_shadbala_section(data, styles))
+        story.extend(_build_astrological_context(data, styles))
+        story.extend(_build_predictions(data, styles))
+        story.extend(_build_practices_reflection(data, styles))
+        story.extend(_build_closing(data, styles))
+
     story.extend(_build_methodology_appendix(data, styles))
-    
+
     doc.build(story)
     
     buffer.seek(0)
