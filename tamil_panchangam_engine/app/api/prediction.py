@@ -32,7 +32,7 @@ from app.engines.paraphrasing_engine import paraphrase_interpretation
 from app.engines.explainability_engine import build_explainability
 from app.engines.ai_interpretation_engine import generate_interpretation as generate_ai_interpretation
 from app.engines.explainability_filter import apply_explainability
-from app.engines.llm_interpretation_orchestrator import generate_llm_interpretation
+from app.engines.llm_interpretation_orchestrator import generate_llm_interpretation, is_llm_enabled
 from app.engines.corner_case_detector import assess_calculation_confidence
 
 from app.models.schema import (
@@ -369,17 +369,20 @@ def generate_monthly_prediction(
         # -------------------------------------------------
         # 7b. LLM Interpretation — run in background after response
         # -------------------------------------------------
-        background_tasks.add_task(
-            _run_llm_background,
-            base_chart_id=payload.base_chart_id,
-            envelope=envelope,
-            synthesis=synthesis,
-            ai_interpretation=ai_interpretation,
-            year=payload.year,
-            month=payload.month,
-            base_chart_payload=base_chart_payload,
-        )
-        llm_status = "pending"
+        if is_llm_enabled():
+            background_tasks.add_task(
+                _run_llm_background,
+                base_chart_id=payload.base_chart_id,
+                envelope=envelope,
+                synthesis=synthesis,
+                ai_interpretation=ai_interpretation,
+                year=payload.year,
+                month=payload.month,
+                base_chart_payload=base_chart_payload,
+            )
+            llm_status = "pending"
+        else:
+            llm_status = None
 
     # -------------------------------------------------
     # 8. Explainability
