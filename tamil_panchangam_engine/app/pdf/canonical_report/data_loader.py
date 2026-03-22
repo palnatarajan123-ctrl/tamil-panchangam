@@ -37,6 +37,15 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 
+_AYANAMSA_LABELS = {
+    "lahiri": "Lahiri (Chitrapaksha)",
+    "kp": "KP (Krishnamurti)",
+}
+
+
+def _ayanamsa_label(raw: str) -> str:
+    return _AYANAMSA_LABELS.get(str(raw).lower(), raw)
+
 
 class ReportDataNotFoundError(Exception):
     """Raised when required report data is missing."""
@@ -889,7 +898,7 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
         llm_enhanced=natal_interp is not None,
         methodology=MethodologyInfo(
             ephemeris_source="Swiss Ephemeris",
-            ayanamsa=chart_metadata.get("ayanamsa", "Lahiri (Chitrapaksha)"),
+            ayanamsa=_ayanamsa_label(chart_metadata.get("ayanamsa", "lahiri")),
             node_type=chart_metadata.get("node_type", "Mean Node"),
             division_method=chart_metadata.get("division_method", "Parashara"),
             calculation_confidence=calc_confidence,

@@ -269,7 +269,8 @@ def _build_context_for_llm(
         "antardasha_lord": dasha.get("antar_lord", "Unknown"),
         "life_areas": life_areas,
         "explainability_mode": explainability_mode,
-        "deterministic_summary": deterministic_interpretation.get("window_summary", {}).get("summary", "")
+        "deterministic_summary": deterministic_interpretation.get("window_summary", {}).get("summary", ""),
+        "ayanamsa": envelope.get("reference", {}).get("ayanamsa", "lahiri"),
     }
 
 

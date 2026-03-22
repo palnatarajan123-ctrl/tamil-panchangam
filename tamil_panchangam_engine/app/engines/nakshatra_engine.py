@@ -74,6 +74,7 @@ def compute_nakshatra_context(
     birth_moon_longitude: float,
     latitude: float = 13.0827,
     longitude: float = 80.2707,
+    ayanamsa: str = "lahiri",
 ) -> Dict:
     """
     Compute nakshatra context for predictions.
@@ -89,7 +90,7 @@ def compute_nakshatra_context(
         birth_nakshatra_index = _longitude_to_nakshatra_index(birth_moon_longitude)
         birth_nakshatra = NAKSHATRA_NAMES[birth_nakshatra_index]
         
-        current_moon_long = compute_planet_longitude("Moon", reference_date_utc)
+        current_moon_long = compute_planet_longitude("Moon", reference_date_utc, ayanamsa=ayanamsa)
         current_nakshatra_index = _longitude_to_nakshatra_index(current_moon_long)
         current_nakshatra = NAKSHATRA_NAMES[current_nakshatra_index]
         

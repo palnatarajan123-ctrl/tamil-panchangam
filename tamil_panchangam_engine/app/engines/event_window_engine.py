@@ -70,7 +70,8 @@ def compute_moon_windows(
     start_date: datetime,
     days: int = 30,
     latitude: float = 13.0,
-    longitude: float = 80.0
+    longitude: float = 80.0,
+    ayanamsa: str = "lahiri",
 ) -> List[Dict[str, Any]]:
     """
     Compute Moon transit windows for a period.
@@ -95,7 +96,7 @@ def compute_moon_windows(
         check_date = current_date + timedelta(days=day_offset)
         
         try:
-            moon_lon = compute_planet_longitude("Moon", check_date)
+            moon_lon = compute_planet_longitude("Moon", check_date, ayanamsa=ayanamsa)
             transit_nakshatra_idx = get_nakshatra_index(moon_lon)
             tara = get_tara_bala(birth_nakshatra_idx, transit_nakshatra_idx)
             quality = TARA_QUALITY.get(tara, "neutral")
@@ -158,7 +159,8 @@ def compute_event_windows(
     reference_date: datetime,
     gochara_data: Dict[str, Any] | None = None,
     latitude: float = 13.0,
-    longitude: float = 80.0
+    longitude: float = 80.0,
+    ayanamsa: str = "lahiri",
 ) -> Dict[str, Any]:
     """
     Compute monthly event windows.
@@ -190,7 +192,8 @@ def compute_event_windows(
             start_of_month,
             days_in_month,
             latitude,
-            longitude
+            longitude,
+            ayanamsa=ayanamsa,
         )
         
         aggregated = aggregate_windows(moon_windows)

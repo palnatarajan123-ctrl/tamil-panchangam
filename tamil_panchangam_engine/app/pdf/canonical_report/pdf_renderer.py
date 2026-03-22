@@ -218,7 +218,7 @@ def _build_how_to_read(styles) -> List:
     
     elements.append(Paragraph(
         "The planetary positions, dasha periods, and transit data are calculated using "
-        "precise astronomical algorithms (Drik Ganita) with the Lahiri Ayanamsa. "
+        "precise astronomical algorithms (Drik Ganita) with the ayanamsa specified in the Methodology section. "
         "These are objective astronomical facts about celestial positions at specific times.",
         styles['BodyText']
     ))

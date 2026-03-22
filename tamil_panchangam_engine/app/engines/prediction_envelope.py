@@ -74,6 +74,7 @@ def build_monthly_prediction_envelope(
 
     birth_details = base_chart["birth_details"]
     ephemeris = base_chart["ephemeris"]
+    ayanamsa = ephemeris.get("ayanamsa", "lahiri")
 
     latitude = birth_details["latitude"]
     longitude = birth_details["longitude"]
@@ -260,6 +261,7 @@ def build_monthly_prediction_envelope(
         natal_moon_longitude=birth_moon_longitude if birth_moon_longitude else None,
         natal_lagna_rasi=natal_lagna_rasi_for_gochara,
         drishti_data=drishti,
+        ayanamsa=ayanamsa,
     )
 
     # -------------------------------------------------
@@ -272,6 +274,7 @@ def build_monthly_prediction_envelope(
         natal_moon_rasi=natal_moon_rasi,
         latitude=latitude,
         longitude=longitude,
+        ayanamsa=ayanamsa,
     )
 
     # -------------------------------------------------
@@ -283,6 +286,7 @@ def build_monthly_prediction_envelope(
         birth_moon_longitude=birth_moon_longitude,
         latitude=latitude,
         longitude=longitude,
+        ayanamsa=ayanamsa,
     )
 
     # -------------------------------------------------
@@ -345,6 +349,7 @@ def build_monthly_prediction_envelope(
         gochara_data=gochara,
         latitude=latitude,
         longitude=longitude,
+        ayanamsa=ayanamsa,
     )
 
     # -------------------------------------------------
@@ -362,6 +367,7 @@ def build_monthly_prediction_envelope(
             "year": year,
             "month": month,
             "reference_date_utc": reference_date_utc.isoformat(),
+            "ayanamsa": ayanamsa,
         },
 
         # ✅ CRITICAL: DERIVED HOUSES (NOT FROM DB)

@@ -57,6 +57,7 @@ def compute_chandra_gati(
     natal_moon_rasi: str,
     latitude: float = 13.0827,
     longitude: float = 80.2707,
+    ayanamsa: str = "lahiri",
 ) -> Dict:
     """
     Compute Moon transit rhythm (Chandra Gati) for the month.
@@ -84,7 +85,7 @@ def compute_chandra_gati(
         for day in sample_days:
             try:
                 sample_date = datetime(year, month, day, 12, 0, 0)
-                moon_long = compute_planet_longitude("Moon", sample_date)
+                moon_long = compute_planet_longitude("Moon", sample_date, ayanamsa=ayanamsa)
                 moon_rasi = _longitude_to_rasi(moon_long)
                 moon_house = _house_from_moon(moon_rasi, natal_moon_rasi)
                 mood = RASI_MOOD_QUALITIES.get(moon_rasi, "neutral")
