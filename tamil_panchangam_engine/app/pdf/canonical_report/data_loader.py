@@ -33,6 +33,7 @@ from .models import (
     Closing,
     VedaRemedy,
     MethodologyInfo,
+    KpSublordsData,
 )
 
 logger = logging.getLogger(__name__)
@@ -688,6 +689,26 @@ def build_report_data(
     shadbala_raw = envelope.get("shadbala")
     shadbala_data = shadbala_raw if isinstance(shadbala_raw, dict) else None
 
+    # KP Sub-lords (only for KP charts)
+    kp_sublords_data = None
+    raw_kp = payload.get("kp_sublords")
+    if raw_kp and isinstance(raw_kp, dict):
+        KP_ORDER = ["Lagna", "Sun", "Moon", "Mars", "Mercury",
+                    "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"]
+        kp_entries = []
+        for planet in KP_ORDER:
+            if planet in raw_kp:
+                e = raw_kp[planet]
+                kp_entries.append({
+                    "planet": planet,
+                    "longitude": round(e.get("longitude", 0), 2),
+                    "star_lord": e.get("star_lord", ""),
+                    "sub_lord": e.get("sub_lord", ""),
+                    "sub_sub_lord": e.get("sub_sub_lord", ""),
+                })
+        if kp_entries:
+            kp_sublords_data = KpSublordsData(entries=kp_entries)
+
     return CanonicalReportData(
         report_type=report_type.title(),
         period_label=period_label,
@@ -751,6 +772,7 @@ def build_report_data(
         yogas_data=yogas_data,
         sade_sati_data=sade_sati_data,
         shadbala_data=shadbala_data,
+        kp_sublords=kp_sublords_data,
     )
 
 
@@ -827,6 +849,26 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
     yogas_raw = payload.get("yogas")
     sade_sati_raw = payload.get("sade_sati")
     shadbala_raw = payload.get("shadbala")
+
+    # KP Sub-lords (only for KP charts)
+    kp_sublords_data = None
+    raw_kp = payload.get("kp_sublords")
+    if raw_kp and isinstance(raw_kp, dict):
+        KP_ORDER = ["Lagna", "Sun", "Moon", "Mars", "Mercury",
+                    "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"]
+        kp_entries = []
+        for planet in KP_ORDER:
+            if planet in raw_kp:
+                e = raw_kp[planet]
+                kp_entries.append({
+                    "planet": planet,
+                    "longitude": round(e.get("longitude", 0), 2),
+                    "star_lord": e.get("star_lord", ""),
+                    "sub_lord": e.get("sub_lord", ""),
+                    "sub_sub_lord": e.get("sub_sub_lord", ""),
+                })
+        if kp_entries:
+            kp_sublords_data = KpSublordsData(entries=kp_entries)
 
     birth_details_data = payload.get("birth_details", {})
     chart_metadata = payload.get("chart_metadata", {})
@@ -907,6 +949,7 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
         yogas_data=yogas_raw if isinstance(yogas_raw, dict) else None,
         sade_sati_data=sade_sati_raw if isinstance(sade_sati_raw, dict) else None,
         shadbala_data=shadbala_raw if isinstance(shadbala_raw, dict) else None,
+        kp_sublords=kp_sublords_data,
     )
 
 

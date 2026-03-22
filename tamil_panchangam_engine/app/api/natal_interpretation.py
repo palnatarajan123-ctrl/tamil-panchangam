@@ -31,7 +31,8 @@ FEATURE_NAME = "natal_interpretation"
 NATAL_SYSTEM_PROMPT = """You are a classical Tamil Jyotish astrologer of the Siddhar tradition. \
 Generate a profound natal chart interpretation for this person based on their birth chart data.
 
-Return ONLY valid JSON — no markdown fences, no preamble, no explanation outside the JSON object."""
+Return ONLY valid JSON — no markdown fences, no preamble, no explanation outside the JSON object. \
+When the chart uses KP (Krishnamurti Paddhati) ayanamsa, reference sub-lord significators in your interpretation using KP terminology."""
 
 NATAL_USER_TEMPLATE = """Birth Chart Data:
 {chart_context}
@@ -171,6 +172,27 @@ def _build_natal_context(payload: Dict[str, Any]) -> str:
             lines.append(f"Strongest planet (Shadbala): {strongest}")
         if weakest:
             lines.append(f"Weakest planet (Shadbala): {weakest}")
+
+    # KP Sub-lords (only for KP charts)
+    ayanamsa = eph.get("ayanamsa", "lahiri")
+    if ayanamsa == "kp":
+        kp_sublords = payload.get("kp_sublords", {})
+        if kp_sublords:
+            lines.append("Ayanamsa: KP (Krishnamurti Paddhati)")
+            kp_lines = []
+            for planet in ["Lagna", "Sun", "Moon", "Mars", "Mercury",
+                           "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"]:
+                if planet in kp_sublords:
+                    e = kp_sublords[planet]
+                    kp_lines.append(
+                        f"{planet}: star={e.get('star_lord', '')} "
+                        f"sub={e.get('sub_lord', '')} "
+                        f"sub-sub={e.get('sub_sub_lord', '')}"
+                    )
+            if kp_lines:
+                lines.append("KP Sub-lords: " + " | ".join(kp_lines))
+    else:
+        lines.append("Ayanamsa: Lahiri (Chitrapaksha)")
 
     # Current Dasha + full sequence
     if isinstance(dashas, dict):

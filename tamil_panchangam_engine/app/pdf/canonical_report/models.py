@@ -161,9 +161,14 @@ class VedaRemedy(BaseModel):
     specific_remedies: List[str] = []
 
 
+class KpSublordsData(BaseModel):
+    """KP Sub-lord data for PDF rendering. Only present for KP charts."""
+    entries: List[Dict[str, Any]] = []  # list of {planet, longitude, star_lord, sub_lord, sub_sub_lord}
+
+
 class CanonicalReportData(BaseModel):
     """Complete data model for canonical PDF report."""
-    
+
     report_type: str
     period_label: str
     generated_at: datetime
@@ -208,3 +213,4 @@ class CanonicalReportData(BaseModel):
     yogas_data: Optional[Dict[str, Any]] = None
     sade_sati_data: Optional[Dict[str, Any]] = None
     shadbala_data: Optional[Dict[str, Any]] = None
+    kp_sublords: Optional[KpSublordsData] = None

@@ -197,7 +197,9 @@ def build_llm_payload(
     chandrashtama_periods: Optional[List[Dict[str, Any]]] = None,
     nakshatra_pada: Optional[int] = None,
     sade_sati_data: Optional[Dict[str, Any]] = None,
-    shadbala_data: Optional[Dict[str, Any]] = None
+    shadbala_data: Optional[Dict[str, Any]] = None,
+    ayanamsa: str = "lahiri",
+    kp_sublords: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Build enriched LLM payload v3.0 — Siddhar-Tradition Synthesizer.
@@ -377,6 +379,20 @@ def build_llm_payload(
             "weakest_planet": shadbala_data.get("weakest_planet"),
             "ranking": shadbala_data.get("ranking", [])[:3],
             "weak_count": shadbala_data.get("summary", {}).get("weak_count", 0),
+        }
+
+    overall_context["chart_system"] = {
+        "ayanamsa": ayanamsa,
+        "is_kp": ayanamsa == "kp",
+    }
+    if ayanamsa == "kp" and kp_sublords:
+        overall_context["kp_active_sublords"] = {
+            planet: {
+                "star_lord": data.get("star_lord"),
+                "sub_lord": data.get("sub_lord"),
+            }
+            for planet, data in kp_sublords.items()
+            if planet in ["Moon", "Lagna", "Sun"]
         }
 
     payload = {
@@ -674,6 +690,8 @@ def extract_payload_inputs(
         "nakshatra_pada": nakshatra_pada,
         "sade_sati_data": envelope_sade_sati if envelope_sade_sati else None,
         "shadbala_data": envelope_shadbala if envelope_shadbala else None,
+        "ayanamsa": envelope.get("reference", {}).get("ayanamsa", "lahiri"),
+        "kp_sublords": base_chart_payload.get("kp_sublords") if base_chart_payload else None,
     }
 
 

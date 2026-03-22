@@ -343,7 +343,55 @@ def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
     
     elements.append(table)
     elements.append(PageBreak())
-    
+
+    return elements
+
+
+def _build_kp_sublords_section(data: CanonicalReportData, styles) -> List:
+    """Build KP Sub-lords section. Only called for KP charts."""
+    if not data.kp_sublords or not data.kp_sublords.entries:
+        return []
+
+    elements = []
+    elements.append(Paragraph("KP Sub-lord Analysis", styles['SectionTitle']))
+    elements.append(Paragraph(
+        "Krishnamurti Paddhati sub-lord positions indicate the ruling planets "
+        "at each level of nakshatra division. The sub-lord is the primary "
+        "significator for prediction in KP astrology.",
+        styles['BodyText']
+    ))
+    elements.append(Spacer(1, 0.2 * inch))
+
+    table_data = [["Planet", "Longitude", "Star Lord", "Sub Lord", "Sub-Sub Lord"]]
+    for entry in data.kp_sublords.entries:
+        table_data.append([
+            entry["planet"],
+            f"{entry['longitude']:.2f}\u00b0",
+            entry["star_lord"],
+            entry["sub_lord"],
+            entry["sub_sub_lord"],
+        ])
+
+    table = Table(table_data, colWidths=[1.2 * inch, 1.1 * inch, 1.2 * inch, 1.2 * inch, 1.3 * inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.Color(0.95, 0.95, 0.95)),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('TOPPADDING', (0, 1), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        # Highlight sub_lord column (index 3)
+        ('FONTNAME', (3, 1), (3, -1), 'Helvetica-Bold'),
+    ]))
+
+    elements.append(KeepTogether([table]))
+    elements.append(PageBreak())
     return elements
 
 
@@ -1408,6 +1456,8 @@ def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
 
     story.extend(_build_cover_page(data, styles))
     story.extend(_build_natal_snapshot(data, styles))
+    if data.kp_sublords:
+        story.extend(_build_kp_sublords_section(data, styles))
     story.extend(_build_divisional_charts(data, styles))
     story.extend(_build_yogas_section(data, styles))
     story.extend(_build_sade_sati_section(data, styles))
@@ -1444,6 +1494,8 @@ def render_pdf(data: CanonicalReportData) -> bytes:
     story.extend(_build_cover_page(data, styles))
     story.extend(_build_how_to_read(styles))
     story.extend(_build_natal_snapshot(data, styles))
+    if data.kp_sublords:
+        story.extend(_build_kp_sublords_section(data, styles))
     story.extend(_build_divisional_charts(data, styles))
     story.extend(_build_yogas_section(data, styles))
     story.extend(_build_sade_sati_section(data, styles))
