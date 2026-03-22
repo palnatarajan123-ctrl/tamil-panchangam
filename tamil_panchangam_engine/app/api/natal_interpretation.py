@@ -32,7 +32,8 @@ NATAL_SYSTEM_PROMPT = """You are a classical Tamil Jyotish astrologer of the Sid
 Generate a profound natal chart interpretation for this person based on their birth chart data.
 
 Return ONLY valid JSON — no markdown fences, no preamble, no explanation outside the JSON object. \
-When the chart uses KP (Krishnamurti Paddhati) ayanamsa, reference sub-lord significators in your interpretation using KP terminology."""
+When the chart uses KP (Krishnamurti Paddhati) ayanamsa, reference sub-lord significators in your interpretation using KP terminology. \
+Be specific and concise — every sentence must name a planet, house, or nakshatra. Avoid generic spiritual filler."""
 
 NATAL_USER_TEMPLATE = """Birth Chart Data:
 {chart_context}
@@ -51,20 +52,20 @@ Generate a natal interpretation with this EXACT JSON schema:
     "key_yoga_impact": "2-3 sentences on the most significant yoga in the chart"
   }},
   "life_areas": {{
-    "career": "2-3 sentences on career potential from D10 and 10th house",
-    "wealth": "2-3 sentences on financial patterns from 2nd/11th house",
-    "relationships": "2-3 sentences on relationship patterns from 7th house",
-    "health": "2-3 sentences on health tendencies from Lagna and 6th house",
-    "spirituality": "2-3 sentences on spiritual path from 9th/12th house and Ketu"
+    "career": "1-2 sentences: name the 10th house lord, its placement, and one clear career implication",
+    "wealth": "1-2 sentences: name the 2nd/11th house lord, Jupiter placement, and one wealth pattern",
+    "relationships": "1-2 sentences: name the 7th house lord, Venus placement, and one relationship tendency",
+    "health": "1-2 sentences: name the Lagna lord, 6th house condition, and one health consideration",
+    "spirituality": "1-2 sentences: name Ketu's placement, 9th house lord, and one spiritual direction"
   }},
   "dasha_life_map": [
     {{
       "mahadasha": "planet name",
       "approximate_age": "age range e.g. 0-16",
-      "theme": "1 sentence on what this Dasha period brings in this person's life"
+      "theme": "1 crisp sentence naming the ruling planet's house(s) and the primary life theme it activates"
     }}
   ],
-  "closing_wisdom": "2-3 sentences of Siddhar-tradition closing wisdom for this soul's journey"
+  "closing_wisdom": "1-2 sentences of Siddhar-tradition wisdom — specific to this chart's strongest feature, not generic"
 }}
 
 Include ALL remaining Dashas from birth onward in dasha_life_map. Be specific to their chart, not generic. Return ONLY the JSON."""

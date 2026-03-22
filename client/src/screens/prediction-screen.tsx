@@ -77,7 +77,7 @@ export default function PredictionScreen() {
      the backend returns llm_status = "pending".
      MonthlyPredictionView is blocked until ready.
   -------------------------------------------------- */
-  const llmPending = period === "monthly" && (data as any)?.llm_status === "pending";
+  const llmPending = (period === "monthly" || period === "yearly") && (data as any)?.llm_status === "pending";
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -87,19 +87,19 @@ export default function PredictionScreen() {
     }
     pollRef.current = setInterval(async () => {
       try {
-        const params = new URLSearchParams({
-          base_chart_id: id,
-          year: year.toString(),
-          month: index.toString(),
-        });
-        const res = await fetch(`/api/prediction/monthly/llm-status?${params}`);
+        const statusUrl = period === "monthly"
+          ? `/api/prediction/monthly/llm-status?${new URLSearchParams({ base_chart_id: id, year: year.toString(), month: index.toString() })}`
+          : `/api/prediction/yearly/llm-status?${new URLSearchParams({ base_chart_id: id, year: year.toString() })}`;
+        const res = await fetch(statusUrl);
         if (!res.ok) return;
         const json = await res.json();
         if (json.status === "ready") {
           clearInterval(pollRef.current!);
           pollRef.current = null;
           queryClient.invalidateQueries({
-            queryKey: ["prediction", id, "monthly", year, index, undefined],
+            queryKey: period === "monthly"
+              ? ["prediction", id, "monthly", year, index, undefined]
+              : ["prediction", id, "yearly", year],
           });
         }
       } catch (_) { /* ignore */ }

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from datetime import datetime, timezone
 from typing import Any, Dict
 import json
@@ -15,7 +15,8 @@ from app.core.limiter import limiter
 
 from app.db.session import get_db
 from app.repositories.base_chart_repo import get_base_chart_by_id
-from app.repositories.yearly_prediction_repo import save_yearly_prediction
+from app.repositories.yearly_prediction_repo import save_yearly_prediction, get_yearly_prediction
+from app.db.postgres import get_conn
 
 from app.engines.yearly_prediction_envelope import build_yearly_prediction_envelope
 from app.engines.synthesis_engine import synthesize_from_envelope
@@ -49,9 +50,60 @@ def _normalize_confidence(synthesis: Dict[str, Any]) -> Dict[str, Any]:
     return synthesis
 
 
+def _run_yearly_llm_background(
+    base_chart_id: str,
+    envelope: dict,
+    synthesis: dict,
+    ai_interpretation: dict,
+    year: int,
+    base_chart_payload: dict,
+) -> None:
+    period_key = str(year)
+    try:
+        llm_result = generate_llm_interpretation(
+            base_chart_id=base_chart_id,
+            envelope=envelope,
+            synthesis=synthesis,
+            deterministic_interpretation=ai_interpretation,
+            year=year,
+            period_type="yearly",
+            period_key=period_key,
+            feature_name="prediction",
+            explainability_mode="full",
+            base_chart_payload=base_chart_payload,
+        )
+        existing = get_yearly_prediction(base_chart_id=base_chart_id, year=year)
+        if existing:
+            interp = existing["interpretation"] if isinstance(existing["interpretation"], dict) else json.loads(existing["interpretation"])
+            interp["llm_interpretation"] = llm_result.get("llm_interpretation")
+            interp["llm_metadata"] = llm_result.get("llm_metadata")
+            save_yearly_prediction(
+                base_chart_id=base_chart_id,
+                year=year,
+                status="success",
+                envelope=existing["envelope"] if isinstance(existing["envelope"], dict) else json.loads(existing["envelope"]),
+                synthesis=existing["synthesis"] if isinstance(existing["synthesis"], dict) else json.loads(existing["synthesis"]),
+                interpretation=interp,
+                engine_version="v4.2",
+            )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Background yearly LLM failed for {base_chart_id}/{year}: {e}")
+
+
+@router.get("/yearly/llm-status")
+def get_yearly_llm_status(base_chart_id: str, year: int):
+    existing = get_yearly_prediction(base_chart_id=base_chart_id, year=year)
+    if existing and existing.get("interpretation"):
+        interp = existing["interpretation"] if isinstance(existing["interpretation"], dict) else json.loads(existing["interpretation"])
+        if interp.get("llm_interpretation"):
+            return {"status": "ready"}
+    return {"status": "pending"}
+
+
 @limiter.limit("10/hour")
 @router.post("/yearly")
-def generate_yearly_prediction(request: Request, payload: dict, db=Depends(get_db)):
+def generate_yearly_prediction(request: Request, payload: dict, background_tasks: BackgroundTasks, db=Depends(get_db)):
     """
     EPIC-9
     Yearly prediction endpoint.
@@ -126,23 +178,10 @@ def generate_yearly_prediction(request: Request, payload: dict, db=Depends(get_d
     interpretation["ai_interpretation"] = ai_interpretation
 
     # --------------------------------------------------
-    # LLM Interpretation (language-only enhancement)
+    # LLM Interpretation — deferred to background task
     # --------------------------------------------------
-    period_key = str(int(year))
-    llm_result = generate_llm_interpretation(
-        base_chart_id=base_chart_id,
-        envelope=envelope,
-        synthesis=synthesis,
-        deterministic_interpretation=ai_interpretation,
-        year=int(year),
-        period_type="yearly",
-        period_key=period_key,
-        feature_name="prediction",
-        explainability_mode="full",
-        base_chart_payload=base_chart_payload,
-    )
-    interpretation["llm_interpretation"] = llm_result.get("llm_interpretation")
-    interpretation["llm_metadata"] = llm_result.get("llm_metadata")
+    interpretation["llm_interpretation"] = None
+    interpretation["llm_metadata"] = {"provider": "none", "fallback_reason": None}
 
     explainability = build_explainability(
         dasha_context=envelope["dasha_context"],
@@ -168,7 +207,17 @@ def generate_yearly_prediction(request: Request, payload: dict, db=Depends(get_d
         envelope=json.dumps(envelope),
         synthesis=json.dumps(synthesis),
         interpretation=json.dumps(interpretation),
-        engine_version="v4.1",
+        engine_version="v4.2",
+    )
+
+    background_tasks.add_task(
+        _run_yearly_llm_background,
+        base_chart_id=base_chart_id,
+        envelope=envelope,
+        synthesis=synthesis,
+        ai_interpretation=ai_interpretation,
+        year=int(year),
+        base_chart_payload=base_chart_payload,
     )
 
     return {
@@ -188,5 +237,5 @@ def generate_yearly_prediction(request: Request, payload: dict, db=Depends(get_d
             if hasattr(explainability, "model_dump")
             else explainability
         ),
-        "llm_status": None,
+        "llm_status": "pending",
     }

@@ -193,18 +193,18 @@ If period_type = "weekly":
 - danger_windows: 1 entry if Chandrashtama falls in this week
 
 If period_type = "monthly":
-- yearly_mantra: 3-4 sentences
-- dasha_transit_synthesis: 5-7 sentences showing transit + dasha interplay with aspect references
-- Each Life Area: 4-6 sentences with specific planet/house/aspect references
-- veda_remedy: 2 specific remedies with days/deities/mantras
-- danger_windows: Reference any Chandrashtama windows in this month
+- yearly_mantra: 2-3 sentences (crisp monthly theme)
+- dasha_transit_synthesis: 3-4 sentences — dasha + key transit interaction only
+- Each Life Area: 2-3 sentences — lead with the most impactful signal, one practical note
+- veda_remedy: 1-2 specific remedies with deity, day, mantra
+- danger_windows: Only if Chandrashtama falls in this month
 
 If period_type = "yearly":
-- yearly_mantra: 4-6 sentences (full thematic arc for the year)
-- dasha_transit_synthesis: 8-10 sentences with seasonal timing, turning points, aspect analysis
-- Each Life Area: 5-8 sentences with rich detail, timing windows, planet interactions, aspects
-- veda_remedy: 3 specific remedies with detailed Tamil tradition guidance
-- danger_windows: Reference all Chandrashtama periods with approximate dates
+- yearly_mantra: 3-4 sentences (clear thematic arc — one governing insight, not an essay)
+- dasha_transit_synthesis: 4-5 sentences showing dasha-transit interplay — synthesized, not listed
+- Each Life Area: 3-4 sentences — one key planetary influence, one practical implication, one timing note
+- veda_remedy: 2 specific remedies with deity, day, and mantra — no lengthy explanations
+- danger_windows: 1-2 Chandrashtama windows only if clearly falling in this year
 
 DETAIL LEVEL RULES (explainability_mode)
 
@@ -221,6 +221,17 @@ If explainability_mode = "full":
 - Expand all sections by ~30%. Include sub-period timing, planetary dignity details, aspect degrees.
 - Add Nakshatra Pada context where available.
 - Include additional remedies.
+
+CLARITY RULES (CRITICAL)
+- Every sentence must contain a specific planet, house, or transit reference — no generic filler.
+- If you cannot make a sentence chart-specific, cut it entirely.
+- Prefer short, declarative sentences over long compound ones.
+- One idea per sentence. One planet per sentence.
+- Never use: "it is worth noting", "it is important to remember", "as you navigate",
+  "the cosmos invites you", "this is a time of", "in this period".
+- Lead every life area with the most concrete planetary fact, not a vague theme.
+- Good: "Jupiter (Guru) transiting your 5th house brings creative confidence in Q1."
+- Bad: "This is a period of creative exploration and inner growth as planetary energies align."
 
 NARRATIVE RULES
 - Write FULL PARAGRAPHS, not one-liners.
