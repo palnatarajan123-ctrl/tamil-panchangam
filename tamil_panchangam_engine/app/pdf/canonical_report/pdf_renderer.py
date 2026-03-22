@@ -395,6 +395,54 @@ def _build_kp_sublords_section(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def _build_natal_interpretation_section(data: CanonicalReportData, styles) -> List:
+    """Build natal LLM interpretation section for birth chart PDF."""
+    elements = []
+
+    elements.append(Paragraph("Natal Chart Reading", styles['SectionTitle']))
+    elements.append(Paragraph(
+        "Your lifelong astrological blueprint, interpreted through the Siddhar tradition.",
+        styles['BodyText']
+    ))
+    elements.append(Spacer(1, 0.2 * inch))
+
+    # Life theme / overview
+    if data.prediction_overview:
+        elements.append(Paragraph("Life Theme", styles['SubsectionTitle']))
+        for grp in _split_sentences(data.prediction_overview, per_group=3):
+            elements.append(Paragraph(grp, styles['BodyText']))
+        elements.append(Spacer(1, 0.2 * inch))
+
+    # Life areas
+    if data.prediction_areas:
+        elements.append(Paragraph("Life Area Blueprint", styles['SubsectionTitle']))
+        elements.append(Spacer(1, 0.1 * inch))
+        for area in data.prediction_areas:
+            area_elements = []
+            area_elements.append(Paragraph(
+                f"<b>{area.area}</b>",
+                styles['SubsectionTitle']
+            ))
+            if area.interpretation:
+                for grp in _split_sentences(area.interpretation, per_group=2):
+                    area_elements.append(Paragraph(grp, styles['BodyText']))
+            if area.deeper_explanation:
+                area_elements.append(Paragraph(
+                    area.deeper_explanation,
+                    styles.get('SmallText', styles['BodyText'])
+                ))
+            area_elements.append(Spacer(1, 0.15 * inch))
+            elements.append(KeepTogether(area_elements))
+
+    # Closing blessing
+    if data.closing_note:
+        elements.append(Spacer(1, 0.2 * inch))
+        elements.append(Paragraph(data.closing_note, styles['BodyText']))
+
+    elements.append(PageBreak())
+    return elements
+
+
 def _build_astrological_context(data: CanonicalReportData, styles) -> List:
     """Build astrological context section with dasha, transit, and timing tables."""
     elements = []
@@ -1455,13 +1503,17 @@ def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
     story = []
 
     story.extend(_build_cover_page(data, styles))
+    story.extend(_build_how_to_read(styles))
     story.extend(_build_natal_snapshot(data, styles))
     if data.kp_sublords:
         story.extend(_build_kp_sublords_section(data, styles))
+    story.extend(_build_astrological_context(data, styles))
     story.extend(_build_divisional_charts(data, styles))
     story.extend(_build_yogas_section(data, styles))
     story.extend(_build_sade_sati_section(data, styles))
     story.extend(_build_shadbala_section(data, styles))
+    if data.prediction_overview or data.prediction_areas:
+        story.extend(_build_natal_interpretation_section(data, styles))
     story.extend(_build_methodology_appendix(data, styles))
 
     doc.build(story)

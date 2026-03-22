@@ -873,12 +873,141 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
     birth_details_data = payload.get("birth_details", {})
     chart_metadata = payload.get("chart_metadata", {})
 
+    # ── Live astrological context ────────────────────────────────────────────
+    from app.engines.gochara_engine import compute_gochara
+    from app.engines.nakshatra_engine import compute_nakshatra_context
+    from app.utils.time_utils import get_month_reference_date_utc
+    from datetime import datetime as dt
+
+    ayanamsa = ephemeris.get("ayanamsa", "lahiri")
+    birth_details_raw = payload.get("birth_details", {})
+    latitude = birth_details_raw.get("latitude", 0.0)
+    longitude_coord = birth_details_raw.get("longitude", 0.0)
+    natal_moon_rasi = ephemeris.get("moon", {}).get("rasi", "")
+    natal_lagna_rasi = ephemeris.get("lagna", {}).get("rasi", "")
+    natal_moon_longitude = ephemeris.get("moon", {}).get("longitude_deg", 0.0)
+
+    now = dt.utcnow()
+    reference_date = get_month_reference_date_utc(now.year, now.month)
+
+    # Gochara (transits)
+    try:
+        gochara = compute_gochara(
+            reference_date_utc=reference_date,
+            latitude=latitude,
+            longitude=longitude_coord,
+            natal_moon_rasi=natal_moon_rasi,
+            natal_lagna_rasi=natal_lagna_rasi,
+            natal_moon_longitude=natal_moon_longitude,
+            ayanamsa=ayanamsa,
+        )
+        jup = gochara.get("jupiter", {})
+        sat = gochara.get("saturn", {})
+        rahu_ketu = gochara.get("rahu_ketu", {})
+        jupiter_transit = f"{jup.get('transit_rasi', '')} (H{jup.get('from_moon_house', '')}) - {jup.get('effect', '')}"
+        saturn_transit = f"{sat.get('transit_rasi', '')} (H{sat.get('from_moon_house', '')})"
+        rahu_ketu_axis_str = f"Rahu H{rahu_ketu.get('rahu_from_moon_house', '')} / Ketu H{rahu_ketu.get('ketu_from_moon_house', '')}"
+        live_transit_context = TransitContext(
+            jupiter_transit=jupiter_transit,
+            saturn_transit=saturn_transit,
+            rahu_ketu_axis=rahu_ketu_axis_str,
+            jupiter_rasi=jup.get("transit_rasi", ""),
+            saturn_rasi=sat.get("transit_rasi", ""),
+        )
+    except Exception as e:
+        logger.warning(f"Failed to compute gochara for natal PDF: {e}")
+        live_transit_context = TransitContext(
+            jupiter_transit="", saturn_transit="", rahu_ketu_axis=""
+        )
+
+    # Nakshatra context
+    try:
+        nak_context = compute_nakshatra_context(
+            reference_date_utc=reference_date,
+            birth_moon_longitude=natal_moon_longitude,
+            ayanamsa=ayanamsa,
+        )
+        quality = nak_context.get("quality", "neutral")
+        live_nakshatra = NakshatraTimingContext(
+            current_moon_nakshatra=nak_context.get("current_nakshatra", ""),
+            tara_bala=nak_context.get("tara_name", ""),
+            chandra_gati=quality,
+            favorable_window="Auspicious period" if quality in ("beneficial", "very_beneficial") else "Neutral / Watchful period",
+        )
+    except Exception as e:
+        logger.warning(f"Failed to compute nakshatra context for natal PDF: {e}")
+        live_nakshatra = NakshatraTimingContext(
+            current_moon_nakshatra="", tara_bala="", chandra_gati="", favorable_window=""
+        )
+
+    # Pakshi context (static from birth data, no live computation needed)
+    try:
+        birth_pakshi = payload.get("pancha_pakshi_birth", {})
+        pakshi_name = birth_pakshi.get("pakshi", "") if isinstance(birth_pakshi, dict) else ""
+        pakshi_activity = birth_pakshi.get("nature", "") if isinstance(birth_pakshi, dict) else ""
+        live_pakshi = PakshiRhythmContext(
+            dominant_pakshi=pakshi_name,
+            activity_phase=pakshi_activity,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to extract pakshi for natal PDF: {e}")
+        live_pakshi = PakshiRhythmContext(dominant_pakshi="", activity_phase="")
+
+    # ── Natal LLM interpretation ─────────────────────────────────────────────
     natal_interp = load_natal_interpretation(base_chart_id)
-    natal_text = ""
+    natal_prediction_overview = ""
+    natal_prediction_areas: List[PredictionArea] = []
+    natal_closing_note = ""
+    natal_llm_enhanced = False
+
     if natal_interp:
+        natal_llm_enhanced = True
         life_theme = natal_interp.get("life_theme", {})
+        chart_highlights = natal_interp.get("chart_highlights", {})
+
+        # Overview from life_theme narrative
         if isinstance(life_theme, dict):
-            natal_text = life_theme.get("narrative", "")
+            natal_prediction_overview = life_theme.get("narrative", "")
+
+        # Life area predictions
+        life_areas_raw = natal_interp.get("life_areas", {})
+        if isinstance(life_areas_raw, dict):
+            area_label_map = {
+                "career": "Career & Purpose",
+                "wealth": "Wealth & Resources",
+                "relationships": "Relationships",
+                "health": "Health & Vitality",
+                "spirituality": "Spirituality & Moksha",
+            }
+            for area_key, label in area_label_map.items():
+                area_data = life_areas_raw.get(area_key)
+                if not area_data:
+                    continue
+                if isinstance(area_data, str):
+                    natal_prediction_areas.append(PredictionArea(
+                        area=label,
+                        score=50,
+                        outlook="neutral",
+                        interpretation=area_data,
+                    ))
+                elif isinstance(area_data, dict) and area_data.get("interpretation"):
+                    natal_prediction_areas.append(PredictionArea(
+                        area=label,
+                        score=area_data.get("score", 50),
+                        outlook=area_data.get("outlook", "neutral"),
+                        interpretation=area_data.get("interpretation", ""),
+                        deeper_explanation=area_data.get("deeper_explanation"),
+                    ))
+
+        # Closing note
+        closing_wisdom = natal_interp.get("closing_wisdom")
+        closing_raw = natal_interp.get("closing_blessing", natal_interp.get("closing", {}))
+        if closing_wisdom and isinstance(closing_wisdom, str):
+            natal_closing_note = closing_wisdom
+        elif isinstance(closing_raw, dict):
+            natal_closing_note = closing_raw.get("blessing", closing_raw.get("encouragement", ""))
+        elif isinstance(closing_raw, str):
+            natal_closing_note = closing_raw
 
     try:
         confidence_result = assess_calculation_confidence(ephemeris)
@@ -918,26 +1047,14 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
         ),
         core_life_themes=[],
         dasha_context=_extract_dasha_context_from_payload(payload),
-        transit_context=TransitContext(
-            jupiter_transit="",
-            saturn_transit="",
-            rahu_ketu_axis="",
-        ),
-        nakshatra_timing=NakshatraTimingContext(
-            current_moon_nakshatra="",
-            tara_bala="",
-            chandra_gati="",
-            favorable_window="",
-        ),
-        pakshi_rhythm=PakshiRhythmContext(
-            dominant_pakshi="",
-            activity_phase="",
-        ),
-        prediction_overview=natal_text,
-        prediction_areas=[],
+        transit_context=live_transit_context,
+        nakshatra_timing=live_nakshatra,
+        pakshi_rhythm=live_pakshi,
+        prediction_overview=natal_prediction_overview,
+        prediction_areas=natal_prediction_areas,
         practices=[],
-        closing_note="",
-        llm_enhanced=natal_interp is not None,
+        closing_note=natal_closing_note,
+        llm_enhanced=natal_llm_enhanced,
         methodology=MethodologyInfo(
             ephemeris_source="Swiss Ephemeris",
             ayanamsa=_ayanamsa_label(chart_metadata.get("ayanamsa", "lahiri")),
