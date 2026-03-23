@@ -1593,23 +1593,53 @@ def _build_v4_executive_summary(data: CanonicalReportData, styles) -> List:
         elements.append(Spacer(1, 0.15*inch))
 
     if es.one_lines:
-        elements.append(Paragraph("Area Snapshot", styles['SubsectionTitle']))
-        snapshot_data = [["Life Area", "In One Line"]]
-        for area, line in es.one_lines.items():
-            snapshot_data.append([area.replace("_", " ").title(), line])
-        snap_table = Table(snapshot_data, colWidths=[1.8*inch, 3.9*inch])
-        snap_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["secondary"])),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
-        elements.append(snap_table)
-        elements.append(Spacer(1, 0.2*inch))
+        area_order = [
+            "career", "finance", "relationships",
+            "health", "personal_growth"
+        ]
+        elements.append(Spacer(1, 0.1*inch))
+        elements.append(Paragraph("AREA SNAPSHOT", styles['V4SectionLabel']))
+        elements.append(Spacer(1, 0.06*inch))
+
+        AREA_LABEL_COLORS = [
+            colors.Color(0.25, 0.45, 0.70),
+            colors.Color(0.25, 0.55, 0.40),
+            colors.Color(0.60, 0.35, 0.60),
+            colors.Color(0.65, 0.40, 0.20),
+            colors.Color(0.35, 0.50, 0.60),
+        ]
+        for idx, key in enumerate(area_order):
+            line = es.one_lines.get(key, "")
+            if not line:
+                continue
+            label_color = AREA_LABEL_COLORS[idx % len(AREA_LABEL_COLORS)]
+            row_table = Table(
+                [[
+                    Paragraph(
+                        key.replace("_", " ").upper(),
+                        ParagraphStyle(
+                            f'SnapLabel_{idx}',
+                            parent=styles['Normal'],
+                            fontSize=8,
+                            fontName='Helvetica-Bold',
+                            textColor=colors.white,
+                        )
+                    ),
+                    Paragraph(line, styles['BodyText']),
+                ]],
+                colWidths=[1.3*inch, 4.3*inch]
+            )
+            row_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, 0), label_color),
+                ('BACKGROUND', (1, 0), (1, 0), colors.Color(0.97, 0.97, 0.97)),
+                ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LINEBELOW', (0, 0), (-1, 0), 0.3, colors.Color(0.85, 0.85, 0.85)),
+            ]))
+            elements.append(row_table)
 
     return elements
 
@@ -1638,28 +1668,69 @@ def _build_v4_why_this_period(data: CanonicalReportData, styles) -> List:
         elements.append(Paragraph(w.overlap_summary, styles['BodyText']))
         elements.append(Spacer(1, 0.15*inch))
 
-    if w.supportive or w.watchouts:
-        cols_data = [["What Supports You", "What Needs Care"]]
-        max_rows = max(len(w.supportive), len(w.watchouts))
-        for i in range(max_rows):
-            s = f"✓ {w.supportive[i]}" if i < len(w.supportive) else ""
-            wt = f"⚠ {w.watchouts[i]}" if i < len(w.watchouts) else ""
-            cols_data.append([s, wt])
-        t = Table(cols_data, colWidths=[2.85*inch, 2.85*inch])
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        elements.append(t)
-        elements.append(Spacer(1, 0.2*inch))
+    if w.supportive:
+        elements.append(Spacer(1, 0.1*inch))
+        elements.append(Paragraph("WORKING FOR YOU", styles['V4SectionLabel']))
+        for item in w.supportive:
+            item_table = Table(
+                [[
+                    Paragraph(
+                        "+",
+                        ParagraphStyle(
+                            'SupportIcon',
+                            parent=styles['Normal'],
+                            fontSize=12,
+                            fontName='Helvetica-Bold',
+                            textColor=colors.Color(0.15, 0.55, 0.25),
+                        )
+                    ),
+                    Paragraph(item, styles['BodyText']),
+                ]],
+                colWidths=[0.3*inch, 5.2*inch]
+            )
+            item_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.93, 0.98, 0.93)),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LINEBELOW', (0, 0), (-1, 0), 0.3, colors.Color(0.80, 0.92, 0.80)),
+            ]))
+            elements.append(item_table)
 
+    if w.watchouts:
+        elements.append(Spacer(1, 0.1*inch))
+        elements.append(Paragraph("WATCH OUT FOR", styles['V4SectionLabel']))
+        for item in w.watchouts:
+            item_table = Table(
+                [[
+                    Paragraph(
+                        "!",
+                        ParagraphStyle(
+                            'WatchIcon',
+                            parent=styles['Normal'],
+                            fontSize=12,
+                            fontName='Helvetica-Bold',
+                            textColor=colors.Color(0.65, 0.40, 0.05),
+                        )
+                    ),
+                    Paragraph(item, styles['BodyText']),
+                ]],
+                colWidths=[0.3*inch, 5.2*inch]
+            )
+            item_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.99, 0.96, 0.88)),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LINEBELOW', (0, 0), (-1, 0), 0.3, colors.Color(0.92, 0.82, 0.70)),
+            ]))
+            elements.append(item_table)
+
+    elements.append(Spacer(1, 0.3*inch))
     return elements
 
 
@@ -1676,7 +1747,7 @@ def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
         "avoid, and what you may notice.",
         styles['BodyText']
     ))
-    elements.append(PageBreak())
+    elements.append(Spacer(1, 0.2*inch))
 
     area_order = ["career", "finance", "relationships", "health", "personal_growth"]
     areas_to_render = [a for a in area_order if a in data.v4_life_areas]
@@ -1687,7 +1758,12 @@ def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
         area_elements = []
 
         if i > 0:
-            area_elements.append(PageBreak())
+            area_elements.append(Spacer(1, 0.3*inch))
+            area_elements.append(HRFlowable(
+                width="100%", thickness=1.0,
+                color=colors.Color(*COLORS["primary"]),
+                spaceBefore=4, spaceAfter=12,
+            ))
 
         area_elements.append(Paragraph(
             area_key.replace("_", " ").title(),
@@ -1721,10 +1797,15 @@ def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
                 styles['BodyText']
             ))
 
-        area_elements.append(Spacer(1, 0.2*inch))
-        elements.append(KeepTogether(area_elements))
+        area_elements.append(Spacer(1, 0.15*inch))
+        # Use KeepTogether only for the header+summary block
+        # to prevent orphaned headings. Full area may span pages.
+        header_block = area_elements[:3]  # heading + spacer + plain_english
+        elements.append(KeepTogether(header_block))
+        for el in area_elements[3:]:
+            elements.append(el)
 
-    elements.append(PageBreak())
+    elements.append(Spacer(1, 0.3*inch))
     return elements
 
 
@@ -1924,8 +2005,11 @@ def render_pdf(data: CanonicalReportData) -> bytes:
     if data.is_v4:
         # v4: human meaning first, technical appendix at end
         story.extend(_build_v4_executive_summary(data, styles))
+        story.append(PageBreak())
         story.extend(_build_v4_why_this_period(data, styles))
+        story.append(PageBreak())
         story.extend(_build_v4_life_areas(data, styles))
+        story.append(PageBreak())
         story.extend(_build_v4_remedies(data, styles))
         story.extend(_build_v4_key_takeaways(data, styles))
 
