@@ -1163,7 +1163,12 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
             dasha_map = natal_interp.get("dasha_life_map", [])
             if isinstance(dasha_map, list):
                 natal_dasha_life_map_list = [
-                    e for e in dasha_map
+                    {
+                        "planet": e.get("mahadasha", e.get("planet", "")),
+                        "period": e.get("approximate_age", e.get("period", "")),
+                        "theme": e.get("theme", ""),
+                    }
+                    for e in dasha_map
                     if isinstance(e, dict)
                 ]
 
