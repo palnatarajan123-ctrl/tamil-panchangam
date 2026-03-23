@@ -1523,28 +1523,74 @@ def _build_v4_executive_summary(data: CanonicalReportData, styles) -> List:
         elements.append(Paragraph(f"<b>{es.main_theme}</b>", styles['BodyText']))
         elements.append(Spacer(1, 0.15*inch))
 
-    if es.strongest_area or es.watch_area:
-        cols = []
-        if es.strongest_area:
-            cols.append(["Strongest Area", es.strongest_area.title()])
-        if es.watch_area:
-            cols.append(["Needs Attention", es.watch_area.title()])
-        if es.best_use:
-            cols.append(["Best Use of This Period", es.best_use])
-        if cols:
-            t = Table(cols, colWidths=[2.2*inch, 3.5*inch])
-            t.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (0, -1), colors.Color(*COLORS["primary"])),
-                ('TEXTCOLOR', (0, 0), (0, -1), colors.white),
-                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ]))
-            elements.append(t)
-            elements.append(Spacer(1, 0.2*inch))
+    if es.strongest_area:
+        strongest_block = Table(
+            [[
+                Paragraph("STRONGEST AREA", styles['V4SectionLabel']),
+                Paragraph(es.strongest_area, styles['BodyText']),
+            ]],
+            colWidths=[1.5*inch, 4.1*inch]
+        )
+        strongest_block.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.92, 0.98, 0.92)),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.Color(0.4, 0.75, 0.4)),
+            ('TEXTCOLOR', (0, 0), (0, 0), colors.Color(0.15, 0.55, 0.25)),
+            ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (0, 0), 8),
+        ]))
+        elements.append(strongest_block)
+        elements.append(Spacer(1, 0.08*inch))
+
+    if es.watch_area:
+        watch_block = Table(
+            [[
+                Paragraph("NEEDS ATTENTION", styles['V4SectionLabel']),
+                Paragraph(es.watch_area, styles['BodyText']),
+            ]],
+            colWidths=[1.5*inch, 4.1*inch]
+        )
+        watch_block.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.99, 0.96, 0.88)),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.Color(0.8, 0.6, 0.2)),
+            ('TEXTCOLOR', (0, 0), (0, 0), colors.Color(0.65, 0.40, 0.05)),
+            ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (0, 0), 8),
+        ]))
+        elements.append(watch_block)
+        elements.append(Spacer(1, 0.12*inch))
+
+    if es.best_use:
+        best_use_block = Table(
+            [[
+                Paragraph("BEST USE", styles['V4SectionLabel']),
+                Paragraph(es.best_use, styles['BodyText']),
+            ]],
+            colWidths=[1.5*inch, 4.1*inch]
+        )
+        best_use_block.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.94, 0.94, 0.99)),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.Color(0.5, 0.5, 0.85)),
+            ('TEXTCOLOR', (0, 0), (0, 0), colors.Color(0.25, 0.25, 0.65)),
+            ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (0, 0), 8),
+        ]))
+        elements.append(best_use_block)
+        elements.append(Spacer(1, 0.15*inch))
 
     if es.one_lines:
         elements.append(Paragraph("Area Snapshot", styles['SubsectionTitle']))
@@ -1624,6 +1670,13 @@ def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
         return elements
 
     elements.append(Paragraph("Life Area Guidance", styles['SectionTitle']))
+    elements.append(Paragraph(
+        "Plain-English guidance for each area of life "
+        "this period. Each area shows what to do, what to "
+        "avoid, and what you may notice.",
+        styles['BodyText']
+    ))
+    elements.append(PageBreak())
 
     area_order = ["career", "finance", "relationships", "health", "personal_growth"]
     areas_to_render = [a for a in area_order if a in data.v4_life_areas]
@@ -1634,11 +1687,7 @@ def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
         area_elements = []
 
         if i > 0:
-            area_elements.append(HRFlowable(
-                width="100%", thickness=0.5,
-                color=colors.Color(0.82, 0.82, 0.82),
-                spaceBefore=6, spaceAfter=10,
-            ))
+            area_elements.append(PageBreak())
 
         area_elements.append(Paragraph(
             area_key.replace("_", " ").title(),
@@ -1748,6 +1797,65 @@ def _build_v4_key_takeaways(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def _build_appendix_divider(styles) -> List:
+    """Full-page Technical Appendix divider for v4 reports."""
+    elements = []
+
+    elements.append(PageBreak())
+    elements.append(Spacer(1, 2.0*inch))
+
+    elements.append(Paragraph(
+        "Technical Appendix",
+        ParagraphStyle(
+            'AppendixTitle',
+            parent=styles['Normal'],
+            fontSize=26,
+            fontName='Helvetica-Bold',
+            textColor=colors.Color(*COLORS["primary"]),
+            alignment=TA_CENTER,
+            spaceAfter=20,
+        )
+    ))
+
+    elements.append(Paragraph(
+        "For Astrology Readers",
+        ParagraphStyle(
+            'AppendixSubtitle',
+            parent=styles['Normal'],
+            fontSize=14,
+            textColor=colors.Color(*COLORS["secondary"]),
+            alignment=TA_CENTER,
+            spaceAfter=30,
+        )
+    ))
+
+    elements.append(HRFlowable(
+        width="60%", thickness=1.5,
+        color=colors.Color(*COLORS["primary"]),
+        hAlign='CENTER',
+        spaceBefore=10, spaceAfter=20,
+    ))
+
+    elements.append(Paragraph(
+        "The following sections contain the full deterministic "
+        "astrological calculations underlying this report — "
+        "including birth charts, divisional charts, yogas, "
+        "dasha periods, transit tables, Ashtakavarga scores, "
+        "Shadbala planetary strength, and methodology.",
+        ParagraphStyle(
+            'AppendixDesc',
+            parent=styles['Normal'],
+            fontSize=11,
+            textColor=colors.Color(*COLORS["muted"]),
+            alignment=TA_CENTER,
+            leading=16,
+        )
+    ))
+
+    elements.append(PageBreak())
+    return elements
+
+
 def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
     """
     Render a birth-chart-only PDF (no prediction sections).
@@ -1812,9 +1920,6 @@ def render_pdf(data: CanonicalReportData) -> bytes:
 
     story.extend(_build_cover_page(data, styles))
     story.extend(_build_how_to_read(styles))
-    story.extend(_build_natal_snapshot(data, styles))
-    if data.kp_sublords:
-        story.extend(_build_kp_sublords_section(data, styles))
 
     if data.is_v4:
         # v4: human meaning first, technical appendix at end
@@ -1823,7 +1928,14 @@ def render_pdf(data: CanonicalReportData) -> bytes:
         story.extend(_build_v4_life_areas(data, styles))
         story.extend(_build_v4_remedies(data, styles))
         story.extend(_build_v4_key_takeaways(data, styles))
-        # Technical sections always rendered
+
+        # Technical appendix divider (v4 only)
+        story.extend(_build_appendix_divider(styles))
+
+        # Technical appendix — always rendered
+        story.extend(_build_natal_snapshot(data, styles))
+        if data.kp_sublords:
+            story.extend(_build_kp_sublords_section(data, styles))
         story.extend(_build_divisional_charts(data, styles))
         story.extend(_build_yogas_section(data, styles))
         story.extend(_build_sade_sati_section(data, styles))
@@ -1831,6 +1943,9 @@ def render_pdf(data: CanonicalReportData) -> bytes:
         story.extend(_build_astrological_context(data, styles))
         story.extend(_build_predictions(data, styles))
     else:
+        story.extend(_build_natal_snapshot(data, styles))
+        if data.kp_sublords:
+            story.extend(_build_kp_sublords_section(data, styles))
         story.extend(_build_divisional_charts(data, styles))
         story.extend(_build_yogas_section(data, styles))
         story.extend(_build_sade_sati_section(data, styles))
