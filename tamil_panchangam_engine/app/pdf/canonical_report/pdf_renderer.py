@@ -711,37 +711,56 @@ def _build_natal_v2_interpretation(
             "Life by Decade", styles['SubsectionTitle']))
         elements.append(Spacer(1, 0.1*inch))
 
-        decade_data = [["Age", "Theme", "Key Focus"]]
-        for d in data.natal_life_by_decade:
-            decade_data.append([
-                d.age_range,
-                d.theme,
-                d.key_focus,
-            ])
-
-        dt = Table(
-            decade_data,
-            colWidths=[0.7*inch, 2.8*inch, 2.0*inch]
-        )
-        dt.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0),
-             colors.Color(*COLORS["primary"])),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0),
-             'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('GRID', (0, 0), (-1, -1), 0.5,
-             colors.Color(*COLORS["muted"])),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('BACKGROUND', (0, 1), (-1, -1),
-             colors.Color(0.97, 0.97, 0.97)),
-            ('FONTNAME', (0, 1), (0, -1),
-             'Helvetica-Bold'),
-        ]))
-        elements.append(dt)
+        DECADE_COLORS = [
+            (colors.Color(0.94, 0.94, 0.99),
+             colors.Color(0.5, 0.5, 0.85)),
+            (colors.Color(0.92, 0.98, 0.92),
+             colors.Color(0.4, 0.75, 0.4)),
+            (colors.Color(0.99, 0.96, 0.88),
+             colors.Color(0.8, 0.6, 0.2)),
+            (colors.Color(0.93, 0.88, 0.98),
+             colors.Color(0.6, 0.4, 0.8)),
+            (colors.Color(0.88, 0.95, 0.98),
+             colors.Color(0.3, 0.6, 0.8)),
+            (colors.Color(0.99, 0.92, 0.92),
+             colors.Color(0.8, 0.3, 0.3)),
+        ]
+        for i, d in enumerate(data.natal_life_by_decade):
+            bg, border = DECADE_COLORS[i % len(DECADE_COLORS)]
+            card = Table(
+                [[
+                    Paragraph(
+                        f"<b>{d.age_range}</b>",
+                        ParagraphStyle(
+                            'DecadeAge',
+                            parent=styles['Normal'],
+                            fontSize=9,
+                            fontName='Helvetica-Bold',
+                            textColor=border,
+                        )
+                    ),
+                    Paragraph(
+                        f"<b>{d.theme}</b>",
+                        styles['BodyText']
+                    ),
+                    Paragraph(
+                        d.key_focus,
+                        styles['BodyText']
+                    ),
+                ]],
+                colWidths=[0.85*inch, 2.4*inch, 2.25*inch]
+            )
+            card.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), bg),
+                ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LINEBELOW', (0, 0), (-1, 0), 0.3,
+                 colors.Color(0.85, 0.85, 0.85)),
+            ]))
+            elements.append(card)
         elements.append(Spacer(1, 0.2*inch))
 
     # ── CLASSICAL SECTIONS ────────────────────────────────
@@ -783,6 +802,90 @@ def _build_natal_v2_interpretation(
                         grp, styles['BodyText']))
             area_el.append(Spacer(1, 0.15*inch))
             elements.append(KeepTogether(area_el))
+
+    # ── DASHA LIFE MAP ────────────────────────────────────
+    if data.natal_dasha_life_map:
+        elements.append(Paragraph(
+            "Dasha Life Map", styles['SubsectionTitle']))
+        elements.append(Paragraph(
+            "How each major planetary period has shaped — "
+            "and will shape — your life story.",
+            styles['BodyText']
+        ))
+        elements.append(Spacer(1, 0.1*inch))
+
+        DASHA_MAP_COLORS = [
+            (colors.Color(0.94, 0.94, 0.99),
+             colors.Color(0.5, 0.5, 0.85)),
+            (colors.Color(0.92, 0.98, 0.92),
+             colors.Color(0.4, 0.75, 0.4)),
+            (colors.Color(0.99, 0.96, 0.88),
+             colors.Color(0.8, 0.6, 0.2)),
+            (colors.Color(0.93, 0.88, 0.98),
+             colors.Color(0.6, 0.4, 0.8)),
+            (colors.Color(0.88, 0.95, 0.98),
+             colors.Color(0.3, 0.6, 0.8)),
+        ]
+        for i, entry in enumerate(data.natal_dasha_life_map):
+            if not isinstance(entry, dict):
+                continue
+            planet = entry.get("planet", "")
+            period = entry.get("period", "")
+            theme = entry.get("theme", "")
+            what_happened = entry.get("what_happened", "")
+            bg, border = DASHA_MAP_COLORS[
+                i % len(DASHA_MAP_COLORS)]
+            header = Table(
+                [[
+                    Paragraph(
+                        f"<b>{planet}</b>",
+                        ParagraphStyle(
+                            'DashaMapPlanet',
+                            parent=styles['Normal'],
+                            fontSize=10,
+                            fontName='Helvetica-Bold',
+                            textColor=border,
+                        )
+                    ),
+                    Paragraph(
+                        period,
+                        styles['BodyText']
+                    ),
+                    Paragraph(
+                        f"<i>{theme}</i>",
+                        styles['BodyText']
+                    ),
+                ]],
+                colWidths=[1.0*inch, 1.4*inch, 3.1*inch]
+            )
+            header.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), bg),
+                ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            elements.append(header)
+            if what_happened:
+                body = Table(
+                    [[Paragraph(
+                        what_happened, styles['BodyText']
+                    )]],
+                    colWidths=[5.5*inch]
+                )
+                body.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1),
+                     colors.Color(0.98, 0.98, 0.98)),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 14),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                    ('TOPPADDING', (0, 0), (-1, -1), 4),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('LINEBELOW', (0, 0), (-1, 0), 0.3,
+                     colors.Color(0.85, 0.85, 0.85)),
+                ]))
+                elements.append(body)
+        elements.append(Spacer(1, 0.2*inch))
 
     if data.closing_note:
         elements.append(Spacer(1, 0.2*inch))
@@ -2327,14 +2430,7 @@ def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
 
     story.extend(_build_cover_page(data, styles))
     story.extend(_build_how_to_read(styles))
-    story.extend(_build_natal_snapshot(data, styles))
-    if data.kp_sublords:
-        story.extend(_build_kp_sublords_section(data, styles))
-    story.extend(_build_astrological_context(data, styles))
-    story.extend(_build_divisional_charts(data, styles))
-    story.extend(_build_yogas_section(data, styles))
-    story.extend(_build_sade_sati_section(data, styles))
-    story.extend(_build_shadbala_section(data, styles))
+    # Interpretation first — human meaning before technical charts
     if data.is_natal_v2 or data.prediction_overview \
             or data.prediction_areas:
         if data.is_natal_v2:
@@ -2345,6 +2441,15 @@ def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
             story.extend(
                 _build_natal_interpretation_section(
                     data, styles))
+    # Technical appendix
+    story.extend(_build_natal_snapshot(data, styles))
+    if data.kp_sublords:
+        story.extend(_build_kp_sublords_section(data, styles))
+    story.extend(_build_astrological_context(data, styles))
+    story.extend(_build_divisional_charts(data, styles))
+    story.extend(_build_yogas_section(data, styles))
+    story.extend(_build_sade_sati_section(data, styles))
+    story.extend(_build_shadbala_section(data, styles))
     story.extend(_build_methodology_appendix(data, styles))
 
     doc.build(story)

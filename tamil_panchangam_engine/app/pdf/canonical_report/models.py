@@ -313,3 +313,4 @@ class CanonicalReportData(BaseModel):
     natal_relationships: Optional[NatalRelationships] = None
     natal_current_chapter: Optional[NatalCurrentChapter] = None
     natal_life_by_decade: List[NatalDecade] = Field(default_factory=list)
+    natal_dasha_life_map: List[dict] = Field(default_factory=list)

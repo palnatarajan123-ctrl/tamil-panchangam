@@ -410,7 +410,7 @@ def get_natal_interpretation(request: Request, body: NatalInterpretationRequest)
     llm_response, usage_info, error = anthropic_provider.call_llm(
         system_prompt=NATAL_SYSTEM_PROMPT,
         user_prompt=user_prompt,
-        max_tokens=5000,
+        max_tokens=7000,
     )
 
     provider = usage_info.get("provider") if usage_info else None

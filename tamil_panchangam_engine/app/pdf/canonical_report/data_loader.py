@@ -1060,6 +1060,7 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
     natal_relationships_obj = None
     natal_current_chapter_obj = None
     natal_life_by_decade_list: List[NatalDecade] = []
+    natal_dasha_life_map_list: List[dict] = []
 
     if natal_interp:
         natal_llm_enhanced = True
@@ -1159,6 +1160,13 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
                         dasha_context=d.get("dasha_context", ""),
                     ))
 
+            dasha_map = natal_interp.get("dasha_life_map", [])
+            if isinstance(dasha_map, list):
+                natal_dasha_life_map_list = [
+                    e for e in dasha_map
+                    if isinstance(e, dict)
+                ]
+
     try:
         confidence_result = assess_calculation_confidence(ephemeris)
         calc_confidence = confidence_result.get("level", "high")
@@ -1211,6 +1219,7 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
         natal_relationships=natal_relationships_obj,
         natal_current_chapter=natal_current_chapter_obj,
         natal_life_by_decade=natal_life_by_decade_list,
+        natal_dasha_life_map=natal_dasha_life_map_list,
         methodology=MethodologyInfo(
             ephemeris_source="Swiss Ephemeris",
             ayanamsa=_ayanamsa_label(chart_metadata.get("ayanamsa", "lahiri")),
