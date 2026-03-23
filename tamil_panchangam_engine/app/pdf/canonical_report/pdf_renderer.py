@@ -835,56 +835,53 @@ def _build_natal_v2_interpretation(
             what_happened = entry.get("what_happened", "")
             bg, border = DASHA_MAP_COLORS[
                 i % len(DASHA_MAP_COLORS)]
-            header = Table(
-                [[
-                    Paragraph(
-                        f"<b>{planet}</b>",
-                        ParagraphStyle(
-                            'DashaMapPlanet',
-                            parent=styles['Normal'],
-                            fontSize=10,
-                            fontName='Helvetica-Bold',
-                            textColor=border,
-                        )
-                    ),
-                    Paragraph(
-                        period,
-                        styles['BodyText']
-                    ),
-                    Paragraph(
-                        f"<i>{theme}</i>",
-                        styles['BodyText']
-                    ),
-                ]],
-                colWidths=[1.0*inch, 1.4*inch, 3.1*inch]
+            age = period
+            card = Table(
+                [
+                    [
+                        Paragraph(
+                            f"<b>{planet}</b>",
+                            ParagraphStyle(
+                                f'DashaP_{i}',
+                                parent=styles['Normal'],
+                                fontSize=10,
+                                fontName='Helvetica-Bold',
+                                textColor=colors.Color(
+                                    *COLORS["primary"]),
+                            )
+                        ),
+                        Paragraph(theme, styles['BodyText']),
+                    ],
+                    [
+                        Paragraph(
+                            age,
+                            ParagraphStyle(
+                                f'DashaA_{i}',
+                                parent=styles['Normal'],
+                                fontSize=8,
+                                textColor=colors.Color(
+                                    0.5, 0.5, 0.5),
+                            )
+                        ),
+                        Paragraph("", styles['BodyText']),
+                    ],
+                ],
+                colWidths=[0.9*inch, 4.6*inch]
             )
-            header.setStyle(TableStyle([
+            card.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, -1), bg),
                 ('LEFTPADDING', (0, 0), (-1, -1), 8),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('TOPPADDING', (0, 0), (0, 0), 6),
+                ('BOTTOMPADDING', (0, 0), (0, 0), 0),
+                ('TOPPADDING', (0, 1), (-1, 1), 0),
+                ('BOTTOMPADDING', (0, 1), (-1, 1), 6),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('SPAN', (1, 0), (1, 1)),
+                ('LINEBELOW', (0, 0), (-1, -1), 0.3,
+                 colors.Color(0.85, 0.85, 0.85)),
             ]))
-            elements.append(header)
-            if what_happened:
-                body = Table(
-                    [[Paragraph(
-                        what_happened, styles['BodyText']
-                    )]],
-                    colWidths=[5.5*inch]
-                )
-                body.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, -1),
-                     colors.Color(0.98, 0.98, 0.98)),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 14),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-                    ('TOPPADDING', (0, 0), (-1, -1), 4),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                    ('LINEBELOW', (0, 0), (-1, 0), 0.3,
-                     colors.Color(0.85, 0.85, 0.85)),
-                ]))
-                elements.append(body)
+            elements.append(card)
         elements.append(Spacer(1, 0.2*inch))
 
     if data.closing_note:
