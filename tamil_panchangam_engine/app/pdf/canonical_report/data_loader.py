@@ -40,6 +40,11 @@ from .models import (
     V4Remedy,
     V4Remedies,
     V4CautionWindow,
+    NatalWhoYouAre,
+    NatalWhereYouShine,
+    NatalRelationships,
+    NatalCurrentChapter,
+    NatalDecade,
 )
 
 logger = logging.getLogger(__name__)
@@ -1048,6 +1053,14 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
     natal_closing_note = ""
     natal_llm_enhanced = False
 
+    # natal v2 fields
+    is_natal_v2 = False
+    natal_who_you_are_obj = None
+    natal_where_you_shine_obj = None
+    natal_relationships_obj = None
+    natal_current_chapter_obj = None
+    natal_life_by_decade_list: List[NatalDecade] = []
+
     if natal_interp:
         natal_llm_enhanced = True
         life_theme = natal_interp.get("life_theme", {})
@@ -1097,6 +1110,55 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
         elif isinstance(closing_raw, str):
             natal_closing_note = closing_raw
 
+        # natal v2 population
+        natal_engine = natal_interp.get("engine_version", "")
+        if natal_engine == "natal-v2.0":
+            is_natal_v2 = True
+
+            wya = natal_interp.get("who_you_are", {})
+            if wya:
+                natal_who_you_are_obj = NatalWhoYouAre(
+                    core_identity=wya.get("core_identity", ""),
+                    in_one_line=wya.get("in_one_line", ""),
+                    core_strengths=wya.get("core_strengths", []),
+                    growth_edges=wya.get("growth_edges", []),
+                    central_tension=wya.get("central_tension", ""),
+                )
+
+            wys = natal_interp.get("where_you_shine", {})
+            if wys:
+                natal_where_you_shine_obj = NatalWhereYouShine(
+                    natural_domains=wys.get("natural_domains", []),
+                    why=wys.get("why", ""),
+                    working_style=wys.get("working_style", ""),
+                )
+
+            raf = natal_interp.get("relationships_and_family", {})
+            if raf:
+                natal_relationships_obj = NatalRelationships(
+                    partnership_nature=raf.get("partnership_nature", ""),
+                    marriage_windows=raf.get("marriage_windows", ""),
+                    children_indication=raf.get("children_indication", ""),
+                    family_dynamics=raf.get("family_dynamics", ""),
+                )
+
+            cc = natal_interp.get("current_chapter", {})
+            if cc:
+                natal_current_chapter_obj = NatalCurrentChapter(
+                    dasha_now=cc.get("dasha_now", ""),
+                    what_this_means=cc.get("what_this_means", ""),
+                    focus_for_now=cc.get("focus_for_now", ""),
+                )
+
+            for d in natal_interp.get("life_by_decade", []):
+                if isinstance(d, dict):
+                    natal_life_by_decade_list.append(NatalDecade(
+                        age_range=d.get("age_range", ""),
+                        theme=d.get("theme", ""),
+                        key_focus=d.get("key_focus", ""),
+                        dasha_context=d.get("dasha_context", ""),
+                    ))
+
     try:
         confidence_result = assess_calculation_confidence(ephemeris)
         calc_confidence = confidence_result.get("level", "high")
@@ -1143,6 +1205,12 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
         practices=[],
         closing_note=natal_closing_note,
         llm_enhanced=natal_llm_enhanced,
+        is_natal_v2=is_natal_v2,
+        natal_who_you_are=natal_who_you_are_obj,
+        natal_where_you_shine=natal_where_you_shine_obj,
+        natal_relationships=natal_relationships_obj,
+        natal_current_chapter=natal_current_chapter_obj,
+        natal_life_by_decade=natal_life_by_decade_list,
         methodology=MethodologyInfo(
             ephemeris_source="Swiss Ephemeris",
             ayanamsa=_ayanamsa_label(chart_metadata.get("ayanamsa", "lahiri")),

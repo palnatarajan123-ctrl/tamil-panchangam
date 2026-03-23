@@ -25,50 +25,146 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chart", tags=["Natal Interpretation"])
 
-PROMPT_VERSION = "natal_v1.0"
+PROMPT_VERSION = "natal_v2.0"
 FEATURE_NAME = "natal_interpretation"
 
-NATAL_SYSTEM_PROMPT = """You are a classical Tamil Jyotish astrologer of the Siddhar tradition. \
-Generate a profound natal chart interpretation for this person based on their birth chart data.
+NATAL_SYSTEM_PROMPT = """You are a natal chart interpreter
+combining Tamil Jyotisha tradition with plain-English
+clarity.
 
-Return ONLY valid JSON — no markdown fences, no preamble, no explanation outside the JSON object. \
-When the chart uses KP (Krishnamurti Paddhati) ayanamsa, reference sub-lord significators in your interpretation using KP terminology. \
-Be specific and concise — every sentence must name a planet, house, or nakshatra. Avoid generic spiritual filler."""
+Your output has TWO layers:
+
+LAYER 1 — Plain English (new v2 sections):
+who_you_are, where_you_shine, relationships_and_family,
+current_chapter, life_by_decade
+
+Rules for Layer 1:
+- Write for an intelligent person with NO astrology background
+- No Sanskrit terms, no house numbers, no jargon
+- Every sentence answers: what does this mean in real life?
+- Probabilistic language only: "tends to", "often", "may",
+  "is likely to", "the chart suggests"
+- Never deterministic: no "will", "definitely", "guaranteed"
+- For marriage_windows and children_indication: give
+  favorable WINDOWS and TENDENCIES only — never specific
+  age predictions
+- Tone: grounded, honest, warm — not threatening, not
+  over-rosy
+- Acknowledge challenges constructively, never fatalistic
+- For very strong placements: highlight clearly and
+  positively
+- For challenging placements: honest but framed as growth
+
+LAYER 2 — Classical Jyotisha (existing v1 sections):
+chart_highlights, life_areas, dasha_life_map, closing_wisdom
+
+Rules for Layer 2:
+- Keep classical Siddhar tradition voice
+- Name specific planets, houses, nakshatras
+- Rich, chart-specific interpretation — no generic filler
+- For KP charts: reference sub-lord significators explicitly
+- Every sentence must name a planet, house, or nakshatra
+
+GLOBAL RULES:
+- Every sentence must be specific to THIS person's chart
+- No repeated themes across sections
+- Output ONLY valid JSON — no markdown, no text outside JSON
+- Include ALL remaining dashas from birth in dasha_life_map
+- Include ALL decades from birth to end of life in
+  life_by_decade
+- current_chapter must reflect the CURRENT dasha from
+  the chart context provided"""
 
 NATAL_USER_TEMPLATE = """Birth Chart Data:
 {chart_context}
 
-Generate a natal interpretation with this EXACT JSON schema:
+Generate a natal-v2.0 interpretation with this EXACT JSON.
+Return ONLY the JSON — no markdown fences, no preamble.
+
 {{
-  "engine_version": "natal-v1.0",
-  "life_theme": {{
-    "title": "2-4 word poetic title for this life",
-    "narrative": "3-4 sentences on the core karmic theme of this birth chart"
+  "engine_version": "natal-v2.0",
+
+  "who_you_are": {{
+    "core_identity": "3 sentences plain English. Who is this person at their core? What drives them? How do others naturally experience them? Zero astrology terms.",
+    "in_one_line": "One sentence. What a close friend who knows them well would say to describe them.",
+    "core_strengths": [
+      "Strength 1 — specific to this chart, plain English, 15 words max",
+      "Strength 2 — specific to this chart, plain English, 15 words max",
+      "Strength 3 — specific to this chart, plain English, 15 words max"
+    ],
+    "growth_edges": [
+      "Growth area 1 — framed as opportunity not flaw, 15 words max",
+      "Growth area 2 — framed as opportunity not flaw, 15 words max"
+    ],
+    "central_tension": "1-2 sentences. The core karmic push-pull of this life in plain English. What is this person's central paradox or challenge? What do they need to reconcile?"
   }},
+
+  "where_you_shine": {{
+    "natural_domains": [
+      "Specific field or domain — e.g. medicine, teaching, finance, technology",
+      "Specific field or domain",
+      "Specific field or domain"
+    ],
+    "why": "1-2 sentences. Which specific planetary placements or yogas create this natural aptitude? Plain English — translate the astrology into capability.",
+    "working_style": "1 sentence. How does this person naturally approach work, problems, and achievement?"
+  }},
+
+  "relationships_and_family": {{
+    "partnership_nature": "2 sentences. What kind of partner is this person? What do they need and offer in close relationships? Plain English.",
+    "marriage_windows": "2 sentences. When are the most favorable windows for committed partnership? Use probabilistic framing: 'the chart suggests favorable conditions during...', 'partnership tends to...' Never give a specific age as a prediction.",
+    "children_indication": "1-2 sentences. What does the chart suggest about children? Frame probabilistically. Acknowledge uncertainty naturally.",
+    "family_dynamics": "1-2 sentences. What patterns exist with parents or family of origin? What shaped this person early?"
+  }},
+
+  "current_chapter": {{
+    "dasha_now": "Current Mahadasha / Antardasha — copy from the chart context",
+    "what_this_means": "2-3 sentences. What does this specific dasha period mean for THIS person right now? What is being activated in their chart? What themes are dominant? Plain English, specific.",
+    "focus_for_now": "1 sentence. The single most important focus or opportunity for this person in their current life phase."
+  }},
+
+  "life_by_decade": [
+    {{
+      "age_range": "0-10",
+      "theme": "Plain English: what kind of period is this decade?",
+      "key_focus": "What matters most or is being built in this window?",
+      "dasha_context": "Which dasha is active and what specific life area does it activate for this chart?"
+    }}
+  ],
+
   "chart_highlights": {{
-    "lagna_interpretation": "2-3 sentences on Lagna lord and ascendant sign meaning",
-    "moon_interpretation": "2-3 sentences on Moon sign and nakshatra",
-    "strongest_influence": "2-3 sentences on the strongest planet and its life impact",
-    "key_yoga_impact": "2-3 sentences on the most significant yoga in the chart"
+    "lagna_interpretation": "2-3 sentences. Name the Lagna sign and its lord, state the lord's current placement and dignity, explain the life impact specifically for this person.",
+    "moon_interpretation": "2-3 sentences. Name the Moon sign, nakshatra, and pada. Explain emotional nature, mental patterns, and intuitive gifts specific to this placement.",
+    "strongest_influence": "2-3 sentences. Name the strongest planet by Shadbala, its placement, and its dominant life impact for this chart.",
+    "key_yoga_impact": "2-3 sentences. Name the most significant yoga present, explain its mechanism (which planets/houses form it), and state its practical life implication."
   }},
+
   "life_areas": {{
-    "career": "1-2 sentences: name the 10th house lord, its placement, and one clear career implication",
-    "wealth": "1-2 sentences: name the 2nd/11th house lord, Jupiter placement, and one wealth pattern",
-    "relationships": "1-2 sentences: name the 7th house lord, Venus placement, and one relationship tendency",
-    "health": "1-2 sentences: name the Lagna lord, 6th house condition, and one health consideration",
-    "spirituality": "1-2 sentences: name Ketu's placement, 9th house lord, and one spiritual direction"
+    "career": "2-3 sentences. Name the 10th house lord, its placement, any D10 signals if available, and one clear career implication specific to this chart.",
+    "wealth": "2-3 sentences. Name the 2nd and 11th house lords, Jupiter's placement, and one specific wealth pattern or tendency.",
+    "relationships": "2-3 sentences. Name the 7th house lord, Venus placement, and one specific relationship tendency or pattern.",
+    "health": "2-3 sentences. Name the Lagna lord, 6th house condition, and one health consideration with practical guidance.",
+    "spirituality": "2-3 sentences. Name Ketu's placement, 9th house lord, and the specific spiritual direction indicated."
   }},
+
   "dasha_life_map": [
     {{
       "mahadasha": "planet name",
       "approximate_age": "age range e.g. 0-16",
-      "theme": "1 crisp sentence naming the ruling planet's house(s) and the primary life theme it activates"
+      "theme": "1 sentence naming the ruling planet's house(s) and the primary life theme it activates for this specific chart"
     }}
   ],
-  "closing_wisdom": "1-2 sentences of Siddhar-tradition wisdom — specific to this chart's strongest feature, not generic"
+
+  "closing_wisdom": "2 sentences of Siddhar-tradition wisdom specific to this chart's most distinctive feature. Reference the actual chart — not generic wisdom."
 }}
 
-Include ALL remaining Dashas from birth onward in dasha_life_map. Be specific to their chart, not generic. Return ONLY the JSON."""
+CRITICAL:
+- Include ALL decades from 0 to end of life in life_by_decade
+- Include ALL remaining dashas from birth in dasha_life_map
+- current_chapter.dasha_now must match the current dasha
+  in the chart context
+- marriage_windows and children_indication must be
+  probabilistic — never deterministic age predictions
+- Return ONLY valid JSON"""
 
 
 class NatalInterpretationRequest(BaseModel):
@@ -147,6 +243,15 @@ def _build_natal_context(payload: Dict[str, Any]) -> str:
     lines: list[str] = []
     lines.append(f"Name: {birth.get('name', 'Unknown')}")
     lines.append(f"DOB: {birth.get('date_of_birth', '')} {birth.get('time_of_birth', '')} at {birth.get('place_of_birth', '')}")
+    dob_str = birth.get('date_of_birth', '')
+    if dob_str:
+        try:
+            from datetime import date
+            birth_year = int(str(dob_str)[:4])
+            age = date.today().year - birth_year
+            lines.append(f"Approximate current age: {age}")
+        except Exception:
+            pass
     lines.append(f"Lagna (Ascendant): {lagna.get('rasi', '')} ({lagna.get('longitude_deg', 0):.1f}°)")
     lines.append(f"Moon: {moon.get('rasi', '')} nakshatra {moon.get('nakshatra', {}).get('name', '')} pada {moon.get('nakshatra', {}).get('pada', '')}")
 
@@ -215,7 +320,31 @@ def _build_natal_context(payload: Dict[str, Any]) -> str:
 
 def _fallback_response() -> Dict[str, Any]:
     return {
-        "engine_version": "natal-v1.0",
+        "engine_version": "natal-v2.0",
+        "who_you_are": {
+            "core_identity": "",
+            "in_one_line": "",
+            "core_strengths": [],
+            "growth_edges": [],
+            "central_tension": ""
+        },
+        "where_you_shine": {
+            "natural_domains": [],
+            "why": "",
+            "working_style": ""
+        },
+        "relationships_and_family": {
+            "partnership_nature": "",
+            "marriage_windows": "",
+            "children_indication": "",
+            "family_dynamics": ""
+        },
+        "current_chapter": {
+            "dasha_now": "",
+            "what_this_means": "",
+            "focus_for_now": ""
+        },
+        "life_by_decade": [],
         "life_theme": {
             "title": "Chart Under Analysis",
             "narrative": "Enable AI interpretation to receive your personalized natal reading."
@@ -281,7 +410,7 @@ def get_natal_interpretation(request: Request, body: NatalInterpretationRequest)
     llm_response, usage_info, error = anthropic_provider.call_llm(
         system_prompt=NATAL_SYSTEM_PROMPT,
         user_prompt=user_prompt,
-        max_tokens=4000,
+        max_tokens=5000,
     )
 
     provider = usage_info.get("provider") if usage_info else None
@@ -301,7 +430,10 @@ def get_natal_interpretation(request: Request, body: NatalInterpretationRequest)
         return {"interpretation": fallback, "cached": False, "llm_error": error}
 
     # 5. Validate required keys
-    required_keys = ["life_theme", "chart_highlights", "life_areas", "dasha_life_map", "closing_wisdom"]
+    required_keys = [
+        "chart_highlights", "life_areas",
+        "dasha_life_map", "closing_wisdom"
+    ]
     for key in required_keys:
         if key not in llm_response:
             llm_response[key] = {} if key != "dasha_life_map" else []

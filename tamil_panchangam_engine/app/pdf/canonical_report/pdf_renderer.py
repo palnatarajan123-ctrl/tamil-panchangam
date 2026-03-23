@@ -424,6 +424,375 @@ def _build_kp_sublords_section(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def _build_natal_v2_interpretation(
+        data: CanonicalReportData, styles) -> List:
+    """Natal v2 — plain English first, classical second."""
+    elements = []
+
+    elements.append(Paragraph(
+        "Natal Chart Reading", styles['SectionTitle']))
+    elements.append(Paragraph(
+        "Your lifelong astrological blueprint — "
+        "plain-English guidance followed by classical "
+        "Jyotisha analysis.",
+        styles['BodyText']
+    ))
+    elements.append(Spacer(1, 0.25*inch))
+
+    # ── WHO YOU ARE ───────────────────────────────────────
+    if data.natal_who_you_are:
+        wya = data.natal_who_you_are
+        elements.append(Paragraph(
+            "Who You Are", styles['SubsectionTitle']))
+
+        if wya.in_one_line:
+            oneline = Table(
+                [[Paragraph(
+                    f"<i>{wya.in_one_line}</i>",
+                    styles['BodyText']
+                )]],
+                colWidths=[5.5*inch]
+            )
+            oneline.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1),
+                 colors.Color(0.94, 0.94, 0.99)),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('BOX', (0, 0), (-1, -1), 0.5,
+                 colors.Color(0.5, 0.5, 0.85)),
+            ]))
+            elements.append(oneline)
+            elements.append(Spacer(1, 0.1*inch))
+
+        if wya.core_identity:
+            elements.append(Paragraph(
+                wya.core_identity, styles['BodyText']))
+            elements.append(Spacer(1, 0.1*inch))
+
+        if wya.core_strengths:
+            elements.append(Paragraph(
+                "CORE STRENGTHS",
+                styles['V4SectionLabel']))
+            for s in wya.core_strengths:
+                row = Table(
+                    [[
+                        Paragraph("+", ParagraphStyle(
+                            'SIcon',
+                            parent=styles['Normal'],
+                            fontSize=11,
+                            fontName='Helvetica-Bold',
+                            textColor=colors.Color(
+                                0.15, 0.55, 0.25),
+                        )),
+                        Paragraph(s, styles['BodyText']),
+                    ]],
+                    colWidths=[0.3*inch, 5.2*inch]
+                )
+                row.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1),
+                     colors.Color(0.93, 0.98, 0.93)),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                    ('TOPPADDING', (0, 0), (-1, -1), 5),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('LINEBELOW', (0, 0), (-1, 0), 0.3,
+                     colors.Color(0.80, 0.92, 0.80)),
+                ]))
+                elements.append(row)
+            elements.append(Spacer(1, 0.1*inch))
+
+        if wya.growth_edges:
+            elements.append(Paragraph(
+                "GROWTH EDGES",
+                styles['V4SectionLabel']))
+            for g in wya.growth_edges:
+                row = Table(
+                    [[
+                        Paragraph("->", ParagraphStyle(
+                            'GIcon',
+                            parent=styles['Normal'],
+                            fontSize=11,
+                            textColor=colors.Color(
+                                0.45, 0.35, 0.65),
+                        )),
+                        Paragraph(g, styles['BodyText']),
+                    ]],
+                    colWidths=[0.3*inch, 5.2*inch]
+                )
+                row.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1),
+                     colors.Color(0.96, 0.93, 0.99)),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                    ('TOPPADDING', (0, 0), (-1, -1), 5),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('LINEBELOW', (0, 0), (-1, 0), 0.3,
+                     colors.Color(0.85, 0.80, 0.92)),
+                ]))
+                elements.append(row)
+            elements.append(Spacer(1, 0.1*inch))
+
+        if wya.central_tension:
+            elements.append(Paragraph(
+                "CENTRAL LIFE TENSION",
+                styles['V4SectionLabel']))
+            ct = Table(
+                [[Paragraph(
+                    wya.central_tension,
+                    styles['BodyText']
+                )]],
+                colWidths=[5.5*inch]
+            )
+            ct.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1),
+                 colors.Color(0.99, 0.96, 0.88)),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('BOX', (0, 0), (-1, -1), 0.5,
+                 colors.Color(0.8, 0.6, 0.2)),
+            ]))
+            elements.append(ct)
+        elements.append(Spacer(1, 0.2*inch))
+
+    # ── WHERE YOU SHINE ───────────────────────────────────
+    if data.natal_where_you_shine:
+        wys = data.natal_where_you_shine
+        elements.append(Paragraph(
+            "Where You Shine", styles['SubsectionTitle']))
+
+        if wys.natural_domains:
+            dom_table = Table(
+                [[
+                    Paragraph(
+                        "NATURAL DOMAINS",
+                        styles['V4SectionLabel']
+                    ),
+                    Paragraph(
+                        ", ".join(wys.natural_domains),
+                        styles['BodyText']
+                    ),
+                ]],
+                colWidths=[1.5*inch, 4.0*inch]
+            )
+            dom_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1),
+                 colors.Color(0.92, 0.98, 0.92)),
+                ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('BOX', (0, 0), (-1, -1), 0.5,
+                 colors.Color(0.4, 0.75, 0.4)),
+                ('FONTNAME', (0, 0), (0, 0),
+                 'Helvetica-Bold'),
+                ('TEXTCOLOR', (0, 0), (0, 0),
+                 colors.Color(0.15, 0.55, 0.25)),
+            ]))
+            elements.append(dom_table)
+            elements.append(Spacer(1, 0.08*inch))
+
+        if wys.why:
+            elements.append(Paragraph(
+                wys.why, styles['BodyText']))
+        if wys.working_style:
+            elements.append(Paragraph(
+                f"<i>Working style: {wys.working_style}</i>",
+                styles['BodyText']
+            ))
+        elements.append(Spacer(1, 0.2*inch))
+
+    # ── RELATIONSHIPS AND FAMILY ──────────────────────────
+    if data.natal_relationships:
+        raf = data.natal_relationships
+        elements.append(Paragraph(
+            "Relationships & Family",
+            styles['SubsectionTitle']))
+
+        fields = [
+            ("PARTNERSHIP NATURE",
+             raf.partnership_nature,
+             colors.Color(0.93, 0.88, 0.98),
+             colors.Color(0.6, 0.4, 0.8)),
+            ("MARRIAGE WINDOWS",
+             raf.marriage_windows,
+             colors.Color(0.93, 0.98, 0.93),
+             colors.Color(0.4, 0.75, 0.4)),
+            ("CHILDREN",
+             raf.children_indication,
+             colors.Color(0.88, 0.95, 0.98),
+             colors.Color(0.3, 0.6, 0.8)),
+            ("FAMILY DYNAMICS",
+             raf.family_dynamics,
+             colors.Color(0.97, 0.97, 0.97),
+             colors.Color(0.6, 0.6, 0.6)),
+        ]
+        for label, text, bg, border in fields:
+            if not text:
+                continue
+            ft = Table(
+                [[
+                    Paragraph(label, ParagraphStyle(
+                        'RafLabel',
+                        parent=styles['Normal'],
+                        fontSize=8,
+                        fontName='Helvetica-Bold',
+                        textColor=border,
+                    )),
+                    Paragraph(text, styles['BodyText']),
+                ]],
+                colWidths=[1.4*inch, 4.1*inch]
+            )
+            ft.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), bg),
+                ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LINEBELOW', (0, 0), (-1, 0), 0.3,
+                 colors.Color(0.85, 0.85, 0.85)),
+            ]))
+            elements.append(ft)
+        elements.append(Spacer(1, 0.2*inch))
+
+    # ── CURRENT CHAPTER ───────────────────────────────────
+    if data.natal_current_chapter:
+        cc = data.natal_current_chapter
+        elements.append(Paragraph(
+            "Your Current Chapter",
+            styles['SubsectionTitle']))
+
+        if cc.dasha_now:
+            elements.append(Paragraph(
+                f"<b>Active period:</b> {cc.dasha_now}",
+                styles['BodyText']
+            ))
+        if cc.what_this_means:
+            elements.append(Paragraph(
+                cc.what_this_means, styles['BodyText']))
+        if cc.focus_for_now:
+            fn = Table(
+                [[
+                    Paragraph(
+                        "FOCUS NOW",
+                        styles['V4SectionLabel']
+                    ),
+                    Paragraph(
+                        cc.focus_for_now,
+                        styles['BodyText']
+                    ),
+                ]],
+                colWidths=[1.0*inch, 4.5*inch]
+            )
+            fn.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1),
+                 colors.Color(0.94, 0.94, 0.99)),
+                ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('BOX', (0, 0), (-1, -1), 0.5,
+                 colors.Color(0.5, 0.5, 0.85)),
+            ]))
+            elements.append(fn)
+        elements.append(Spacer(1, 0.2*inch))
+
+    # ── LIFE BY DECADE ────────────────────────────────────
+    if data.natal_life_by_decade:
+        elements.append(Paragraph(
+            "Life by Decade", styles['SubsectionTitle']))
+        elements.append(Spacer(1, 0.1*inch))
+
+        decade_data = [["Age", "Theme", "Key Focus"]]
+        for d in data.natal_life_by_decade:
+            decade_data.append([
+                d.age_range,
+                d.theme,
+                d.key_focus,
+            ])
+
+        dt = Table(
+            decade_data,
+            colWidths=[0.7*inch, 2.8*inch, 2.0*inch]
+        )
+        dt.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0),
+             colors.Color(*COLORS["primary"])),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0),
+             'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('GRID', (0, 0), (-1, -1), 0.5,
+             colors.Color(*COLORS["muted"])),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('BACKGROUND', (0, 1), (-1, -1),
+             colors.Color(0.97, 0.97, 0.97)),
+            ('FONTNAME', (0, 1), (0, -1),
+             'Helvetica-Bold'),
+        ]))
+        elements.append(dt)
+        elements.append(Spacer(1, 0.2*inch))
+
+    # ── CLASSICAL SECTIONS ────────────────────────────────
+    elements.append(PageBreak())
+    elements.append(Paragraph(
+        "Classical Chart Analysis",
+        styles['SectionTitle']))
+    elements.append(Paragraph(
+        "In-depth interpretation using Tamil Jyotisha "
+        "and Siddhar tradition.",
+        styles['BodyText']
+    ))
+    elements.append(Spacer(1, 0.2*inch))
+
+    if data.prediction_overview:
+        elements.append(Paragraph(
+            "Life Theme", styles['SubsectionTitle']))
+        for grp in _split_sentences(
+                data.prediction_overview, per_group=3):
+            elements.append(Paragraph(
+                grp, styles['BodyText']))
+        elements.append(Spacer(1, 0.2*inch))
+
+    if data.prediction_areas:
+        elements.append(Paragraph(
+            "Life Area Blueprint",
+            styles['SubsectionTitle']))
+        elements.append(Spacer(1, 0.1*inch))
+        for area in data.prediction_areas:
+            area_el = []
+            area_el.append(Paragraph(
+                f"<b>{area.area}</b>",
+                styles['SubsectionTitle']
+            ))
+            if area.interpretation:
+                for grp in _split_sentences(
+                        area.interpretation, per_group=2):
+                    area_el.append(Paragraph(
+                        grp, styles['BodyText']))
+            area_el.append(Spacer(1, 0.15*inch))
+            elements.append(KeepTogether(area_el))
+
+    if data.closing_note:
+        elements.append(Spacer(1, 0.2*inch))
+        elements.append(Paragraph(
+            data.closing_note, styles['BodyText']))
+
+    elements.append(PageBreak())
+    return elements
+
+
 def _build_natal_interpretation_section(data: CanonicalReportData, styles) -> List:
     """Build natal LLM interpretation section for birth chart PDF."""
     elements = []
@@ -1966,8 +2335,16 @@ def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
     story.extend(_build_yogas_section(data, styles))
     story.extend(_build_sade_sati_section(data, styles))
     story.extend(_build_shadbala_section(data, styles))
-    if data.prediction_overview or data.prediction_areas:
-        story.extend(_build_natal_interpretation_section(data, styles))
+    if data.is_natal_v2 or data.prediction_overview \
+            or data.prediction_areas:
+        if data.is_natal_v2:
+            story.extend(
+                _build_natal_v2_interpretation(
+                    data, styles))
+        else:
+            story.extend(
+                _build_natal_interpretation_section(
+                    data, styles))
     story.extend(_build_methodology_appendix(data, styles))
 
     doc.build(story)

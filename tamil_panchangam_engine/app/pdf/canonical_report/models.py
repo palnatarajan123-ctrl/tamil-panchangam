@@ -6,7 +6,7 @@ All data is READ-ONLY from database - no recalculation.
 """
 
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 
@@ -213,6 +213,42 @@ class KpSublordsData(BaseModel):
     entries: List[Dict[str, Any]] = []  # list of {planet, longitude, star_lord, sub_lord, sub_sub_lord}
 
 
+# ── Natal V2 models ────────────────────────────────────────
+
+class NatalWhoYouAre(BaseModel):
+    core_identity: str = ""
+    in_one_line: str = ""
+    core_strengths: List[str] = Field(default_factory=list)
+    growth_edges: List[str] = Field(default_factory=list)
+    central_tension: str = ""
+
+
+class NatalWhereYouShine(BaseModel):
+    natural_domains: List[str] = Field(default_factory=list)
+    why: str = ""
+    working_style: str = ""
+
+
+class NatalRelationships(BaseModel):
+    partnership_nature: str = ""
+    marriage_windows: str = ""
+    children_indication: str = ""
+    family_dynamics: str = ""
+
+
+class NatalCurrentChapter(BaseModel):
+    dasha_now: str = ""
+    what_this_means: str = ""
+    focus_for_now: str = ""
+
+
+class NatalDecade(BaseModel):
+    age_range: str = ""
+    theme: str = ""
+    key_focus: str = ""
+    dasha_context: str = ""
+
+
 class CanonicalReportData(BaseModel):
     """Complete data model for canonical PDF report."""
 
@@ -269,3 +305,11 @@ class CanonicalReportData(BaseModel):
     v4_remedies: Optional[V4Remedies] = None
     v4_caution_windows: List[V4CautionWindow] = []
     v4_key_takeaways: List[str] = []
+
+    # natal v2 fields
+    is_natal_v2: bool = False
+    natal_who_you_are: Optional[NatalWhoYouAre] = None
+    natal_where_you_shine: Optional[NatalWhereYouShine] = None
+    natal_relationships: Optional[NatalRelationships] = None
+    natal_current_chapter: Optional[NatalCurrentChapter] = None
+    natal_life_by_decade: List[NatalDecade] = Field(default_factory=list)

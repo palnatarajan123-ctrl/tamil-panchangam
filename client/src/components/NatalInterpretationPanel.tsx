@@ -46,6 +46,35 @@ interface NatalInterpretation {
   dasha_life_map: DashaEntry[];
   closing_wisdom: string;
   llm_disabled?: boolean;
+  who_you_are?: {
+    core_identity: string;
+    in_one_line: string;
+    core_strengths: string[];
+    growth_edges: string[];
+    central_tension: string;
+  };
+  where_you_shine?: {
+    natural_domains: string[];
+    why: string;
+    working_style: string;
+  };
+  relationships_and_family?: {
+    partnership_nature: string;
+    marriage_windows: string;
+    children_indication: string;
+    family_dynamics: string;
+  };
+  current_chapter?: {
+    dasha_now: string;
+    what_this_means: string;
+    focus_for_now: string;
+  };
+  life_by_decade?: Array<{
+    age_range: string;
+    theme: string;
+    key_focus: string;
+    dasha_context: string;
+  }>;
 }
 
 const LIFE_AREA_LABELS: Record<string, string> = {
@@ -224,8 +253,160 @@ export function NatalInterpretationPanel({ chartId }: { chartId: string }) {
 
         {!isLoading && !error && interp && !interp.llm_disabled && (
           <div className="space-y-6">
-            {/* Life Theme */}
-            {interp.life_theme?.title && (
+            {(() => { const isV2 = interp.engine_version === "natal-v2.0"; return (
+            <>
+          {/* V2: WHO YOU ARE */}
+          {isV2 && interp.who_you_are && (
+            <div className="space-y-3">
+              <h3 className="text-base font-semibold">Who You Are</h3>
+              {interp.who_you_are.in_one_line && (
+                <p className="text-sm italic text-muted-foreground border-l-2 border-primary/40 pl-3">
+                  {interp.who_you_are.in_one_line}
+                </p>
+              )}
+              {interp.who_you_are.core_identity && (
+                <p className="text-sm leading-relaxed">
+                  {interp.who_you_are.core_identity}
+                </p>
+              )}
+              {(interp.who_you_are.core_strengths?.length ?? 0) > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Core Strengths
+                  </p>
+                  <ul className="space-y-1">
+                    {interp.who_you_are.core_strengths.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm bg-green-50 dark:bg-green-950/30 rounded px-3 py-2">
+                        <span className="text-green-600 dark:text-green-400 font-bold mt-0.5 shrink-0">+</span>
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(interp.who_you_are.growth_edges?.length ?? 0) > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Growth Edges
+                  </p>
+                  <ul className="space-y-1">
+                    {interp.who_you_are.growth_edges.map((g, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm bg-purple-50 dark:bg-purple-950/30 rounded px-3 py-2">
+                        <span className="text-purple-600 dark:text-purple-400 font-bold mt-0.5 shrink-0">→</span>
+                        {g}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {interp.who_you_are.central_tension && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 rounded px-3 py-2 border-l-2 border-amber-400">
+                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide mb-1">
+                    Central Life Tension
+                  </p>
+                  <p className="text-sm">{interp.who_you_are.central_tension}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* V2: WHERE YOU SHINE */}
+          {isV2 && interp.where_you_shine && (
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold">Where You Shine</h3>
+              {(interp.where_you_shine.natural_domains?.length ?? 0) > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {interp.where_you_shine.natural_domains.map((d, i) => (
+                    <span key={i} className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-medium px-2.5 py-1 rounded-full">
+                      {d}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {interp.where_you_shine.why && (
+                <p className="text-sm text-muted-foreground">{interp.where_you_shine.why}</p>
+              )}
+              {interp.where_you_shine.working_style && (
+                <p className="text-sm italic text-muted-foreground">{interp.where_you_shine.working_style}</p>
+              )}
+            </div>
+          )}
+
+          {/* V2: RELATIONSHIPS AND FAMILY */}
+          {isV2 && interp.relationships_and_family && (
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold">Relationships &amp; Family</h3>
+              {interp.relationships_and_family.partnership_nature && (
+                <div className="rounded px-3 py-2 bg-purple-50 dark:bg-purple-950/20">
+                  <p className="text-xs font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wide mb-1">Partnership Nature</p>
+                  <p className="text-sm">{interp.relationships_and_family.partnership_nature}</p>
+                </div>
+              )}
+              {interp.relationships_and_family.marriage_windows && (
+                <div className="rounded px-3 py-2 bg-green-50 dark:bg-green-950/20">
+                  <p className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide mb-1">Marriage Windows</p>
+                  <p className="text-sm">{interp.relationships_and_family.marriage_windows}</p>
+                </div>
+              )}
+              {interp.relationships_and_family.children_indication && (
+                <div className="rounded px-3 py-2 bg-blue-50 dark:bg-blue-950/20">
+                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide mb-1">Children</p>
+                  <p className="text-sm">{interp.relationships_and_family.children_indication}</p>
+                </div>
+              )}
+              {interp.relationships_and_family.family_dynamics && (
+                <div className="rounded px-3 py-2 bg-muted/40">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Family Dynamics</p>
+                  <p className="text-sm">{interp.relationships_and_family.family_dynamics}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* V2: CURRENT CHAPTER */}
+          {isV2 && interp.current_chapter && (
+            <div className="space-y-2 bg-muted/30 rounded-lg p-4">
+              <h3 className="text-base font-semibold">Your Current Chapter</h3>
+              {interp.current_chapter.dasha_now && (
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium">Active period:</span>{" "}
+                  {interp.current_chapter.dasha_now}
+                </p>
+              )}
+              {interp.current_chapter.what_this_means && (
+                <p className="text-sm leading-relaxed">{interp.current_chapter.what_this_means}</p>
+              )}
+              {interp.current_chapter.focus_for_now && (
+                <div className="bg-primary/10 rounded px-3 py-2 border-l-2 border-primary">
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-0.5">Focus Now</p>
+                  <p className="text-sm">{interp.current_chapter.focus_for_now}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* V2: LIFE BY DECADE */}
+          {isV2 && (interp.life_by_decade?.length ?? 0) > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold">Life by Decade</h3>
+              <div className="space-y-2">
+                {interp.life_by_decade!.map((d, i) => (
+                  <div key={i} className="flex gap-3 items-start border-b border-border/30 pb-2 last:border-0">
+                    <div className="flex-shrink-0 w-14 text-right">
+                      <span className="text-xs font-mono font-semibold text-primary">{d.age_range}</span>
+                    </div>
+                    <div className="flex-1 space-y-0.5">
+                      <p className="text-sm font-medium">{d.theme}</p>
+                      <p className="text-xs text-muted-foreground">{d.key_focus}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+            {/* V1 only: Life Theme */}
+            {!isV2 && interp.life_theme?.title && (
               <div className="space-y-2">
                 <h3 className="text-lg font-serif font-semibold text-amber-400">
                   {interp.life_theme.title}
@@ -279,6 +460,8 @@ export function NatalInterpretationPanel({ chartId }: { chartId: string }) {
                 {interp.closing_wisdom}
               </p>
             )}
+            </>
+            ); })()}
           </div>
         )}
       </CardContent>
