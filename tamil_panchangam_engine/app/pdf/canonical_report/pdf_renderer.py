@@ -1429,8 +1429,6 @@ def _build_methodology_appendix(data: CanonicalReportData, styles) -> List:
     """Build methodology appendix section."""
     elements = []
 
-    elements.append(PageBreak())
-
     if not data.methodology:
         return elements
     
