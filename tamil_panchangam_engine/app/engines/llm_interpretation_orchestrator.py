@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Literal
 
 from app.db.postgres import get_conn
+from app.engines.budget_guard import log_llm_call
 from app.llm.token_estimator import check_token_limits, get_max_completion_tokens
 from app.llm.providers import anthropic_provider as openai_provider  # openai_provider alias kept for internal references
 from app.llm.payload_builder import (
@@ -226,6 +227,18 @@ def _persist_interpretation(
                         id, feature_name, prompt_version, total_tokens, created_at
                     ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """, [usage_id, feature_name, prompt_version, total_tokens])
+
+            # Log to unified llm_calls table for budget tracking
+            log_llm_call(
+                db=conn,
+                chart_id=base_chart_id,
+                call_type="prediction",
+                period=f"{period_type}/{period_key}",
+                input_tokens=prompt_tokens,
+                output_tokens=completion_tokens,
+                status="error" if fallback_reason else "success",
+                fallback_reason=fallback_reason,
+            )
                 
     except Exception as e:
         logger.error(f"Failed to persist interpretation: {e}")

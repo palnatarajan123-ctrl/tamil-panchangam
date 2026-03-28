@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.db.postgres import get_conn
+from app.engines.budget_guard import get_monthly_summary
 from app.engines.llm_interpretation_orchestrator import (
     is_llm_enabled,
     set_llm_enabled,
@@ -151,14 +152,123 @@ def get_fallback_summary():
 def toggle_llm(request: ToggleRequest):
     """Enable or disable LLM interpretation."""
     success = set_llm_enabled(request.enabled)
-    
+
     if not success:
         raise HTTPException(status_code=500, detail="Failed to toggle LLM state")
-    
+
+    # Also sync llm_budget singleton
+    try:
+        with get_conn() as conn:
+            conn.execute("""
+                UPDATE llm_budget SET
+                    llm_enabled = ?,
+                    paused_reason = CASE WHEN ? = FALSE THEN 'manual' ELSE NULL END,
+                    paused_at = CASE WHEN ? = FALSE THEN CURRENT_TIMESTAMP ELSE NULL END,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = 1
+            """, [request.enabled, request.enabled, request.enabled])
+    except Exception as e:
+        logger.warning(f"Failed to sync llm_budget on toggle: {e}")
+
     return ToggleResponse(
         success=True,
         llm_enabled=request.enabled
     )
+
+
+# ── New v2 endpoints ─────────────────────────────────────────────────────
+
+@router.get("/summary")
+def llm_summary_v2():
+    """Monthly cost/budget summary for admin dashboard v2."""
+    try:
+        return get_monthly_summary()
+    except Exception as e:
+        logger.error(f"Failed to get LLM summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/calls")
+def llm_calls_list(page: int = 1, per_page: int = 20, call_type: Optional[str] = None):
+    """Paginated list of LLM calls from llm_calls table."""
+    offset = (page - 1) * per_page
+    try:
+        with get_conn() as conn:
+            if call_type:
+                rows = conn.execute("""
+                    SELECT id, chart_id, call_type, period,
+                           input_tokens, output_tokens, total_tokens,
+                           cost_usd, status, fallback_reason, created_at
+                    FROM llm_calls
+                    WHERE call_type = ?
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?
+                """, [call_type, per_page, offset]).fetchall()
+                total_row = conn.execute(
+                    "SELECT COUNT(*) FROM llm_calls WHERE call_type = ?", [call_type]
+                ).fetchone()
+            else:
+                rows = conn.execute("""
+                    SELECT id, chart_id, call_type, period,
+                           input_tokens, output_tokens, total_tokens,
+                           cost_usd, status, fallback_reason, created_at
+                    FROM llm_calls
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?
+                """, [per_page, offset]).fetchall()
+                total_row = conn.execute(
+                    "SELECT COUNT(*) FROM llm_calls"
+                ).fetchone()
+
+        total = int(total_row[0]) if total_row else 0
+        calls = [
+            {
+                "id": str(r[0]), "chart_id": str(r[1]) if r[1] else "",
+                "call_type": str(r[2]) if r[2] else "prediction",
+                "period": str(r[3]) if r[3] else "",
+                "input_tokens": int(r[4] or 0), "output_tokens": int(r[5] or 0),
+                "total_tokens": int(r[6] or 0), "cost_usd": float(r[7] or 0),
+                "status": str(r[8]) if r[8] else "success",
+                "fallback_reason": r[9], "created_at": str(r[10]),
+            }
+            for r in rows
+        ]
+        return {"calls": calls, "total": total, "page": page, "per_page": per_page}
+    except Exception as e:
+        logger.error(f"Failed to get LLM calls: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class BudgetUpdateRequest(BaseModel):
+    monthly_budget_usd: Optional[float] = None
+    auto_pause_enabled: Optional[bool] = None
+    auto_pause_threshold_pct: Optional[int] = None
+
+
+@router.post("/budget")
+def update_budget(request: BudgetUpdateRequest):
+    """Update monthly budget config."""
+    try:
+        with get_conn() as conn:
+            if request.monthly_budget_usd is not None:
+                conn.execute(
+                    "UPDATE llm_budget SET monthly_budget_usd = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+                    [request.monthly_budget_usd]
+                )
+            if request.auto_pause_enabled is not None:
+                conn.execute(
+                    "UPDATE llm_budget SET auto_pause_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+                    [request.auto_pause_enabled]
+                )
+            if request.auto_pause_threshold_pct is not None:
+                conn.execute(
+                    "UPDATE llm_budget SET auto_pause_threshold_pct = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+                    [request.auto_pause_threshold_pct]
+                )
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"Failed to update budget: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 class ClearCacheRequest(BaseModel):

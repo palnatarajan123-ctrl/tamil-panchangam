@@ -197,6 +197,41 @@ def bootstrap():
         )
         """)
 
+        # llm_calls — unified log for prediction + chat LLM calls
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS llm_calls (
+            id TEXT PRIMARY KEY,
+            chart_id TEXT,
+            call_type TEXT DEFAULT 'prediction',
+            period TEXT,
+            input_tokens INTEGER DEFAULT 0,
+            output_tokens INTEGER DEFAULT 0,
+            total_tokens INTEGER DEFAULT 0,
+            cost_usd REAL DEFAULT 0.0,
+            status TEXT DEFAULT 'success',
+            fallback_reason TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        # llm_budget — singleton budget config row (id always = 1)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS llm_budget (
+            id INTEGER PRIMARY KEY,
+            monthly_budget_usd REAL DEFAULT 50.0,
+            auto_pause_enabled BOOLEAN DEFAULT TRUE,
+            auto_pause_threshold_pct INTEGER DEFAULT 90,
+            llm_enabled BOOLEAN DEFAULT TRUE,
+            paused_reason TEXT,
+            paused_at TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        conn.execute("""
+        INSERT INTO llm_budget (id) VALUES (1) ON CONFLICT DO NOTHING
+        """)
+
         conn.commit()
         logger.info("PostgreSQL schema bootstrapped successfully")
     except Exception as e:

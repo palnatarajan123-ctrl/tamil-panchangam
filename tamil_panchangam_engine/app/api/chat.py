@@ -20,6 +20,7 @@ from app.db.postgres import get_conn
 from app.engines.yoga_engine import compute_yogas
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.shadbala_engine import compute_shadbala
+from app.engines.budget_guard import log_llm_call
 
 logger = logging.getLogger(__name__)
 
@@ -312,9 +313,21 @@ async def chat_stream(
     if not api_key:
         raise HTTPException(status_code=500, detail="LLM not configured")
 
+    # Budget gate — check llm_budget before calling Anthropic
+    with get_conn() as conn:
+        budget_row = conn.execute(
+            "SELECT llm_enabled, paused_reason FROM llm_budget WHERE id = 1"
+        ).fetchone()
+
     async def generate():
+        if budget_row and not budget_row[0]:
+            yield f"data: {json.dumps({'error': 'llm_paused', 'reason': budget_row[1]})}\n\n"
+            return
+
         import anthropic
         full_response = []
+        input_tokens = 0
+        output_tokens = 0
         try:
             client = anthropic.Anthropic(api_key=api_key)
             with client.messages.stream(
@@ -326,16 +339,48 @@ async def chat_stream(
                 for text in stream.text_stream:
                     full_response.append(text)
                     yield f"data: {json.dumps({'text': text})}\n\n"
+                # Capture usage before exiting the stream context
+                final_msg = stream.get_final_message()
+                input_tokens = final_msg.usage.input_tokens
+                output_tokens = final_msg.usage.output_tokens
 
             # Save assistant response
             _save_chat_message(
                 user_id, req.base_chart_id, session_id,
                 "assistant", "".join(full_response)
             )
+
+            # Log to llm_calls and check budget
+            with get_conn() as db:
+                log_llm_call(
+                    db=db,
+                    chart_id=req.base_chart_id,
+                    call_type="chat",
+                    period="chat",
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    status="success",
+                )
+
             yield f"data: {json.dumps({'done': True})}\n\n"
 
         except Exception as e:
             logger.error(f"Chat stream error: {e}")
+            # Log failed call
+            try:
+                with get_conn() as db:
+                    log_llm_call(
+                        db=db,
+                        chart_id=req.base_chart_id,
+                        call_type="chat",
+                        period="chat",
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        status="error",
+                        fallback_reason=str(e)[:100],
+                    )
+            except Exception:
+                pass
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
