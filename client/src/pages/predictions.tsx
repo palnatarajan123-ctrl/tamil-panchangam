@@ -47,7 +47,9 @@ import {
   ShieldCheck,
   ShieldAlert,
   Info,
+  MessageCircle,
 } from "lucide-react";
+import { ChatPanel } from "@/components/ChatPanel";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -66,6 +68,7 @@ const yearlySchema = z.object({
 export default function Predictions() {
   const { id } = useParams<{ id: string }>();
   const baseChartId = id;
+  const [chatOpen, setChatOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -476,11 +479,36 @@ export default function Predictions() {
             </Card>
           )}
           
-          <MonthlyPredictionView prediction={prediction} period={predictionType} envelope={envelopeData} />
-          
+          <div className="flex gap-4 items-start">
+            <div className={chatOpen ? "flex-1 min-w-0" : "w-full"}>
+              <MonthlyPredictionView prediction={prediction} period={predictionType} envelope={envelopeData} />
+            </div>
+            {chatOpen && (
+              <div className="w-80 flex-shrink-0 h-[600px] rounded-xl overflow-hidden border border-border shadow-sm">
+                <ChatPanel
+                  baseChartId={baseChartId!}
+                  chartName={chart?.payload?.birth_details?.name || chart?.name || "Chart"}
+                  mahadasha={chart?.payload?.dasha_periods?.current?.mahadasha || "—"}
+                  antardasha={chart?.payload?.dasha_periods?.current?.antardasha || "—"}
+                  periodLabel={predictionType === "monthly" ? `${prediction?.periodLabel || ""}` : String(new Date().getFullYear())}
+                  onClose={() => setChatOpen(false)}
+                />
+              </div>
+            )}
+          </div>
+
           {/* PDF Download Button */}
           {lastPredictionParams && (
-            <div className="mt-6 flex justify-center">
+            <div className="mt-6 flex justify-center gap-3">
+              {prediction && (
+                <button
+                  onClick={() => setChatOpen((v) => !v)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-sm font-medium"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  {chatOpen ? "Close Chat" : "Ask Jyotishi"}
+                </button>
+              )}
               <Button
                 onClick={handleDownloadPdf}
                 disabled={isDownloadingPdf}
