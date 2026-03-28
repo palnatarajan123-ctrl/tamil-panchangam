@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/user", tags=["User Charts"])
 
 MAX_CHARTS_PER_USER = 10
+MAX_CHARTS_ADMIN = None  # unlimited
 
 
 # ── Models ───────────────────────────────────────────────────────────────────
@@ -90,15 +91,16 @@ def save_chart(body: SaveChartRequest, user: dict = Depends(get_current_user)):
         if existing:
             return {"id": existing[0], "already_saved": True}
 
-        # Enforce max 10 charts
-        count = conn.execute(
-            "SELECT COUNT(*) FROM user_charts WHERE user_id = ?", [user["id"]]
-        ).fetchone()[0]
-        if count >= MAX_CHARTS_PER_USER:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Maximum of {MAX_CHARTS_PER_USER} saved charts reached. Delete one to save more.",
-            )
+        # Enforce max charts (admin = unlimited)
+        if user.get("role") != "admin":
+            count = conn.execute(
+                "SELECT COUNT(*) FROM user_charts WHERE user_id = ?", [user["id"]]
+            ).fetchone()[0]
+            if count >= MAX_CHARTS_PER_USER:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Maximum of {MAX_CHARTS_PER_USER} saved charts reached. Delete one to save more.",
+                )
 
         uc_id = str(uuid.uuid4())
         conn.execute(
