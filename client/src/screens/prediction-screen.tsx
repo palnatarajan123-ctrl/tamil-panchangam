@@ -175,10 +175,12 @@ export default function PredictionScreen() {
           {period} Predictions
         </h1>
         {data && (
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-base font-semibold text-foreground mt-0.5">
             {data?.details?.envelope?.birth_details?.name || ""}
-            {data?.details?.envelope?.ephemeris?.moon?.rasi ? ` · ${data.details.envelope.ephemeris.moon.rasi}` : ""}
-            {data?.details?.envelope?.ephemeris?.moon?.nakshatra?.name ? ` · ${data.details.envelope.ephemeris.moon.nakshatra.name}` : ""}
+            <span className="font-normal text-muted-foreground">
+              {data?.details?.envelope?.ephemeris?.moon?.rasi ? ` · ${data.details.envelope.ephemeris.moon.rasi}` : ""}
+              {data?.details?.envelope?.ephemeris?.moon?.nakshatra?.name ? ` · ${data.details.envelope.ephemeris.moon.nakshatra.name}` : ""}
+            </span>
           </p>
         )}
 

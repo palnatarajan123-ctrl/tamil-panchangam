@@ -393,6 +393,7 @@ def build_monthly_prediction_envelope(
         # ✅ CRITICAL: DERIVED HOUSES (NOT FROM DB)
         "houses": houses,
 
+        "birth_details": base_chart.get("birth_details", {}),
         "ephemeris": base_chart.get("ephemeris", {}),
 
         "environment": {
