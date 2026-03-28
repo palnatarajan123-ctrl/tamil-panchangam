@@ -17,6 +17,8 @@ from app.engines.drishti_engine import compute_drishti
 from app.engines.house_strength_engine import compute_all_house_strength
 from app.engines.functional_role_engine import compute_functional_roles
 from app.engines.yoga_engine import compute_yogas
+from app.engines.sade_sati_engine import compute_sade_sati
+from app.engines.shadbala_engine import compute_shadbala
 from app.engines.event_window_engine import compute_event_windows
 
 logger = logging.getLogger(__name__)
@@ -51,6 +53,24 @@ def build_mahadasha_timeline(vimshottari: dict) -> list:
 # ============================================================
 # MONTHLY PREDICTION ENVELOPE
 # ============================================================
+
+def _compute_sade_sati_safe(base_chart: dict) -> dict:
+    """Compute sade sati fresh — base_chart never stores it."""
+    try:
+        result = compute_sade_sati(base_chart)
+        return result if isinstance(result, dict) else {}
+    except Exception as e:
+        logger.warning(f"Sade sati computation failed: {e}")
+        return {}
+
+def _compute_shadbala_safe(base_chart: dict) -> dict:
+    """Compute shadbala fresh — base_chart never stores it."""
+    try:
+        result = compute_shadbala(base_chart)
+        return result if isinstance(result, dict) else {}
+    except Exception as e:
+        logger.warning(f"Shadbala computation failed: {e}")
+        return {}
 
 def build_monthly_prediction_envelope(
     *,
@@ -411,8 +431,8 @@ def build_monthly_prediction_envelope(
         "event_windows": event_windows,
 
         # ===== SADE SATI =====
-        "sade_sati": base_chart.get("sade_sati", {}),
+        "sade_sati": _compute_sade_sati_safe(base_chart),
 
         # ===== SHADBALA =====
-        "shadbala": base_chart.get("shadbala", {}),
+        "shadbala": _compute_shadbala_safe(base_chart),
     }

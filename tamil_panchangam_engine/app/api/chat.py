@@ -17,6 +17,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from app.core.auth import get_current_user, get_current_user_optional
 from app.db.postgres import get_conn
+from app.engines.yoga_engine import compute_yogas
+from app.engines.sade_sati_engine import compute_sade_sati
+from app.engines.shadbala_engine import compute_shadbala
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,8 @@ CHART CONTEXT:
 - Current Mahadasha: {mahadasha} | Antardasha: {antardasha}
 - Key planets: {planets_summary}
 - Active yogas: {yogas_summary}
+- Shadbala (planetary strength): {shadbala_summary}
+- Saturn influence: {sade_sati_summary}
 - Monthly outlook: {monthly_summary}
 - Yearly outlook: {yearly_summary}
 
@@ -41,7 +46,7 @@ ANSWER RULES:
 1. Lead with a direct answer — yes/likely/unlikely/no — in the first sentence
 2. Name the specific planet, house, or dasha that drives your answer
 3. Give one practical suggestion the person can act on
-4. Stay under 120 words unless the question genuinely needs more depth
+4. Stay under 150 words unless the question genuinely needs more depth
 5. Warm but grounded tone — like a trusted advisor, not a fortune teller
 6. Never be vague — if the chart is mixed, say so and explain both sides
 7. If the question is outside astrology scope, gently redirect"""
@@ -106,82 +111,133 @@ def _save_chat_message(user_id: str, base_chart_id: str, session_id: str, role: 
 def _build_chat_context(base_chart_id: str) -> dict:
     """Assemble chart context for system prompt."""
     with get_conn() as conn:
-        chart = conn.execute("""
-            SELECT payload FROM base_charts WHERE id = ?
-        """, [base_chart_id]).fetchone()
-
-        monthly = conn.execute("""
-            SELECT interpretation FROM monthly_predictions
-            WHERE base_chart_id = ?
-            ORDER BY created_at DESC LIMIT 1
-        """, [base_chart_id]).fetchone()
-
-        yearly = conn.execute("""
-            SELECT interpretation FROM yearly_predictions
-            WHERE base_chart_id = ?
-            ORDER BY created_at DESC LIMIT 1
-        """, [base_chart_id]).fetchone()
+        chart = conn.execute(
+            "SELECT payload FROM base_charts WHERE id = ?",
+            [base_chart_id]
+        ).fetchone()
+        monthly = conn.execute(
+            "SELECT interpretation FROM monthly_predictions WHERE base_chart_id = ? ORDER BY created_at DESC LIMIT 1",
+            [base_chart_id]
+        ).fetchone()
+        yearly = conn.execute(
+            "SELECT interpretation FROM yearly_predictions WHERE base_chart_id = ? ORDER BY created_at DESC LIMIT 1",
+            [base_chart_id]
+        ).fetchone()
 
     if not chart:
         raise HTTPException(status_code=404, detail="Chart not found")
 
     payload = chart[0] if isinstance(chart[0], dict) else json.loads(chart[0])
-
     birth = payload.get("birth_details", {})
     ephemeris = payload.get("ephemeris", {})
     planets = ephemeris.get("planets", {})
-    dasha = payload.get("dasha_periods", {})
-    yogas = payload.get("yogas", {})
-
-    # Build planets summary (top 5 most relevant)
-    planet_bits = []
-    for p in ["Sun", "Moon", "Mars", "Jupiter", "Saturn", "Rahu"]:
-        pdata = planets.get(p, {})
-        if pdata:
-            planet_bits.append(
-                f"{p} in {pdata.get('rasi', '')} ({pdata.get('house', '')}H)"
-            )
-    planets_summary = ", ".join(planet_bits[:5]) or "not available"
-
-    # Dasha context
-    current_dasha = dasha.get("current", {}) if isinstance(dasha, dict) else {}
-    mahadasha = current_dasha.get("mahadasha", current_dasha.get("mahadasha_lord", "unknown"))
-    antardasha = current_dasha.get("antardasha", current_dasha.get("antardasha_lord", "unknown"))
-
-    # Yogas summary
-    yoga_list = []
-    if isinstance(yogas, dict):
-        for yname, ydata in list(yogas.items())[:3]:
-            if isinstance(ydata, dict) and ydata.get("present"):
-                yoga_list.append(yname)
-    yogas_summary = ", ".join(yoga_list) if yoga_list else "none notable"
-
-    # Monthly/yearly summaries
-    monthly_summary = "not available"
-    if monthly:
-        mdata = monthly[0] if isinstance(monthly[0], dict) else json.loads(monthly[0] or "{}")
-        llm = mdata.get("llm_interpretation", {})
-        if isinstance(llm, dict):
-            exec_summary = llm.get("executive_summary", "")
-            if exec_summary:
-                monthly_summary = exec_summary[:200]
-
-    yearly_summary = "not available"
-    if yearly:
-        ydata = yearly[0] if isinstance(yearly[0], dict) else json.loads(yearly[0] or "{}")
-        llm = ydata.get("llm_interpretation", {})
-        if isinstance(llm, dict):
-            exec_summary = llm.get("executive_summary", "")
-            if exec_summary:
-                yearly_summary = exec_summary[:200]
-
-    # Moon info
-    moon_data = planets.get("Moon", {})
-    moon_sign = moon_data.get("rasi", "unknown")
-    moon_nakshatra = moon_data.get("nakshatra", "unknown")
+    dashas = payload.get("dashas", {})
 
     # Lagna
-    lagna_sign = ephemeris.get("lagna", {}).get("rasi", payload.get("lagna_sign", "unknown"))
+    lagna_sign = ephemeris.get("lagna", {}).get("rasi", "unknown")
+
+    # Moon
+    moon_data = ephemeris.get("moon", {})
+    moon_sign = moon_data.get("rasi", planets.get("Moon", {}).get("rasi", "unknown"))
+    nakshatra_raw = moon_data.get("nakshatra", {})
+    moon_nakshatra = nakshatra_raw.get("name", "unknown") if isinstance(nakshatra_raw, dict) else str(nakshatra_raw) if nakshatra_raw else "unknown"
+
+    # Planets summary
+    planet_bits = []
+    for p in ["Sun", "Moon", "Mars", "Jupiter", "Saturn", "Rahu", "Venus", "Mercury", "Ketu"]:
+        pdata = planets.get(p, {})
+        if isinstance(pdata, dict):
+            rasi = pdata.get("rasi", "")
+            if rasi:
+                retro = " (R)" if pdata.get("is_retrograde") else ""
+                planet_bits.append(f"{p} in {rasi}{retro}")
+    planets_summary = ", ".join(planet_bits) or "not available"
+
+    # Dasha
+    mahadasha = "unknown"
+    antardasha = "unknown"
+    vimshottari = dashas.get("vimshottari", {}) if isinstance(dashas, dict) else {}
+    if isinstance(vimshottari, dict):
+        current = vimshottari.get("current", {})
+        if isinstance(current, dict):
+            mahadasha = current.get("lord", "unknown")
+            antar = current.get("antar", {})
+            if isinstance(antar, dict):
+                antardasha = antar.get("lord", "unknown")
+
+    # Yogas — compute fresh using yoga engine
+    yogas_summary = "none notable"
+    try:
+        yogas = compute_yogas(payload)
+        if isinstance(yogas, dict):
+            present = [
+                y.get("name", k)
+                for k, y in yogas.items()
+                if isinstance(y, dict) and y.get("present")
+            ]
+            if not present:
+                present = yogas.get("present_yogas", [])
+                if isinstance(present, list):
+                    present = [y.get("name", str(y)) if isinstance(y, dict) else str(y) for y in present]
+            if present:
+                yogas_summary = ", ".join(str(y) for y in present[:5])
+    except Exception as e:
+        logger.warning(f"Yogas computation failed: {e}")
+
+    # Shadbala — compute fresh
+    shadbala_summary = "not available"
+    try:
+        shadbala = compute_shadbala(payload)
+        if isinstance(shadbala, dict) and not shadbala.get("error"):
+            strongest = shadbala.get("strongest_planet", "")
+            weakest = shadbala.get("weakest_planet", "")
+            if strongest or weakest:
+                shadbala_summary = f"Strongest: {strongest}, Weakest: {weakest}"
+    except Exception as e:
+        logger.warning(f"Shadbala computation failed: {e}")
+
+    # Sade Sati — compute fresh
+    sade_sati_summary = "not active"
+    try:
+        sade_sati = compute_sade_sati(payload)
+        if isinstance(sade_sati, dict):
+            ss = sade_sati.get("sade_sati", {})
+            ashtama = sade_sati.get("ashtama_shani", {})
+            alert = sade_sati.get("alert_level", "")
+            if isinstance(ss, dict) and ss.get("active"):
+                phase = ss.get("phase", "")
+                sade_sati_summary = f"Sade Sati active ({phase} phase), alert: {alert}"
+            elif isinstance(ashtama, dict) and ashtama.get("active"):
+                sade_sati_summary = f"Ashtama Shani active, alert: {alert}"
+    except Exception as e:
+        logger.warning(f"Sade Sati computation failed: {e}")
+
+    # Monthly summary from stored LLM interpretation
+    monthly_summary = "not available"
+    if monthly:
+        try:
+            mdata = monthly[0] if isinstance(monthly[0], dict) else json.loads(monthly[0] or "{}")
+            llm = mdata.get("llm_interpretation", {})
+            if isinstance(llm, dict):
+                exec_summary = llm.get("executive_summary", "")
+                why = llm.get("why_this_period", {})
+                why_text = why.get("plain_english", "") if isinstance(why, dict) else ""
+                monthly_summary = (exec_summary[:150] + " " + why_text[:100]).strip() or "not available"
+        except Exception:
+            pass
+
+    # Yearly summary
+    yearly_summary = "not available"
+    if yearly:
+        try:
+            ydata = yearly[0] if isinstance(yearly[0], dict) else json.loads(yearly[0] or "{}")
+            llm = ydata.get("llm_interpretation", {})
+            if isinstance(llm, dict):
+                exec_summary = llm.get("executive_summary", "")
+                if exec_summary:
+                    yearly_summary = exec_summary[:200]
+        except Exception:
+            pass
 
     return {
         "name": birth.get("name", "the chart holder"),
@@ -195,6 +251,8 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "antardasha": antardasha,
         "planets_summary": planets_summary,
         "yogas_summary": yogas_summary,
+        "shadbala_summary": shadbala_summary,
+        "sade_sati_summary": sade_sati_summary,
         "monthly_summary": monthly_summary,
         "yearly_summary": yearly_summary,
     }
