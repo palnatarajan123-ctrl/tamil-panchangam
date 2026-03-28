@@ -174,6 +174,13 @@ export default function PredictionScreen() {
         <h1 className="text-xl font-semibold capitalize">
           {period} Predictions
         </h1>
+        {data && (
+          <p className="text-sm text-muted-foreground mt-1">
+            {data?.details?.envelope?.birth_details?.name || ""}
+            {data?.details?.envelope?.ephemeris?.moon?.rasi ? ` · ${data.details.envelope.ephemeris.moon.rasi}` : ""}
+            {data?.details?.envelope?.ephemeris?.moon?.nakshatra?.name ? ` · ${data.details.envelope.ephemeris.moon.nakshatra.name}` : ""}
+          </p>
+        )}
 
         <div className="flex gap-2">
           {(["monthly", "yearly"] as const).map((p) => (
