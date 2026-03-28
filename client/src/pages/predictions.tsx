@@ -497,7 +497,7 @@ export default function Predictions() {
             )}
           </div>
 
-          {lastPredictionParams && (
+          {prediction && (
             <div className="mt-6 flex justify-center gap-3 flex-wrap">
               {prediction && (
                 <button
