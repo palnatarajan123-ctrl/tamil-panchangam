@@ -172,6 +172,31 @@ def bootstrap():
         )
         """)
 
+        # chat_messages
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            base_chart_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """)
+
+        # chat_usage
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS chat_usage (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            base_chart_id TEXT NOT NULL,
+            month_key TEXT NOT NULL,
+            question_count INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(user_id, base_chart_id, month_key)
+        )
+        """)
+
         conn.commit()
         logger.info("PostgreSQL schema bootstrapped successfully")
     except Exception as e:
