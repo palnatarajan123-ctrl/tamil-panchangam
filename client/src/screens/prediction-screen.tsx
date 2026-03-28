@@ -135,9 +135,9 @@ export default function PredictionScreen() {
     },
     enabled: !!id,
   });
-  const chartName = data?.details?.envelope?.birth_details?.name || baseChart?.birth_details?.name || baseChart?.payload?.birth_details?.name || "";
-  const moonRasi = data?.details?.envelope?.ephemeris?.moon?.rasi || baseChart?.payload?.ephemeris?.moon?.rasi || "";
-  const moonNakshatra = data?.details?.envelope?.ephemeris?.moon?.nakshatra?.name || baseChart?.payload?.ephemeris?.moon?.nakshatra?.name || "";
+  const chartName = data?.details?.envelope?.birth_details?.name || baseChart?.data?.birth_details?.name || "";
+  const moonRasi = data?.details?.envelope?.ephemeris?.moon?.rasi || baseChart?.data?.ephemeris?.moon?.rasi || "";
+  const moonNakshatra = data?.details?.envelope?.ephemeris?.moon?.nakshatra?.name || baseChart?.data?.ephemeris?.moon?.nakshatra?.name || "";
 
   const dashaContext = data?.details?.envelope?.dasha_context;
 
