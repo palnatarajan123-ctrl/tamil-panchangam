@@ -1,6 +1,6 @@
 import { useParams } from "wouter";
 import { useState, useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { usePrediction } from "@/hooks/usePrediction";
 
 import { MonthlyPredictionView } from "@/components/prediction/MonthlyPredictionView";
@@ -126,6 +126,19 @@ export default function PredictionScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [llmPending]);
 
+  const { data: baseChart } = useQuery({
+    queryKey: ["base-chart", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/base-chart/${id}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!id,
+  });
+  const chartName = data?.details?.envelope?.birth_details?.name || baseChart?.birth_details?.name || baseChart?.payload?.birth_details?.name || "";
+  const moonRasi = data?.details?.envelope?.ephemeris?.moon?.rasi || baseChart?.payload?.ephemeris?.moon?.rasi || "";
+  const moonNakshatra = data?.details?.envelope?.ephemeris?.moon?.nakshatra?.name || baseChart?.payload?.ephemeris?.moon?.nakshatra?.name || "";
+
   const dashaContext = data?.details?.envelope?.dasha_context;
 
   const fallbackReason = data?.details?.interpretation?.llm_metadata?.fallback_reason;
@@ -174,12 +187,12 @@ export default function PredictionScreen() {
         <h1 className="text-xl font-semibold capitalize">
           {period} Predictions
         </h1>
-        {data && (
+        {(chartName || moonRasi) && (
           <p className="text-base font-semibold text-foreground mt-0.5">
-            {data?.details?.envelope?.birth_details?.name || ""}
+            {chartName}
             <span className="font-normal text-muted-foreground">
-              {data?.details?.envelope?.ephemeris?.moon?.rasi ? ` · ${data.details.envelope.ephemeris.moon.rasi}` : ""}
-              {data?.details?.envelope?.ephemeris?.moon?.nakshatra?.name ? ` · ${data.details.envelope.ephemeris.moon.nakshatra.name}` : ""}
+              {moonRasi ? ` · ${moonRasi}` : ""}
+              {moonNakshatra ? ` · ${moonNakshatra}` : ""}
             </span>
           </p>
         )}
@@ -280,7 +293,7 @@ export default function PredictionScreen() {
             <div className="fixed top-0 right-0 h-full w-80 z-40 shadow-xl border-l border-border">
               <ChatPanel
                 baseChartId={id}
-                chartName={data?.details?.envelope?.birth_details?.name || data?.details?.birth_details?.name || id}
+                chartName={chartName || id}
                 mahadasha={dashaContext?.active?.lord || "—"}
                 antardasha={dashaContext?.active?.antar?.lord || "—"}
                 periodLabel={period === "monthly" ? `${new Date(year, (index ?? 1) - 1).toLocaleString("default", { month: "long" })} ${year}` : String(year)}
