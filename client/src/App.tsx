@@ -8,7 +8,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useEffect, type ReactNode } from "react";
 
 import Home from "@/pages/home";
-import Predictions from "@/pages/predictions"; // legacy
+import Predictions from "@/pages/predictions.legacy"; // legacy
 import Health from "@/pages/health";
 import Docs from "@/pages/docs";
 import ChartDetail from "@/pages/chart-detail";

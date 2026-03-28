@@ -17,7 +17,7 @@ import {
 } from "@/adapters/aiInterpretationAdapter";
 
 import { Button } from "@/components/ui/button";
-import { Loader2, Download, Sparkles } from "lucide-react";
+import { Loader2, Download, Sparkles, MessageCircle } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { getAccessToken } from "@/lib/auth";
+import { ChatPanel } from "@/components/ChatPanel";
 
 /* -------------------------------------------------
    Screen
@@ -35,6 +36,7 @@ import { getAccessToken } from "@/lib/auth";
 export default function PredictionScreen() {
   const { id } = useParams<{ id: string }>();
   if (!id) return <div>Missing base chart id</div>;
+  const [chatOpen, setChatOpen] = useState(false);
 
   const now = new Date();
   const baseYear = now.getFullYear();
@@ -218,6 +220,13 @@ export default function PredictionScreen() {
           -------------------------------------------------- */}
           {(period === "monthly" || period === "yearly") && (
             <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setChatOpen((v) => !v)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-sm font-medium"
+              >
+                <MessageCircle className="w-4 h-4" />
+                {chatOpen ? "Close Chat" : "Ask Jyotishi"}
+              </button>
               <Button
                 variant="outline"
                 className="gap-2"
@@ -257,6 +266,18 @@ export default function PredictionScreen() {
           )}
 
           <Separator className="my-4" />
+          {chatOpen && (
+            <div className="w-full h-[600px] rounded-xl overflow-hidden border border-border shadow-sm mb-4">
+              <ChatPanel
+                baseChartId={id}
+                chartName={id}
+                mahadasha="—"
+                antardasha="—"
+                periodLabel=""
+                onClose={() => setChatOpen(false)}
+              />
+            </div>
+          )}
 
           {/* -------------------------------------------------
               Prediction Body

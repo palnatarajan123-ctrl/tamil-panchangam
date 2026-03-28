@@ -490,7 +490,7 @@ export default function Predictions() {
                   chartName={chart?.payload?.birth_details?.name || chart?.name || "Chart"}
                   mahadasha={chart?.payload?.dasha_periods?.current?.mahadasha || "—"}
                   antardasha={chart?.payload?.dasha_periods?.current?.antardasha || "—"}
-                  periodLabel={predictionType === "monthly" ? `${prediction?.periodLabel || ""}` : String(new Date().getFullYear())}
+                  periodLabel={predictionType === "monthly" && lastPredictionParams ? `${MONTHS[(lastPredictionParams.month ?? 1) - 1]} ${lastPredictionParams.year}` : String(lastPredictionParams?.year ?? new Date().getFullYear())}
                   onClose={() => setChatOpen(false)}
                 />
               </div>
@@ -499,15 +499,13 @@ export default function Predictions() {
 
           {prediction && (
             <div className="mt-6 flex justify-center gap-3 flex-wrap">
-              {prediction && (
-                <button
-                  onClick={() => setChatOpen((v) => !v)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-sm font-medium"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  {chatOpen ? "Close Chat" : "Ask Jyotishi"}
-                </button>
-              )}
+              <button
+                onClick={() => setChatOpen((v) => !v)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-sm font-medium"
+              >
+                <MessageCircle className="w-4 h-4" />
+                {chatOpen ? "Close Chat" : "Ask Jyotishi"}
+              </button>
               <Button
                 onClick={handleDownloadPdf}
                 disabled={isDownloadingPdf}
