@@ -215,6 +215,7 @@ export default function PredictionScreen() {
 
       {data && !llmPending && (
         <>
+        <div className={chatOpen ? "mr-80 transition-all duration-300" : "transition-all duration-300"}>
           {/* -------------------------------------------------
               Download (only for monthly/yearly)
           -------------------------------------------------- */}
@@ -267,13 +268,13 @@ export default function PredictionScreen() {
 
           <Separator className="my-4" />
           {chatOpen && (
-            <div className="w-full h-[600px] rounded-xl overflow-hidden border border-border shadow-sm mb-4">
+            <div className="fixed top-0 right-0 h-full w-80 z-40 shadow-xl border-l border-border">
               <ChatPanel
                 baseChartId={id}
-                chartName={id}
-                mahadasha="—"
-                antardasha="—"
-                periodLabel=""
+                chartName={data?.details?.envelope?.birth_details?.name || data?.details?.birth_details?.name || id}
+                mahadasha={dashaContext?.active?.lord || "—"}
+                antardasha={dashaContext?.active?.antar?.lord || "—"}
+                periodLabel={period === "monthly" ? `${new Date(year, (index ?? 1) - 1).toLocaleString("default", { month: "long" })} ${year}` : String(year)}
                 onClose={() => setChatOpen(false)}
               />
             </div>
@@ -324,6 +325,7 @@ export default function PredictionScreen() {
               </Card>
             </>
           )}
+        </div>
         </>
       )}
     </div>
