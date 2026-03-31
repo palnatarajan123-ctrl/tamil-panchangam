@@ -389,6 +389,12 @@ function GroupDetail({
     queryFn: () => apiFetch("GET", `/api/family/groups/${groupId}`),
   });
 
+  const { data: overviewData } = useQuery({
+    queryKey: ["/api/family/groups", groupId, "overview"],
+    queryFn: () => apiFetch("GET", `/api/family/groups/${groupId}/overview`),
+    enabled: !!groupId,
+  });
+
   const deleteMember = useMutation({
     mutationFn: (memberId: string) =>
       apiFetch("DELETE", `/api/family/groups/${groupId}/members/${memberId}`),
@@ -422,6 +428,12 @@ function GroupDetail({
   const group: FamilyGroup = data;
   if (!group) return null;
   const members: FamilyMember[] = group.members ?? [];
+
+  // Build a lookup from member_id → overview entry for O(1) access in render
+  const overviewByMemberId: Record<string, { dasha: { mahadasha: string | null; antardasha: string | null; end_date: string | null }; sade_sati: { is_active: boolean; phase: string | null } }> = {};
+  for (const entry of (overviewData?.members ?? [])) {
+    overviewByMemberId[entry.member_id] = entry;
+  }
   const primaryChartId = group.primary_chart_id ?? null;
   const primaryChartName = group.primary_chart_name ?? "";
 
@@ -512,32 +524,52 @@ function GroupDetail({
           {members.length === 0 && !showAddMember && (
             <p className="text-muted-foreground text-sm text-center py-4">No members yet.</p>
           )}
-          {members.map((m) => (
-            <Card key={m.id}>
-              <CardContent className="flex items-center justify-between p-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{m.display_name || m.chart_name}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${ROLE_COLORS[m.role]}`}>
-                      {ROLE_LABELS[m.role] ?? m.role}
-                    </span>
+          {members.map((m) => {
+            const ov = overviewByMemberId[m.id];
+            const dasha = ov?.dasha;
+            const ss = ov?.sade_sati;
+            const dashaLabel = dasha?.mahadasha
+              ? `${dasha.mahadasha} › ${dasha.antardasha ?? "—"}${dasha.end_date ? `  until ${dasha.end_date.slice(0, 10)}` : ""}`
+              : "—";
+            return (
+              <Card key={m.id}>
+                <CardContent className="flex items-start justify-between p-3 gap-2">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{m.display_name || m.chart_name}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${ROLE_COLORS[m.role]}`}>
+                        {ROLE_LABELS[m.role] ?? m.role}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs text-muted-foreground shrink-0">Current Dasha</span>
+                      <span className="text-xs font-medium truncate">{dashaLabel}</span>
+                    </div>
+                    {ss ? (
+                      ss.is_active ? (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                          ⚠ Sade Sati active — {ss.phase ?? "unknown"} phase
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+                          ✓ No Sade Sati
+                        </span>
+                      )
+                    ) : null}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {m.nakshatra && m.rasi ? `${m.nakshatra} · ${m.rasi}` : m.date_of_birth || ""}
-                  </p>
-                </div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => deleteMember.mutate(m.id)}
-                  disabled={deleteMember.isPending}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={() => deleteMember.mutate(m.id)}
+                    disabled={deleteMember.isPending}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
 
           {showAddMember ? (
             <AddMemberForm groupId={groupId} onDone={() => setShowAddMember(false)} />

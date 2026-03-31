@@ -358,7 +358,7 @@ async def chat_stream(
                 log_llm_call(
                     db=db,
                     chart_id=req.base_chart_id,
-                    call_type="chat",
+                    call_type="family_chat" if req.reading_as_name else "chat",
                     period="chat",
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
@@ -375,7 +375,7 @@ async def chat_stream(
                     log_llm_call(
                         db=db,
                         chart_id=req.base_chart_id,
-                        call_type="chat",
+                        call_type="family_chat" if req.reading_as_name else "chat",
                         period="chat",
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,

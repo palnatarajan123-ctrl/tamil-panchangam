@@ -11,12 +11,14 @@ Routes:
   POST   /family/groups/{group_id}/members       Add member
   DELETE /family/groups/{group_id}/members/{id}  Remove member
   GET    /family/groups/{group_id}/porutham       Compute husband↔wife Porutham
+  GET    /family/groups/{group_id}/overview       Dasha + Sade Sati per member
   GET    /family/user-charts              List charts owned by user (for picker)
 """
 
 import json
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -25,6 +27,8 @@ from app.core.auth import get_current_user
 from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.engines.porutham_engine import compute_porutham
+from app.engines.sade_sati_engine import compute_sade_sati
+from app.engines.dasha_resolver import resolve_antar_dasha
 
 logger = logging.getLogger(__name__)
 
@@ -420,3 +424,79 @@ def get_porutham(group_id: str, user: dict = Depends(get_current_user)):
         "wife": wife,
         "porutham": result,
     }
+
+
+@router.get("/groups/{group_id}/overview")
+def get_group_overview(group_id: str, user: dict = Depends(get_current_user)):
+    """Dasha + Sade Sati summary for each member in the group."""
+    user_id = user["id"]
+    with get_conn() as conn:
+        _assert_group_owner(conn, group_id, user_id)
+        member_rows = conn.execute("""
+            SELECT id, group_id, chart_id, role, display_name, birth_order, created_at
+            FROM family_members
+            WHERE group_id = ?
+            ORDER BY birth_order ASC, created_at ASC
+        """, [group_id]).fetchall()
+
+    now = datetime.now(timezone.utc)
+    members_overview = []
+
+    for row in member_rows:
+        member_id = str(row[0])
+        chart_id = str(row[2])
+        role = str(row[3])
+        display_name = row[4]
+
+        with get_conn() as conn:
+            chart = get_base_chart_by_id(conn, chart_id)
+
+        payload = None
+        if chart:
+            p = chart.get("payload")
+            try:
+                payload = p if isinstance(p, dict) else json.loads(p or "{}")
+            except Exception:
+                payload = {}
+
+        # ── Dasha resolution (same pattern as prediction_envelope.py) ──
+        dasha_info = {"mahadasha": None, "antardasha": None, "end_date": None}
+        if payload:
+            try:
+                vimshottari = payload.get("dashas", {}).get("vimshottari", {})
+                resolved = resolve_antar_dasha(
+                    vimshottari=vimshottari,
+                    reference_date=now,
+                )
+                if resolved:
+                    dasha_info["mahadasha"] = resolved["maha"]["lord"]
+                    dasha_info["antardasha"] = resolved["antar"]["lord"]
+                    dasha_info["end_date"] = resolved["antar"]["end"]
+            except Exception as e:
+                logger.warning(f"Dasha resolution failed for member {member_id}: {e}")
+
+        # ── Sade Sati (same pattern as chat.py _build_chat_context) ──
+        sade_sati_info = {"is_active": False, "phase": None, "start_date": None, "end_date": None}
+        if payload:
+            try:
+                ss_result = compute_sade_sati(payload)
+                if isinstance(ss_result, dict):
+                    ss = ss_result.get("sade_sati", {})
+                    if isinstance(ss, dict) and ss.get("active"):
+                        sade_sati_info["is_active"] = True
+                        sade_sati_info["phase"] = ss.get("phase")
+                        sade_sati_info["start_date"] = ss.get("start_date")
+                        sade_sati_info["end_date"] = ss.get("end_date")
+            except Exception as e:
+                logger.warning(f"Sade Sati computation failed for member {member_id}: {e}")
+
+        members_overview.append({
+            "member_id": member_id,
+            "chart_id": chart_id,
+            "role": role,
+            "display_name": display_name,
+            "dasha": dasha_info,
+            "sade_sati": sade_sati_info,
+        })
+
+    return {"members": members_overview}
