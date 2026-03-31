@@ -380,6 +380,7 @@ function GroupDetail({
   onBack: () => void;
 }) {
   const qc = useQueryClient();
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<"overview" | "compatibility">("overview");
   const [showAddMember, setShowAddMember] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -449,6 +450,14 @@ function GroupDetail({
           <ArrowLeft className="h-4 w-4" /> Groups
         </button>
         <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 text-sm"
+            onClick={() => navigate(`/family/${groupId}/predictions`)}
+          >
+            View Predictions
+          </Button>
           {primaryChartId && (
             <Button
               size="sm"

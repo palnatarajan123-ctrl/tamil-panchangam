@@ -18,9 +18,10 @@ Routes:
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.core.auth import get_current_user
@@ -29,6 +30,8 @@ from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.engines.porutham_engine import compute_porutham
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.dasha_resolver import resolve_antar_dasha
+from app.engines.family_prediction_engine import run_family_prediction
+from app.pdf.family_report.family_pdf_renderer import render_family_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -500,3 +503,142 @@ def get_group_overview(group_id: str, user: dict = Depends(get_current_user)):
         })
 
     return {"members": members_overview}
+
+
+# ── Family Predictions ────────────────────────────────────────────────────────
+
+def _load_members_with_charts(conn, group_id: str) -> list:
+    """Shared helper: fetch members + parsed chart payloads for a group."""
+    member_rows = conn.execute("""
+        SELECT id, group_id, chart_id, role, display_name, birth_order, created_at
+        FROM family_members
+        WHERE group_id = ?
+        ORDER BY birth_order ASC, created_at ASC
+    """, [group_id]).fetchall()
+
+    result = []
+    for row in member_rows:
+        chart = get_base_chart_by_id(conn, str(row[2]))
+        if not chart:
+            continue
+        p = chart.get("payload")
+        try:
+            payload = p if isinstance(p, dict) else json.loads(p or "{}")
+        except Exception:
+            payload = {}
+        result.append({
+            "member": {
+                "id": str(row[0]),
+                "group_id": str(row[1]),
+                "chart_id": str(row[2]),
+                "role": str(row[3]),
+                "display_name": row[4],
+                "birth_order": int(row[5] or 0),
+            },
+            "payload": payload,
+        })
+    return result
+
+
+@router.get("/groups/{group_id}/predictions")
+def get_family_predictions(
+    group_id: str,
+    year: int = None,
+    user: dict = Depends(get_current_user),
+):
+    """Return cached family prediction or trigger a new LLM run."""
+    if year is None:
+        year = date.today().year
+    user_id = user["id"]
+
+    with get_conn() as conn:
+        group = _assert_group_owner(conn, group_id, user_id)
+        members_with_charts = _load_members_with_charts(conn, group_id)
+
+        if not members_with_charts:
+            raise HTTPException(status_code=400, detail="No valid member charts found")
+
+        result = run_family_prediction(
+            group={"id": group_id, "name": group["name"]},
+            members_with_charts=members_with_charts,
+            year=year,
+            db=conn,
+        )
+
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+
+    return result
+
+
+@router.get("/groups/{group_id}/predictions/pdf")
+def get_family_predictions_pdf(
+    group_id: str,
+    year: int = None,
+    user: dict = Depends(get_current_user),
+):
+    """Render family prediction as PDF. Triggers LLM run if not cached."""
+    if year is None:
+        year = date.today().year
+    user_id = user["id"]
+
+    with get_conn() as conn:
+        group = _assert_group_owner(conn, group_id, user_id)
+        members_with_charts = _load_members_with_charts(conn, group_id)
+
+        if not members_with_charts:
+            raise HTTPException(status_code=400, detail="No valid member charts found")
+
+        prediction = run_family_prediction(
+            group={"id": group_id, "name": group["name"]},
+            members_with_charts=members_with_charts,
+            year=year,
+            db=conn,
+        )
+
+    if "error" in prediction:
+        raise HTTPException(status_code=500, detail=prediction["error"])
+
+    member_names = [
+        item["member"].get("display_name")
+        or item["payload"].get("birth_details", {}).get("name", item["member"]["role"])
+        for item in members_with_charts
+    ]
+
+    try:
+        pdf_bytes = render_family_pdf(
+            group_name=group["name"],
+            member_names=member_names,
+            year=year,
+            prediction=prediction,
+        )
+    except Exception as e:
+        logger.error(f"Family PDF render failed: {e}")
+        raise HTTPException(status_code=500, detail="PDF generation failed")
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="family_prediction_{year}.pdf"'
+        },
+    )
+
+
+@router.delete("/groups/{group_id}/predictions", status_code=204)
+def clear_family_predictions_cache(
+    group_id: str,
+    year: int = None,
+    user: dict = Depends(get_current_user),
+):
+    """Clear cached family prediction to force a fresh LLM run."""
+    if year is None:
+        year = date.today().year
+    user_id = user["id"]
+
+    with get_conn() as conn:
+        _assert_group_owner(conn, group_id, user_id)
+        conn.execute(
+            "DELETE FROM family_predictions WHERE group_id = ? AND year = ?",
+            [group_id, year],
+        )

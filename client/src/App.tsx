@@ -22,6 +22,7 @@ import NotFound from "@/pages/not-found";
 
 import PredictionScreen from "@/screens/prediction-screen";
 import FamilyScreen from "@/screens/family-screen";
+import FamilyPredictionScreen from "@/screens/family-prediction-screen";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -85,6 +86,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/my-charts" component={MyCharts} />
+      <Route path="/family/:groupId/predictions" component={FamilyPredictionScreen} />
       <Route path="/family" component={FamilyScreen} />
 
       {/* Admin dashboard */}

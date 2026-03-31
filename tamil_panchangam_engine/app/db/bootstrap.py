@@ -262,6 +262,28 @@ def bootstrap():
         )
         """)
 
+        # family_predictions
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS family_predictions (
+            id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
+            year INTEGER NOT NULL,
+            raw_response TEXT,
+            financial_peaks TEXT,
+            caution_windows TEXT,
+            child_milestones TEXT,
+            executive_summary TEXT,
+            llm_tokens_used INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(group_id, year)
+        )
+        """)
+
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_family_predictions_group
+            ON family_predictions(group_id)
+        """)
+
         conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_family_groups_user_id ON family_groups(user_id)
         """)
