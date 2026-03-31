@@ -15,7 +15,7 @@ export interface ChatUsage {
   remaining: number | null;
 }
 
-export function useChat(baseChartId: string | undefined) {
+export function useChat(baseChartId: string | undefined, endpoint = "/api/chat/stream") {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export function useChat(baseChartId: string | undefined) {
       ]);
 
       try {
-        const res = await fetch("/api/chat/stream", {
+        const res = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify({

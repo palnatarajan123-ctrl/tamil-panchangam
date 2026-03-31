@@ -11,6 +11,7 @@ interface ChatPanelProps {
   antardasha: string;
   periodLabel: string;
   onClose: () => void;
+  chatEndpoint?: string;
 }
 
 export function ChatPanel({
@@ -20,11 +21,12 @@ export function ChatPanel({
   antardasha,
   periodLabel,
   onClose,
+  chatEndpoint = "/api/chat/stream",
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { messages, isStreaming, error, usage, sendMessage } = useChat(baseChartId);
+  const { messages, isStreaming, error, usage, sendMessage } = useChat(baseChartId, chatEndpoint);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

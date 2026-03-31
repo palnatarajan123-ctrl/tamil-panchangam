@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sparkles, Activity, BookOpen, Settings, BookMarked, User, LogOut, BarChart2 } from "lucide-react";
+import { Sparkles, Activity, BookOpen, Settings, BookMarked, User, LogOut, BarChart2, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function Navigation() {
@@ -65,6 +65,18 @@ export function Navigation() {
               >
                 <BookMarked className="h-4 w-4" />
                 <span className="hidden md:inline">My Charts</span>
+              </Button>
+            </Link>
+          )}
+          {user && (
+            <Link href="/family">
+              <Button
+                variant={location === "/family" ? "secondary" : "ghost"}
+                size="sm"
+                className="gap-2"
+              >
+                <Users className="h-4 w-4" />
+                <span className="hidden md:inline">Family</span>
               </Button>
             </Link>
           )}

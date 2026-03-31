@@ -21,6 +21,7 @@ import AdminDashboard from "@/pages/admin/index";
 import NotFound from "@/pages/not-found";
 
 import PredictionScreen from "@/screens/prediction-screen";
+import FamilyScreen from "@/screens/family-screen";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/my-charts" component={MyCharts} />
+      <Route path="/family" component={FamilyScreen} />
 
       {/* Admin dashboard */}
       <Route path="/admin">

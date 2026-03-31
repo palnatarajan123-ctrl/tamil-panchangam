@@ -25,6 +25,7 @@ from app.api.natal_interpretation import router as natal_interpretation_router
 from app.api.auth import router as auth_router
 from app.api.user_charts import router as user_charts_router
 from app.api.chat import router as chat_router
+from app.api.family import router as family_router
 from app.api.admin import router as admin_router
 from app.db.bootstrap import bootstrap
 
@@ -140,6 +141,7 @@ app.include_router(natal_interpretation_router, prefix="/api")
 app.include_router(auth_router,             prefix="/api")
 app.include_router(user_charts_router,      prefix="/api")
 app.include_router(chat_router,             prefix="/api")
+app.include_router(family_router,           prefix="/api")
 app.include_router(admin_router,            prefix="/api")
 
 # =====================================================

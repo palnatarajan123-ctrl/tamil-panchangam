@@ -232,6 +232,40 @@ def bootstrap():
         INSERT INTO llm_budget (id) VALUES (1) ON CONFLICT DO NOTHING
         """)
 
+        # family_groups
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS family_groups (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        # family_members
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS family_members (
+            id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
+            chart_id TEXT NOT NULL REFERENCES base_charts(id) ON DELETE CASCADE,
+            role TEXT NOT NULL CHECK (role IN ('husband', 'wife', 'child', 'other')),
+            display_name TEXT,
+            birth_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_family_groups_user_id ON family_groups(user_id)
+        """)
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_family_members_group_id ON family_members(group_id)
+        """)
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_family_members_chart_id ON family_members(chart_id)
+        """)
+
         conn.commit()
         logger.info("PostgreSQL schema bootstrapped successfully")
     except Exception as e:
