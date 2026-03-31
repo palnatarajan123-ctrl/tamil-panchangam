@@ -238,10 +238,16 @@ def bootstrap():
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
             name TEXT NOT NULL,
+            primary_chart_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
+        # migration: add column to existing tables
+        try:
+            conn.execute("ALTER TABLE family_groups ADD COLUMN IF NOT EXISTS primary_chart_id TEXT")
+        except Exception:
+            pass
 
         # family_members
         conn.execute("""

@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ChatPanel } from "@/components/ChatPanel";
 import {
   Users, Plus, Trash2, ArrowLeft, ChevronRight,
   Heart, Star, AlertCircle, CheckCircle2, XCircle,
+  MessageCircle, ChevronDown,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -39,6 +41,8 @@ interface FamilyMember {
 interface FamilyGroup {
   id: string;
   name: string;
+  primary_chart_id: string | null;
+  primary_chart_name?: string;
   created_at: string;
   updated_at: string;
   member_count: number;
@@ -378,6 +382,7 @@ function GroupDetail({
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<"overview" | "compatibility">("overview");
   const [showAddMember, setShowAddMember] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["/api/family/groups", groupId],
@@ -402,6 +407,14 @@ function GroupDetail({
     },
   });
 
+  const patchPrimary = useMutation({
+    mutationFn: (chartId: string | null) =>
+      apiFetch("PATCH", `/api/family/groups/${groupId}`, { primary_chart_id: chartId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/family/groups", groupId] });
+    },
+  });
+
   if (isLoading) {
     return <div className="text-muted-foreground text-sm py-8 text-center">Loading…</div>;
   }
@@ -409,8 +422,11 @@ function GroupDetail({
   const group: FamilyGroup = data;
   if (!group) return null;
   const members: FamilyMember[] = group.members ?? [];
+  const primaryChartId = group.primary_chart_id ?? null;
+  const primaryChartName = group.primary_chart_name ?? "";
 
   return (
+    <div className={chatOpen ? "mr-80 transition-all duration-300" : "transition-all duration-300"}>
     <div className="space-y-4">
       {/* Back header */}
       <div className="flex items-center justify-between">
@@ -420,18 +436,55 @@ function GroupDetail({
         >
           <ArrowLeft className="h-4 w-4" /> Groups
         </button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-destructive hover:text-destructive"
-          onClick={() => deleteGroup.mutate()}
-          disabled={deleteGroup.isPending}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {primaryChartId && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 text-sm"
+              onClick={() => setChatOpen((o) => !o)}
+            >
+              <MessageCircle className="h-4 w-4" />
+              Ask Jyotishi
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-destructive hover:text-destructive"
+            onClick={() => deleteGroup.mutate()}
+            disabled={deleteGroup.isPending}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      <h2 className="text-xl font-semibold">{group.name}</h2>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-xl font-semibold">{group.name}</h2>
+
+        {/* Primary chart selector */}
+        {members.length > 0 && (
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-xs text-muted-foreground">Reading from:</span>
+            <div className="relative">
+              <select
+                value={primaryChartId ?? ""}
+                onChange={(e) => patchPrimary.mutate(e.target.value || null)}
+                className="appearance-none pl-2 pr-6 py-1 text-sm font-medium bg-muted rounded-md border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">— auto —</option>
+                {members.map((m) => (
+                  <option key={m.chart_id} value={m.chart_id}>
+                    {m.display_name || m.chart_name || m.chart_id}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-0 border-b border-border">
@@ -497,6 +550,21 @@ function GroupDetail({
       )}
 
       {activeTab === "compatibility" && <PoruthTab groupId={groupId} />}
+    </div>
+
+    {chatOpen && primaryChartId && (
+      <div className="fixed top-0 right-0 h-full w-80 z-40">
+        <ChatPanel
+          baseChartId={primaryChartId}
+          chartName={primaryChartName}
+          mahadasha=""
+          antardasha=""
+          periodLabel={group.name}
+          onClose={() => setChatOpen(false)}
+          readingAsName={primaryChartName}
+        />
+      </div>
+    )}
     </div>
   );
 }

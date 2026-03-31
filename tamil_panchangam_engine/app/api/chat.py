@@ -68,6 +68,7 @@ class ChatRequest(BaseModel):
     base_chart_id: str
     question: str
     history: list[ChatMessage] = []
+    reading_as_name: Optional[str] = None  # family context: whose chart is being read
 
 
 def _get_question_count(user_id: str, base_chart_id: str) -> int:
@@ -296,6 +297,8 @@ async def chat_stream(
         raise HTTPException(status_code=500, detail="Failed to load chart context")
 
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(**context)
+    if req.reading_as_name:
+        system_prompt = f"Reading from {req.reading_as_name}'s chart.\n\n" + system_prompt
 
     # Build messages array (last 6 pairs max)
     history_trimmed = req.history[-12:] if len(req.history) > 12 else req.history

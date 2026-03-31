@@ -15,7 +15,11 @@ export interface ChatUsage {
   remaining: number | null;
 }
 
-export function useChat(baseChartId: string | undefined, endpoint = "/api/chat/stream") {
+export function useChat(
+  baseChartId: string | undefined,
+  endpoint = "/api/chat/stream",
+  readingAsName?: string,
+) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +76,7 @@ export function useChat(baseChartId: string | undefined, endpoint = "/api/chat/s
               role: m.role,
               content: m.content,
             })),
+            ...(readingAsName ? { reading_as_name: readingAsName } : {}),
           }),
         });
 
@@ -134,7 +139,7 @@ export function useChat(baseChartId: string | undefined, endpoint = "/api/chat/s
         setIsStreaming(false);
       }
     },
-    [baseChartId, isStreaming, messages]
+    [baseChartId, isStreaming, messages, readingAsName]
   );
 
   const clearMessages = useCallback(() => setMessages([]), []);

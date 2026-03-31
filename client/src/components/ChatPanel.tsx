@@ -12,6 +12,7 @@ interface ChatPanelProps {
   periodLabel: string;
   onClose: () => void;
   chatEndpoint?: string;
+  readingAsName?: string;
 }
 
 export function ChatPanel({
@@ -22,11 +23,12 @@ export function ChatPanel({
   periodLabel,
   onClose,
   chatEndpoint = "/api/chat/stream",
+  readingAsName,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { messages, isStreaming, error, usage, sendMessage } = useChat(baseChartId, chatEndpoint);
+  const { messages, isStreaming, error, usage, sendMessage } = useChat(baseChartId, chatEndpoint, readingAsName);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

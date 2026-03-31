@@ -41,6 +41,10 @@ class RenameGroupRequest(BaseModel):
     name: str
 
 
+class PatchGroupRequest(BaseModel):
+    primary_chart_id: Optional[str] = None
+
+
 class AddMemberRequest(BaseModel):
     chart_id: str
     role: str  # husband | wife | child | other
@@ -53,7 +57,7 @@ class AddMemberRequest(BaseModel):
 def _assert_group_owner(conn, group_id: str, user_id: str) -> dict:
     """Return group row or raise 404/403."""
     row = conn.execute(
-        "SELECT id, user_id, name, created_at, updated_at FROM family_groups WHERE id = ?",
+        "SELECT id, user_id, name, primary_chart_id, created_at, updated_at FROM family_groups WHERE id = ?",
         [group_id]
     ).fetchone()
     if not row:
@@ -61,7 +65,8 @@ def _assert_group_owner(conn, group_id: str, user_id: str) -> dict:
     if row[1] != user_id:
         raise HTTPException(status_code=403, detail="Not your group")
     return {"id": row[0], "user_id": row[1], "name": row[2],
-            "created_at": str(row[3]), "updated_at": str(row[4])}
+            "primary_chart_id": row[3],
+            "created_at": str(row[4]), "updated_at": str(row[5])}
 
 
 def _chart_owned_by_user(conn, chart_id: str, user_id: str) -> bool:
@@ -110,6 +115,45 @@ def _member_row_to_dict(row, payload: Optional[dict] = None) -> dict:
     return d
 
 
+def _resolve_primary_chart(conn, group_id: str, user_id: str,
+                            explicit_id: Optional[str]) -> tuple[Optional[str], str]:
+    """
+    Return (chart_id, display_name) for the primary reading chart.
+    Priority: explicit primary_chart_id → member chart owned by this user → None.
+    """
+    if explicit_id:
+        chart = get_base_chart_by_id(conn, explicit_id)
+        if chart:
+            p = chart.get("payload")
+            try:
+                payload = p if isinstance(p, dict) else json.loads(p or "{}")
+            except Exception:
+                payload = {}
+            birth = payload.get("birth_details", {}) if isinstance(payload, dict) else {}
+            return explicit_id, birth.get("name", "Primary")
+        # stale reference — fall through
+
+    # Fall back: find any member chart owned by this user
+    row = conn.execute("""
+        SELECT fm.chart_id FROM family_members fm
+        JOIN user_charts uc ON uc.chart_id = fm.chart_id AND uc.user_id = ?
+        WHERE fm.group_id = ?
+        LIMIT 1
+    """, [user_id, group_id]).fetchone()
+    if row:
+        chart = get_base_chart_by_id(conn, str(row[0]))
+        if chart:
+            p = chart.get("payload")
+            try:
+                payload = p if isinstance(p, dict) else json.loads(p or "{}")
+            except Exception:
+                payload = {}
+            birth = payload.get("birth_details", {}) if isinstance(payload, dict) else {}
+            return str(row[0]), birth.get("name", "Primary")
+
+    return None, ""
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/user-charts")
@@ -149,20 +193,21 @@ def list_groups(user: dict = Depends(get_current_user)):
     user_id = user["id"]
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT fg.id, fg.name, fg.created_at, fg.updated_at,
+            SELECT fg.id, fg.name, fg.primary_chart_id, fg.created_at, fg.updated_at,
                    COUNT(fm.id) AS member_count
             FROM family_groups fg
             LEFT JOIN family_members fm ON fm.group_id = fg.id
             WHERE fg.user_id = ?
-            GROUP BY fg.id, fg.name, fg.created_at, fg.updated_at
+            GROUP BY fg.id, fg.name, fg.primary_chart_id, fg.created_at, fg.updated_at
             ORDER BY fg.created_at DESC
         """, [user_id]).fetchall()
 
     return {"groups": [
         {
             "id": str(r[0]), "name": str(r[1]),
-            "created_at": str(r[2]), "updated_at": str(r[3]),
-            "member_count": int(r[4]),
+            "primary_chart_id": r[2],
+            "created_at": str(r[3]), "updated_at": str(r[4]),
+            "member_count": int(r[5]),
         }
         for r in rows
     ]}
@@ -207,7 +252,13 @@ def get_group(group_id: str, user: dict = Depends(get_current_user)):
                     payload = {}
             members.append(_member_row_to_dict(row, payload))
 
+        primary_id, primary_name = _resolve_primary_chart(
+            conn, group_id, user_id, group.get("primary_chart_id")
+        )
+
     group["members"] = members
+    group["primary_chart_id"] = primary_id
+    group["primary_chart_name"] = primary_name
     return group
 
 
@@ -222,6 +273,24 @@ def rename_group(group_id: str, req: RenameGroupRequest, user: dict = Depends(ge
             WHERE id = ?
         """, [req.name.strip(), group_id])
     return {"ok": True}
+
+
+@router.patch("/groups/{group_id}")
+def patch_group(group_id: str, req: PatchGroupRequest, user: dict = Depends(get_current_user)):
+    """Update primary_chart_id for a group."""
+    user_id = user["id"]
+    with get_conn() as conn:
+        _assert_group_owner(conn, group_id, user_id)
+        if req.primary_chart_id is not None and not _chart_owned_by_user(conn, req.primary_chart_id, user_id):
+            raise HTTPException(status_code=403, detail="Chart not owned by you")
+        conn.execute("""
+            UPDATE family_groups SET primary_chart_id = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, [req.primary_chart_id, group_id])
+        primary_id, primary_name = _resolve_primary_chart(
+            conn, group_id, user_id, req.primary_chart_id
+        )
+    return {"ok": True, "primary_chart_id": primary_id, "primary_chart_name": primary_name}
 
 
 @router.delete("/groups/{group_id}", status_code=204)
