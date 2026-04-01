@@ -458,6 +458,35 @@ function GroupDetail({
           >
             View Predictions
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 text-sm"
+            onClick={() => navigate(`/family/${groupId}/timeline`)}
+          >
+            Timeline
+          </Button>
+          {members.some((m) => m.role === "husband") && members.some((m) => m.role === "wife") && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-sm"
+              onClick={() => navigate(`/family/${groupId}/children-timing`)}
+            >
+              Children Timing
+            </Button>
+          )}
+          {members.filter((m) => m.role === "child").map((child) => (
+            <Button
+              key={child.id}
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-sm"
+              onClick={() => navigate(`/family/${groupId}/members/${child.id}/predictions`)}
+            >
+              {child.display_name || "Child"}'s Predictions
+            </Button>
+          ))}
           {primaryChartId && (
             <Button
               size="sm"

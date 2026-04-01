@@ -31,6 +31,9 @@ from app.engines.porutham_engine import compute_porutham
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.family_prediction_engine import run_family_prediction
+from app.engines.children_timing_engine import run_children_timing
+from app.engines.timeline_aggregator import build_timeline
+from app.engines.child_prediction_engine import run_child_prediction
 from app.pdf.family_report.family_pdf_renderer import render_family_pdf
 
 logger = logging.getLogger(__name__)
@@ -641,4 +644,260 @@ def clear_family_predictions_cache(
         conn.execute(
             "DELETE FROM family_predictions WHERE group_id = ? AND year = ?",
             [group_id, year],
+        )
+
+
+# ── Helper ────────────────────────────────────────────────────────────────────
+
+def _get_chart_payload(conn, chart_id: str) -> dict:
+    """Fetch and parse chart payload from base_charts."""
+    chart = get_base_chart_by_id(conn, chart_id)
+    if not chart:
+        return {}
+    p = chart.get("payload") if isinstance(chart, dict) else None
+    if p is None:
+        return {}
+    try:
+        return p if isinstance(p, dict) else json.loads(p or "{}")
+    except Exception:
+        return {}
+
+
+# ── Children Timing ───────────────────────────────────────────────────────────
+
+@router.get("/groups/{group_id}/children-timing")
+def get_children_timing(
+    group_id: str,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
+    user: dict = Depends(get_current_user),
+):
+    if year_from is None:
+        year_from = date.today().year
+    if year_to is None:
+        year_to = date.today().year + 3
+    user_id = user["id"]
+    with get_conn() as conn:
+        group = _assert_group_owner(conn, group_id, user_id)
+        # Find husband and wife payloads
+        member_rows = conn.execute("""
+            SELECT id, chart_id, role, display_name FROM family_members
+            WHERE group_id = ? AND role IN ('husband', 'wife')
+        """, [group_id]).fetchall()
+        husband_payload = {}
+        wife_payload = {}
+        for row in member_rows:
+            if row[2] == "husband":
+                husband_payload = _get_chart_payload(conn, str(row[1]))
+            elif row[2] == "wife":
+                wife_payload = _get_chart_payload(conn, str(row[1]))
+        if not husband_payload or not wife_payload:
+            raise HTTPException(status_code=400, detail="Children timing requires both husband and wife charts")
+        result = run_children_timing(
+            group_id=group_id,
+            husband_payload=husband_payload,
+            wife_payload=wife_payload,
+            year_from=year_from,
+            year_to=year_to,
+            db=conn,
+        )
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
+
+
+@router.delete("/groups/{group_id}/children-timing", status_code=204)
+def clear_children_timing_cache(
+    group_id: str,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
+    user: dict = Depends(get_current_user),
+):
+    if year_from is None:
+        year_from = date.today().year
+    if year_to is None:
+        year_to = date.today().year + 3
+    user_id = user["id"]
+    with get_conn() as conn:
+        _assert_group_owner(conn, group_id, user_id)
+        conn.execute(
+            "DELETE FROM family_children_timing WHERE group_id = ? AND year_from = ? AND year_to = ?",
+            [group_id, year_from, year_to],
+        )
+
+
+# ── Timeline ──────────────────────────────────────────────────────────────────
+
+@router.get("/groups/{group_id}/timeline")
+def get_family_timeline(
+    group_id: str,
+    from_year: Optional[int] = None,
+    to_year: Optional[int] = None,
+    user: dict = Depends(get_current_user),
+):
+    if from_year is None:
+        from_year = date.today().year
+    if to_year is None:
+        to_year = date.today().year + 5
+    user_id = user["id"]
+    with get_conn() as conn:
+        group = _assert_group_owner(conn, group_id, user_id)
+        members_with_charts = _load_members_with_charts(conn, group_id)
+        if not members_with_charts:
+            raise HTTPException(status_code=400, detail="No valid member charts found")
+        result = build_timeline(
+            group={"id": group_id, "name": group["name"]},
+            members_with_charts=members_with_charts,
+            from_year=from_year,
+            to_year=to_year,
+            db=conn,
+        )
+    return result
+
+
+@router.delete("/groups/{group_id}/timeline", status_code=204)
+def clear_timeline_cache(
+    group_id: str,
+    from_year: Optional[int] = None,
+    to_year: Optional[int] = None,
+    user: dict = Depends(get_current_user),
+):
+    if from_year is None:
+        from_year = date.today().year
+    if to_year is None:
+        to_year = date.today().year + 5
+    user_id = user["id"]
+    with get_conn() as conn:
+        _assert_group_owner(conn, group_id, user_id)
+        conn.execute(
+            "DELETE FROM family_timeline_cache WHERE group_id = ? AND from_year = ? AND to_year = ?",
+            [group_id, from_year, to_year],
+        )
+
+
+# ── Child Predictions ─────────────────────────────────────────────────────────
+
+@router.get("/groups/{group_id}/members/{member_id}/predictions")
+def get_child_predictions(
+    group_id: str,
+    member_id: str,
+    year: Optional[int] = None,
+    user: dict = Depends(get_current_user),
+):
+    if year is None:
+        year = date.today().year
+    user_id = user["id"]
+    with get_conn() as conn:
+        _assert_group_owner(conn, group_id, user_id)
+        member_row = conn.execute("""
+            SELECT id, chart_id, role, display_name FROM family_members
+            WHERE id = ? AND group_id = ?
+        """, [member_id, group_id]).fetchone()
+        if not member_row:
+            raise HTTPException(status_code=404, detail="Member not found")
+        if str(member_row[2]) != "child":
+            raise HTTPException(status_code=400, detail="Child predictions only available for child members")
+        payload = _get_chart_payload(conn, str(member_row[1]))
+        result = run_child_prediction(
+            member_id=member_id,
+            chart_payload=payload,
+            year=year,
+            db=conn,
+        )
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
+
+
+@router.get("/groups/{group_id}/children-timing/pdf")
+def get_children_timing_pdf(
+    group_id: str,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
+    user: dict = Depends(get_current_user),
+):
+    """Render children timing analysis as PDF."""
+    if year_from is None:
+        year_from = date.today().year
+    if year_to is None:
+        year_to = date.today().year + 3
+    data = get_children_timing(group_id, year_from, year_to, user)
+
+    from app.pdf.family_report.family_pdf_renderer import render_children_timing_pdf
+    with get_conn() as conn:
+        group = _assert_group_owner(conn, group_id, user["id"])
+    try:
+        pdf_bytes = render_children_timing_pdf(
+            group_name=group["name"],
+            year_from=year_from,
+            year_to=year_to,
+            data=data,
+        )
+    except Exception as e:
+        logger.error(f"Children timing PDF render failed: {e}")
+        raise HTTPException(status_code=500, detail="PDF generation failed")
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="children_timing_{year_from}_{year_to}.pdf"'
+        },
+    )
+
+
+@router.get("/groups/{group_id}/members/{member_id}/predictions/pdf")
+def get_child_predictions_pdf(
+    group_id: str,
+    member_id: str,
+    year: Optional[int] = None,
+    user: dict = Depends(get_current_user),
+):
+    """Render child prediction as PDF."""
+    if year is None:
+        year = date.today().year
+    data = get_child_predictions(group_id, member_id, year, user)
+
+    with get_conn() as conn:
+        member_row = conn.execute(
+            "SELECT display_name FROM family_members WHERE id = ? AND group_id = ?",
+            [member_id, group_id],
+        ).fetchone()
+    child_name = (member_row[0] if member_row and member_row[0] else None) or "Child"
+
+    from app.pdf.family_report.family_pdf_renderer import render_child_prediction_pdf
+    try:
+        pdf_bytes = render_child_prediction_pdf(
+            child_name=child_name,
+            year=year,
+            data=data,
+        )
+    except Exception as e:
+        logger.error(f"Child prediction PDF render failed: {e}")
+        raise HTTPException(status_code=500, detail="PDF generation failed")
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="child_prediction_{child_name}_{year}.pdf"'
+        },
+    )
+
+
+@router.delete("/groups/{group_id}/members/{member_id}/predictions", status_code=204)
+def clear_child_predictions_cache(
+    group_id: str,
+    member_id: str,
+    year: Optional[int] = None,
+    user: dict = Depends(get_current_user),
+):
+    if year is None:
+        year = date.today().year
+    user_id = user["id"]
+    with get_conn() as conn:
+        _assert_group_owner(conn, group_id, user_id)
+        conn.execute(
+            "DELETE FROM family_child_predictions WHERE member_id = ? AND year = ?",
+            [member_id, year],
         )

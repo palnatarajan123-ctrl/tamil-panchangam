@@ -368,6 +368,12 @@ export default function FamilyPredictionScreen() {
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
+              onClick={() => navigate(`/family/${groupId}/timeline`)}
+              className="text-xs text-gray-500 hover:text-orange-400 underline"
+            >
+              View Family Timeline →
+            </button>
+            <button
               onClick={() => setChatOpen((v) => !v)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-sm font-medium"
             >

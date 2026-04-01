@@ -285,6 +285,71 @@ def bootstrap():
         """)
 
         conn.execute("""
+        CREATE TABLE IF NOT EXISTS family_children_timing (
+            id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
+            year_from INTEGER NOT NULL,
+            year_to INTEGER NOT NULL,
+            raw_response TEXT,
+            has_children_already INTEGER DEFAULT 0,
+            husband_5th_analysis TEXT,
+            wife_5th_analysis TEXT,
+            jupiter_transits TEXT,
+            combined_windows TEXT,
+            overall_outlook TEXT,
+            llm_tokens_used INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(group_id, year_from, year_to)
+        )
+        """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS family_timeline_cache (
+            id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
+            from_year INTEGER NOT NULL,
+            to_year INTEGER NOT NULL,
+            timeline_data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(group_id, from_year, to_year)
+        )
+        """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS family_child_predictions (
+            id TEXT PRIMARY KEY,
+            member_id TEXT NOT NULL REFERENCES family_members(id) ON DELETE CASCADE,
+            year INTEGER NOT NULL,
+            raw_response TEXT,
+            education TEXT,
+            career_aptitude TEXT,
+            marriage_window TEXT,
+            leaving_home TEXT,
+            health_cautions TEXT,
+            key_takeaways TEXT,
+            overall_narrative TEXT,
+            llm_tokens_used INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(member_id, year)
+        )
+        """)
+
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_family_children_timing_group
+            ON family_children_timing(group_id)
+        """)
+
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_family_timeline_group
+            ON family_timeline_cache(group_id)
+        """)
+
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_family_child_predictions_member
+            ON family_child_predictions(member_id)
+        """)
+
+        conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_family_groups_user_id ON family_groups(user_id)
         """)
         conn.execute("""
