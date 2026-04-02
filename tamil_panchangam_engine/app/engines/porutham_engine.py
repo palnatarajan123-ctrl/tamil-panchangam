@@ -85,14 +85,26 @@ def _nakshatra_index(nak_name: str) -> Optional[int]:
 
 
 def _rasi_index(rasi_name: str) -> Optional[int]:
-    """Return 0-based rasi index from name."""
-    RASI_NAMES = [
-        "aries", "taurus", "gemini", "cancer", "leo", "virgo",
-        "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces",
+    """Return 0-based rasi index from English or Tamil rasi name."""
+    if not rasi_name:
+        return None
+    RASI_PAIRS = [
+        ("aries",       "mesham"),
+        ("taurus",      "rishabam"),
+        ("gemini",      "mithunam"),
+        ("cancer",      "kadakam"),
+        ("leo",         "simmam"),
+        ("virgo",       "kanni"),
+        ("libra",       "thulam"),
+        ("scorpio",     "vrischikam"),
+        ("sagittarius", "dhanusu"),
+        ("capricorn",   "makaram"),
+        ("aquarius",    "kumbham"),
+        ("pisces",      "meenam"),
     ]
     r = rasi_name.lower().strip()
-    for i, name in enumerate(RASI_NAMES):
-        if r == name or r.startswith(name[:4]):
+    for i, (english, tamil) in enumerate(RASI_PAIRS):
+        if r == english or r == tamil or r.startswith(english[:4]):
             return i
     return None
 
