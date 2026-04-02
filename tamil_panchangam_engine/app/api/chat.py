@@ -86,6 +86,7 @@ class ChatRequest(BaseModel):
     question: str
     history: list[ChatMessage] = []
     reading_as_name: Optional[str] = None  # family context: whose chart is being read
+    context_type: Optional[str] = None  # "child:{member_id}" enriches prompt with cached prediction
 
 
 def _get_question_count(user_id: str, base_chart_id: str) -> int:
@@ -316,6 +317,40 @@ async def chat_stream(
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(**context)
     if req.reading_as_name:
         system_prompt = f"Reading from {req.reading_as_name}'s chart.\n\n" + system_prompt
+
+    # Enrich with child prediction context if requested
+    if req.context_type and req.context_type.startswith("child:"):
+        member_id = req.context_type.split(":", 1)[1]
+        with get_conn() as conn:
+            child_pred = conn.execute("""
+                SELECT overall_narrative, education, career_aptitude,
+                       marriage_window, key_takeaways
+                FROM family_child_predictions
+                WHERE member_id = ?
+                ORDER BY created_at DESC LIMIT 1
+            """, [member_id]).fetchone()
+        if child_pred:
+            overall = (child_pred[0] or "")[:500]
+            education = (child_pred[1] or "")[:300]
+            career = (child_pred[2] or "")[:300]
+            takeaways = (child_pred[4] or "")[:300]
+            child_context = f"""
+
+## Child's Prediction Context
+The user is asking about a child whose Jyotisha profile is:
+
+Overall: {overall}
+
+Education outlook: {education}
+
+Career aptitude: {career}
+
+Key takeaways: {takeaways}
+
+When answering, refer to this child's specific profile.
+Frame all responses in parent-friendly language.
+"""
+            system_prompt = system_prompt + child_context
 
     # Build messages array (last 6 pairs max)
     history_trimmed = req.history[-12:] if len(req.history) > 12 else req.history

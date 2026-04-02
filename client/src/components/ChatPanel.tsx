@@ -13,6 +13,7 @@ interface ChatPanelProps {
   onClose: () => void;
   chatEndpoint?: string;
   readingAsName?: string;
+  contextType?: string;
 }
 
 export function ChatPanel({
@@ -24,11 +25,12 @@ export function ChatPanel({
   onClose,
   chatEndpoint = "/api/chat/stream",
   readingAsName,
+  contextType,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { messages, isStreaming, error, usage, sendMessage } = useChat(baseChartId, chatEndpoint, readingAsName);
+  const { messages, isStreaming, error, usage, sendMessage } = useChat(baseChartId, chatEndpoint, readingAsName, contextType);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

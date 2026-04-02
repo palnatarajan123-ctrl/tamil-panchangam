@@ -479,6 +479,7 @@ export default function ChildPredictionScreen() {
             onClose={() => setChatOpen(false)}
             chatEndpoint={`/api/family/groups/${groupId}/chat/stream`}
             readingAsName={childName}
+            contextType={`child:${memberId}`}
           />
         </div>
       )}

@@ -30,6 +30,30 @@ import { getAccessToken } from "@/lib/auth";
 import { ChatPanel } from "@/components/ChatPanel";
 
 /* -------------------------------------------------
+   Helpers
+-------------------------------------------------- */
+
+function getCurrentDashaFromChart(chartPayload: any): { mahadasha: string; antardasha: string } {
+  const today = new Date();
+  const timeline = chartPayload?.dashas?.vimshottari?.timeline ?? [];
+  for (const maha of timeline) {
+    const mahaStart = new Date(maha.start);
+    const mahaEnd = new Date(maha.end);
+    if (today >= mahaStart && today <= mahaEnd) {
+      for (const antar of maha.antar_dashas ?? []) {
+        const antarStart = new Date(antar.start);
+        const antarEnd = new Date(antar.end);
+        if (today >= antarStart && today <= antarEnd) {
+          return { mahadasha: maha.mahadasha, antardasha: antar.antar_lord };
+        }
+      }
+      return { mahadasha: maha.mahadasha, antardasha: "—" };
+    }
+  }
+  return { mahadasha: "—", antardasha: "—" };
+}
+
+/* -------------------------------------------------
    Screen
 -------------------------------------------------- */
 
@@ -140,6 +164,7 @@ export default function PredictionScreen() {
   const moonNakshatra = data?.details?.envelope?.ephemeris?.moon?.nakshatra?.name || baseChart?.data?.ephemeris?.moon?.nakshatra?.name || "";
 
   const dashaContext = data?.details?.envelope?.dasha_context;
+  const dashaFallback = getCurrentDashaFromChart(baseChart?.data);
 
   const fallbackReason = data?.details?.interpretation?.llm_metadata?.fallback_reason;
   const llmProvider = data?.details?.interpretation?.llm_metadata?.provider;
@@ -197,7 +222,7 @@ export default function PredictionScreen() {
           </p>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 relative z-50">
           {(["monthly", "yearly"] as const).map((p) => (
             <Button
               key={p}
@@ -290,12 +315,12 @@ export default function PredictionScreen() {
 
           <Separator className="my-4" />
           {chatOpen && (
-            <div className="fixed top-0 right-0 h-full w-80 z-40 shadow-xl border-l border-border">
+            <div className="fixed top-12 md:top-0 right-0 bottom-0 w-80 z-40 shadow-xl border-l border-border">
               <ChatPanel
                 baseChartId={id}
                 chartName={chartName || id}
-                mahadasha={dashaContext?.active?.lord || "—"}
-                antardasha={dashaContext?.active?.antar?.lord || "—"}
+                mahadasha={dashaContext?.active?.lord || dashaFallback.mahadasha}
+                antardasha={dashaContext?.active?.antar?.lord || dashaFallback.antardasha}
                 periodLabel={period === "monthly" ? `${new Date(year, (index ?? 1) - 1).toLocaleString("default", { month: "long" })} ${year}` : String(year)}
                 onClose={() => setChatOpen(false)}
               />
