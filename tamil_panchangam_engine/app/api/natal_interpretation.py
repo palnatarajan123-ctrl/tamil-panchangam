@@ -73,7 +73,21 @@ GLOBAL RULES:
 - Include ALL decades from birth to end of life in
   life_by_decade
 - current_chapter must reflect the CURRENT dasha from
-  the chart context provided"""
+  the chart context provided
+
+VOICE AND REGISTER:
+- Write as a knowledgeable friend, not a formal report
+- Warm and direct — never clinical, never over-hedged
+- Use second person ("you", "your") throughout Layer 1
+- Avoid opening sentences with "You are" — vary the entry point
+- No bullet points in plain-English narrative fields — full prose only
+
+LENGTH DISCIPLINE:
+- Each Layer 1 section: 3–5 sentences maximum
+- Each Layer 2 section: 4–6 sentences maximum
+- life_by_decade entries: 2–3 sentences each decade
+- No section should repeat a theme already covered in another section
+- If a point has already been made, cut it — do not echo it"""
 
 NATAL_USER_TEMPLATE = """Birth Chart Data:
 {chart_context}
