@@ -17,6 +17,7 @@ from pathlib import Path
 from app.engines.budget_guard import log_llm_call
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.children_timing_engine import RASI_LORDS
+from app.engines.porutham_engine import _rasi_index
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,8 @@ def _build_child_context(payload: dict, year: int) -> str:
     nakshatra_raw = moon.get("nakshatra", {}) if isinstance(moon, dict) else {}
     nakshatra = nakshatra_raw.get("name", "") if isinstance(nakshatra_raw, dict) else str(nakshatra_raw)
     rasi = moon.get("rasi", "") if isinstance(moon, dict) else ""
-    rasi_index = int(moon.get("rasi_index", 0)) if isinstance(moon, dict) else 0
+    rasi_str = moon.get("rasi", "") if isinstance(moon, dict) else ""
+    rasi_index = _rasi_index(rasi_str) or 0
 
     vimshottari = (
         payload.get("dashas", {}).get("vimshottari", {})

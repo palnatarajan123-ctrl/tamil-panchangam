@@ -113,7 +113,7 @@ def score_ganam(boy_nak: int, girl_nak: int) -> dict:
     gg = GANA[girl_nak]
     if bg == gg:
         score = 6
-    elif bg == 0 and gg == 1:  # Deva + Manushya
+    elif bg == 0 and gg == 1:  # Deva + Manushya — intentional asymmetry: boy=Deva/girl=Manushya=5, reversed=0 (classical texts treat male Deva more favourably)
         score = 5
     elif bg == 1 and gg == 0:
         score = 0
