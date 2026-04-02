@@ -491,8 +491,8 @@ def get_group_overview(group_id: str, user: dict = Depends(get_current_user)):
                     if isinstance(ss, dict) and ss.get("active"):
                         sade_sati_info["is_active"] = True
                         sade_sati_info["phase"] = ss.get("phase")
-                        sade_sati_info["start_date"] = ss.get("start_date")
-                        sade_sati_info["end_date"] = ss.get("end_date")
+                        sade_sati_info["start_date"] = None  # not available per-phase; use end_date
+                        sade_sati_info["end_date"] = ss.get("current_phase_ends")
             except Exception as e:
                 logger.warning(f"Sade Sati computation failed for member {member_id}: {e}")
 

@@ -167,19 +167,27 @@ def _find_sade_sati_windows(moon_sign: int) -> list:
 
 
 def compute_sade_sati(
-    natal_moon_longitude: float,
+    natal_moon_longitude,  # float (degrees) OR dict (chart payload)
     reference_date: Optional[datetime] = None
 ) -> Dict[str, Any]:
     """
     Compute Sade Sati status for a natal Moon position.
 
     Args:
-        natal_moon_longitude: Moon's longitude in degrees (0-360, sidereal/Lahiri)
+        natal_moon_longitude: Moon's longitude in degrees (0-360, sidereal/Lahiri),
+            OR a full chart payload dict from which the longitude is extracted.
         reference_date: Date to check against (defaults to today)
 
     Returns:
         Full Sade Sati analysis dict
     """
+    if isinstance(natal_moon_longitude, dict):
+        natal_moon_longitude = (
+            natal_moon_longitude.get("ephemeris", {})
+            .get("moon", {})
+            .get("longitude_deg", 0.0)
+        )
+
     if reference_date is None:
         reference_date = datetime.utcnow()
 

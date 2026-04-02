@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chart", tags=["Natal Interpretation"])
 
-PROMPT_VERSION = "natal_v2.0"
+PROMPT_VERSION = "natal_v2.1"
 FEATURE_NAME = "natal_interpretation"
 
 NATAL_SYSTEM_PROMPT = """You are a natal chart interpreter
