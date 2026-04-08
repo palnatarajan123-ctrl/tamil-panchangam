@@ -381,8 +381,9 @@ function GroupDetail({
   const [activeTab, setActiveTab] = useState<"overview" | "compatibility">("overview");
   const [showAddMember, setShowAddMember] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["/api/family/groups", groupId],
     queryFn: () => apiFetch("GET", `/api/family/groups/${groupId}`),
   });
@@ -403,14 +404,6 @@ function GroupDetail({
     },
   });
 
-  const deleteGroup = useMutation({
-    mutationFn: () => apiFetch("DELETE", `/api/family/groups/${groupId}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/family/groups"] });
-      onBack();
-    },
-  });
-
   const patchPrimary = useMutation({
     mutationFn: (chartId: string | null) =>
       apiFetch("PATCH", `/api/family/groups/${groupId}`, { primary_chart_id: chartId }),
@@ -420,11 +413,30 @@ function GroupDetail({
   });
 
   if (isLoading) {
-    return <div className="text-muted-foreground text-sm py-8 text-center">Loading…</div>;
+    return (
+      <div className="flex items-center justify-center py-20 text-gray-400">
+        Loading group...
+      </div>
+    );
+  }
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <p className="text-red-400 font-medium mb-2">Could not load family group</p>
+        <p className="text-gray-500 text-sm mb-4">
+          {error instanceof Error ? error.message : "Please try again"}
+        </p>
+        <button
+          onClick={() => refetch()}
+          className="text-orange-400 hover:text-orange-300 text-sm underline"
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   const group: FamilyGroup = data;
-  if (!group) return null;
   const members: FamilyMember[] = group.members ?? [];
 
   // Build a lookup from member_id → overview entry for O(1) access in render
@@ -495,15 +507,12 @@ function GroupDetail({
               Ask Jyotishi
             </Button>
           )}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-destructive hover:text-destructive"
-            onClick={() => deleteGroup.mutate()}
-            disabled={deleteGroup.isPending}
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="text-gray-500 hover:text-red-400 text-xs px-2 py-1 rounded border border-gray-700 hover:border-red-400 transition-colors"
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+            Delete Group
+          </button>
         </div>
       </div>
 
@@ -630,6 +639,36 @@ function GroupDetail({
           onClose={() => setChatOpen(false)}
           readingAsName={primaryChartName}
         />
+      </div>
+    )}
+
+    {showDeleteConfirm && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-80">
+          <h3 className="font-semibold mb-2">Delete {group.name}?</h3>
+          <p className="text-gray-400 text-sm mb-4">
+            This will permanently delete the family group and all its
+            predictions. Member charts are not affected.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={async () => {
+                await apiFetch("DELETE", `/api/family/groups/${groupId}`);
+                setShowDeleteConfirm(false);
+                onBack();
+              }}
+              className="flex-1 bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-sm font-medium"
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg text-sm font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       </div>
     )}
     </div>

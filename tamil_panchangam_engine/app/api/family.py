@@ -172,25 +172,26 @@ def list_user_charts(user: dict = Depends(get_current_user)):
     user_id = user["id"]
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT uc.chart_id, bc.payload
+            SELECT uc.base_chart_id, uc.nickname, bc.payload
             FROM user_charts uc
-            JOIN base_charts bc ON bc.id = uc.chart_id
+            JOIN base_charts bc ON bc.id = uc.base_chart_id
             WHERE uc.user_id = ?
             ORDER BY uc.created_at DESC
         """, [user_id]).fetchall()
 
     charts = []
     for row in rows:
+        base_chart_id, nickname, payload_raw = row[0], row[1], row[2]
         try:
-            payload = row[1] if isinstance(row[1], dict) else json.loads(row[1] or "{}")
+            payload = payload_raw if isinstance(payload_raw, dict) else json.loads(payload_raw or "{}")
         except Exception:
             payload = {}
         birth = payload.get("birth_details", {}) if isinstance(payload, dict) else {}
         nak, rasi = _extract_nak_rasi(payload)
         charts.append({
-            "chart_id": str(row[0]),
+            "chart_id": str(base_chart_id),
+            "nickname": nickname or birth.get("name", ""),
             "name": birth.get("name", ""),
-            "date_of_birth": birth.get("date_of_birth", ""),
             "nakshatra": nak,
             "rasi": rasi,
         })
