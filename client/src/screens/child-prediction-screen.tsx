@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { authHeaders } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -65,10 +66,6 @@ interface ChildPrediction {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("auth_token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 async function apiFetch(method: string, path: string, body?: unknown) {
   const res = await fetch(path, {
