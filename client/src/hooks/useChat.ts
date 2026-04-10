@@ -20,6 +20,7 @@ export function useChat(
   endpoint = "/api/chat/stream",
   readingAsName?: string,
   contextType?: string,
+  groupId?: string,
 ) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -79,6 +80,7 @@ export function useChat(
             })),
             ...(readingAsName ? { reading_as_name: readingAsName } : {}),
             ...(contextType ? { context_type: contextType } : {}),
+            ...(groupId ? { group_id: groupId } : {}),
           }),
         });
 
@@ -141,7 +143,7 @@ export function useChat(
         setIsStreaming(false);
       }
     },
-    [baseChartId, isStreaming, messages, readingAsName, contextType]
+    [baseChartId, isStreaming, messages, readingAsName, contextType, groupId]
   );
 
   const clearMessages = useCallback(() => setMessages([]), []);

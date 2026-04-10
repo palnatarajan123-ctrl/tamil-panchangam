@@ -382,6 +382,7 @@ function GroupDetail({
   const [showAddMember, setShowAddMember] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmDeleteMemberId, setConfirmDeleteMemberId] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["/api/family/groups", groupId],
@@ -605,7 +606,7 @@ function GroupDetail({
                     size="icon"
                     variant="ghost"
                     className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                    onClick={() => deleteMember.mutate(m.id)}
+                    onClick={() => setConfirmDeleteMemberId(m.id)}
                     disabled={deleteMember.isPending}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -638,7 +639,37 @@ function GroupDetail({
           periodLabel={group.name}
           onClose={() => setChatOpen(false)}
           readingAsName={primaryChartName}
+          groupId={groupId}
         />
+      </div>
+    )}
+
+    {confirmDeleteMemberId && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-80">
+          <h3 className="font-semibold mb-2">Remove member?</h3>
+          <p className="text-gray-400 text-sm mb-4">
+            This removes them from the family group.
+            Their chart and predictions are not affected.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                deleteMember.mutate(confirmDeleteMemberId);
+                setConfirmDeleteMemberId(null);
+              }}
+              className="flex-1 bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-sm font-medium"
+            >
+              Remove
+            </button>
+            <button
+              onClick={() => setConfirmDeleteMemberId(null)}
+              className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg text-sm font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       </div>
     )}
 

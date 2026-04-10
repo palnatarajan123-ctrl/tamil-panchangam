@@ -14,6 +14,7 @@ interface ChatPanelProps {
   chatEndpoint?: string;
   readingAsName?: string;
   contextType?: string;
+  groupId?: string;
 }
 
 export function ChatPanel({
@@ -26,11 +27,12 @@ export function ChatPanel({
   chatEndpoint = "/api/chat/stream",
   readingAsName,
   contextType,
+  groupId,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { messages, isStreaming, error, usage, sendMessage } = useChat(baseChartId, chatEndpoint, readingAsName, contextType);
+  const { messages, isStreaming, error, usage, sendMessage } = useChat(baseChartId, chatEndpoint, readingAsName, contextType, groupId);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

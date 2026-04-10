@@ -10,7 +10,7 @@ import os
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, date, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -21,6 +21,7 @@ from app.engines.yoga_engine import compute_yogas
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.shadbala_engine import compute_shadbala
 from app.engines.budget_guard import log_llm_call
+from app.engines.dasha_resolver import resolve_antar_dasha
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ CHART CONTEXT:
 
 RESPONSE FORMAT — strictly follow this every time:
 1. One direct answer in plain English — yes/likely/unlikely/no + one sentence why. No astrology jargon unless essential.
-2. One practical suggestion the person can act on this week.
+2. One practical suggestion the person can act on.
 3. One short closing line — a memorable takeaway or gentle caution.
 
 RULES:
@@ -59,8 +60,9 @@ TIME HORIZON RULE:
 - If the question is about a Mahadasha (6–20 years), answer in broad
   themes only. Do not name specific months or years.
 - If the question is about an Antardasha, season-level language is fine.
-- Never give a specific date, week, or month unless explicitly asked
-  and the period is short enough to support it.
+- Never say 'this week' or 'next week' unless the user explicitly asked
+  about the current week.
+- Never give a specific date or month for broad questions.
 
 AVOID REPEATING VISIBLE INFORMATION:
 - Do not restate birth details, chart basics, or period names the user
@@ -87,6 +89,7 @@ class ChatRequest(BaseModel):
     history: list[ChatMessage] = []
     reading_as_name: Optional[str] = None  # family context: whose chart is being read
     context_type: Optional[str] = None  # "child:{member_id}" enriches prompt with cached prediction
+    group_id: Optional[str] = None  # family group — triggers multi-member chart context
 
 
 def _get_question_count(user_id: str, base_chart_id: str) -> int:
@@ -317,6 +320,61 @@ async def chat_stream(
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(**context)
     if req.reading_as_name:
         system_prompt = f"Reading from {req.reading_as_name}'s chart.\n\n" + system_prompt
+
+    # Build family member context if this is a family chat
+    family_member_context = ""
+    if req.group_id:
+        with get_conn() as conn:
+            members = conn.execute("""
+                SELECT fm.role, fm.display_name, fm.chart_id,
+                       uc.payload
+                FROM family_members fm
+                JOIN user_charts uc ON uc.base_chart_id = fm.chart_id
+                WHERE fm.group_id = ?
+                ORDER BY fm.role
+            """, [req.group_id]).fetchall()
+
+            member_lines = []
+            for m in members:
+                role, display_name, chart_id, payload_raw = m
+                payload = payload_raw if isinstance(payload_raw, dict) \
+                          else json.loads(payload_raw or "{}")
+                birth = payload.get("birth_details", {})
+                moon = payload.get("ephemeris", {}).get("moon", {})
+                vimshottari = payload.get("dashas", {}).get("vimshottari", {})
+                dasha = resolve_antar_dasha(
+                    vimshottari=vimshottari,
+                    reference_date=date.today()
+                )
+                ss = compute_sade_sati(payload)
+                ss_data = ss.get("sade_sati", {}) if ss else {}
+
+                name = display_name or birth.get("name", role)
+                nak = moon.get("nakshatra", {})
+                nak_name = nak.get("name", "") if isinstance(nak, dict) else nak
+                rasi = moon.get("rasi", "")
+                maha = dasha.get("maha", {}).get("lord", "—") if dasha else "—"
+                antar = dasha.get("antar", {}).get("lord", "—") if dasha else "—"
+                ss_active = ss_data.get("active", False)
+                ss_phase = ss_data.get("phase", "")
+
+                member_lines.append(
+                    f"{role.upper()} — {name}: "
+                    f"Nakshatra {nak_name}, Rasi {rasi}, "
+                    f"Dasha {maha}›{antar}, "
+                    f"Sade Sati: {'Active (' + ss_phase + ')' if ss_active else 'None'}"
+                )
+
+            if member_lines:
+                family_member_context = (
+                    "\n\n## FAMILY CONTEXT\n"
+                    "You are advising this couple/family. "
+                    "Use ALL members' charts when answering family questions:\n"
+                    + "\n".join(member_lines)
+                )
+
+    if family_member_context:
+        system_prompt = system_prompt + family_member_context
 
     # Enrich with child prediction context if requested
     if req.context_type and req.context_type.startswith("child:"):
