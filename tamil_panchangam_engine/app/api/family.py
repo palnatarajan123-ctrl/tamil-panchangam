@@ -82,7 +82,7 @@ def _assert_group_owner(conn, group_id: str, user_id: str) -> dict:
 def _chart_owned_by_user(conn, chart_id: str, user_id: str) -> bool:
     """Check that user owns this chart via user_charts."""
     row = conn.execute(
-        "SELECT id FROM user_charts WHERE chart_id = ? AND user_id = ?",
+        "SELECT id FROM user_charts WHERE base_chart_id = ? AND user_id = ?",
         [chart_id, user_id]
     ).fetchone()
     return row is not None
@@ -146,7 +146,7 @@ def _resolve_primary_chart(conn, group_id: str, user_id: str,
     # Fall back: find any member chart owned by this user
     row = conn.execute("""
         SELECT fm.chart_id FROM family_members fm
-        JOIN user_charts uc ON uc.chart_id = fm.chart_id AND uc.user_id = ?
+        JOIN user_charts uc ON uc.base_chart_id = fm.chart_id AND uc.user_id = ?
         WHERE fm.group_id = ?
         LIMIT 1
     """, [user_id, group_id]).fetchone()
