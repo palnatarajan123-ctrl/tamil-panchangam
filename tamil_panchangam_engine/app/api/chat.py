@@ -330,9 +330,9 @@ async def chat_stream(
                        uc.payload
                 FROM family_members fm
                 JOIN user_charts uc ON uc.base_chart_id = fm.chart_id
-                WHERE fm.group_id = ?
+                WHERE fm.group_id = %s
                 ORDER BY fm.role
-            """, [req.group_id]).fetchall()
+            """, (req.group_id,)).fetchall()
 
             member_lines = []
             for m in members:
