@@ -327,9 +327,9 @@ async def chat_stream(
         with get_conn() as conn:
             members = conn.execute("""
                 SELECT fm.role, fm.display_name, fm.chart_id,
-                       uc.payload
+                       bc.payload
                 FROM family_members fm
-                JOIN user_charts uc ON uc.base_chart_id = fm.chart_id
+                JOIN base_charts bc ON bc.id = fm.chart_id
                 WHERE fm.group_id = %s
                 ORDER BY fm.role
             """, (req.group_id,)).fetchall()
