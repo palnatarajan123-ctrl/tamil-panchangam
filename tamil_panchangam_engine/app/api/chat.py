@@ -356,13 +356,13 @@ async def chat_stream(
                 maha = dasha.get("maha", {}).get("lord", "—") if dasha else "—"
                 antar = dasha.get("antar", {}).get("lord", "—") if dasha else "—"
                 ss_active = ss_data.get("active", False)
-                ss_phase = ss_data.get("phase", "")
+                ss_phase = ss_data.get("phase_name", "")
 
                 member_lines.append(
                     f"{role.upper()} — {name}: "
                     f"Nakshatra {nak_name}, Rasi {rasi}, "
                     f"Dasha {maha}›{antar}, "
-                    f"Sade Sati: {'Active (' + ss_phase + ')' if ss_active else 'None'}"
+                    f"Sade Sati: {'Active – ' + ss_phase if ss_active else 'None'}"
                 )
 
             if member_lines:
