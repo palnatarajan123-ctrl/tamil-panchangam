@@ -344,7 +344,7 @@ async def chat_stream(
                 vimshottari = payload.get("dashas", {}).get("vimshottari", {})
                 dasha = resolve_antar_dasha(
                     vimshottari=vimshottari,
-                    reference_date=date.today()
+                    reference_date=datetime.today()
                 )
                 ss = compute_sade_sati(payload)
                 ss_data = ss.get("sade_sati", {}) if ss else {}
