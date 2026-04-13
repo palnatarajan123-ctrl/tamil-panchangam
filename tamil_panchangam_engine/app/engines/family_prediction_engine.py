@@ -98,7 +98,7 @@ def _build_family_context(group: dict, members_with_charts: list, year: int) -> 
                 ss = ss_result.get("sade_sati", {})
                 if isinstance(ss, dict) and ss.get("active"):
                     ss_active = True
-                    ss_phase = ss.get("phase", "")
+                    ss_phase = ss.get("phase_name", "")
         except Exception as e:
             logger.warning(f"Sade Sati computation failed for {name}: {e}")
 
@@ -110,7 +110,7 @@ def _build_family_context(group: dict, members_with_charts: list, year: int) -> 
             f"Current Mahadasha: {maha_lord}",
             f"Current Antardasha: {antar_lord}",
             f"Antardasha ends: {antar_end[:10] if antar_end else 'unknown'}",
-            f"Sade Sati: {'Active (' + ss_phase + ' phase)' if ss_active else 'Not active'}",
+            f"Sade Sati: {'Active – ' + ss_phase if ss_active else 'Not active'}",
             "",
         ]
 
