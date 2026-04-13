@@ -160,18 +160,39 @@ function RegenerateDialog({
 const BENEFICS = new Set(["Jupiter", "Venus", "Mercury", "Moon"]);
 const MALEFICS = new Set(["Saturn", "Rahu", "Ketu", "Mars", "Sun"]);
 
-function getDashaColor(bar: DashaBar, memberColor: string): { fill: string; stroke: string; opacity: number } {
-  let opacity = BENEFICS.has(bar.mahadasha) ? 1.0 : 0.65;
-  if (bar.antardasha === bar.mahadasha) {
-    opacity = Math.min(opacity + 0.1, 1.0);
-  } else if (MALEFICS.has(bar.mahadasha) && BENEFICS.has(bar.antardasha)) {
-    opacity = 0.75;
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [
+    parseInt(h.substring(0, 2), 16),
+    parseInt(h.substring(2, 4), 16),
+    parseInt(h.substring(4, 6), 16),
+  ];
+}
+
+function getDashaColor(
+  bar: DashaBar,
+  memberColor: string
+): { fill: string; fillOpacity: number; stroke: string; strokeWidth: number } {
+  const isMahaBenefic = BENEFICS.has(bar.mahadasha);
+  const isAntarBenefic = BENEFICS.has(bar.antardasha);
+  const isAntarSame = bar.antardasha === bar.mahadasha;
+
+  let tier: "favorable" | "moderate" | "challenging";
+  if (isMahaBenefic) {
+    tier = isAntarSame || isAntarBenefic ? "favorable" : "moderate";
+  } else {
+    // malefic mahadasha
+    tier = isAntarBenefic ? "moderate" : "challenging";
   }
+
+  const fillOpacity = tier === "favorable" ? 1.0 : tier === "moderate" ? 0.6 : 0.35;
   const stroke =
-    opacity >= 0.85 ? "#4ade80" :
-    opacity >= 0.7  ? memberColor :
+    tier === "favorable" ? "#4ade80" :
+    tier === "moderate"  ? memberColor :
     "#f87171";
-  return { fill: memberColor, stroke, opacity };
+  const strokeWidth = tier === "challenging" ? 1.5 : 1;
+
+  return { fill: memberColor, fillOpacity, stroke, strokeWidth };
 }
 
 // ── SVG Timeline Renderer ──────────────────────────────────────────────────────
@@ -281,15 +302,15 @@ function TimelineSVG({
                     x={x1} y={dashaY}
                     width={w} height={DASHA_ROW_H}
                     fill={dc.fill}
-                    opacity={dc.opacity}
+                    fillOpacity={dc.fillOpacity}
                     stroke={dc.stroke}
-                    strokeWidth={1}
+                    strokeWidth={dc.strokeWidth}
                     rx={3}
                   />
                   {w > 40 && (
                     <text
                       x={x1 + 4} y={dashaY + 17}
-                      fill="white" fontSize={8}
+                      fill="white" opacity={1} fontSize={8}
                       style={{ pointerEvents: "none" }}
                     >
                       {bar.label.length > Math.floor(w / 6) ? bar.label.slice(0, Math.floor(w / 6)) + "…" : bar.label}
