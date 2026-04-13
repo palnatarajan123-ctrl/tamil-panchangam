@@ -232,8 +232,8 @@ def _build_chat_context(base_chart_id: str) -> dict:
             ashtama = sade_sati.get("ashtama_shani", {})
             alert = sade_sati.get("alert_level", "")
             if isinstance(ss, dict) and ss.get("active"):
-                phase = ss.get("phase", "")
-                sade_sati_summary = f"Sade Sati active ({phase} phase), alert: {alert}"
+                phase = ss.get("phase_name", "")
+                sade_sati_summary = f"Sade Sati active – {phase}, alert: {alert}"
             elif isinstance(ashtama, dict) and ashtama.get("active"):
                 sade_sati_summary = f"Ashtama Shani active, alert: {alert}"
     except Exception as e:

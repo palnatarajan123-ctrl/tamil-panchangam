@@ -140,7 +140,7 @@ def _build_children_timing_context(
             ss_result = compute_sade_sati(payload)
             ss = ss_result.get("sade_sati", {}) if isinstance(ss_result, dict) else {}
             ss_active = ss.get("active", False) if isinstance(ss, dict) else False
-            ss_phase = ss.get("phase", "") if isinstance(ss, dict) else ""
+            ss_phase = ss.get("phase_name", "") if isinstance(ss, dict) else ""
         except Exception:
             ss_active = False
             ss_phase = ""
