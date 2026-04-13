@@ -310,6 +310,7 @@ def bootstrap():
             from_year INTEGER NOT NULL,
             to_year INTEGER NOT NULL,
             timeline_data TEXT NOT NULL,
+            summary TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(group_id, from_year, to_year)
         )

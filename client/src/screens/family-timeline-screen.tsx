@@ -67,6 +67,7 @@ interface TimelineData {
   members: TimelineMember[];
   shared_events: SharedEvent[];
   cached: boolean;
+  summary?: string | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -152,6 +153,25 @@ function RegenerateDialog({
       </Card>
     </div>
   );
+}
+
+// ── Dasha color intensity ──────────────────────────────────────────────────────
+
+const BENEFICS = new Set(["Jupiter", "Venus", "Mercury", "Moon"]);
+const MALEFICS = new Set(["Saturn", "Rahu", "Ketu", "Mars", "Sun"]);
+
+function getDashaColor(bar: DashaBar, memberColor: string): { fill: string; stroke: string; opacity: number } {
+  let opacity = BENEFICS.has(bar.mahadasha) ? 1.0 : 0.65;
+  if (bar.antardasha === bar.mahadasha) {
+    opacity = Math.min(opacity + 0.1, 1.0);
+  } else if (MALEFICS.has(bar.mahadasha) && BENEFICS.has(bar.antardasha)) {
+    opacity = 0.75;
+  }
+  const stroke =
+    opacity >= 0.85 ? "#4ade80" :
+    opacity >= 0.7  ? memberColor :
+    "#f87171";
+  return { fill: memberColor, stroke, opacity };
 }
 
 // ── SVG Timeline Renderer ──────────────────────────────────────────────────────
@@ -254,13 +274,16 @@ function TimelineSVG({
               const x1 = dateToX(bar.from, fromYear);
               const x2 = dateToX(bar.to, fromYear);
               const w = Math.max(x2 - x1, 2);
+              const dc = getDashaColor(bar, member.color);
               return (
                 <g key={bi}>
                   <rect
                     x={x1} y={dashaY}
                     width={w} height={DASHA_ROW_H}
-                    fill={bar.color}
-                    opacity={0.85}
+                    fill={dc.fill}
+                    opacity={dc.opacity}
+                    stroke={dc.stroke}
+                    strokeWidth={1}
                     rx={3}
                   />
                   {w > 40 && (
@@ -486,7 +509,37 @@ export default function FamilyTimelineScreen() {
                 <span className="inline-block w-2 h-2 rounded-full bg-orange-400" />
                 Milestone
               </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#4ade80" }} />
+                Favorable
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3 rounded-sm bg-gray-400" />
+                Moderate
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#f87171" }} />
+                Challenging
+              </span>
             </div>
+
+            {/* Summary panel */}
+            {data.summary && (
+              <div className="bg-card border border-border rounded-lg p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">🪐 Family Dasha Landscape</p>
+                {(() => {
+                  const parts = data.summary.split("Collective Theme:");
+                  return (
+                    <>
+                      <p className="text-sm text-foreground leading-relaxed">{parts[0].trim()}</p>
+                      {parts[1] && (
+                        <p className="text-orange-400 font-medium mt-2">Collective Theme: {parts[1].trim()}</p>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
 
             {/* Scrollable SVG container */}
             <div

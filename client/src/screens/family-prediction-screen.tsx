@@ -320,6 +320,25 @@ export default function FamilyPredictionScreen() {
   const primaryChartId = groupData?.primary_chart_id ?? null;
   const primaryChartName = groupData?.primary_chart_name ?? groupName;
 
+  const handlePdfDownload = async () => {
+    try {
+      const res = await fetch(
+        `/api/family/groups/${groupId}/predictions/pdf?year=${year}`,
+        { headers: authHeaders() }
+      );
+      if (!res.ok) throw new Error("PDF download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${groupName}-predictions-${year}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("PDF download error:", e);
+    }
+  };
+
   const members: { display_name?: string; chart_name?: string; role: string }[] =
     groupData?.members ?? [];
   const memberPills = members.map(
@@ -381,12 +400,7 @@ export default function FamilyPredictionScreen() {
               variant="outline"
               size="sm"
               className="gap-2"
-              onClick={() =>
-                window.open(
-                  `/api/family/groups/${groupId}/predictions/pdf?year=${year}`,
-                  "_blank"
-                )
-              }
+              onClick={handlePdfDownload}
             >
               <Download className="h-4 w-4" /> PDF
             </Button>
@@ -426,6 +440,10 @@ export default function FamilyPredictionScreen() {
         {data && !isLoading && (
           <div className="space-y-6">
 
+            <p className="text-xs text-muted-foreground">
+              Predictions reflect current dasha periods and planetary transits for {year}. Regenerate next year for updated windows.
+            </p>
+
             {/* Executive Summary */}
             {data.executive_summary && (
               <Card className="border-amber-500/30 bg-amber-500/5">
@@ -457,12 +475,34 @@ export default function FamilyPredictionScreen() {
               </Card>
             )}
 
-            {/* Three content cards */}
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <FinancialPeaksCard peaks={data.financial_peaks ?? []} />
-              <CautionWindowsCard windows={data.caution_windows ?? []} />
-              <ChildMilestonesCard milestones={data.child_milestones ?? []} />
-            </div>
+            {/* Financial Peaks section */}
+            {(data.financial_peaks?.length ?? 0) > 0 && (
+              <div className="space-y-3">
+                <div className="border-b border-border pb-2">
+                  <h2 className="text-base font-semibold text-foreground">📈 Financial Peaks &amp; Troughs</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Income and investment windows for {year}, based on current dasha periods
+                  </p>
+                </div>
+                <FinancialPeaksCard peaks={data.financial_peaks ?? []} />
+              </div>
+            )}
+
+            {/* Caution Windows section */}
+            {(data.caution_windows?.length ?? 0) > 0 && (
+              <div className="space-y-3">
+                <div className="border-b border-border pb-2">
+                  <h2 className="text-base font-semibold text-foreground">⚠️ Shared Caution Windows</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Periods requiring mindful attention across health, relationships, and finances
+                  </p>
+                </div>
+                <CautionWindowsCard windows={data.caution_windows ?? []} />
+              </div>
+            )}
+
+            {/* Child Milestones */}
+            <ChildMilestonesCard milestones={data.child_milestones ?? []} />
 
           </div>
         )}

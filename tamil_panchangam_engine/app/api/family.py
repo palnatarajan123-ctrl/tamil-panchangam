@@ -17,6 +17,7 @@ Routes:
 
 import json
 import logging
+import os
 import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
@@ -30,6 +31,7 @@ from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.engines.porutham_engine import compute_porutham
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.dasha_resolver import resolve_antar_dasha
+from app.engines.budget_guard import log_llm_call
 from app.engines.family_prediction_engine import run_family_prediction
 from app.engines.children_timing_engine import run_children_timing
 from app.engines.timeline_aggregator import build_timeline
@@ -729,6 +731,135 @@ def clear_children_timing_cache(
 
 # ── Timeline ──────────────────────────────────────────────────────────────────
 
+def generate_timeline_summary(
+    group: dict,
+    members_with_charts: list,
+    from_year: int,
+    to_year: int,
+    db,
+) -> Optional[str]:
+    """Generate an LLM summary of the family's collective dasha landscape."""
+    group_id = group["id"]
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return None
+
+    try:
+        budget_row = db.execute(
+            "SELECT llm_enabled, paused_reason FROM llm_budget WHERE id = 1"
+        ).fetchone()
+        if budget_row and not budget_row[0]:
+            return None
+    except Exception as e:
+        logger.warning(f"Budget check failed: {e}")
+
+    # Cache check
+    try:
+        row = db.execute(
+            "SELECT summary FROM family_timeline_cache WHERE group_id = %s "
+            "AND from_year = %s AND to_year = %s AND summary IS NOT NULL",
+            [group_id, from_year, to_year]
+        ).fetchone()
+        if row:
+            return row[0]
+    except Exception as e:
+        logger.warning(f"Timeline summary cache read failed: {e}")
+
+    # Build member context using resolve_antar_dasha
+    now = datetime.now(timezone.utc)
+    member_lines = []
+    for item in members_with_charts:
+        name = item["member"].get("display_name") or item["member"].get("role", "Member")
+        payload = item["payload"]
+        vimshottari = payload.get("dashas", {}).get("vimshottari", {})
+        sade_sati = payload.get("sade_sati", {}).get("phase_name", "Not active")
+
+        dasha = resolve_antar_dasha(vimshottari=vimshottari, reference_date=now)
+        if dasha:
+            mahadasha = dasha["maha"]["lord"]
+            antardasha = dasha["antar"]["lord"]
+        else:
+            mahadasha = "Unknown"
+            antardasha = "Unknown"
+
+        member_lines.append(
+            f"- {name}: Mahadasha: {mahadasha} | Antardasha: {antardasha} "
+            f"| Sade Sati: {sade_sati}"
+        )
+
+    # Prompt
+    system_prompt = (
+        "You are a Vedic astrology advisor. Write in warm, clear language. "
+        "No bullet points. No markdown. No headers."
+    )
+    user_message = (
+        f"Given this family's planetary periods from {from_year} to {to_year}:\n\n"
+        + "\n".join(member_lines)
+        + f"\n\nWrite a 2-3 sentence summary of their collective dasha landscape "
+        f"for this period. Be specific to their actual dashas — name the planets. "
+        f"End with exactly this format on a new line: Collective Theme: [one phrase]"
+    )
+
+    # LLM call
+    input_tokens = 0
+    output_tokens = 0
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=300,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+        )
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
+        summary = response.content[0].text.strip()
+    except Exception as e:
+        logger.error(f"Timeline summary LLM call failed: {e}")
+        try:
+            log_llm_call(
+                db=db,
+                chart_id=group_id,
+                call_type="timeline_summary",
+                period=f"{from_year}_{to_year}",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                status="error",
+                fallback_reason=str(e)[:100],
+            )
+        except Exception:
+            pass
+        return None
+
+    # Log success
+    try:
+        log_llm_call(
+            db=db,
+            chart_id=group_id,
+            call_type="timeline_summary",
+            period=f"{from_year}_{to_year}",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            status="success",
+        )
+    except Exception as e:
+        logger.warning(f"log_llm_call failed: {e}")
+
+    # Cache write
+    try:
+        db.execute(
+            "UPDATE family_timeline_cache SET summary = %s "
+            "WHERE group_id = %s AND from_year = %s AND to_year = %s",
+            [summary, group_id, from_year, to_year]
+        )
+    except Exception as e:
+        logger.warning(f"Timeline summary cache write failed: {e}")
+
+    return summary
+
+
 @router.get("/groups/{group_id}/timeline")
 def get_family_timeline(
     group_id: str,
@@ -753,6 +884,18 @@ def get_family_timeline(
             to_year=to_year,
             db=conn,
         )
+        try:
+            summary = generate_timeline_summary(
+                group={"id": group_id, "name": group["name"]},
+                members_with_charts=members_with_charts,
+                from_year=from_year,
+                to_year=to_year,
+                db=conn,
+            )
+            result["summary"] = summary
+        except Exception as e:
+            logger.error(f"Timeline summary generation failed: {e}")
+            result["summary"] = None
     return result
 
 
