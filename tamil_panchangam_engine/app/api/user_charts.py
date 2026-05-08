@@ -45,7 +45,7 @@ def list_user_charts(user: dict = Depends(get_current_user)):
                       bc.payload
                FROM user_charts uc
                JOIN base_charts bc ON bc.id = uc.base_chart_id
-               WHERE uc.user_id = ?
+               WHERE uc.user_id = %s
                ORDER BY uc.created_at DESC""",
             [user["id"]],
         ).fetchall()
@@ -78,14 +78,14 @@ def save_chart(body: SaveChartRequest, user: dict = Depends(get_current_user)):
     with get_conn() as conn:
         # Check chart exists
         bc = conn.execute(
-            "SELECT id FROM base_charts WHERE id = ?", [body.base_chart_id]
+            "SELECT id FROM base_charts WHERE id = %s", [body.base_chart_id]
         ).fetchone()
         if not bc:
             raise HTTPException(status_code=404, detail="Base chart not found")
 
         # Check if already saved
         existing = conn.execute(
-            "SELECT id FROM user_charts WHERE user_id = ? AND base_chart_id = ?",
+            "SELECT id FROM user_charts WHERE user_id = %s AND base_chart_id = %s",
             [user["id"], body.base_chart_id],
         ).fetchone()
         if existing:
@@ -94,7 +94,7 @@ def save_chart(body: SaveChartRequest, user: dict = Depends(get_current_user)):
         # Enforce max charts (admin = unlimited)
         if user.get("role") != "admin":
             count = conn.execute(
-                "SELECT COUNT(*) FROM user_charts WHERE user_id = ?", [user["id"]]
+                "SELECT COUNT(*) FROM user_charts WHERE user_id = %s", [user["id"]]
             ).fetchone()[0]
             if count >= MAX_CHARTS_PER_USER:
                 raise HTTPException(
@@ -105,7 +105,7 @@ def save_chart(body: SaveChartRequest, user: dict = Depends(get_current_user)):
         uc_id = str(uuid.uuid4())
         conn.execute(
             """INSERT INTO user_charts (id, user_id, base_chart_id, nickname, created_at)
-               VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+               VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)""",
             [uc_id, user["id"], body.base_chart_id, body.nickname],
         )
     return {"id": uc_id, "already_saved": False}
@@ -116,13 +116,13 @@ def rename_chart(chart_id: str, body: RenameChartRequest, user: dict = Depends(g
     """Rename (update nickname of) a saved chart."""
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id FROM user_charts WHERE id = ? AND user_id = ?",
+            "SELECT id FROM user_charts WHERE id = %s AND user_id = %s",
             [chart_id, user["id"]],
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Chart not found")
         conn.execute(
-            "UPDATE user_charts SET nickname = ? WHERE id = ?",
+            "UPDATE user_charts SET nickname = %s WHERE id = %s",
             [body.nickname, chart_id],
         )
     return {"ok": True}
@@ -133,9 +133,9 @@ def delete_chart(chart_id: str, user: dict = Depends(get_current_user)):
     """Remove a chart from the current user's saved collection."""
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id FROM user_charts WHERE id = ? AND user_id = ?",
+            "SELECT id FROM user_charts WHERE id = %s AND user_id = %s",
             [chart_id, user["id"]],
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Chart not found")
-        conn.execute("DELETE FROM user_charts WHERE id = ?", [chart_id])
+        conn.execute("DELETE FROM user_charts WHERE id = %s", [chart_id])

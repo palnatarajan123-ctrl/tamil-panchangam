@@ -87,7 +87,7 @@ def _get_user_from_token(token: str) -> Optional[dict]:
     try:
         with get_conn() as conn:
             row = conn.execute(
-                "SELECT id, email, name, role, is_active FROM users WHERE id = ?",
+                "SELECT id, email, name, role, is_active FROM users WHERE id = %s",
                 [user_id],
             ).fetchone()
         if row and row[4]:  # is_active

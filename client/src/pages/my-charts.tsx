@@ -79,7 +79,9 @@ export default function MyCharts() {
         <BookOpen className="h-5 w-5 text-primary" />
         <h1 className="text-2xl font-serif font-bold">My Saved Charts</h1>
         <span className="text-sm text-muted-foreground ml-2">
-          ({charts.length} / 10)
+          {user.role === "admin"
+            ? `(${charts.length} / Unlimited)`
+            : `(${charts.length} / 10)`}
         </span>
       </div>
 
