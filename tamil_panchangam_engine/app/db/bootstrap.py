@@ -91,6 +91,12 @@ def bootstrap():
         )
         """)
 
+        # migration: add prompt_version to existing prediction_llm_interpretation tables
+        try:
+            conn.execute("ALTER TABLE prediction_llm_interpretation ADD COLUMN IF NOT EXISTS prompt_version TEXT DEFAULT 'v4'")
+        except Exception:
+            pass
+
         # llm_token_usage
         conn.execute("""
         CREATE TABLE IF NOT EXISTS llm_token_usage (
