@@ -69,6 +69,8 @@ from app.engines.divisional_charts import (
 
 # ✅ Functional Role engine
 from app.engines.functional_role_engine import compute_functional_roles
+from app.engines.yoga_engine import compute_yogas
+from app.engines.shadbala_engine import compute_shadbala
 
 from app.utils.time_utils import (
     normalize_birth_time_to_utc,
@@ -348,6 +350,37 @@ def create_base_chart(
     )
 
     # -------------------------------------------------
+    # 7c. Yogas — stored at creation for PDF/LLM use
+    # -------------------------------------------------
+    try:
+        yoga_result = compute_yogas(ephemeris, {})
+        base_chart_yogas = yoga_result
+    except Exception as e:
+        logger.warning(f"Yoga computation at creation failed: {e}")
+        base_chart_yogas = {"yogas": [], "summary": {}, "error": str(e)}
+
+    # -------------------------------------------------
+    # 7d. Shadbala — natal baseline stored at creation
+    # -------------------------------------------------
+    try:
+        planets_data = ephemeris.get("planets", {})
+        lagna_lon = ephemeris.get("lagna", {}).get("longitude_deg", 0.0)
+        shadbala_natal = compute_shadbala(planets_data, lagna_lon)
+    except Exception as e:
+        logger.warning(f"Shadbala computation at creation failed: {e}")
+        shadbala_natal = {"planets": {}, "ranking": [], "error": str(e)}
+
+    # -------------------------------------------------
+    # 7e. Bhinnashtakavarga — stored at creation
+    # -------------------------------------------------
+    try:
+        from app.engines.bhinnashtakavarga_engine import compute_bhinnashtakavarga
+        bav_result = compute_bhinnashtakavarga(ephemeris)
+    except Exception as e:
+        logger.warning(f"BAV computation at creation failed: {e}")
+        bav_result = {"error": str(e)}
+
+    # -------------------------------------------------
     # 8. Assemble immutable base chart
     # -------------------------------------------------
     base_chart = {
@@ -391,6 +424,9 @@ def create_base_chart(
         "pancha_pakshi_birth": pakshi,
         "functional_roles": functional_roles,
         "kp_sublords": kp_sublords,
+        "yogas": base_chart_yogas,
+        "shadbala_natal": shadbala_natal,
+        "bhinnashtakavarga": bav_result,
     }
 
     # -------------------------------------------------
