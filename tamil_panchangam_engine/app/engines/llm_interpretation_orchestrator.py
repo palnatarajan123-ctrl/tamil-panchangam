@@ -40,11 +40,11 @@ LLM_MONTHLY_TOKEN_BUDGET = 1_000_000
 
 # v1.9: Window-type-specific prompt versions with detail level support
 PROMPT_VERSION_BY_WINDOW = {
-    "weekly": "v4",
-    "monthly": "v4",
-    "yearly": "v4"
+    "weekly": "v5",
+    "monthly": "v5",
+    "yearly": "v5"
 }
-PROMPT_VERSION = "v4"  # fallback
+PROMPT_VERSION = "v5"  # fallback
 
 
 def _load_prompt_template(version: str = "v2") -> str:
@@ -303,6 +303,28 @@ def _validate_llm_output(output: Dict[str, Any]) -> bool:
     
     engine_version = output.get("engine_version", "")
     
+    if engine_version == "ai-interpretation-v5.0":
+        required_keys = [
+            "executive_summary", "why_this_period",
+            "life_areas", "remedies", "key_takeaways"
+        ]
+        if not all(k in output for k in required_keys):
+            missing = [k for k in required_keys if k not in output]
+            logger.warning(f"LLM v5 output missing keys: {missing}")
+            return False
+        exec_summary = output.get("executive_summary", {})
+        if not exec_summary.get("main_theme"):
+            return False
+        life_areas = output.get("life_areas", {})
+        if not isinstance(life_areas, dict) or len(life_areas) < 2:
+            return False
+        for area_name, area_data in life_areas.items():
+            if not isinstance(area_data, dict):
+                continue
+            if not area_data.get("plain_english"):
+                return False
+        return True
+
     if engine_version == "ai-interpretation-v4.0":
         required_keys = [
             "executive_summary", "why_this_period",
@@ -485,6 +507,10 @@ def generate_llm_interpretation(
             shadbala_data=payload_inputs.get("shadbala_data"),
             ayanamsa=payload_inputs.get("ayanamsa", "lahiri"),
             kp_sublords=payload_inputs.get("kp_sublords"),
+            divisional_signals=payload_inputs.get("divisional_signals"),
+            panchangam_context=payload_inputs.get("panchangam_context"),
+            shadbala_detail=payload_inputs.get("shadbala_detail"),
+            bav_context=payload_inputs.get("bav_context"),
         )
     except AssertionError as e:
         logger.error(f"Dasha payload leak detected: {e}")
@@ -537,7 +563,7 @@ def generate_llm_interpretation(
         )
         return result
     
-    system_prompt = _load_prompt_template("v4")
+    system_prompt = _load_prompt_template(effective_prompt_version)
     user_prompt = f"Generate interpretation:\n\n{json.dumps(payload, indent=2)}"
     
     max_completion = MAX_COMPLETION_TOKENS.get(period_type, 900)
