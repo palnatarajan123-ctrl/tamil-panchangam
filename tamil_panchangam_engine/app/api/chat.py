@@ -195,26 +195,24 @@ def _build_chat_context(base_chart_id: str) -> dict:
     # Yogas — compute fresh using yoga engine
     yogas_summary = "none notable"
     try:
-        yogas = compute_yogas(payload)
-        if isinstance(yogas, dict):
-            present = [
-                y.get("name", k)
-                for k, y in yogas.items()
-                if isinstance(y, dict) and y.get("present")
-            ]
-            if not present:
-                present = yogas.get("present_yogas", [])
-                if isinstance(present, list):
-                    present = [y.get("name", str(y)) if isinstance(y, dict) else str(y) for y in present]
-            if present:
-                yogas_summary = ", ".join(str(y) for y in present[:5])
+        ephemeris_for_yogas = payload.get("ephemeris", {})
+        yoga_result = compute_yogas(ephemeris_for_yogas, {})
+        if isinstance(yoga_result, dict):
+            present = yoga_result.get("yogas", [])
+            if isinstance(present, list):
+                names = [y.get("name", "") for y in present if y.get("present")]
+                if names:
+                    yogas_summary = ", ".join(names[:5])
     except Exception as e:
         logger.warning(f"Yogas computation failed: {e}")
 
     # Shadbala — compute fresh
     shadbala_summary = "not available"
     try:
-        shadbala = compute_shadbala(payload)
+        ephemeris_for_shad = payload.get("ephemeris", {})
+        planets_for_shad = ephemeris_for_shad.get("planets", {})
+        lagna_lon_for_shad = ephemeris_for_shad.get("lagna", {}).get("longitude_deg", 0.0)
+        shadbala = compute_shadbala(planets_for_shad, lagna_lon_for_shad)
         if isinstance(shadbala, dict) and not shadbala.get("error"):
             strongest = shadbala.get("strongest_planet", "")
             weakest = shadbala.get("weakest_planet", "")
@@ -238,6 +236,22 @@ def _build_chat_context(base_chart_id: str) -> dict:
                 sade_sati_summary = f"Ashtama Shani active, alert: {alert}"
     except Exception as e:
         logger.warning(f"Sade Sati computation failed: {e}")
+
+    # Divisional signals for D10/D2/D7
+    divisional_summary = ""
+    try:
+        div = payload.get("divisional_charts", {})
+        d10 = div.get("D10", {}).get("planets", {})
+        d10_planets = []
+        for p in ["Sun", "Saturn"]:
+            if d10.get(p, {}).get("rasi"):
+                sign = d10[p]["rasi"]
+                dignity = d10[p].get("dignity", "")
+                d10_planets.append(f"{p} in {sign}" + (f" ({dignity})" if dignity != "neutral" else ""))
+        if d10_planets:
+            divisional_summary = f"D10 career: {', '.join(d10_planets)}"
+    except Exception:
+        pass
 
     # Monthly summary from stored LLM interpretation
     monthly_summary = "not available"
@@ -282,6 +296,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "sade_sati_summary": sade_sati_summary,
         "monthly_summary": monthly_summary,
         "yearly_summary": yearly_summary,
+        "divisional_summary": divisional_summary,
     }
 
 
@@ -318,6 +333,11 @@ async def chat_stream(
         raise HTTPException(status_code=500, detail="Failed to load chart context")
 
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(**context)
+    if context.get("divisional_summary"):
+        system_prompt = system_prompt.replace(
+            "- Key planets:",
+            f"- D10 career chart: {context['divisional_summary']}\n- Key planets:"
+        )
     if req.reading_as_name:
         system_prompt = f"Reading from {req.reading_as_name}'s chart.\n\n" + system_prompt
 
