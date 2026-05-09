@@ -219,6 +219,10 @@ def build_llm_payload(
     shadbala_data: Optional[Dict[str, Any]] = None,
     ayanamsa: str = "lahiri",
     kp_sublords: Optional[Dict[str, Any]] = None,
+    divisional_signals: Optional[Dict[str, Any]] = None,
+    panchangam_context: Optional[Dict[str, Any]] = None,
+    shadbala_detail: Optional[Dict[str, Any]] = None,
+    bav_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Build enriched LLM payload v3.0 — Siddhar-Tradition Synthesizer.
@@ -414,6 +418,15 @@ def build_llm_payload(
             if planet in ["Moon", "Lagna", "Sun"]
         }
 
+    if shadbala_detail:
+        overall_context["shadbala_detail"] = shadbala_detail
+    if divisional_signals:
+        overall_context["divisional_signals"] = divisional_signals
+    if panchangam_context and panchangam_context.get("tithi"):
+        overall_context["panchangam_birth"] = panchangam_context
+    if bav_context:
+        overall_context["bav_transit_scores"] = bav_context
+
     payload = {
         "overall_context": overall_context,
         "synthesis_instruction": (
@@ -558,6 +571,123 @@ def _extract_chandrashtama(chandra_gati: Dict[str, Any]) -> List[Dict[str, Any]]
     return periods
 
 
+def _build_shadbala_detail(shadbala: dict) -> dict:
+    """Build per-planet shadbala context with plain-English weakness reasons."""
+    if not shadbala or shadbala.get("error"):
+        return {}
+
+    weakness_reasons = {
+        "sthana_bala": "placed in an uncomfortable sign",
+        "dig_bala": "loses directional strength in this house",
+        "chesta_bala": "slow or stationary — reduced drive to act",
+        "drik_bala": "under pressure from malefic aspects",
+        "naisargika_bala": "naturally mild in this context",
+    }
+
+    planets_out = []
+    for planet_name, data in shadbala.get("planets", {}).items():
+        rupas = data.get("rupas", 0)
+        label = data.get("strength_label", "")
+        components = data.get("components", {})
+
+        weakness_reason = None
+        if label in ("Weak", "Very Weak") and components:
+            comp_scores = {k: v.get("score", 0) if isinstance(v, dict) else 0
+                          for k, v in components.items()}
+            if comp_scores:
+                weakest_comp = min(comp_scores, key=comp_scores.get)
+                weakness_reason = weakness_reasons.get(weakest_comp)
+
+        entry: Dict[str, Any] = {
+            "planet": planet_name,
+            "rupas": round(rupas, 1),
+            "strength": label,
+            "can_deliver": rupas >= 5.0,
+        }
+        if weakness_reason:
+            entry["weakness_reason"] = weakness_reason
+        planets_out.append(entry)
+
+    return {
+        "planets": planets_out,
+        "strongest": shadbala.get("strongest_planet"),
+        "weakest": shadbala.get("weakest_planet"),
+        "note": (
+            "Shadbala measures how much each planet can actually deliver its promise. "
+            "A planet with low strength gives diluted results even in a good dasha."
+        )
+    }
+
+
+def _extract_divisional_signals(base_chart_payload: dict) -> dict:
+    """Extract key career/wealth/children signals from D10/D2/D7."""
+    div = base_chart_payload.get("divisional_charts", {})
+    if not div:
+        return {}
+
+    result = {}
+
+    sig_map = {
+        "D10": ("d10_career", "D10 Dasamsa shows career destiny", ["Sun", "Saturn"]),
+        "D2":  ("d2_wealth",  "D2 Hora shows wealth potential",   ["Jupiter", "Venus"]),
+        "D7":  ("d7_children","D7 Saptamsa shows children/creativity", ["Jupiter"]),
+    }
+
+    for chart_key, (out_key, note, significators) in sig_map.items():
+        chart = div.get(chart_key, {})
+        if not chart:
+            continue
+        planets = chart.get("planets", {})
+        placements = []
+        for sig in significators:
+            p = planets.get(sig, {})
+            if p:
+                sign = p.get("rasi") or p.get("sign") or p.get("navamsa_sign")
+                dignity = p.get("dignity", "neutral")
+                if sign:
+                    placements.append({"planet": sig, "sign": sign, "dignity": dignity})
+        if placements:
+            result[out_key] = {"note": note, "key_placements": placements}
+
+    return result
+
+
+def _build_panchangam_context(panchangam_birth: dict) -> dict:
+    """Birth Panchangam context for LLM."""
+    if not panchangam_birth:
+        return {}
+    return {
+        "tithi": panchangam_birth.get("tithi"),
+        "vara": panchangam_birth.get("weekday"),
+        "yoga": panchangam_birth.get("yoga"),
+        "note": "Birth Tithi and Vara carry classical significance for chart character.",
+    }
+
+
+def _build_bav_context(bav: dict, gochara: dict) -> dict:
+    """BAV transit scores for current Saturn/Jupiter/Rahu transits."""
+    if not bav or bav.get("error"):
+        return {}
+    transit_scores = bav.get("transit_scores", {})
+    if not transit_scores:
+        return {}
+
+    result = {}
+    for planet in ["saturn", "jupiter", "rahu"]:
+        ts = transit_scores.get(planet, {})
+        if ts:
+            result[planet] = {
+                "bav_score": ts.get("bav_score"),
+                "strength": ts.get("combined_strength") or ts.get("strength"),
+            }
+
+    if result:
+        result["note"] = (
+            "BAV score: 5+ = strong transit, 3-4 = moderate, 1-2 = weak/friction."
+        )
+    return result
+
+
 def extract_payload_inputs(
     envelope: Dict[str, Any],
     synthesis: Dict[str, Any],
@@ -676,12 +806,32 @@ def extract_payload_inputs(
                     birth_year = dob.year
             except (ValueError, TypeError):
                 pass
-        
+
         ephemeris = base_chart_payload.get("ephemeris", {})
         lagna_rasi_for_lord = ephemeris.get("lagna", {}).get("rasi", "")
         if lagna_rasi_for_lord:
             lagnadipathi_status = _derive_lagnadipathi(lagna_rasi_for_lord, ephemeris)
-    
+
+    # New v5 context fields
+    divisional_signals: Dict[str, Any] = {}
+    panchangam_context: Dict[str, Any] = {}
+    shadbala_detail: Dict[str, Any] = {}
+    bav_context: Dict[str, Any] = {}
+
+    if base_chart_payload:
+        divisional_signals = _extract_divisional_signals(base_chart_payload)
+        panchangam_context = _build_panchangam_context(
+            base_chart_payload.get("panchangam_birth", {}))
+
+        shadbala_natal = base_chart_payload.get("shadbala_natal", {})
+        if shadbala_natal and not shadbala_natal.get("error"):
+            shadbala_detail = _build_shadbala_detail(shadbala_natal)
+        elif envelope_shadbala and not envelope_shadbala.get("error"):
+            shadbala_detail = _build_shadbala_detail(envelope_shadbala)
+
+        bav = base_chart_payload.get("bhinnashtakavarga", {})
+        bav_context = _build_bav_context(bav, gochara)
+
     life_area_scores = {}
     top_signals_by_life_area = {}
     
@@ -715,6 +865,10 @@ def extract_payload_inputs(
         "shadbala_data": envelope_shadbala if envelope_shadbala else None,
         "ayanamsa": envelope.get("reference", {}).get("ayanamsa", "lahiri"),
         "kp_sublords": base_chart_payload.get("kp_sublords") if base_chart_payload else None,
+        "divisional_signals": divisional_signals if divisional_signals else None,
+        "panchangam_context": panchangam_context if panchangam_context else None,
+        "shadbala_detail": shadbala_detail if shadbala_detail else None,
+        "bav_context": bav_context if bav_context else None,
     }
 
 
