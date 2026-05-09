@@ -13,64 +13,79 @@ def test_resolve_antar_dasha_basic():
     """
 
     # -------------------------------------------------
-    # Given: A simplified Vimshottari structure
+    # Given: A simplified Vimshottari structure using the locked schema
     # (matches what base_chart["dashas"]["vimshottari"] contains)
     # -------------------------------------------------
     vimshottari = {
-        "current": {
-            "lord": "Saturn",
-            "start": "2019-06-01T00:00:00Z",
-            "end": "2038-06-01T00:00:00Z",
-        },
-        "periods": [
+        "timeline": [
             {
-                "maha_lord": "Saturn",
-                "start": "2019-06-01T00:00:00Z",
-                "end": "2038-06-01T00:00:00Z",
+                "mahadasha": "Jupiter",
+                "start": "2020-01-01T00:00:00+00:00",
+                "end": "2036-01-01T00:00:00+00:00",
+                "is_partial": False,
                 "antar_dashas": [
                     {
+                        "antar_lord": "Jupiter",
+                        "start": "2020-01-01T00:00:00+00:00",
+                        "end": "2022-02-01T00:00:00+00:00",
+                    },
+                    {
                         "antar_lord": "Saturn",
-                        "start": "2019-06-01T00:00:00Z",
-                        "end": "2022-06-01T00:00:00Z",
-                    },
-                    {
-                        "antar_lord": "Mercury",
-                        "start": "2022-06-01T00:00:00Z",
-                        "end": "2025-06-01T00:00:00Z",
-                    },
-                    {
-                        "antar_lord": "Ketu",
-                        "start": "2025-06-01T00:00:00Z",
-                        "end": "2026-06-01T00:00:00Z",
+                        "start": "2022-02-01T00:00:00+00:00",
+                        "end": "2024-10-01T00:00:00+00:00",
                     },
                 ],
             }
-        ],
+        ]
     }
 
     # -------------------------------------------------
-    # When: Resolving Antar Dasha for Jan 2026
+    # When: Resolving Antar Dasha for Jun 2023 (inside Saturn antar)
     # -------------------------------------------------
-    reference_date = datetime(2026, 1, 15, tzinfo=timezone.utc)
-
-    antar = resolve_antar_dasha(
+    result = resolve_antar_dasha(
         vimshottari=vimshottari,
-        reference_date=reference_date,
+        reference_date=datetime(2023, 6, 15, tzinfo=timezone.utc),
     )
 
     # -------------------------------------------------
     # Then: Antar Dasha is resolved correctly
     # -------------------------------------------------
-    assert antar is not None, "Antar dasha should not be None"
+    assert result is not None, "Antar dasha should not be None"
 
-    assert antar["maha_lord"] == "Saturn"
-    assert antar["antar_lord"] == "Ketu"
+    assert result["maha"]["lord"] == "Jupiter"
+    assert result["antar"]["lord"] == "Saturn"
 
-    assert "start" in antar
-    assert "end" in antar
+    assert isinstance(result["antar"]["confidence_weight"], float)
+    assert 0.0 <= result["antar"]["confidence_weight"] <= 1.0
 
     # Sanity: reference date must fall within antar period
-    start = datetime.fromisoformat(antar["start"].replace("Z", "+00:00"))
-    end = datetime.fromisoformat(antar["end"].replace("Z", "+00:00"))
+    start = datetime.fromisoformat(result["antar"]["start"])
+    end = datetime.fromisoformat(result["antar"]["end"])
+    reference_date = datetime(2023, 6, 15, tzinfo=timezone.utc)
+    assert start <= reference_date < end
 
-    assert start <= reference_date <= end
+
+def test_resolve_antar_dasha_no_match():
+    """Returns None when reference date is outside all mahadasha windows."""
+    vimshottari = {
+        "timeline": [
+            {
+                "mahadasha": "Jupiter",
+                "start": "2020-01-01T00:00:00+00:00",
+                "end": "2036-01-01T00:00:00+00:00",
+                "is_partial": False,
+                "antar_dashas": [
+                    {
+                        "antar_lord": "Jupiter",
+                        "start": "2020-01-01T00:00:00+00:00",
+                        "end": "2022-02-01T00:00:00+00:00",
+                    }
+                ],
+            }
+        ]
+    }
+    result = resolve_antar_dasha(
+        vimshottari=vimshottari,
+        reference_date=datetime(2010, 1, 1, tzinfo=timezone.utc),
+    )
+    assert result is None
