@@ -391,7 +391,10 @@ def get_porutham(group_id: str, user: dict = Depends(get_current_user)):
 
     husband = None
     wife = None
+    husband_id = None
+    wife_id = None
     for row in rows:
+        member_id = str(row[0])
         role = str(row[3])
         chart = None
         with get_conn() as conn:
@@ -412,8 +415,10 @@ def get_porutham(group_id: str, user: dict = Depends(get_current_user)):
         }
         if role == "husband" and husband is None:
             husband = member_info
+            husband_id = member_id
         elif role == "wife" and wife is None:
             wife = member_info
+            wife_id = member_id
 
     if not husband:
         raise HTTPException(status_code=422, detail="Group has no husband member")
@@ -424,15 +429,49 @@ def get_porutham(group_id: str, user: dict = Depends(get_current_user)):
     if not wife["nakshatra"] or not wife["rasi"]:
         raise HTTPException(status_code=422, detail="Wife chart missing nakshatra/rasi data")
 
+    id1, id2 = husband_id, wife_id
+
+    # Check cache
+    with get_conn() as conn:
+        cached_row = conn.execute("""
+            SELECT result_json FROM family_porutham_cache
+            WHERE group_id = %s
+              AND ((member_id_1 = %s AND member_id_2 = %s)
+                OR (member_id_1 = %s AND member_id_2 = %s))
+            LIMIT 1
+        """, (group_id, id1, id2, id2, id1)).fetchone()
+
+    if cached_row:
+        result_json = cached_row[0] if isinstance(cached_row[0], dict) else json.loads(cached_row[0])
+        return result_json
+
     result = compute_porutham(
         boy_nakshatra=husband["nakshatra"], boy_rasi=husband["rasi"],
         girl_nakshatra=wife["nakshatra"], girl_rasi=wife["rasi"],
     )
-    return {
+
+    full_result = {
         "husband": husband,
         "wife": wife,
         "porutham": result,
     }
+
+    # Cache result
+    try:
+        with get_conn() as conn:
+            conn.execute("""
+                INSERT INTO family_porutham_cache
+                    (group_id, member_id_1, member_id_2, result_json)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (group_id, member_id_1, member_id_2) DO UPDATE
+                SET result_json = EXCLUDED.result_json,
+                    computed_at = NOW()
+            """, (group_id, id1, id2, json.dumps(full_result)))
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"Porutham cache write failed: {e}")
+
+    return full_result
 
 
 @router.get("/groups/{group_id}/overview")

@@ -360,6 +360,23 @@ def bootstrap():
         CREATE INDEX IF NOT EXISTS idx_family_members_chart_id ON family_members(chart_id)
         """)
 
+        # family_porutham_cache
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS family_porutham_cache (
+            id SERIAL PRIMARY KEY,
+            group_id TEXT NOT NULL,
+            member_id_1 TEXT NOT NULL,
+            member_id_2 TEXT NOT NULL,
+            result_json JSONB NOT NULL,
+            computed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            UNIQUE(group_id, member_id_1, member_id_2)
+        )
+        """)
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_porutham_cache_group
+            ON family_porutham_cache(group_id)
+        """)
+
         conn.commit()
         logger.info("PostgreSQL schema bootstrapped successfully")
     except Exception as e:
