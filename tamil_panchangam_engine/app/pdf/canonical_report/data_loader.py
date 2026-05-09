@@ -938,8 +938,17 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
     d10_data = divisional_charts.get("D10", {}).get("planets", {})
     d10_planet_signs = {planet: data.get("sign", "") for planet, data in d10_data.items() if isinstance(data, dict)}
 
-    # Yogas / Sade Sati / Shadbala live in the payload for birth chart context
+    # Yogas — read from payload (stored at creation) or compute fresh as fallback
     yogas_raw = payload.get("yogas")
+    if not yogas_raw or not (isinstance(yogas_raw, dict) and yogas_raw.get("yogas")):
+        try:
+            from app.engines.yoga_engine import compute_yogas
+            ephemeris_for_yogas = payload.get("ephemeris", {})
+            yogas_raw = compute_yogas(ephemeris_for_yogas, {})
+        except Exception as e:
+            logger.warning(f"Yoga fallback computation failed: {e}")
+            yogas_raw = None
+
     sade_sati_raw = payload.get("sade_sati")
     shadbala_raw = payload.get("shadbala")
 
@@ -1237,6 +1246,8 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
         sade_sati_data=sade_sati_raw if isinstance(sade_sati_raw, dict) else None,
         shadbala_data=shadbala_raw if isinstance(shadbala_raw, dict) else None,
         kp_sublords=kp_sublords_data,
+        bhinnashtakavarga=payload.get("bhinnashtakavarga") or None,
+        shadbala_natal=payload.get("shadbala_natal") or None,
     )
 
 

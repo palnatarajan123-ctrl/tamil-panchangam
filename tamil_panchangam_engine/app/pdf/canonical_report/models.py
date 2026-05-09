@@ -314,3 +314,7 @@ class CanonicalReportData(BaseModel):
     natal_current_chapter: Optional[NatalCurrentChapter] = None
     natal_life_by_decade: List[NatalDecade] = Field(default_factory=list)
     natal_dasha_life_map: List[dict] = Field(default_factory=list)
+
+    # v5 accuracy enhancement fields
+    bhinnashtakavarga: Optional[Dict[str, Any]] = None
+    shadbala_natal: Optional[Dict[str, Any]] = None
