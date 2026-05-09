@@ -30,6 +30,7 @@ def compute_realtime_context(
     latitude: float = 13.0827,
     longitude: float = 80.2707,
     reference_time_utc: Optional[datetime] = None,
+    base_chart_payload: Optional[dict] = None,
 ) -> Dict:
     """
     Compute real-time astrological context for display.
@@ -171,6 +172,16 @@ def compute_realtime_context(
             "activity_phase": None,
         }
     
+    # Divisional chart signals
+    if base_chart_payload:
+        try:
+            from app.llm.payload_builder import _extract_divisional_signals
+            div_signals = _extract_divisional_signals(base_chart_payload)
+            if div_signals:
+                result["divisional_signals"] = div_signals
+        except Exception as e:
+            logger.warning(f"Divisional signals extraction failed: {e}")
+
     return result
 
 

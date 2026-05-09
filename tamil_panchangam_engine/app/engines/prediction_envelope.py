@@ -64,9 +64,12 @@ def _compute_sade_sati_safe(base_chart: dict) -> dict:
         return {}
 
 def _compute_shadbala_safe(base_chart: dict) -> dict:
-    """Compute shadbala fresh — base_chart never stores it."""
+    """Compute shadbala from natal positions."""
     try:
-        result = compute_shadbala(base_chart)
+        ephemeris = base_chart.get("ephemeris", {})
+        planets_data = ephemeris.get("planets", {})
+        lagna_lon = ephemeris.get("lagna", {}).get("longitude_deg", 0.0)
+        result = compute_shadbala(planets_data, lagna_lon)
         return result if isinstance(result, dict) else {}
     except Exception as e:
         logger.warning(f"Shadbala computation failed: {e}")

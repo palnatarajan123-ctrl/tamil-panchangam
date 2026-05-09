@@ -94,6 +94,7 @@ def get_realtime_context(base_chart_id: str):
         birth_lagna_rasi=birth_lagna_rasi,
         latitude=latitude,
         longitude=longitude,
+        base_chart_payload=payload,
     )
     
     return {
