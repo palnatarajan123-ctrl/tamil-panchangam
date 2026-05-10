@@ -188,6 +188,17 @@ function LifeAreaCard({ area, isV2, isV4, envelope }: LifeAreaCardProps) {
           </p>
         )}
 
+        {area.divisionalInsight && (
+          <div className="bg-indigo-50 dark:bg-indigo-950/30 rounded-md p-3 text-sm"
+            data-testid={`text-divisional-insight-${area.key}`}>
+            <p className="text-xs font-medium text-indigo-700 dark:text-indigo-400
+               uppercase tracking-wide mb-1">
+              Divisional Chart Insight
+            </p>
+            <p>{area.divisionalInsight}</p>
+          </div>
+        )}
+
         {!isV2 && !isV4 && area.deeperExplanation && (
           <div className="bg-muted/50 p-3 rounded-md" data-testid={`text-explanation-${area.key}`}>
             <Paragraphs text={area.deeperExplanation} className="text-muted-foreground" />
@@ -235,7 +246,8 @@ export function MonthlyPredictionView({
   }
 
   const { lifeAreas } = prediction;
-  const isV4 = prediction.engineVersion === "ai-interpretation-v4.0";
+  const isV5 = prediction.engineVersion === "ai-interpretation-v5.0";
+  const isV4 = prediction.engineVersion === "ai-interpretation-v4.0" || isV5;
   const isV3 = prediction.engineVersion === "ai-interpretation-v3.0";
   const isV2 = prediction.engineVersion === "ai-interpretation-v2.0";
 
@@ -334,6 +346,16 @@ export function MonthlyPredictionView({
             {prediction.whyThisPeriod.overlapSummary && (
               <div className="bg-muted/50 rounded-md p-3 text-sm italic">
                 {prediction.whyThisPeriod.overlapSummary}
+              </div>
+            )}
+            {isV5 && prediction.whyThisPeriod.bavQualifier && (
+              <div className="bg-blue-50 dark:bg-blue-950/30 rounded-md p-3 text-sm"
+                data-testid="text-bav-qualifier">
+                <p className="text-xs font-medium text-blue-700 dark:text-blue-400
+                   uppercase tracking-wide mb-1">
+                  Ashtakavarga Context
+                </p>
+                <p>{prediction.whyThisPeriod.bavQualifier}</p>
               </div>
             )}
             <div className="grid grid-cols-2 gap-3 pt-1">
@@ -666,6 +688,43 @@ export function MonthlyPredictionView({
         </Card>
       )}
 
+      {/* ================= V5: CAUTION WINDOWS (object format) ================= */}
+      {isV5 && prediction.cautionWindowsV5 &&
+       prediction.cautionWindowsV5.length > 0 && (
+        <Card data-testid="card-caution-windows-v5"
+          className="border-amber-500/30 dark:border-amber-400/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              Mindfulness Windows
+            </CardTitle>
+            <CardDescription>
+              Dates and patterns that call for extra care
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3" data-testid="list-caution-windows-v5">
+              {prediction.cautionWindowsV5.map((window, idx) => (
+                <li key={idx} className="space-y-1"
+                  data-testid={`text-caution-window-v5-${idx}`}>
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600
+                      dark:text-amber-400 shrink-0" />
+                    <span className="text-sm font-medium">{window.dates}</span>
+                  </div>
+                  {window.theme && (
+                    <p className="text-sm text-muted-foreground pl-6">{window.theme}</p>
+                  )}
+                  {window.advice && (
+                    <p className="text-xs text-muted-foreground/80 italic pl-6">{window.advice}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ================= TRANSIT STRENGTH (ENHANCEMENT A) ================= */}
       {envelope?.gochara && (
         <Card data-testid="card-transit-strength">
@@ -864,6 +923,42 @@ export function MonthlyPredictionView({
                   </div>
                 </div>
               </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ================= V5: REMEDIES (simple string format) ================= */}
+      {isV5 && prediction.remediesV5 && (
+        prediction.remediesV5.primary || prediction.remediesV5.supporting
+      ) && (
+        <Card data-testid="card-remedies-v5" className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Flame className="h-5 w-5 text-primary" />
+              Remedies & Practices
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {prediction.remediesV5.primary && (
+              <div className="flex items-start gap-3" data-testid="section-primary-remedy-v5">
+                <Star className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase
+                     tracking-wide mb-1">Primary</p>
+                  <p className="text-sm">{prediction.remediesV5.primary}</p>
+                </div>
+              </div>
+            )}
+            {prediction.remediesV5.supporting && (
+              <div className="flex items-start gap-3" data-testid="section-supporting-remedy-v5">
+                <Calendar className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase
+                     tracking-wide mb-1">Supporting</p>
+                  <p className="text-sm">{prediction.remediesV5.supporting}</p>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
