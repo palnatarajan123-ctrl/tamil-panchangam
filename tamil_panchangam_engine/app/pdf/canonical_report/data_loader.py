@@ -625,7 +625,7 @@ def build_report_data(
     
     llm_src = llm_interpretation if llm_interpretation else {}
     is_v3 = llm_src.get("engine_version") == "ai-interpretation-v3.0"
-    is_v4 = llm_src.get("engine_version") == "ai-interpretation-v4.0"
+    is_v4 = llm_src.get("engine_version") in ("ai-interpretation-v4.0", "ai-interpretation-v5.0")
     
     birth_details_data = payload.get("birth_details", {})
     

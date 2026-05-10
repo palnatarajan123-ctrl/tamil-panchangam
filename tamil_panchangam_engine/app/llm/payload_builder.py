@@ -819,6 +819,16 @@ def extract_payload_inputs(
     bav_context: Dict[str, Any] = {}
 
     if base_chart_payload:
+        # Lazy backfill: compute BAV for charts created before v1.9 (no stored bhinnashtakavarga)
+        if not base_chart_payload.get("bhinnashtakavarga"):
+            _ephemeris_for_bav = base_chart_payload.get("ephemeris", {})
+            if _ephemeris_for_bav:
+                try:
+                    from app.engines.bhinnashtakavarga_engine import compute_bhinnashtakavarga
+                    base_chart_payload["bhinnashtakavarga"] = compute_bhinnashtakavarga(_ephemeris_for_bav)
+                except Exception as _e:
+                    logger.warning(f"Lazy BAV compute failed: {_e}")
+
         divisional_signals = _extract_divisional_signals(base_chart_payload)
         panchangam_context = _build_panchangam_context(
             base_chart_payload.get("panchangam_birth", {}))
