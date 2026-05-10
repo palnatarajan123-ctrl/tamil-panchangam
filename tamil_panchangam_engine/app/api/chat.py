@@ -260,10 +260,29 @@ def _build_chat_context(base_chart_id: str) -> dict:
             mdata = monthly[0] if isinstance(monthly[0], dict) else json.loads(monthly[0] or "{}")
             llm = mdata.get("llm_interpretation", {})
             if isinstance(llm, dict):
-                exec_summary = llm.get("executive_summary", "")
-                why = llm.get("why_this_period", {})
-                why_text = why.get("plain_english", "") if isinstance(why, dict) else ""
-                monthly_summary = (exec_summary[:150] + " " + why_text[:100]).strip() or "not available"
+                engine_ver = llm.get("engine_version", "")
+                exec_sum = llm.get("executive_summary", {})
+                if "v5" in engine_ver or "v4" in engine_ver:
+                    if isinstance(exec_sum, dict):
+                        why = llm.get("why_this_period", {})
+                        monthly_summary = (
+                            f"Theme: {exec_sum.get('main_theme', '')}\n"
+                            f"Period: {exec_sum.get('year_in_one_line', '')}\n"
+                            f"Dasha: {why.get('dasha_plain', '') if isinstance(why, dict) else ''}\n"
+                            f"Strongest: {exec_sum.get('strongest_area', '')}\n"
+                            f"Watch: {exec_sum.get('watch_area', '')}"
+                        ).strip() or "not available"
+                        one_lines = exec_sum.get("one_lines", {})
+                        if one_lines:
+                            monthly_summary += "\nArea snapshot: " + "; ".join(
+                                f"{k.replace('_',' ')}: {v}" for k, v in one_lines.items()
+                            )
+                elif isinstance(exec_sum, str) and exec_sum:
+                    monthly_summary = exec_sum[:200]
+                else:
+                    window = llm.get("window_summary", {})
+                    if isinstance(window, dict):
+                        monthly_summary = window.get("overview", "not available")[:200]
         except Exception:
             pass
 
@@ -274,9 +293,15 @@ def _build_chat_context(base_chart_id: str) -> dict:
             ydata = yearly[0] if isinstance(yearly[0], dict) else json.loads(yearly[0] or "{}")
             llm = ydata.get("llm_interpretation", {})
             if isinstance(llm, dict):
-                exec_summary = llm.get("executive_summary", "")
-                if exec_summary:
-                    yearly_summary = exec_summary[:200]
+                engine_ver = llm.get("engine_version", "")
+                exec_sum = llm.get("executive_summary", {})
+                if ("v5" in engine_ver or "v4" in engine_ver) and isinstance(exec_sum, dict):
+                    yearly_summary = (
+                        f"Theme: {exec_sum.get('main_theme', '')}\n"
+                        f"Best use: {exec_sum.get('best_use', '')}"
+                    ).strip() or "not available"
+                elif isinstance(exec_sum, str) and exec_sum:
+                    yearly_summary = exec_sum[:200]
         except Exception:
             pass
 

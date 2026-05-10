@@ -2135,6 +2135,11 @@ def _build_v4_why_this_period(data: CanonicalReportData, styles) -> List:
         elements.append(Paragraph(w.overlap_summary, styles['BodyText']))
         elements.append(Spacer(1, 0.15*inch))
 
+    if w.bav_qualifier:
+        elements.append(Paragraph("<b>Ashtakavarga Context:</b>", styles['BodyText']))
+        elements.append(Paragraph(w.bav_qualifier, styles['BodyText']))
+        elements.append(Spacer(1, 0.1*inch))
+
     if w.supportive:
         elements.append(Spacer(1, 0.1*inch))
         elements.append(Paragraph("WORKING FOR YOU", styles['V4SectionLabel']))
@@ -2261,6 +2266,12 @@ def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
         if area.astrological_basis:
             area_elements.append(Paragraph(
                 f"<font color='gray' size='9'><i>Astrological basis: {area.astrological_basis}</i></font>",
+                styles['BodyText']
+            ))
+
+        if area.divisional_insight:
+            area_elements.append(Paragraph(
+                f"<font color='gray' size='9'><i>Chart insight: {area.divisional_insight}</i></font>",
                 styles['BodyText']
             ))
 

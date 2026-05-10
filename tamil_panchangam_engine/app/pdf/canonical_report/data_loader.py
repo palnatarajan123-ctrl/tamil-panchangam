@@ -626,6 +626,7 @@ def build_report_data(
     llm_src = llm_interpretation if llm_interpretation else {}
     is_v3 = llm_src.get("engine_version") == "ai-interpretation-v3.0"
     is_v4 = llm_src.get("engine_version") in ("ai-interpretation-v4.0", "ai-interpretation-v5.0")
+    is_v5 = llm_src.get("engine_version") == "ai-interpretation-v5.0"
     
     birth_details_data = payload.get("birth_details", {})
     
@@ -687,6 +688,7 @@ def build_report_data(
                 overlap_summary=why_data.get("overlap_summary"),
                 supportive=why_data.get("supportive", []),
                 watchouts=why_data.get("watchouts", []),
+                bav_qualifier=why_data.get("bav_qualifier") if is_v5 else None,
             )
 
         life_areas_raw = llm_src.get("life_areas")
@@ -698,6 +700,7 @@ def build_report_data(
                     avoid=area_data.get("avoid", []),
                     real_life_patterns=area_data.get("real_life_patterns", ""),
                     astrological_basis=area_data.get("astrological_basis"),
+                    divisional_insight=area_data.get("divisional_insight") if is_v5 else None,
                 )
                 for area, area_data in life_areas_raw.items()
                 if isinstance(area_data, dict)
@@ -707,29 +710,48 @@ def build_report_data(
         if remedies_raw and isinstance(remedies_raw, dict):
             primary_raw = remedies_raw.get("primary")
             primary_obj = None
-            if primary_raw and isinstance(primary_raw, dict):
+            if primary_raw and isinstance(primary_raw, str):
+                # v5: simple string remedy
+                primary_obj = V4Remedy(name=primary_raw)
+            elif primary_raw and isinstance(primary_raw, dict):
                 primary_obj = V4Remedy(
-                    name=primary_raw.get("name", ""),
+                    name=primary_raw.get("name", "") or primary_raw.get("traditional", ""),
                     simple_practice=primary_raw.get("simple_practice"),
-                    why=primary_raw.get("why"),
+                    why=primary_raw.get("why") or primary_raw.get("purpose"),
                 )
             supporting_list = []
-            for sup in remedies_raw.get("supporting", []):
-                if isinstance(sup, dict):
-                    supporting_list.append(V4Remedy(
-                        name=sup.get("name", ""),
-                        simple_practice=sup.get("simple_practice"),
-                        why=sup.get("why"),
-                    ))
+            supporting_raw = remedies_raw.get("supporting")
+            if isinstance(supporting_raw, str) and supporting_raw:
+                # v5: single supporting string
+                supporting_list.append(V4Remedy(name=supporting_raw))
+            elif isinstance(supporting_raw, list):
+                for sup in supporting_raw:
+                    if isinstance(sup, dict):
+                        supporting_list.append(V4Remedy(
+                            name=sup.get("name", "") or sup.get("traditional", ""),
+                            simple_practice=sup.get("simple_practice"),
+                            why=sup.get("why") or sup.get("purpose"),
+                        ))
             v4_remedies_obj = V4Remedies(primary=primary_obj, supporting=supporting_list)
 
         for cw in llm_src.get("caution_windows", []):
             if isinstance(cw, dict):
-                v4_caution_windows_list.append(V4CautionWindow(
-                    period=cw.get("period", ""),
-                    concern=cw.get("concern"),
-                    action=cw.get("action"),
-                ))
+                if is_v5:
+                    # v5 caution_windows: {dates, theme, advice}
+                    v4_caution_windows_list.append(V4CautionWindow(
+                        period=cw.get("dates", ""),
+                        concern=cw.get("theme"),
+                        action=cw.get("advice"),
+                    ))
+                else:
+                    # v4 caution_windows: {period, concern, action}
+                    v4_caution_windows_list.append(V4CautionWindow(
+                        period=cw.get("period", ""),
+                        concern=cw.get("concern"),
+                        action=cw.get("action"),
+                    ))
+            elif isinstance(cw, str):
+                v4_caution_windows_list.append(V4CautionWindow(period=cw))
 
         v4_key_takeaways_list = llm_src.get("key_takeaways", [])
 

@@ -181,6 +181,7 @@ class V4LifeArea(BaseModel):
     avoid: List[str] = []
     real_life_patterns: str = ""
     astrological_basis: Optional[str] = None
+    divisional_insight: Optional[str] = None
 
 
 class V4ExecutiveSummary(BaseModel):
@@ -199,6 +200,7 @@ class V4WhyThisPeriod(BaseModel):
     overlap_summary: Optional[str] = None
     supportive: List[str] = []
     watchouts: List[str] = []
+    bav_qualifier: Optional[str] = None
 
 
 class V4CautionWindow(BaseModel):
