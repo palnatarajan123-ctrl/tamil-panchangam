@@ -671,6 +671,17 @@ export function extractInterpretationWithDeterministic(details: any): ExtractedI
   return { primary: aiInterp };
 }
 
+function _toRemedyString(val: any): string | undefined {
+  if (!val) return undefined;
+  if (typeof val === "string") return val;
+  if (typeof val === "object") {
+    return (
+      val.traditional || val.name || val.simple_practice || val.purpose || undefined
+    );
+  }
+  return undefined;
+}
+
 export function adaptInterpretation(
   interpretation: AIInterpretationV1 | AIInterpretationV2 | AIInterpretationV3 | AIInterpretationV4 | AIInterpretationV5,
   deterministicInterpretation?: AIInterpretationV1
@@ -729,10 +740,14 @@ export function adaptInterpretation(
         bavQualifier: llm.why_this_period.bav_qualifier,
       } : undefined,
       remediesV5: llm.remedies ? {
-        primary: llm.remedies.primary,
-        supporting: llm.remedies.supporting,
+        primary: _toRemedyString(llm.remedies.primary),
+        supporting: _toRemedyString(llm.remedies.supporting),
       } : undefined,
-      cautionWindowsV5: llm.caution_windows ?? [],
+      cautionWindowsV5: (llm.caution_windows ?? []).map((w: any) =>
+        typeof w === "string"
+          ? { dates: "", theme: w, advice: "" }
+          : { dates: w.dates ?? "", theme: w.theme ?? "", advice: w.advice ?? "" }
+      ),
       keyTakeawaysV4: llm.key_takeaways ?? [],
       lifeAreas,
       yearlyMantra: undefined,

@@ -1,5 +1,5 @@
 import { useParams, Link } from "wouter";
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -64,6 +64,28 @@ const monthlySchema = z.object({
 const yearlySchema = z.object({
   year: z.string(),
 });
+
+class PredictionErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; message: string }
+> {
+  state = { hasError: false, message: "" };
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, message: error.message };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 text-center text-muted-foreground space-y-2">
+          <p className="font-medium">Unable to display prediction.</p>
+          <p className="text-sm">Please try refreshing the page.</p>
+          <p className="text-xs opacity-60">{this.state.message}</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function Predictions() {
   const { id } = useParams<{ id: string }>();
@@ -481,7 +503,9 @@ export default function Predictions() {
           
           <div className="flex gap-4 items-start">
             <div className={chatOpen ? "flex-1 min-w-0" : "w-full"}>
-              <MonthlyPredictionView prediction={prediction} period={predictionType} envelope={envelopeData} />
+              <PredictionErrorBoundary>
+                <MonthlyPredictionView prediction={prediction} period={predictionType} envelope={envelopeData} />
+              </PredictionErrorBoundary>
             </div>
             {chatOpen && (
               <div className="w-80 flex-shrink-0 h-[600px] rounded-xl overflow-hidden border border-border shadow-sm">

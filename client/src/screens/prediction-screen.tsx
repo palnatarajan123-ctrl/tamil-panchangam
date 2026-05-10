@@ -1,5 +1,5 @@
 import { useParams } from "wouter";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { usePrediction } from "@/hooks/usePrediction";
 
@@ -28,6 +28,34 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { getAccessToken } from "@/lib/auth";
 import { ChatPanel } from "@/components/ChatPanel";
+
+/* -------------------------------------------------
+   Error boundary — prevents render crash → blank screen
+-------------------------------------------------- */
+
+class PredictionErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; message: string }
+> {
+  state = { hasError: false, message: "" };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, message: error.message };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 text-center text-muted-foreground space-y-2">
+          <p className="font-medium">Unable to display prediction.</p>
+          <p className="text-sm">Please try refreshing the page.</p>
+          <p className="text-xs opacity-60">{this.state.message}</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 /* -------------------------------------------------
    Helpers
@@ -334,11 +362,13 @@ export default function PredictionScreen() {
             const extracted = extractInterpretationWithDeterministic(data.details);
             if (!extracted) return null;
             return (
-              <MonthlyPredictionView
-                prediction={adaptInterpretation(extracted.primary, extracted.deterministic)}
-                period={period}
-                envelope={data.details?.envelope}
-              />
+              <PredictionErrorBoundary>
+                <MonthlyPredictionView
+                  prediction={adaptInterpretation(extracted.primary, extracted.deterministic)}
+                  period={period}
+                  envelope={data.details?.envelope}
+                />
+              </PredictionErrorBoundary>
             );
           })()}
 
