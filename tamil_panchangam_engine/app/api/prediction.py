@@ -466,9 +466,8 @@ def rerun_llm_interpretation(
                     detail="Already rerun in last 24h. Wait before rerunning again.",
                 )
 
-            # Delete cached rows for this specific period so the next
-            # prediction request generates fresh v6 output
-            result = conn.execute(
+            # Clear prediction_llm_interpretation so no stale LLM row survives
+            conn.execute(
                 """
                 DELETE FROM prediction_llm_interpretation
                 WHERE base_chart_id = %s
@@ -477,19 +476,41 @@ def rerun_llm_interpretation(
                 """,
                 (base_chart_id, period_type, period_key),
             )
-            rows_deleted = result.rowcount if hasattr(result, "rowcount") else 0
+
+            # Also delete the envelope row so the next fetch rebuilds from
+            # scratch and schedules a fresh background LLM call.
+            # The envelope stores llm_interpretation inline after the background
+            # merge — deleting it is the only way to force re-generation.
+            if period_type == "monthly":
+                conn.execute(
+                    """
+                    DELETE FROM monthly_predictions
+                    WHERE base_chart_id = %s
+                      AND year = %s
+                      AND month = %s
+                    """,
+                    (base_chart_id, year, month),
+                )
+            else:
+                conn.execute(
+                    """
+                    DELETE FROM yearly_predictions
+                    WHERE base_chart_id = %s
+                      AND year = %s
+                    """,
+                    (base_chart_id, year),
+                )
 
         logger.info(
             f"Admin rerun-llm: {base_chart_id}/{period_type}/{period_key} "
-            f"— {rows_deleted} cache rows deleted by {_admin.get('email', '?')}"
+            f"— envelope + LLM cache cleared by {_admin.get('email', '?')}"
         )
         return {
             "success": True,
             "base_chart_id": base_chart_id,
             "period_type": period_type,
             "period_key": period_key,
-            "rows_deleted": rows_deleted,
-            "message": "Cache cleared. Next prediction request will regenerate with v6.",
+            "message": "Envelope and LLM cache cleared. Next fetch rebuilds with fresh v6.",
         }
 
     except HTTPException:
