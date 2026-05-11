@@ -65,14 +65,8 @@ TITHI_NAMES = [
     "Ekadashi", "Dwadashi", "Trayodashi", "Chaturdashi", "Amavasya",
 ]
 
-NAKSHATRA_NAMES = [
-    "Aswini", "Bharani", "Karthigai", "Rohini", "Mirugashirisham",
-    "Thiruvadirai", "Punarpoosam", "Poosam", "Ayilyam", "Magam",
-    "Pooram", "Uthiram", "Hastham", "Chittirai", "Swathi",
-    "Visakam", "Anusham", "Kettai", "Moolam", "Pooradam",
-    "Uthiradam", "Thiruvonam", "Avittam", "Sadayam",
-    "Poorattadhi", "Uthirattadhi", "Revathi",
-]
+from app.engines.nakshatra_names import canonical_nakshatra_list as _canonical_nakshatra_list
+NAKSHATRA_NAMES = _canonical_nakshatra_list()
 
 TARA_BALA_CYCLE = [
     ("janma", "Janma Tara", "neutral"),

@@ -9,48 +9,43 @@ This module will compute Pancha Pakshi (Five Birds) system:
 
 from typing import Dict
 from datetime import datetime
+from app.engines.nakshatra_names import nakshatra_index as _nakshatra_index
 
 # -----------------------------
 # PAKSHI MAPPINGS
 # -----------------------------
 
-PAKSHI_BY_NAKSHATRA = {
-    "Ashwini": "Vulture",
-    "Magha": "Vulture",
-    "Mula": "Vulture",
-
-    "Bharani": "Owl",
-    "Purva Phalguni": "Owl",
-    "Purva Ashada": "Owl",
-
-    "Krittika": "Crow",
-    "Uttara Phalguni": "Crow",
-    "Uttara Ashada": "Crow",
-
-    "Rohini": "Cock",
-    "Hasta": "Cock",
-    "Shravana": "Cock",
-
-    "Mrigashira": "Peacock",
-    "Chitra": "Peacock",
-    "Dhanishta": "Peacock",
-
-    "Ardra": "Peacock",
-    "Swati": "Peacock",
-    "Shatabhisha": "Peacock",
-
-    "Punarvasu": "Cock",
-    "Vishakha": "Cock",
-    "Purva Bhadrapada": "Cock",
-
-    "Pushya": "Crow",
-    "Anuradha": "Crow",
-    "Uttara Bhadrapada": "Crow",
-
-    "Ashlesha": "Owl",
-    "Jyeshtha": "Owl",
-    "Revati": "Owl"
-}
+# Index-based mapping (0–26, sidereal order) — replaces fragile Sanskrit name dict.
+# Derived from classical Pancha Pakshi assignment, verified against PAKSHI_BY_NAKSHATRA.
+_PAKSHI_BY_INDEX = [
+    "Vulture",  # 0  Aswini
+    "Owl",      # 1  Bharani
+    "Crow",     # 2  Karthigai
+    "Cock",     # 3  Rohini
+    "Peacock",  # 4  Mirugashirisham
+    "Peacock",  # 5  Thiruvadirai
+    "Cock",     # 6  Punarpoosam
+    "Crow",     # 7  Poosam
+    "Owl",      # 8  Ayilyam
+    "Vulture",  # 9  Magam
+    "Owl",      # 10 Pooram
+    "Crow",     # 11 Uthiram
+    "Cock",     # 12 Hastham
+    "Peacock",  # 13 Chittirai
+    "Peacock",  # 14 Swathi
+    "Cock",     # 15 Visakam
+    "Crow",     # 16 Anusham
+    "Owl",      # 17 Kettai
+    "Vulture",  # 18 Moolam
+    "Owl",      # 19 Pooradam
+    "Crow",     # 20 Uthiradam
+    "Cock",     # 21 Thiruvonam
+    "Peacock",  # 22 Avittam
+    "Peacock",  # 23 Sadayam
+    "Cock",     # 24 Poorattadhi
+    "Crow",     # 25 Uthirattadhi
+    "Owl",      # 26 Revathi
+]
 
 PAKSHI_NATURE = {
     "Vulture": "Slow, karmic, deep work, endurance",
@@ -67,15 +62,15 @@ PAKSHI_NATURE = {
 def get_birth_pakshi(nakshatra_name: str) -> Dict:
     """
     Determine birth Pakshi from Nakshatra.
+    Accepts any spelling variant (Tamil or Sanskrit) via normalize_nakshatra.
     """
-    pakshi = PAKSHI_BY_NAKSHATRA.get(nakshatra_name)
-
-    if not pakshi:
+    idx = _nakshatra_index(nakshatra_name)
+    if idx is None:
         raise ValueError(f"No Pakshi mapping for Nakshatra: {nakshatra_name}")
-
+    pakshi = _PAKSHI_BY_INDEX[idx]
     return {
         "pakshi": pakshi,
-        "nature": PAKSHI_NATURE[pakshi]
+        "nature": PAKSHI_NATURE[pakshi],
     }
 
 

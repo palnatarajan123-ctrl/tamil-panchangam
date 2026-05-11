@@ -38,16 +38,8 @@ TARA_QUALITY = {
     "parama_mitra": "supportive",
 }
 
-NAKSHATRA_NAMES = [
-    "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira",
-    "Ardra", "Punarvasu", "Pushya", "Ashlesha",
-    "Magha", "Purva Phalguni", "Uttara Phalguni",
-    "Hasta", "Chitra", "Swati", "Vishakha",
-    "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha",
-    "Uttara Ashadha", "Shravana", "Dhanishta",
-    "Shatabhisha", "Purva Bhadrapada",
-    "Uttara Bhadrapada", "Revati"
-]
+from app.engines.nakshatra_names import canonical_nakshatra_list as _canonical_nakshatra_list
+NAKSHATRA_NAMES = _canonical_nakshatra_list()
 
 
 def get_nakshatra_index(longitude: float) -> int:
