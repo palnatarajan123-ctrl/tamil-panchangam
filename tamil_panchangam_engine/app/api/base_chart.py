@@ -381,6 +381,21 @@ def create_base_chart(
         bav_result = {"error": str(e)}
 
     # -------------------------------------------------
+    # 7f. Upagrahas (Gulika / Mandi) — stored at creation
+    # -------------------------------------------------
+    try:
+        from app.engines.upagraha_engine import compute_gulika_mandi
+        upagraha_result = compute_gulika_mandi(
+            birth_utc=birth_utc,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            ayanamsa=ayanamsa,
+        )
+    except Exception as e:
+        logger.warning(f"Upagraha computation at creation failed: {e}")
+        upagraha_result = {"error": str(e)}
+
+    # -------------------------------------------------
     # 8. Assemble immutable base chart
     # -------------------------------------------------
     base_chart = {
@@ -427,6 +442,7 @@ def create_base_chart(
         "yogas": base_chart_yogas,
         "shadbala_natal": shadbala_natal,
         "bhinnashtakavarga": bav_result,
+        "upagrahas": upagraha_result,
     }
 
     # -------------------------------------------------

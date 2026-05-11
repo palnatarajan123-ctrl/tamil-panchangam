@@ -223,6 +223,7 @@ def build_llm_payload(
     panchangam_context: Optional[Dict[str, Any]] = None,
     shadbala_detail: Optional[Dict[str, Any]] = None,
     bav_context: Optional[Dict[str, Any]] = None,
+    upagraha_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Build enriched LLM payload v3.0 — Siddhar-Tradition Synthesizer.
@@ -426,6 +427,8 @@ def build_llm_payload(
         overall_context["panchangam_birth"] = panchangam_context
     if bav_context:
         overall_context["bav_transit_scores"] = bav_context
+    if upagraha_context:
+        overall_context["upagraha_context"] = upagraha_context
 
     payload = {
         "overall_context": overall_context,
@@ -664,6 +667,23 @@ def _build_panchangam_context(panchangam_birth: dict) -> dict:
     }
 
 
+def _build_upagraha_context(upagrahas: dict) -> dict:
+    """Build Gulika/Mandi context for LLM payload."""
+    if not upagrahas or upagrahas.get("error"):
+        return {}
+    gulika = upagrahas.get("gulika", {})
+    if not gulika or not gulika.get("rasi"):
+        return {}
+    return {
+        "gulika_rasi": gulika.get("rasi", ""),
+        "gulika_lord": gulika.get("rasi_lord", ""),
+        "note": (
+            "Gulika (Mandi) marks karmic obstruction points. "
+            "Its placement shows areas requiring extra vigilance and remediation."
+        ),
+    }
+
+
 def _build_bav_context(bav: dict, gochara: dict) -> dict:
     """BAV transit scores for current Saturn/Jupiter/Rahu transits."""
     if not bav or bav.get("error"):
@@ -812,11 +832,12 @@ def extract_payload_inputs(
         if lagna_rasi_for_lord:
             lagnadipathi_status = _derive_lagnadipathi(lagna_rasi_for_lord, ephemeris)
 
-    # New v5 context fields
+    # New v5/v6 context fields
     divisional_signals: Dict[str, Any] = {}
     panchangam_context: Dict[str, Any] = {}
     shadbala_detail: Dict[str, Any] = {}
     bav_context: Dict[str, Any] = {}
+    upagraha_context: Dict[str, Any] = {}
 
     if base_chart_payload:
         # Lazy backfill: compute BAV for charts created before v1.9 (no stored bhinnashtakavarga)
@@ -841,6 +862,29 @@ def extract_payload_inputs(
 
         bav = base_chart_payload.get("bhinnashtakavarga", {})
         bav_context = _build_bav_context(bav, gochara)
+
+        # Lazy backfill: compute upagrahas for older charts that were created before v1.10
+        if not base_chart_payload.get("upagrahas"):
+            _birth_details = base_chart_payload.get("birth_details", {})
+            _eph = base_chart_payload.get("ephemeris", {})
+            _birth_utc_str = base_chart_payload.get("birth_utc", "")
+            if _birth_utc_str and _birth_details:
+                try:
+                    from datetime import datetime as _dt
+                    from app.engines.upagraha_engine import compute_gulika_mandi as _cgm
+                    _bu = _dt.fromisoformat(_birth_utc_str.replace("Z", "+00:00"))
+                    base_chart_payload["upagrahas"] = _cgm(
+                        birth_utc=_bu,
+                        latitude=_birth_details.get("latitude", 0.0),
+                        longitude=_birth_details.get("longitude", 0.0),
+                        ayanamsa=_eph.get("ayanamsa", "lahiri"),
+                    )
+                except Exception as _e:
+                    logger.warning(f"Lazy upagraha backfill failed: {_e}")
+
+        upagraha_context = _build_upagraha_context(
+            base_chart_payload.get("upagrahas", {})
+        )
 
     life_area_scores = {}
     top_signals_by_life_area = {}
@@ -879,6 +923,7 @@ def extract_payload_inputs(
         "panchangam_context": panchangam_context if panchangam_context else None,
         "shadbala_detail": shadbala_detail if shadbala_detail else None,
         "bav_context": bav_context if bav_context else None,
+        "upagraha_context": upagraha_context if upagraha_context else None,
     }
 
 
