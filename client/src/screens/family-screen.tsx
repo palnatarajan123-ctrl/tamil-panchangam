@@ -448,6 +448,10 @@ function GroupDetail({
   const primaryChartId = group.primary_chart_id ?? null;
   const primaryChartName = group.primary_chart_name ?? "";
 
+  const confirmDeleteMember = members.find((m) => m.id === confirmDeleteMemberId);
+  const confirmDeleteMemberName =
+    confirmDeleteMember?.display_name || confirmDeleteMember?.chart_name || "this member";
+
   return (
     <div className={chatOpen ? "mr-80 transition-all duration-300" : "transition-all duration-300"}>
     <div className="space-y-4">
@@ -647,10 +651,11 @@ function GroupDetail({
     {confirmDeleteMemberId && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-80">
-          <h3 className="font-semibold mb-2">Remove member?</h3>
+          <h3 className="font-semibold mb-2">
+            Remove {confirmDeleteMemberName} from this family group?
+          </h3>
           <p className="text-gray-400 text-sm mb-4">
-            This removes them from the family group.
-            Their chart and predictions are not affected.
+            This cannot be undone. Their chart and predictions are not affected.
           </p>
           <div className="flex gap-3">
             <button
