@@ -182,6 +182,18 @@ def compute_realtime_context(
         except Exception as e:
             logger.warning(f"Divisional signals extraction failed: {e}")
 
+    # Upagraha context (Gulika/Mandi) for v6 chat enrichment
+    if base_chart_payload:
+        try:
+            from app.llm.payload_builder import _build_upagraha_context
+            upagrahas = base_chart_payload.get("upagrahas", {})
+            if upagrahas and not upagrahas.get("error"):
+                upa_ctx = _build_upagraha_context(upagrahas)
+                if upa_ctx:
+                    result["upagraha_context"] = upa_ctx
+        except Exception as e:
+            logger.warning(f"Upagraha context extraction failed: {e}")
+
     return result
 
 

@@ -363,6 +363,21 @@ async def chat_stream(
             "- Key planets:",
             f"- D10 career chart: {context['divisional_summary']}\n- Key planets:"
         )
+    if context.get("upagraha_context"):
+        upa = context["upagraha_context"]
+        gulika_rasi = upa.get("gulika_rasi", "")
+        gulika_lord = upa.get("gulika_lord", "")
+        if gulika_rasi:
+            system_prompt += (
+                "\n\n## KARMIC SHADOW (Upagrahas)\n"
+                f"Gulika (shadow of Saturn) falls in {gulika_rasi}"
+                + (f", ruled by {gulika_lord}" if gulika_lord else "")
+                + ".\n"
+                "When the user asks about persistent struggle, hidden friction, or why "
+                "certain areas feel stuck despite good dashas — reference this karmic shadow. "
+                "Frame as karmic work in progress, not doom. "
+                "Never use the words 'Gulika' or 'Mandi' in your response.\n"
+            )
     if req.reading_as_name:
         system_prompt = f"Reading from {req.reading_as_name}'s chart.\n\n" + system_prompt
 
