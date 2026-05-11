@@ -788,15 +788,19 @@ export function adaptInterpretation(
         bavQualifier: llm.why_this_period.bav_qualifier,
         upagrahaInsight: llm.why_this_period.upagraha_insight,
       } : undefined,
-      remediesV5: llm.remedies ? {
-        primary: _toRemedyString(llm.remedies.primary),
-        supporting: _toRemedyString(llm.remedies.supporting),
+      remediesV4: llm.remedies ? {
+        primary: {
+          traditional: (llm.remedies as any).primary?.traditional ?? "",
+          simplePractice: (llm.remedies as any).primary?.simple_practice ?? "",
+          purpose: (llm.remedies as any).primary?.purpose ?? "",
+        },
+        supporting: (llm.remedies as any).supporting?.traditional ? {
+          traditional: (llm.remedies as any).supporting.traditional ?? "",
+          simplePractice: (llm.remedies as any).supporting.simple_practice ?? "",
+          purpose: (llm.remedies as any).supporting.purpose ?? "",
+        } : undefined,
       } : undefined,
-      cautionWindowsV5: (llm.caution_windows ?? []).map((w: any) =>
-        typeof w === "string"
-          ? { dates: "", theme: w, advice: "" }
-          : { dates: w.dates ?? "", theme: w.theme ?? "", advice: w.advice ?? "" }
-      ),
+      cautionWindows: (llm.caution_windows as any) ?? [],
       keyTakeawaysV4: llm.key_takeaways ?? [],
       lifeAreas,
       yearlyMantra: undefined,
