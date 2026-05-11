@@ -4,6 +4,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { usePrediction } from "@/hooks/usePrediction";
 
 import { MonthlyPredictionView } from "@/components/prediction/MonthlyPredictionView";
+import { DailyView } from "@/components/prediction/DailyView";
 import { ExplainabilityDrawer } from "@/components/prediction/ExplainabilityDrawer";
 import { AntarExplanationCard } from "@/components/prediction/AntarExplanationCard";
 import { DashaTimeline } from "@/components/DashaTimeline";
@@ -93,7 +94,7 @@ export default function PredictionScreen() {
   const now = new Date();
   const baseYear = now.getFullYear();
 
-  const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
+  const [period, setPeriod] = useState<"daily" | "monthly" | "yearly">("monthly");
   const [year, setYear] = useState(baseYear);
   const [enhancing, setEnhancing] = useState(false);
   const [llmDisabledMessage, setLlmDisabledMessage] = useState<string | null>(null);
@@ -118,10 +119,12 @@ export default function PredictionScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
+  const isDailyPeriod = period === "daily";
+
   const queryClient = useQueryClient();
   const { data, isLoading, error } = usePrediction({
-    baseChartId: id,
-    period,
+    baseChartId: isDailyPeriod ? "" : id,
+    period: isDailyPeriod ? "monthly" : period,
     year,
     month: period === "monthly" ? index : undefined,
   });
@@ -251,7 +254,7 @@ export default function PredictionScreen() {
         )}
 
         <div className="flex gap-2 relative z-50">
-          {(["monthly", "yearly"] as const).map((p) => (
+          {(["daily", "monthly", "yearly"] as const).map((p) => (
             <Button
               key={p}
               variant={period === p ? "default" : "ghost"}
@@ -264,9 +267,9 @@ export default function PredictionScreen() {
       </div>
 
       {/* -------------------------------------------------
-          Unified Timeline Control
+          Unified Timeline Control (not shown for daily)
       -------------------------------------------------- */}
-      <PredictionTimelineControl
+      {!isDailyPeriod && <PredictionTimelineControl
         period={period}
         year={year}
         index={index}
@@ -274,13 +277,20 @@ export default function PredictionScreen() {
           setYear(year);
           setIndex(index);
         }}
-      />
+      />}
 
-      {isLoading && <div>Computing prediction…</div>}
-      {error && <div className="text-red-600">{error.message}</div>}
+      {/* -------------------------------------------------
+          Daily View — rendered independently from prediction data
+      -------------------------------------------------- */}
+      {isDailyPeriod && (
+        <DailyView baseChartId={id} />
+      )}
+
+      {!isDailyPeriod && isLoading && <div>Computing prediction…</div>}
+      {!isDailyPeriod && error && <div className="text-red-600">{error.message}</div>}
 
       {/* LLM pending — block prediction view, show centered spinner */}
-      {llmPending && (
+      {!isDailyPeriod && llmPending && (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
           <Loader2 className="h-8 w-8 animate-spin" />
           <p className="text-base font-medium">Generating your interpretation…</p>
@@ -288,13 +298,13 @@ export default function PredictionScreen() {
         </div>
       )}
 
-      {data && !llmPending && (
+      {!isDailyPeriod && data && !llmPending && (
         <>
         <div className={chatOpen ? "mr-80 transition-all duration-300" : "transition-all duration-300"}>
           {/* -------------------------------------------------
               Download (only for monthly/yearly)
           -------------------------------------------------- */}
-          {(period === "monthly" || period === "yearly") && (
+          {(period === "monthly" || period === "yearly") && !isDailyPeriod && (
             <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => setChatOpen((v) => !v)}
