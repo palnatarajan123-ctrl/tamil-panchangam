@@ -393,10 +393,13 @@ def _extract_prediction_areas(
     Note: v3 fields (yearly_mantra, dasha_transit_synthesis, danger_windows, veda_remedy, closing_v3)
     are extracted separately in build_report_data since this function signature is preserved for v1/v2 compat.
     """
-    ai_interp = interpretation.get("ai_interpretation", {})
-    
-    llm_source = llm_interpretation if llm_interpretation else {}
-    deterministic_source = ai_interp
+    llm_source = (
+        llm_interpretation or
+        interpretation.get("llm_interpretation") or
+        interpretation.get("ai_interpretation") or
+        {}
+    )
+    deterministic_source = interpretation.get("ai_interpretation", {})
     
     engine_version = llm_source.get("engine_version", "")
     is_v2 = engine_version == "ai-interpretation-v2.0"
@@ -564,9 +567,13 @@ def build_report_data(
         base_chart_id, report_type, period_key
     )
     
-    # Fallback: extract from interpretation column (yearly/weekly store it there)
+    # Fallback: interpretation column (yearly/weekly), then deterministic ai_interpretation
     if not llm_interpretation:
-        llm_interpretation = interpretation.get("llm_interpretation", {})
+        llm_interpretation = (
+            interpretation.get("llm_interpretation") or
+            interpretation.get("ai_interpretation") or
+            {}
+        )
     
     ephemeris = payload.get("ephemeris", {})
     planets = ephemeris.get("planets", {})
