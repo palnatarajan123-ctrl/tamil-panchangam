@@ -1,8 +1,9 @@
 # app/api/prediction.py
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
-from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from datetime import datetime, timezone, timedelta
 import json
+from typing import Optional
 
 def _safe_json(val):
     """Accept both str (legacy DuckDB) and dict/list (Neon JSONB)."""
@@ -34,6 +35,8 @@ from app.engines.ai_interpretation_engine import generate_interpretation as gene
 from app.engines.explainability_filter import apply_explainability
 from app.engines.llm_interpretation_orchestrator import generate_llm_interpretation, is_llm_enabled
 from app.engines.corner_case_detector import assess_calculation_confidence
+
+from app.core.auth import require_admin
 
 from app.models.schema import (
     MonthlyPredictionRequest,
@@ -417,3 +420,80 @@ def generate_monthly_prediction(
         cache_hit=cache_hit,
         llm_status=llm_status,
     )
+
+
+@router.post("/rerun-llm/{base_chart_id}")
+def rerun_llm_interpretation(
+    base_chart_id: str,
+    period_type: str,
+    year: int,
+    month: Optional[int] = None,
+    _admin: dict = Depends(require_admin),
+):
+    """
+    Admin-only: clear cached LLM interpretation for a specific period and force
+    regeneration on the next prediction request.
+
+    Rate-limited to one rerun per chart+period per 24 hours.
+    """
+    if period_type not in ("monthly", "yearly"):
+        raise HTTPException(status_code=400, detail="period_type must be 'monthly' or 'yearly'")
+
+    period_key = f"{year}-{month:02d}" if period_type == "monthly" and month else str(year)
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+
+    try:
+        with get_conn() as conn:
+            # 24h rate limit: block if a successful rerun already exists in window
+            recent = conn.execute(
+                """
+                SELECT id FROM prediction_llm_interpretation
+                WHERE base_chart_id = %s
+                  AND period_type = %s
+                  AND period_key = %s
+                  AND fallback_reason IS NULL
+                  AND created_at > %s
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (base_chart_id, period_type, period_key, cutoff),
+            ).fetchone()
+
+            if recent:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Already rerun in last 24h. Wait before rerunning again.",
+                )
+
+            # Delete cached rows for this specific period so the next
+            # prediction request generates fresh v6 output
+            result = conn.execute(
+                """
+                DELETE FROM prediction_llm_interpretation
+                WHERE base_chart_id = %s
+                  AND period_type = %s
+                  AND period_key = %s
+                """,
+                (base_chart_id, period_type, period_key),
+            )
+            rows_deleted = result.rowcount if hasattr(result, "rowcount") else 0
+
+        logger.info(
+            f"Admin rerun-llm: {base_chart_id}/{period_type}/{period_key} "
+            f"— {rows_deleted} cache rows deleted by {_admin.get('email', '?')}"
+        )
+        return {
+            "success": True,
+            "base_chart_id": base_chart_id,
+            "period_type": period_type,
+            "period_key": period_key,
+            "rows_deleted": rows_deleted,
+            "message": "Cache cleared. Next prediction request will regenerate with v6.",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"rerun-llm failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -29,6 +29,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { getAccessToken } from "@/lib/auth";
 import { ChatPanel } from "@/components/ChatPanel";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* -------------------------------------------------
    Error boundary — prevents render crash → blank screen
@@ -89,6 +90,8 @@ function getCurrentDashaFromChart(chartPayload: any): { mahadasha: string; antar
 export default function PredictionScreen() {
   const { id } = useParams<{ id: string }>();
   if (!id) return <div>Missing base chart id</div>;
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [chatOpen, setChatOpen] = useState(false);
 
   const now = new Date();
@@ -377,6 +380,15 @@ export default function PredictionScreen() {
                   prediction={adaptInterpretation(extracted.primary, extracted.deterministic)}
                   period={period}
                   envelope={data.details?.envelope}
+                  isAdmin={isAdmin}
+                  baseChartId={id}
+                  year={year}
+                  month={period === "monthly" ? index : undefined}
+                  onRerunComplete={() => {
+                    queryClient.invalidateQueries({
+                      queryKey: ["prediction", id, period, year, period === "monthly" ? index : undefined, undefined],
+                    });
+                  }}
                 />
               </PredictionErrorBoundary>
             );

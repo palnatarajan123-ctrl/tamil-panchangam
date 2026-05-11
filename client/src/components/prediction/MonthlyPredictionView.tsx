@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 
 import type { PredictionViewModel, LifeAreaViewModel } from "@/adapters/aiInterpretationAdapter";
+import { RerunLLMButton } from "./RerunLLMButton";
 
 function splitIntoParagraphs(text: string): string[] {
   if (!text) return [];
@@ -247,10 +248,20 @@ export function MonthlyPredictionView({
   prediction,
   period = "monthly",
   envelope,
+  isAdmin = false,
+  baseChartId,
+  year,
+  month,
+  onRerunComplete,
 }: {
   prediction: PredictionViewModel | null;
   period?: PredictionPeriod;
   envelope?: any;
+  isAdmin?: boolean;
+  baseChartId?: string;
+  year?: number;
+  month?: number;
+  onRerunComplete?: () => void;
 }) {
   if (!prediction) {
     return null;
@@ -1096,9 +1107,33 @@ export function MonthlyPredictionView({
         </Card>
       )}
 
-      {/* ================= ENGINE INFO ================= */}
-      <div className="text-xs text-muted-foreground text-center" data-testid="text-engine-info">
-        Generated at {new Date(prediction.generatedAt).toLocaleString()} | {prediction.engineVersion}
+      {/* ================= LLM VERSION FOOTER ================= */}
+      <div className="flex items-center justify-between mt-6 pt-4 border-t border-border"
+        data-testid="text-engine-info">
+        <div className="text-xs text-muted-foreground">
+          <span>Generated: {prediction.generatedAt
+            ? new Date(prediction.generatedAt).toLocaleString()
+            : "—"
+          }</span>
+          <span className="mx-2">·</span>
+          <span className={`font-mono ${
+            prediction.engineVersion === "ai-interpretation-v6.0"
+              ? "text-green-500/70"
+              : "text-amber-500/70"
+          }`}>
+            {prediction.engineVersion || "—"}
+          </span>
+        </div>
+
+        {isAdmin && baseChartId && year && (period === "monthly" || period === "yearly") && onRerunComplete && (
+          <RerunLLMButton
+            baseChartId={baseChartId}
+            periodType={period}
+            year={year}
+            month={month}
+            onRerunComplete={onRerunComplete}
+          />
+        )}
       </div>
     </div>
   );
