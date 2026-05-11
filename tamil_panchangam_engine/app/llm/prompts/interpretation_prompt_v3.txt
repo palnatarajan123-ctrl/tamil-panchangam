@@ -190,7 +190,7 @@ If period_type = "weekly":
 - dasha_transit_synthesis: 3-4 sentences (immediate energy with synthesis)
 - Each Life Area: 2-3 sentences with at least one planet/house reference
 - veda_remedy: 1 specific deity-tied remedy
-- danger_windows: 1 entry if Chandrashtama falls in this week
+- danger_windows: 1 entry if Chandrashtama falls in the week
 
 If period_type = "monthly":
 - yearly_mantra: 2-3 sentences (crisp monthly theme)
