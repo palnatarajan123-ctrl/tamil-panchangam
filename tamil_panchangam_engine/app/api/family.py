@@ -1100,6 +1100,50 @@ class _FamilyChatRequest(BaseModel):
     # TODO: add reading_as_name: str | None = None when member-focused context needed
 
 
+def _build_family_yearly_block(group_id: str) -> str:
+    """
+    Fetch the current year's cached family prediction and return a compact
+    system-prompt block (≤200 tokens). Returns "" if not available.
+    """
+    year = datetime.now(timezone.utc).year
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                """
+                SELECT executive_summary, caution_windows, financial_peaks
+                FROM family_predictions
+                WHERE group_id = %s AND year = %s
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (group_id, year),
+            ).fetchone()
+        if not row:
+            return ""
+        exec_summary, caution_windows, financial_peaks = row
+
+        lines = ["## THIS YEAR'S FAMILY FORECAST (already computed)"]
+
+        if exec_summary:
+            lines.append(f"Executive Summary: {exec_summary[:300]}")
+
+        if isinstance(caution_windows, list) and caution_windows:
+            lines.append(
+                "Caution Windows: "
+                + ", ".join(str(w)[:80] for w in caution_windows[:3])
+            )
+
+        if isinstance(financial_peaks, list) and financial_peaks:
+            lines.append(
+                "Financial Peaks: "
+                + ", ".join(str(f)[:80] for f in financial_peaks[:3])
+            )
+
+        return "\n".join(lines) if len(lines) > 1 else ""
+    except Exception as e:
+        logger.warning(f"Failed to fetch family yearly block for {group_id}: {e}")
+        return ""
+
+
 _FAMILY_CHAT_SYSTEM_PROMPT = """You are Jyotishi, a warm family astrologer advising {group_name}.
 
 FAMILY MEMBERS:
@@ -1191,6 +1235,11 @@ async def family_group_chat_stream(
         group_name=group.get("name", "Family"),
         member_lines=member_lines,
     )
+
+    # Inject cached family yearly interpretation for richer context
+    family_block = _build_family_yearly_block(group_id)
+    if family_block:
+        system_prompt = system_prompt + "\n\n" + family_block
 
     history_trimmed = req.history[-12:]
     messages = [{"role": m.role, "content": m.content} for m in history_trimmed]

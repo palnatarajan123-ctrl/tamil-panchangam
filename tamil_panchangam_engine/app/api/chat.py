@@ -78,6 +78,87 @@ RESPONSE LENGTH:
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
+def _build_v6_monthly_block(base_chart_id: str) -> str:
+    """
+    Fetch the current month's cached v6 LLM interpretation and return a
+    compact system-prompt block (≤300 tokens). Returns "" if not available.
+    """
+    now = datetime.now(timezone.utc)
+    year, month = now.year, now.month
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    interpretation->'llm_interpretation' AS llm,
+                    synthesis->'life_areas' AS life_areas
+                FROM monthly_predictions
+                WHERE base_chart_id = %s
+                  AND year = %s
+                  AND month = %s
+                """,
+                (base_chart_id, year, month),
+            ).fetchone()
+        if not row:
+            return ""
+        llm = row[0] if isinstance(row[0], dict) else json.loads(row[0] or "{}")
+        life_areas_raw = row[1] if isinstance(row[1], dict) else json.loads(row[1] or "{}")
+        if not llm or "v6" not in llm.get("engine_version", ""):
+            return ""
+
+        exec_sum = llm.get("executive_summary", {})
+        why = llm.get("why_this_period", {})
+        caution_windows = llm.get("caution_windows", [])
+        key_takeaways = llm.get("key_takeaways", [])
+
+        lines = ["## THIS MONTH'S INTERPRETATION (already computed)"]
+
+        if isinstance(exec_sum, dict):
+            main_theme = exec_sum.get("main_theme", "")
+            one_liner = exec_sum.get("one_liner") or exec_sum.get("year_in_one_line", "")
+            if main_theme:
+                lines.append(
+                    "Executive Summary: " + main_theme
+                    + (f" — {one_liner}" if one_liner else "")
+                )
+
+        if isinstance(why, dict):
+            dasha_plain = why.get("dasha_plain", "")
+            upagraha = why.get("upagraha_insight", "")
+            if dasha_plain:
+                lines.append(f"Dasha Context: {dasha_plain}")
+            if upagraha:
+                lines.append(f"Upagraha Note: {upagraha}")
+
+        if caution_windows:
+            lines.append(
+                "Caution Windows: "
+                + ", ".join(str(w)[:80] for w in caution_windows[:3])
+            )
+
+        if isinstance(life_areas_raw, dict):
+            score_parts = []
+            for area in ["career", "finance", "health", "relationships", "spiritual"]:
+                area_data = life_areas_raw.get(area, {})
+                if isinstance(area_data, dict):
+                    score = area_data.get("score")
+                    if score is not None:
+                        score_parts.append(f"{area.title()} {score}")
+            if score_parts:
+                lines.append("Life Area Scores: " + ", ".join(score_parts))
+
+        if key_takeaways:
+            lines.append(
+                "Key Takeaways: "
+                + "; ".join(str(t) for t in key_takeaways[:3])
+            )
+
+        return "\n".join(lines) if len(lines) > 1 else ""
+    except Exception as e:
+        logger.warning(f"Failed to fetch v6 monthly block for {base_chart_id}: {e}")
+        return ""
+
+
 class ChatMessage(BaseModel):
     role: str  # "user" or "assistant"
     content: str
@@ -469,6 +550,11 @@ When answering, refer to this child's specific profile.
 Frame all responses in parent-friendly language.
 """
             system_prompt = system_prompt + child_context
+
+    # Inject cached v6 monthly interpretation for richer context
+    v6_block = _build_v6_monthly_block(req.base_chart_id)
+    if v6_block:
+        system_prompt = system_prompt + "\n\n" + v6_block
 
     # Build messages array (last 6 pairs max)
     history_trimmed = req.history[-12:] if len(req.history) > 12 else req.history
