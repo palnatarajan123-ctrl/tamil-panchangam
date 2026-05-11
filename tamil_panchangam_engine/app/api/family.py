@@ -22,7 +22,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from app.core.auth import get_current_user
@@ -1084,3 +1084,171 @@ def clear_child_predictions_cache(
             "DELETE FROM family_child_predictions WHERE member_id = ? AND year = ?",
             [member_id, year],
         )
+
+
+# ── Family Chat ───────────────────────────────────────────────────────────────
+
+class _FamilyChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class _FamilyChatRequest(BaseModel):
+    base_chart_id: str
+    question: str
+    history: list[_FamilyChatMessage] = []
+    # TODO: add reading_as_name: str | None = None when member-focused context needed
+
+
+_FAMILY_CHAT_SYSTEM_PROMPT = """You are Jyotishi, a warm family astrologer advising {group_name}.
+
+FAMILY MEMBERS:
+{member_lines}
+
+RESPONSE FORMAT — strictly follow every time:
+1. One direct answer in plain English — yes/likely/unlikely/no + one reason why.
+2. One practical suggestion the family can act on.
+3. One closing line — a memorable takeaway or gentle caution.
+
+RULES:
+- For questions about one person, focus on their chart. For family dynamics, consider all.
+- Reference members by name, not role.
+- If two members have conflicting planetary influences, say so: "Mixed signals between X and Y —"
+- 3–5 sentences for direct questions; up to 5 short paragraphs for complex ones.
+- No preamble. No restating the question. No generic advice."""
+
+
+def _build_member_summary(row: tuple) -> str:
+    """One compact line per family member for the system prompt."""
+    _, role, display_name, _chart_id, payload_raw = row
+    payload = payload_raw if isinstance(payload_raw, dict) else json.loads(payload_raw or "{}")
+    birth = payload.get("birth_details", {})
+    eph = payload.get("ephemeris", {})
+    moon = eph.get("moon", {})
+
+    name = display_name or birth.get("name", role)
+    lagna = eph.get("lagna", {}).get("rasi", "?")
+    moon_rasi = moon.get("rasi", "?")
+    nak = moon.get("nakshatra", {})
+    nak_name = nak.get("name", "?") if isinstance(nak, dict) else str(nak or "?")
+
+    vimshottari = payload.get("dashas", {}).get("vimshottari", {}) \
+        if isinstance(payload.get("dashas"), dict) else {}
+    dasha = resolve_antar_dasha(
+        vimshottari=vimshottari,
+        reference_date=datetime.now(timezone.utc),
+    )
+    maha = dasha.get("maha", {}).get("lord", "—") if dasha else "—"
+    antar = dasha.get("antar", {}).get("lord", "—") if dasha else "—"
+
+    ss = compute_sade_sati(payload)
+    ss_data = ss.get("sade_sati", {}) if ss else {}
+    ss_suffix = f", Sade Sati active – {ss_data.get('phase_name', '')}" \
+        if ss_data.get("active") else ""
+
+    return (
+        f"{role.upper()} {name}: "
+        f"Lagna {lagna}, Moon {moon_rasi} ({nak_name}), "
+        f"Dasha {maha}›{antar}"
+        f"{ss_suffix}"
+    )
+
+
+@router.post("/groups/{group_id}/chat/stream")
+async def family_group_chat_stream(
+    group_id: str,
+    req: _FamilyChatRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Streaming family chat — all member charts included in LLM context."""
+    user_id = user["id"]
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="LLM not configured")
+
+    with get_conn() as conn:
+        group = _assert_group_owner(conn, group_id, user_id)
+
+        rows = conn.execute("""
+            SELECT fm.id, fm.role, fm.display_name, fm.chart_id, bc.payload
+            FROM family_members fm
+            JOIN base_charts bc ON bc.id = fm.chart_id
+            WHERE fm.group_id = %s
+            ORDER BY fm.role, fm.birth_order
+        """, (group_id,)).fetchall()
+
+        budget_row = conn.execute(
+            "SELECT llm_enabled, paused_reason FROM llm_budget WHERE id = 1"
+        ).fetchone()
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="No members in this family group")
+
+    member_lines = "\n".join(f"- {_build_member_summary(r)}" for r in rows)
+
+    system_prompt = _FAMILY_CHAT_SYSTEM_PROMPT.format(
+        group_name=group.get("name", "Family"),
+        member_lines=member_lines,
+    )
+
+    history_trimmed = req.history[-12:]
+    messages = [{"role": m.role, "content": m.content} for m in history_trimmed]
+    messages.append({"role": "user", "content": req.question})
+
+    async def generate():
+        if budget_row and not budget_row[0]:
+            yield f"data: {json.dumps({'error': 'llm_paused', 'reason': budget_row[1]})}\n\n"
+            return
+
+        import anthropic
+        full_response: list[str] = []
+        input_tokens = 0
+        output_tokens = 0
+        try:
+            client = anthropic.Anthropic(api_key=api_key)
+            with client.messages.stream(
+                model="claude-sonnet-4-6",
+                max_tokens=1024,
+                system=system_prompt,
+                messages=messages,
+            ) as stream:
+                for text in stream.text_stream:
+                    full_response.append(text)
+                    yield f"data: {json.dumps({'text': text})}\n\n"
+                final_msg = stream.get_final_message()
+                input_tokens = final_msg.usage.input_tokens
+                output_tokens = final_msg.usage.output_tokens
+
+            with get_conn() as db:
+                log_llm_call(
+                    db=db,
+                    chart_id=req.base_chart_id,
+                    call_type="family_chat",
+                    period="chat",
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    status="success",
+                )
+
+            yield f"data: {json.dumps({'done': True})}\n\n"
+
+        except Exception as e:
+            logger.error(f"Family group chat stream error: {e}")
+            try:
+                with get_conn() as db:
+                    log_llm_call(
+                        db=db,
+                        chart_id=req.base_chart_id,
+                        call_type="family_chat",
+                        period="chat",
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        status="error",
+                        fallback_reason=str(e)[:100],
+                    )
+            except Exception:
+                pass
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
