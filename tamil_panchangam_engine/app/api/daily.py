@@ -8,6 +8,7 @@ Returns daily Panchangam + inauspicious windows for a given chart and date.
 """
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -41,6 +42,75 @@ def _get_base_chart_payload(base_chart_id: str) -> dict:
     except Exception as e:
         logger.error(f"DB error fetching chart {base_chart_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to load base chart")
+
+
+def _generate_daily_llm_guidance(result: dict, chart_name: str, base_chart_id: str) -> Optional[str]:
+    """2-3 sentence personalized daily guidance. Low token usage."""
+    from app.engines.llm_interpretation_orchestrator import is_llm_enabled
+    if not is_llm_enabled():
+        return None
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return None
+
+    try:
+        nak = result.get("nakshatra", {})
+        tara = result.get("tara_bala", {})
+        rahu = result.get("rahu_kaalam", {})
+        yama = result.get("yamagandam", {})
+        tithi = result.get("tithi", {})
+        date_str = result.get("date", "")
+
+        try:
+            weekday = datetime.strptime(date_str, "%Y-%m-%d").strftime("%A")
+        except Exception:
+            weekday = ""
+
+        prompt = (
+            f"You are a Tamil Jyotishi giving brief daily guidance.\n\n"
+            f"Date: {date_str} ({weekday})\n"
+            f"Person: {chart_name}\n"
+            f"Moon Nakshatra today: {nak.get('name', '')} Pada {nak.get('pada', '')}\n"
+            f"Tara Bala: {tara.get('name', '')} ({tara.get('quality', '')})\n"
+            f"Tithi: {tithi.get('name', '')} {tithi.get('paksha', '')} Paksha\n"
+            f"Rahu Kaalam: {rahu.get('start', '')} to {rahu.get('end', '')}\n"
+            f"Yamagandam: {yama.get('start', '')} to {yama.get('end', '')}\n\n"
+            f"Write exactly 2-3 sentences of practical daily guidance in plain English. "
+            f"Be specific to today's tara bala quality and tithi. "
+            f"Naturally mention Rahu Kaalam as 'avoid new starts between X and Y'. "
+            f"No generic advice. No preamble. Return only the guidance sentences."
+        )
+
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=150,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        guidance = response.content[0].text.strip()
+
+        try:
+            from app.engines.budget_guard import log_llm_call
+            with get_conn() as conn:
+                log_llm_call(
+                    conn,
+                    chart_id=base_chart_id,
+                    call_type="daily_guidance",
+                    period=date_str,
+                    input_tokens=response.usage.input_tokens,
+                    output_tokens=response.usage.output_tokens,
+                )
+        except Exception as log_err:
+            logger.warning(f"daily_guidance log_llm_call failed: {log_err}")
+
+        return guidance
+
+    except Exception as e:
+        logger.warning(f"Daily LLM guidance failed: {e}")
+        return None
 
 
 @router.get("/daily")
@@ -107,7 +177,14 @@ def get_daily_prediction(
         ayanamsa=ayanamsa,
     )
 
+    llm_guidance = _generate_daily_llm_guidance(
+        result=result,
+        chart_name=birth_details.get("name", ""),
+        base_chart_id=base_chart_id,
+    )
+
     return {
         "base_chart_id": base_chart_id,
         **result,
+        "llm_guidance": llm_guidance,
     }

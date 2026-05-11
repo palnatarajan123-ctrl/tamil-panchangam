@@ -28,6 +28,7 @@ interface DailyData {
   nakshatra: { name: string; index: number; pada: number; longitude_deg: number };
   tara_bala: { key: string; name: string; quality: string; distance: number };
   tithi: { name: string; paksha: string; number: number };
+  llm_guidance?: string | null;
 }
 
 const TARA_QUALITY_COLOR: Record<string, string> = {
@@ -135,6 +136,21 @@ export function DailyView({ baseChartId, date }: DailyViewProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* LLM Daily Guidance */}
+      {data.llm_guidance && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-primary">✦</span>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Today's Guidance
+            </p>
+          </div>
+          <p className="text-sm text-foreground leading-relaxed">
+            {data.llm_guidance}
+          </p>
+        </div>
+      )}
 
       {/* Inauspicious Windows */}
       <Card data-testid="card-inauspicious-windows">
