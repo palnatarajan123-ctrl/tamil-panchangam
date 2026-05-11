@@ -162,6 +162,32 @@ def generate_monthly_prediction(
     )
 
     # -------------------------------------------------
+    # 1a. Lazy upagraha backfill for pre-v2.0 charts
+    # -------------------------------------------------
+    if not base_chart_payload.get("upagrahas"):
+        _birth_utc_str = base_chart_payload.get("birth_utc", "")
+        _birth_details = base_chart_payload.get("birth_details", {})
+        if _birth_utc_str and _birth_details:
+            try:
+                from app.engines.upagraha_engine import compute_gulika_mandi
+                _bu = datetime.fromisoformat(_birth_utc_str.replace("Z", "+00:00"))
+                _upa = compute_gulika_mandi(
+                    birth_utc=_bu,
+                    latitude=_birth_details.get("latitude", 0.0),
+                    longitude=_birth_details.get("longitude", 0.0),
+                    ayanamsa=base_chart_payload.get("ephemeris", {}).get("ayanamsa", "lahiri"),
+                )
+                base_chart_payload["upagrahas"] = _upa
+                with get_conn() as conn:
+                    conn.execute(
+                        "UPDATE base_charts SET payload = payload || %s::jsonb WHERE id = %s",
+                        (json.dumps({"upagrahas": _upa}), payload.base_chart_id),
+                    )
+                logger.info(f"Lazy upagraha backfill written: {payload.base_chart_id}")
+            except Exception as _e:
+                logger.warning(f"Lazy upagraha backfill failed for {payload.base_chart_id}: {_e}")
+
+    # -------------------------------------------------
     # 2. Check for persisted prediction
     # -------------------------------------------------
     existing = get_monthly_prediction(
