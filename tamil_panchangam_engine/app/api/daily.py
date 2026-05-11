@@ -27,8 +27,8 @@ def _get_base_chart_payload(base_chart_id: str) -> dict:
     try:
         with get_conn() as conn:
             row = conn.execute(
-                "SELECT payload FROM base_charts WHERE id = ?",
-                [base_chart_id],
+                "SELECT payload FROM base_charts WHERE id = %s",
+                (base_chart_id,),
             ).fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Base chart not found")
@@ -71,23 +71,23 @@ def get_daily_prediction(
         target_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Extract chart coordinates
-    latitude = payload.get("latitude")
-    longitude = payload.get("longitude")
+    birth_details = payload.get("birth_details", {})
+    latitude = birth_details.get("latitude")
+    longitude = birth_details.get("longitude")
     if latitude is None or longitude is None:
         raise HTTPException(status_code=422, detail="Chart missing latitude/longitude")
 
-    # Determine birth nakshatra index from stored nakshatra data
-    nakshatra_context = payload.get("nakshatra_context", {})
-    birth_nak_index = nakshatra_context.get("janma_nakshatra_index")
+    # Determine birth nakshatra index from stored ephemeris data
+    moon_eph = payload.get("ephemeris", {}).get("moon", {})
+    nak_data = moon_eph.get("nakshatra", {})
+    birth_nak_index = nak_data.get("index")
     if birth_nak_index is None:
-        planets = payload.get("planets", {})
-        moon = planets.get("Moon", {})
-        moon_lon = moon.get("longitude", 0.0)
+        moon_lon = moon_eph.get("longitude_deg", 0.0)
         birth_nak_index = int(moon_lon / (360 / 27)) % 27
 
-    # Determine UTC offset from chart coordinates
+    # Determine UTC offset — prefer stored timezone, fall back to coordinate lookup
     try:
-        tz_name = get_timezone_from_coordinates(latitude, longitude)
+        tz_name = birth_details.get("timezone") or get_timezone_from_coordinates(latitude, longitude)
         import pytz
         from datetime import timedelta
         tz = pytz.timezone(tz_name)
@@ -96,7 +96,7 @@ def get_daily_prediction(
     except Exception:
         utc_offset = 5.5  # fallback to IST
 
-    ayanamsa = payload.get("reference", {}).get("ayanamsa", "lahiri")
+    ayanamsa = payload.get("chart_metadata", {}).get("ayanamsa", "lahiri")
 
     result = compute_dinaphalam(
         date_utc=target_date,
