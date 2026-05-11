@@ -731,12 +731,13 @@ def extract_payload_inputs(
     moon_rasi = envelope.get("moon_rasi") or nakshatra.get("janma_rasi", "")
     nakshatra_pada = nakshatra.get("janma_pada")
     
-    antar_lord = dasha.get("antar_lord", "Unknown")
+    antar_lord = dasha.get("antar_lord") or "Unknown"  # `or` guards against key-present-but-null
     antar_houses = dasha.get("antar_houses", [])
     dasha_nature = ""
     if antar_houses:
-        house_refs = [str(h) for h in antar_houses[:2]]
-        dasha_nature = f"{antar_lord} rules houses {', '.join(house_refs)}"
+        house_refs = [str(h) for h in antar_houses[:2] if h is not None]
+        if house_refs:
+            dasha_nature = f"{antar_lord} rules houses {', '.join(house_refs)}"
     
     active_dasha: Dict[str, Any] = {
         "mahadasha": dasha.get("maha_lord", "Unknown"),
