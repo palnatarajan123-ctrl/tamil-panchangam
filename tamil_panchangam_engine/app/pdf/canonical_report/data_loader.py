@@ -625,8 +625,16 @@ def build_report_data(
     
     llm_src = llm_interpretation if llm_interpretation else {}
     is_v3 = llm_src.get("engine_version") == "ai-interpretation-v3.0"
-    is_v4 = llm_src.get("engine_version") in ("ai-interpretation-v4.0", "ai-interpretation-v5.0")
-    is_v5 = llm_src.get("engine_version") == "ai-interpretation-v5.0"
+    is_v4 = llm_src.get("engine_version") in (
+        "ai-interpretation-v4.0",
+        "ai-interpretation-v5.0",
+        "ai-interpretation-v6.0",
+    )
+    is_v5 = llm_src.get("engine_version") in (
+        "ai-interpretation-v5.0",
+        "ai-interpretation-v6.0",
+    )
+    is_v6 = llm_src.get("engine_version") == "ai-interpretation-v6.0"
     
     birth_details_data = payload.get("birth_details", {})
     
@@ -689,6 +697,7 @@ def build_report_data(
                 supportive=why_data.get("supportive", []),
                 watchouts=why_data.get("watchouts", []),
                 bav_qualifier=why_data.get("bav_qualifier") if is_v5 else None,
+                upagraha_insight=why_data.get("upagraha_insight") if is_v6 else None,
             )
 
         life_areas_raw = llm_src.get("life_areas")
@@ -701,6 +710,7 @@ def build_report_data(
                     real_life_patterns=area_data.get("real_life_patterns", ""),
                     astrological_basis=area_data.get("astrological_basis"),
                     divisional_insight=area_data.get("divisional_insight") if is_v5 else None,
+                    karmic_note=area_data.get("karmic_note") if is_v6 else None,
                 )
                 for area, area_data in life_areas_raw.items()
                 if isinstance(area_data, dict)
@@ -816,11 +826,16 @@ def build_report_data(
         if kp_entries:
             kp_sublords_data = KpSublordsData(entries=kp_entries)
 
+    # Upagrahas — from base chart payload
+    upagrahas_data = payload.get("upagrahas")
+    if upagrahas_data and upagrahas_data.get("error"):
+        upagrahas_data = None
+
     return CanonicalReportData(
         report_type=report_type.title(),
         period_label=period_label,
         generated_at=datetime.now(),
-        
+
         birth_details=BirthDetails(
             name=birth_details_data.get("name", "Chart Holder"),
             date=birth_details_data.get("date_of_birth", "Unknown"),
@@ -881,6 +896,10 @@ def build_report_data(
         v4_remedies=v4_remedies_obj,
         v4_caution_windows=v4_caution_windows_list,
         v4_key_takeaways=v4_key_takeaways_list,
+
+        is_v5=is_v5,
+        is_v6=is_v6,
+        upagrahas=upagrahas_data,
 
         methodology=methodology,
         sarvashtakavarga=sarvashtakavarga,

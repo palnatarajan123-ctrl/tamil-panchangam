@@ -182,6 +182,7 @@ class V4LifeArea(BaseModel):
     real_life_patterns: str = ""
     astrological_basis: Optional[str] = None
     divisional_insight: Optional[str] = None
+    karmic_note: Optional[str] = None  # v6
 
 
 class V4ExecutiveSummary(BaseModel):
@@ -201,6 +202,7 @@ class V4WhyThisPeriod(BaseModel):
     supportive: List[str] = []
     watchouts: List[str] = []
     bav_qualifier: Optional[str] = None
+    upagraha_insight: Optional[str] = None  # v6
 
 
 class V4CautionWindow(BaseModel):
@@ -320,3 +322,8 @@ class CanonicalReportData(BaseModel):
     # v5 accuracy enhancement fields
     bhinnashtakavarga: Optional[Dict[str, Any]] = None
     shadbala_natal: Optional[Dict[str, Any]] = None
+
+    # v6: upagrahas
+    is_v5: bool = False
+    is_v6: bool = False
+    upagrahas: Optional[Dict[str, Any]] = None
