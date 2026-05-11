@@ -10,16 +10,11 @@ import logging
 from datetime import datetime
 from typing import Dict, Optional
 from app.utils.swisseph_utils import compute_planet_longitude
+from app.engines.nakshatra_names import canonical_nakshatra_list
 
 logger = logging.getLogger(__name__)
 
-NAKSHATRA_NAMES = [
-    "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra",
-    "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni",
-    "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha",
-    "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha",
-    "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"
-]
+NAKSHATRA_NAMES = canonical_nakshatra_list()
 
 TARA_BALA_CYCLE = [
     ("janma", "Janma Tara - Birth Star", "neutral", "Self-awareness heightened"),

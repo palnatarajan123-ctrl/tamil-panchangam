@@ -9,15 +9,10 @@ Total scoreable: 33 points
 """
 
 from typing import Optional
+from app.engines.nakshatra_names import canonical_nakshatra_list, nakshatra_index as _canonical_nakshatra_index
 
-# Nakshatra index 0-26 (Ashwini=0 ... Revati=26)
-NAKSHATRA_NAMES = [
-    "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra",
-    "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni",
-    "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha",
-    "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishtha",
-    "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati",
-]
+# Nakshatra index 0-26 (canonical Tamil names)
+NAKSHATRA_NAMES = canonical_nakshatra_list()
 
 # Gana: 0=Deva, 1=Manushya, 2=Rakshasa
 GANA = [
@@ -76,12 +71,8 @@ NADI = [
 
 
 def _nakshatra_index(nak_name: str) -> Optional[int]:
-    """Return 0-based nakshatra index from name (case-insensitive partial match)."""
-    nak_lower = nak_name.lower().strip()
-    for i, n in enumerate(NAKSHATRA_NAMES):
-        if nak_lower in n.lower() or n.lower() in nak_lower:
-            return i
-    return None
+    """Return 0-based nakshatra index from any known name spelling."""
+    return _canonical_nakshatra_index(nak_name)
 
 
 def _rasi_index(rasi_name: str) -> Optional[int]:
