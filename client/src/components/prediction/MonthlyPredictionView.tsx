@@ -199,6 +199,17 @@ function LifeAreaCard({ area, isV2, isV4, envelope }: LifeAreaCardProps) {
           </div>
         )}
 
+        {area.karmicNote && (
+          <div className="bg-purple-50 dark:bg-purple-950/30 rounded-md p-3 text-sm"
+            data-testid={`text-karmic-note-${area.key}`}>
+            <p className="text-xs font-medium text-purple-700 dark:text-purple-400
+               uppercase tracking-wide mb-1">
+              Karmic Note
+            </p>
+            <p className="italic">{area.karmicNote}</p>
+          </div>
+        )}
+
         {!isV2 && !isV4 && area.deeperExplanation && (
           <div className="bg-muted/50 p-3 rounded-md" data-testid={`text-explanation-${area.key}`}>
             <Paragraphs text={area.deeperExplanation} className="text-muted-foreground" />
@@ -246,7 +257,8 @@ export function MonthlyPredictionView({
   }
 
   const { lifeAreas } = prediction;
-  const isV5 = prediction.engineVersion === "ai-interpretation-v5.0";
+  const isV6 = prediction.engineVersion === "ai-interpretation-v6.0";
+  const isV5 = prediction.engineVersion === "ai-interpretation-v5.0" || isV6;
   const isV4 = prediction.engineVersion === "ai-interpretation-v4.0" || isV5;
   const isV3 = prediction.engineVersion === "ai-interpretation-v3.0";
   const isV2 = prediction.engineVersion === "ai-interpretation-v2.0";
@@ -356,6 +368,16 @@ export function MonthlyPredictionView({
                   Ashtakavarga Context
                 </p>
                 <p>{prediction.whyThisPeriod.bavQualifier}</p>
+              </div>
+            )}
+            {isV6 && prediction.whyThisPeriod.upagrahaInsight && (
+              <div className="bg-purple-50 dark:bg-purple-950/30 rounded-md p-3 text-sm"
+                data-testid="text-upagraha-insight">
+                <p className="text-xs font-medium text-purple-700 dark:text-purple-400
+                   uppercase tracking-wide mb-1">
+                  Karmic Patterns
+                </p>
+                <p>{prediction.whyThisPeriod.upagrahaInsight}</p>
               </div>
             )}
             <div className="grid grid-cols-2 gap-3 pt-1">
