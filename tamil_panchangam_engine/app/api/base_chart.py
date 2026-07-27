@@ -237,7 +237,7 @@ def create_base_chart(
                                 "SELECT COUNT(*) FROM user_charts WHERE user_id = ?",
                                 [current_user["id"]],
                             ).fetchone()[0]
-                            if count < 10:
+                            if current_user.get("role") == "admin" or count < 10:
                                 conn.execute(
                                     """INSERT INTO user_charts (id, user_id, base_chart_id, nickname, created_at)
                                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
@@ -465,7 +465,7 @@ def create_base_chart(
                     "SELECT COUNT(*) FROM user_charts WHERE user_id = ?",
                     [current_user["id"]],
                 ).fetchone()[0]
-                if count < 10:
+                if current_user.get("role") == "admin" or count < 10:
                     conn.execute(
                         """INSERT INTO user_charts (id, user_id, base_chart_id, nickname, created_at)
                            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
