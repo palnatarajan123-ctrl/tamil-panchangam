@@ -149,10 +149,22 @@ def _check_cache(
             
             if result and result[0]:
                 fallback_reason = result[1] if len(result) > 1 else None
-                # If cached entry was only because LLM was disabled, skip it so
-                # LLM gets a real chance now that it may be enabled
+                # llm_disabled: serve the cached deterministic result — LLM is
+                # administratively off so retrying would just fail again.
                 if fallback_reason == "llm_disabled":
-                    logger.info(f"LLM cache skip (llm_disabled entry): {base_chart_id}/{period_type}/{period_key}")
+                    logger.info(f"LLM cache hit (llm_disabled): {base_chart_id}/{period_type}/{period_key}")
+                    if isinstance(result[0], str):
+                        return json.loads(result[0])
+                    return result[0]
+                # Any other fallback_reason (anthropic_key_missing, budget_exceeded,
+                # missing_interpretive_hint, invalid_payload_none_leak, etc.) means a
+                # transient failure was cached. Force a retry on every request so a
+                # restored API key or cleared budget gets a real LLM call.
+                if fallback_reason is not None:
+                    logger.info(
+                        f"LLM cache skip (transient fallback '{fallback_reason}'): "
+                        f"{base_chart_id}/{period_type}/{period_key}"
+                    )
                     return None
                 logger.info(f"LLM cache hit: {base_chart_id}/{period_type}/{period_key}/{explainability_mode}")
                 if isinstance(result[0], str):

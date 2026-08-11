@@ -554,7 +554,7 @@ def rerun_llm_interpretation(
             "base_chart_id": base_chart_id,
             "period_type": period_type,
             "period_key": period_key,
-            "message": "Envelope and LLM cache cleared. Next fetch rebuilds with fresh v6.",
+            "message": "Envelope and LLM cache cleared. Next fetch rebuilds with fresh v7.",
         }
 
     except HTTPException:
