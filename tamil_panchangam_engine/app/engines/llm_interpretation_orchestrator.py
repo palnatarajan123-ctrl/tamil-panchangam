@@ -41,10 +41,10 @@ LLM_MONTHLY_TOKEN_BUDGET = 1_000_000
 # v2.0: Upagraha context added (Gulika/Mandi)
 PROMPT_VERSION_BY_WINDOW = {
     "weekly": "v6",
-    "monthly": "v6",
-    "yearly": "v6"
+    "monthly": "v7",
+    "yearly": "v7"
 }
-PROMPT_VERSION = "v6"  # fallback
+PROMPT_VERSION = "v7"  # fallback
 
 
 def _load_prompt_template(version: str = "v2") -> str:
@@ -303,6 +303,28 @@ def _validate_llm_output(output: Dict[str, Any]) -> bool:
     
     engine_version = output.get("engine_version", "")
 
+    if engine_version == "ai-interpretation-v7.0":
+        required_keys = [
+            "executive_summary", "why_this_period",
+            "life_areas", "remedies", "key_takeaways"
+        ]
+        if not all(k in output for k in required_keys):
+            missing = [k for k in required_keys if k not in output]
+            logger.warning(f"LLM v7 output missing keys: {missing}")
+            return False
+        exec_summary = output.get("executive_summary", {})
+        if not exec_summary.get("main_theme"):
+            return False
+        life_areas = output.get("life_areas", {})
+        if not isinstance(life_areas, dict) or len(life_areas) < 2:
+            return False
+        for area_name, area_data in life_areas.items():
+            if not isinstance(area_data, dict):
+                continue
+            if not area_data.get("plain_english"):
+                return False
+        return True
+
     if engine_version == "ai-interpretation-v6.0":
         required_keys = [
             "executive_summary", "why_this_period",
@@ -534,6 +556,7 @@ def generate_llm_interpretation(
             shadbala_detail=payload_inputs.get("shadbala_detail"),
             bav_context=payload_inputs.get("bav_context"),
             upagraha_context=payload_inputs.get("upagraha_context"),
+            predictive_signals=payload_inputs.get("predictive_signals"),
         )
     except AssertionError as e:
         logger.error(f"Dasha payload leak detected: {e}")

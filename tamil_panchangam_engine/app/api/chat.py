@@ -78,7 +78,7 @@ RESPONSE LENGTH:
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
-def _build_v6_monthly_block(base_chart_id: str) -> str:
+def _build_monthly_context_block(base_chart_id: str) -> str:
     """
     Fetch the current month's cached v6 LLM interpretation and return a
     compact system-prompt block (≤300 tokens). Returns "" if not available.
@@ -103,13 +103,15 @@ def _build_v6_monthly_block(base_chart_id: str) -> str:
             return ""
         llm = row[0] if isinstance(row[0], dict) else json.loads(row[0] or "{}")
         life_areas_raw = row[1] if isinstance(row[1], dict) else json.loads(row[1] or "{}")
-        if not llm or "v6" not in llm.get("engine_version", ""):
+        engine_version = llm.get("engine_version", "")
+        if not llm or ("v6" not in engine_version and "v7" not in engine_version):
             return ""
 
         exec_sum = llm.get("executive_summary", {})
         why = llm.get("why_this_period", {})
         caution_windows = llm.get("caution_windows", [])
         key_takeaways = llm.get("key_takeaways", [])
+        event_predictions = llm.get("event_predictions", [])
 
         lines = ["## THIS MONTH'S INTERPRETATION (already computed)"]
 
@@ -153,9 +155,24 @@ def _build_v6_monthly_block(base_chart_id: str) -> str:
                 + "; ".join(str(t) for t in key_takeaways[:3])
             )
 
+        # v7: inject high-confidence event windows (capped so block stays ≤300 tokens)
+        if event_predictions and isinstance(event_predictions, list):
+            high_windows = [
+                ep for ep in event_predictions
+                if isinstance(ep, dict) and ep.get("confidence") in ("high", "very high")
+            ][:2]
+            if high_windows:
+                parts = []
+                for ep in high_windows:
+                    label = ep.get("window_label", "")
+                    area = ep.get("life_area", "").replace("_", " ")
+                    text = ep.get("plain_english", "")[:120]
+                    parts.append(f"{label} ({area}): {text}")
+                lines.append("Predicted Windows: " + " | ".join(parts))
+
         return "\n".join(lines) if len(lines) > 1 else ""
     except Exception as e:
-        logger.warning(f"Failed to fetch v6 monthly block for {base_chart_id}: {e}")
+        logger.warning(f"Failed to fetch monthly context block for {base_chart_id}: {e}")
         return ""
 
 
@@ -551,8 +568,8 @@ Frame all responses in parent-friendly language.
 """
             system_prompt = system_prompt + child_context
 
-    # Inject cached v6 monthly interpretation for richer context
-    v6_block = _build_v6_monthly_block(req.base_chart_id)
+    # Inject cached monthly interpretation for richer context
+    v6_block = _build_monthly_context_block(req.base_chart_id)
     if v6_block:
         system_prompt = system_prompt + "\n\n" + v6_block
 

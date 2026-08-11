@@ -636,12 +636,18 @@ def build_report_data(
         "ai-interpretation-v4.0",
         "ai-interpretation-v5.0",
         "ai-interpretation-v6.0",
+        "ai-interpretation-v7.0",
     )
     is_v5 = llm_src.get("engine_version") in (
         "ai-interpretation-v5.0",
         "ai-interpretation-v6.0",
+        "ai-interpretation-v7.0",
     )
-    is_v6 = llm_src.get("engine_version") == "ai-interpretation-v6.0"
+    is_v6 = llm_src.get("engine_version") in (
+        "ai-interpretation-v6.0",
+        "ai-interpretation-v7.0",
+    )
+    is_v7 = llm_src.get("engine_version") == "ai-interpretation-v7.0"
     
     birth_details_data = payload.get("birth_details", {})
     
@@ -771,6 +777,18 @@ def build_report_data(
                 v4_caution_windows_list.append(V4CautionWindow(period=cw))
 
         v4_key_takeaways_list = llm_src.get("key_takeaways", [])
+
+    # v7 predictive signals extraction
+    v7_event_predictions: List[Dict[str, Any]] = []
+    v7_annual_theme: Optional[str] = None
+    v7_yoga_activation_summary: Optional[str] = None
+
+    if is_v7:
+        raw_eps = llm_src.get("event_predictions", [])
+        if isinstance(raw_eps, list):
+            v7_event_predictions = [ep for ep in raw_eps if isinstance(ep, dict)]
+        v7_annual_theme = llm_src.get("annual_theme") or None
+        v7_yoga_activation_summary = llm_src.get("yoga_activation_summary") or None
 
     yearly_mantra = None
     dasha_transit_synthesis = None
@@ -907,6 +925,11 @@ def build_report_data(
         is_v5=is_v5,
         is_v6=is_v6,
         upagrahas=upagrahas_data,
+
+        is_v7=is_v7,
+        v7_event_predictions=v7_event_predictions,
+        v7_annual_theme=v7_annual_theme,
+        v7_yoga_activation_summary=v7_yoga_activation_summary,
 
         methodology=methodology,
         sarvashtakavarga=sarvashtakavarga,

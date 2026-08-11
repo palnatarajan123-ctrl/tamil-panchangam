@@ -224,6 +224,7 @@ def build_llm_payload(
     shadbala_detail: Optional[Dict[str, Any]] = None,
     bav_context: Optional[Dict[str, Any]] = None,
     upagraha_context: Optional[Dict[str, Any]] = None,
+    predictive_signals: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Build enriched LLM payload v3.0 — Siddhar-Tradition Synthesizer.
@@ -429,6 +430,8 @@ def build_llm_payload(
         overall_context["bav_transit_scores"] = bav_context
     if upagraha_context:
         overall_context["upagraha_context"] = upagraha_context
+    if predictive_signals:
+        overall_context["predictive_signals"] = predictive_signals
 
     payload = {
         "overall_context": overall_context,
@@ -887,6 +890,57 @@ def extract_payload_inputs(
             base_chart_payload.get("upagrahas", {})
         )
 
+    predictive_signals_context: Optional[Dict[str, Any]] = None
+    if base_chart_payload:
+        ps = base_chart_payload.get("predictive_signals", {})
+        if ps:
+            high_windows = [
+                w for w in ps.get("event_windows", [])
+                if w.get("confidence") in ("high", "very high")
+            ]
+            peak_yogas = [
+                y for y in ps.get("active_yogas", [])
+                if y.get("activation_level") in ("peak", "strong")
+            ]
+            if high_windows or peak_yogas or ps.get("dasha_precision") or ps.get("varshaphal"):
+                predictive_signals_context = {}
+                if ps.get("dasha_precision"):
+                    dp = ps["dasha_precision"]
+                    predictive_signals_context["dasha_precision"] = {
+                        "md_lord": dp.get("md_lord"),
+                        "ad_lord": dp.get("ad_lord"),
+                        "pt_lord": (dp.get("pratyantar") or {}).get("lord"),
+                    }
+                if high_windows:
+                    predictive_signals_context["event_windows"] = [
+                        {
+                            "start": str(w.get("start", ""))[:10],
+                            "end": str(w.get("end", ""))[:10],
+                            "life_area": w.get("life_area", ""),
+                            "confidence": w.get("confidence", ""),
+                            "signal_count": w.get("signal_count", 0),
+                        }
+                        for w in high_windows[:5]
+                    ]
+                if peak_yogas:
+                    predictive_signals_context["active_yogas"] = [
+                        {
+                            "name": y.get("yoga_name", y.get("name", "")),
+                            "activation_level": y.get("activation_level", ""),
+                            "life_area": y.get("life_area", ""),
+                        }
+                        for y in peak_yogas[:3]
+                    ]
+                if ps.get("varshaphal"):
+                    vp = ps["varshaphal"]
+                    predictive_signals_context["varshaphal"] = {
+                        "year": vp.get("year"),
+                        "lagna": vp.get("lagna"),
+                        "varshesha": vp.get("varshesha"),
+                        "strength": vp.get("strength"),
+                        "muntha": vp.get("muntha"),
+                    }
+
     life_area_scores = {}
     top_signals_by_life_area = {}
     
@@ -925,6 +979,7 @@ def extract_payload_inputs(
         "shadbala_detail": shadbala_detail if shadbala_detail else None,
         "bav_context": bav_context if bav_context else None,
         "upagraha_context": upagraha_context if upagraha_context else None,
+        "predictive_signals": predictive_signals_context,
     }
 
 

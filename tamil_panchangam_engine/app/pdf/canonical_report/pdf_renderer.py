@@ -2369,6 +2369,52 @@ def _build_v4_key_takeaways(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def _build_v7_predicted_windows(data: CanonicalReportData, styles) -> List:
+    """Build Predicted Windows section for v7 reports."""
+    from reportlab.lib import colors as _colors
+    elements = []
+    if not data.is_v7 or not data.v7_event_predictions:
+        return elements
+
+    elements.append(Paragraph("Predicted Windows", styles['SectionTitle']))
+    elements.append(Paragraph(
+        "Periods where multiple astrological signals converge — windows of heightened momentum or caution.",
+        styles['BodyText']
+    ))
+    elements.append(Spacer(1, 0.15*inch))
+
+    for ep in data.v7_event_predictions:
+        if not isinstance(ep, dict):
+            continue
+        label = ep.get("window_label", "")
+        confidence = ep.get("confidence", "")
+        life_area = ep.get("life_area", "").replace("_", " ").title()
+        plain_english = ep.get("plain_english", "")
+        action = ep.get("action", "")
+        avoid = ep.get("avoid", "")
+
+        header = f"{label}  ·  {life_area}  ·  Confidence: {confidence}"
+        elements.append(Paragraph(header, styles['SubsectionTitle']))
+        if plain_english:
+            elements.append(Paragraph(plain_english, styles['BodyText']))
+        if action:
+            elements.append(Paragraph(f"✓  {action}", styles['BodyText']))
+        if avoid:
+            elements.append(Paragraph(f"⚠  {avoid}", styles['BodyText']))
+        elements.append(Spacer(1, 0.1*inch))
+
+    if data.v7_annual_theme:
+        elements.append(Paragraph("This Year's Theme", styles['SubsectionTitle']))
+        elements.append(Paragraph(data.v7_annual_theme, styles['BodyText']))
+        if data.v7_yoga_activation_summary:
+            elements.append(Paragraph(
+                f"Active Alignments: {data.v7_yoga_activation_summary}", styles['BodyText']
+            ))
+        elements.append(Spacer(1, 0.2*inch))
+
+    return elements
+
+
 def _build_upagrahas_section(data: CanonicalReportData, styles) -> List:
     """Build upagrahas (Gulika/Mandi) section for v6 reports."""
     elements = []
@@ -2558,6 +2604,7 @@ def render_pdf(data: CanonicalReportData) -> bytes:
         story.append(PageBreak())
         story.extend(_build_v4_remedies(data, styles))
         story.extend(_build_v4_key_takeaways(data, styles))
+        story.extend(_build_v7_predicted_windows(data, styles))
 
         # Technical appendix divider (v4 only)
         story.extend(_build_appendix_divider(styles))

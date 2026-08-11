@@ -327,3 +327,9 @@ class CanonicalReportData(BaseModel):
     is_v5: bool = False
     is_v6: bool = False
     upagrahas: Optional[Dict[str, Any]] = None
+
+    # v7: predictive signals
+    is_v7: bool = False
+    v7_event_predictions: List[Dict[str, Any]] = []
+    v7_annual_theme: Optional[str] = None
+    v7_yoga_activation_summary: Optional[str] = None

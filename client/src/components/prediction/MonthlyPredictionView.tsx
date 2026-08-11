@@ -268,7 +268,8 @@ export function MonthlyPredictionView({
   }
 
   const { lifeAreas } = prediction;
-  const isV6 = prediction.engineVersion === "ai-interpretation-v6.0";
+  const isV7 = prediction.engineVersion === "ai-interpretation-v7.0";
+  const isV6 = prediction.engineVersion === "ai-interpretation-v6.0" || isV7;
   const isV5 = prediction.engineVersion === "ai-interpretation-v5.0" || isV6;
   const isV4 = prediction.engineVersion === "ai-interpretation-v4.0" || isV5;
   const isV3 = prediction.engineVersion === "ai-interpretation-v3.0";
@@ -1107,6 +1108,90 @@ export function MonthlyPredictionView({
         </Card>
       )}
 
+      {/* ================= V7: PREDICTED WINDOWS ================= */}
+      {isV7 && prediction.eventPredictions && prediction.eventPredictions.length > 0 && (
+        <Card data-testid="card-event-predictions" className="border-orange-500/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-orange-500" />
+              <span className="text-orange-600 dark:text-orange-400">Predicted Windows</span>
+            </CardTitle>
+            <CardDescription>
+              Periods where multiple signals converge — lean in or hold back accordingly.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4" data-testid="section-event-predictions">
+            {prediction.eventPredictions.map((ep, idx) => (
+              <div key={idx}
+                className="border border-orange-500/20 rounded-md p-4 space-y-2"
+                data-testid={`event-prediction-${idx}`}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-sm" data-testid={`event-window-label-${idx}`}>
+                    {ep.windowLabel}
+                  </span>
+                  <Badge
+                    className={`text-xs ${
+                      ep.confidence === "very high"
+                        ? "bg-orange-600 text-white"
+                        : "bg-orange-400/80 text-white"
+                    }`}
+                    data-testid={`event-confidence-${idx}`}>
+                    {ep.confidence}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs capitalize" data-testid={`event-area-${idx}`}>
+                    {ep.lifeArea.replace("_", " ")}
+                  </Badge>
+                </div>
+                <p className="text-sm leading-relaxed" data-testid={`event-plain-english-${idx}`}>
+                  {ep.plainEnglish}
+                </p>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  {ep.action && (
+                    <div className="flex items-start gap-1.5" data-testid={`event-action-${idx}`}>
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                      <span className="text-xs text-muted-foreground">{ep.action}</span>
+                    </div>
+                  )}
+                  {ep.avoid && (
+                    <div className="flex items-start gap-1.5" data-testid={`event-avoid-${idx}`}>
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                      <span className="text-xs text-muted-foreground">{ep.avoid}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ================= V7: THIS YEAR'S THEME ================= */}
+      {isV7 && prediction.annualTheme && (
+        <Card data-testid="card-annual-theme" className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-primary" />
+              This Year's Theme
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm leading-relaxed" data-testid="text-annual-theme">
+              {prediction.annualTheme}
+            </p>
+            {prediction.yogaActivationSummary && (
+              <div className="mt-3 bg-purple-50 dark:bg-purple-950/30 rounded-md p-3">
+                <p className="text-xs font-medium text-purple-700 dark:text-purple-400 uppercase tracking-wide mb-1">
+                  Active Alignments
+                </p>
+                <p className="text-sm italic" data-testid="text-yoga-activation">
+                  {prediction.yogaActivationSummary}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* ================= LLM VERSION FOOTER ================= */}
       <div className="flex items-center justify-between mt-6 pt-4 border-t border-border"
         data-testid="text-engine-info">
@@ -1117,7 +1202,9 @@ export function MonthlyPredictionView({
           }</span>
           <span className="mx-2">·</span>
           <span className={`font-mono ${
-            prediction.engineVersion === "ai-interpretation-v6.0"
+            isV7
+              ? "text-orange-500/70"
+              : isV6
               ? "text-green-500/70"
               : "text-amber-500/70"
           }`}>
