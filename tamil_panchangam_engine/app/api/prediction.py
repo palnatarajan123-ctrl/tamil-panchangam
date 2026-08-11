@@ -188,6 +188,24 @@ def generate_monthly_prediction(
                 logger.warning(f"Lazy upagraha backfill failed for {payload.base_chart_id}: {_e}")
 
     # -------------------------------------------------
+    # 1b. Lazy predictive_signals computation
+    # -------------------------------------------------
+    _current_period = f"{payload.year}-{payload.month:02d}"
+    _cached_signals = base_chart_payload.get("predictive_signals", {})
+    if not _cached_signals or _cached_signals.get("computed_for") != _current_period:
+        try:
+            from app.engines.predictive_signals_engine import compute_predictive_signals
+            _signals = compute_predictive_signals(
+                payload=base_chart_payload,
+                chart_id=payload.base_chart_id,
+                year=payload.year,
+                month=payload.month,
+            )
+            base_chart_payload["predictive_signals"] = _signals
+        except Exception as _e:
+            logger.warning(f"Predictive signals failed for {payload.base_chart_id}: {_e}")
+
+    # -------------------------------------------------
     # 2. Check for persisted prediction
     # -------------------------------------------------
     existing = get_monthly_prediction(

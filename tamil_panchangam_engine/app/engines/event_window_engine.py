@@ -255,3 +255,214 @@ def compute_event_windows(
             "recommendations": [],
             "error": str(e)
         }
+
+
+# ── Confluence Detector ───────────────────────────────────────────────────────
+
+from datetime import date as _date
+from typing import Any as _Any, Dict as _Dict, List as _List, Optional as _Optional
+
+_BENEFIC_PLANETS = {"Jupiter", "Venus", "Moon", "Mercury"}
+_MALEFIC_PLANETS = {"Saturn", "Rahu", "Ketu", "Mars", "Sun"}
+
+# Positive/negative aspects for confluence scoring
+_POSITIVE_ASPECTS = {"conjunction", "trine"}
+_NEGATIVE_ASPECTS = {"opposition", "square"}
+
+# Planet → life areas it naturally supports (positive signal)
+_PLANET_POSITIVE_AREAS: _Dict[str, _List[str]] = {
+    "Jupiter": ["career", "fortune", "wealth", "spirituality", "self"],
+    "Venus":   ["relationships", "creativity", "wealth", "gains", "home"],
+    "Mercury": ["communication", "gains", "wealth"],
+    "Moon":    ["home", "self", "spirituality"],
+    "Sun":     ["career", "self"],
+    "Mars":    ["health", "self"],
+    "Saturn":  ["career", "spirituality"],
+    "Rahu":    ["gains", "transformation"],
+    "Ketu":    ["spirituality", "transformation"],
+}
+
+_YOGA_AREA: _Dict[str, str] = {
+    "dhana": "wealth",
+    "raja": "career",
+    "dharma": "fortune",
+    "moksha": "spirituality",
+    "general": "self",
+    "conjunction": "self",
+}
+
+_CONFIDENCE = {3: "medium", 4: "high", 5: "very high"}
+
+_ALL_LIFE_AREAS = [
+    "self", "wealth", "communication", "home", "creativity", "health",
+    "relationships", "transformation", "fortune", "career", "gains", "spirituality",
+]
+
+
+def _signal_label(transit_hit: _Dict[str, _Any]) -> str:
+    tp = transit_hit["transit_planet"]
+    np_ = transit_hit["natal_planet"]
+    asp = transit_hit["aspect_type"]
+    h = transit_hit["house"]
+    return f"{tp} {asp} natal {np_} (house {h})"
+
+
+def detect_confluence(
+    pratyantar: _Dict[str, _Any],
+    transit_hits: _List[_Dict[str, _Any]],
+    active_yogas: _List[_Dict[str, _Any]],
+    varshaphal: _Dict[str, _Any],
+    refined_av: _Dict[str, _Any],
+    reference_date: _Optional[_date] = None,
+    num_months: int = 3,
+) -> _List[_Dict[str, _Any]]:
+    """
+    Combine all predictive signal engines and surface windows with 3+ confluent signals.
+
+    Args:
+        pratyantar: output of compute_pratyantar.
+        transit_hits: output of compute_transit_hits.
+        active_yogas: output of compute_yoga_activation.
+        varshaphal: output of compute_varshaphal.
+        refined_av: output of compute_refined_av.
+        reference_date: center date; defaults to today.
+        num_months: half-range in months (total range = 2 × num_months months).
+
+    Returns:
+        List of confluence window dicts sorted by window_start.
+    """
+    if reference_date is None:
+        reference_date = datetime.now(timezone.utc).date()
+
+    # Build 2-week windows across ± num_months (≈ ±90 days)
+    window_days = num_months * 30
+    start = reference_date - timedelta(days=window_days)
+    results: _List[_Dict[str, _Any]] = []
+
+    # Pre-index transit hits by date string for fast lookup
+    hits_by_date: _Dict[str, _List[_Dict[str, _Any]]] = {}
+    for hit in transit_hits:
+        hits_by_date.setdefault(hit["hit_date"], []).append(hit)
+
+    # PT lord quality (static across current AD)
+    pt_lord = (pratyantar.get("pratyantar") or {}).get("lord")
+    pt_is_benefic = pt_lord in _BENEFIC_PLANETS if pt_lord else False
+    pt_is_malefic = pt_lord in _MALEFIC_PLANETS if pt_lord else False
+
+    # Varshesha
+    varshesha = varshaphal.get("varshesha", "")
+    varshesha_benefic = varshesha in _BENEFIC_PLANETS
+    varshesha_malefic = varshesha in _MALEFIC_PLANETS
+
+    # Refined AV — flag signs with high scores (>= 5 in sarvashtakavarga)
+    sarva = refined_av.get("sarvashtakavarga_refined", {})
+    strong_signs = {rasi for rasi, score in sarva.items() if score >= 5}
+
+    # Walk 2-week windows
+    win_start = start
+    while win_start <= reference_date + timedelta(days=window_days):
+        win_end = win_start + timedelta(days=14)
+
+        # Collect transit hits in this window
+        window_hits = []
+        d = win_start
+        while d < win_end:
+            window_hits.extend(hits_by_date.get(d.isoformat(), []))
+            d += timedelta(days=1)
+
+        # Score per life area
+        pos_counts: _Dict[str, int] = {a: 0 for a in _ALL_LIFE_AREAS}
+        neg_counts: _Dict[str, int] = {a: 0 for a in _ALL_LIFE_AREAS}
+        pos_signals: _Dict[str, _List[str]] = {a: [] for a in _ALL_LIFE_AREAS}
+        neg_signals: _Dict[str, _List[str]] = {a: [] for a in _ALL_LIFE_AREAS}
+
+        # Signal 1: transit hits
+        for hit in window_hits:
+            tp = hit["transit_planet"]
+            area = hit.get("life_area_hint", "self")
+            label = _signal_label(hit)
+            asp = hit["aspect_type"]
+            if tp in _BENEFIC_PLANETS:
+                pos_counts[area] += 1
+                pos_signals[area].append(label)
+            elif tp in _MALEFIC_PLANETS:
+                if asp in _NEGATIVE_ASPECTS:
+                    neg_counts[area] += 1
+                    neg_signals[area].append(label)
+                else:
+                    # Malefic conjunction/trine — still challenging
+                    neg_counts[area] += 1
+                    neg_signals[area].append(label)
+
+        # Signal 2: PT lord
+        if pt_is_benefic and pt_lord:
+            for area in _PLANET_POSITIVE_AREAS.get(pt_lord, []):
+                pos_counts[area] += 1
+                pos_signals[area].append(f"Pratyantar {pt_lord} active (benefic for {area})")
+        elif pt_is_malefic and pt_lord:
+            for area in _PLANET_POSITIVE_AREAS.get(pt_lord, []):
+                neg_counts[area] += 1
+                neg_signals[area].append(f"Pratyantar {pt_lord} active (malefic for {area})")
+
+        # Signal 3: active yogas
+        for yoga in active_yogas:
+            y_area = _YOGA_AREA.get(yoga.get("type", "general"), "self")
+            label = f"{yoga['name']} firing ({yoga['activation_level']})"
+            pos_counts[y_area] += 1
+            pos_signals[y_area].append(label)
+
+        # Signal 4: varshaphal varshesha
+        if varshesha_benefic:
+            for area in _PLANET_POSITIVE_AREAS.get(varshesha, []):
+                pos_counts[area] += 1
+                pos_signals[area].append(f"Varshaphal: {varshesha} varshesha supports {area}")
+        elif varshesha_malefic:
+            for area in _PLANET_POSITIVE_AREAS.get(varshesha, []):
+                neg_counts[area] += 1
+                neg_signals[area].append(f"Varshaphal: {varshesha} varshesha challenges {area}")
+
+        # Signal 5: refined AV — if transit planet's sign has high score
+        for hit in window_hits:
+            # Use the hit sign from transit degree
+            transit_sign_idx = int(hit["transit_degree"] / 30.0) % 12
+            transit_sign_names = [
+                "Mesham", "Rishabam", "Midhunam", "Kadagam", "Simham", "Kanni",
+                "Thulam", "Vrischikam", "Dhanusu", "Makaram", "Kumbham", "Meenam",
+            ]
+            transit_rasi = transit_sign_names[transit_sign_idx]
+            if transit_rasi in strong_signs:
+                area = hit.get("life_area_hint", "self")
+                pos_counts[area] += 1
+                pos_signals[area].append(f"Refined AV strong in {transit_rasi} (score ≥ 5)")
+
+        # Emit windows where confluence >= 3
+        for area in _ALL_LIFE_AREAS:
+            pc = pos_counts[area]
+            nc = neg_counts[area]
+            if pc >= 3:
+                results.append({
+                    "type": f"{area}_peak",
+                    "window_start": win_start.isoformat(),
+                    "window_end": (win_end - timedelta(days=1)).isoformat(),
+                    "confidence": _CONFIDENCE.get(min(pc, 5), "very high"),
+                    "signal_count": pc,
+                    "signals": pos_signals[area][:6],
+                    "life_area": area,
+                    "direction": "opportunity",
+                })
+            if nc >= 3:
+                results.append({
+                    "type": f"{area}_caution",
+                    "window_start": win_start.isoformat(),
+                    "window_end": (win_end - timedelta(days=1)).isoformat(),
+                    "confidence": _CONFIDENCE.get(min(nc, 5), "very high"),
+                    "signal_count": nc,
+                    "signals": neg_signals[area][:6],
+                    "life_area": area,
+                    "direction": "caution",
+                })
+
+        win_start += timedelta(days=14)
+
+    results.sort(key=lambda w: w["window_start"])
+    return results
