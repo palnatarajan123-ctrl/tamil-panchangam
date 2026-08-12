@@ -8,6 +8,7 @@ Cached permanently — one LLM call per chart.
 
 import json
 import logging
+import os
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -19,6 +20,7 @@ from app.core.limiter import limiter
 from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled
+from app.engines.budget_guard import log_llm_call
 from app.llm.providers import anthropic_provider
 
 logger = logging.getLogger(__name__)
@@ -27,6 +29,9 @@ router = APIRouter(prefix="/chart", tags=["Natal Interpretation"])
 
 PROMPT_VERSION = "natal_v2.1"
 FEATURE_NAME = "natal_interpretation"
+
+KP_PROMPT_VERSION = "kp-v1.0"
+KP_FEATURE_NAME = "kp_natal"
 
 NATAL_SYSTEM_PROMPT = """You are a natal chart interpreter
 combining Tamil Jyotisha tradition with plain-English
@@ -459,3 +464,203 @@ def get_natal_interpretation(request: Request, body: NatalInterpretationRequest)
     )
 
     return {"interpretation": llm_response, "cached": False}
+
+
+# ── KP Natal Interpretation ───────────────────────────────────────────────────
+
+def _get_kp_cached(base_chart_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        with get_conn() as conn:
+            row = conn.execute("""
+                SELECT content_json FROM prediction_llm_interpretation
+                WHERE base_chart_id = ?
+                  AND period_type = 'natal'
+                  AND period_key = 'natal'
+                  AND feature_name = ?
+                  AND prompt_version = ?
+                ORDER BY created_at DESC LIMIT 1
+            """, [base_chart_id, KP_FEATURE_NAME, KP_PROMPT_VERSION]).fetchone()
+            if row and row[0]:
+                data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                return data
+    except Exception as e:
+        logger.warning(f"KP cache lookup failed: {e}")
+    return None
+
+
+def _save_kp_cache(
+    base_chart_id: str,
+    content_json: Dict[str, Any],
+    provider: Optional[str],
+    model: Optional[str],
+    prompt_tokens: int,
+    completion_tokens: int,
+    total_tokens: int,
+    fallback_reason: Optional[str],
+) -> None:
+    try:
+        with get_conn() as conn:
+            conn.execute("""
+                INSERT INTO prediction_llm_interpretation (
+                    id, base_chart_id, period_type, period_key, feature_name,
+                    provider, model, prompt_version, prompt_tokens,
+                    completion_tokens, total_tokens, content_json,
+                    fallback_reason, reflection_text, created_at
+                ) VALUES (?, ?, 'natal', 'natal', ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)
+            """, [
+                str(uuid.uuid4()), base_chart_id, KP_FEATURE_NAME,
+                provider, model, KP_PROMPT_VERSION,
+                prompt_tokens, completion_tokens, total_tokens,
+                json.dumps(content_json), fallback_reason,
+            ])
+            try:
+                log_llm_call(
+                    db=conn,
+                    chart_id=base_chart_id,
+                    call_type="kp_natal",
+                    period="natal",
+                    input_tokens=prompt_tokens,
+                    output_tokens=completion_tokens,
+                    status="success" if not fallback_reason else "fallback",
+                    fallback_reason=fallback_reason,
+                )
+            except Exception as _lg_err:
+                logger.warning(f"log_llm_call failed for KP: {_lg_err}")
+    except Exception as e:
+        logger.error(f"Failed to save KP cache: {e}")
+
+
+def _build_kp_context(payload: Dict[str, Any]) -> str:
+    """Build a compact KP-focused context string for the LLM."""
+    eph = payload.get("ephemeris", {})
+    birth = payload.get("birth_details", {})
+    kp = payload.get("kp_sublords", {})
+
+    lagna = eph.get("lagna", {})
+    moon = eph.get("moon", {})
+
+    lines: list = []
+    lines.append(f"Name: {birth.get('name', 'Unknown')}")
+    lines.append(f"DOB: {birth.get('date_of_birth', '')} {birth.get('time_of_birth', '')} at {birth.get('place_of_birth', '')}")
+    lines.append(f"Lagna: {lagna.get('rasi', '')} ({lagna.get('longitude_deg', 0):.1f}°)")
+    lines.append(f"Moon: {moon.get('rasi', '')} nakshatra {moon.get('nakshatra', {}).get('name', '')} pada {moon.get('nakshatra', {}).get('pada', '')}")
+
+    # Per-house significators — translate each to planet list
+    house_labels = {
+        "2": "House 2 (wealth/money)",
+        "6": "House 6 (health/daily work)",
+        "7": "House 7 (relationships/partnerships)",
+        "8": "House 8 (longevity/transformation)",
+        "10": "House 10 (career/reputation)",
+        "11": "House 11 (gains/networks)",
+    }
+    cuspal_sigs = kp.get("cuspal_significators", {})
+    lines.append("\nlife_area_planets:")
+    for house_key, label in house_labels.items():
+        planets = cuspal_sigs.get(house_key, [])
+        lines.append(f"  {label}: {', '.join(planets) if planets else 'none'}")
+
+    # Planet sublord context (star lords for interpretive depth)
+    planets_data = kp.get("planets", {})
+    planet_order = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu", "Lagna"]
+    planet_lines = []
+    for p in planet_order:
+        if p in planets_data:
+            d = planets_data[p]
+            planet_lines.append(
+                f"{p}: house {d.get('house', '?')} | star={d.get('star_lord', '')} sub={d.get('sub_lord', '')}"
+            )
+    if planet_lines:
+        lines.append("\nPlanet placements (house / star / sub):")
+        lines.extend(f"  {pl}" for pl in planet_lines)
+
+    return "\n".join(lines)
+
+
+def _kp_fallback_response(reason: str = "") -> Dict[str, Any]:
+    return {
+        "engine_version": "kp-interpretation-v1.0",
+        "overall_summary": "",
+        "life_areas": {
+            "wealth": {"summary": "", "practical_note": ""},
+            "health": {"summary": "", "practical_note": ""},
+            "relationships": {"summary": "", "practical_note": ""},
+            "longevity_and_transformation": {"summary": "", "practical_note": ""},
+            "career": {"summary": "", "practical_note": ""},
+            "gains_and_goals": {"summary": "", "practical_note": ""},
+        },
+        "llm_disabled": True,
+        **({"llm_error": reason} if reason else {}),
+    }
+
+
+def _load_kp_system_prompt() -> str:
+    prompts_dir = os.path.join(os.path.dirname(__file__), "..", "llm", "prompts")
+    path = os.path.join(prompts_dir, "interpretation_prompt_kp.txt")
+    with open(os.path.abspath(path), "r") as f:
+        return f.read()
+
+
+@limiter.limit("5/hour")
+@router.get("/{chart_id}/kp-interpretation")
+def get_kp_interpretation(chart_id: str, request: Request):
+    """
+    Return (or generate and cache) a KP natal interpretation for this chart.
+    Returns 200 with kp_available=False if the chart pre-dates KP computation.
+    """
+    # 1. Fetch chart
+    with get_conn() as conn:
+        record = get_base_chart_by_id(conn, chart_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Base chart not found")
+
+    raw_payload = record["payload"]
+    payload = raw_payload if isinstance(raw_payload, dict) else json.loads(raw_payload or "{}")
+
+    # 2. Guard: chart must have KP data
+    kp_data = payload.get("kp_sublords")
+    if not kp_data:
+        return {"kp_available": False, "interpretation": None, "cached": False}
+
+    # 3. Check cache
+    cached = _get_kp_cached(chart_id)
+    if cached:
+        return {"kp_available": True, "interpretation": cached, "cached": True}
+
+    # 4. LLM disabled?
+    if not is_llm_enabled() or not anthropic_provider.is_available():
+        return {"kp_available": True, "interpretation": _kp_fallback_response(), "cached": False, "llm_disabled": True}
+
+    # 5. Build context and call LLM
+    context = _build_kp_context(payload)
+    system_prompt = _load_kp_system_prompt()
+    user_prompt = f"Birth Chart Data:\n{context}\n\nGenerate a kp-v1.0 interpretation. Return ONLY valid JSON."
+
+    llm_response, usage_info, error = anthropic_provider.call_llm(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=3000,
+    )
+
+    provider = (usage_info or {}).get("provider")
+    model = (usage_info or {}).get("model")
+    prompt_tokens = (usage_info or {}).get("prompt_tokens", 0)
+    completion_tokens = (usage_info or {}).get("completion_tokens", 0)
+    total_tokens = (usage_info or {}).get("total_tokens", 0)
+
+    if error or llm_response is None:
+        logger.warning(f"KP LLM call failed: {error}")
+        fallback = _kp_fallback_response(error or "llm_failed")
+        _save_kp_cache(chart_id, fallback, provider, model,
+                       prompt_tokens, completion_tokens, total_tokens, error or "llm_failed")
+        return {"kp_available": True, "interpretation": fallback, "cached": False, "llm_error": error}
+
+    # 6. Ensure required keys present
+    if "life_areas" not in llm_response:
+        llm_response["life_areas"] = {}
+
+    # 7. Cache and return
+    _save_kp_cache(chart_id, llm_response, provider, model,
+                   prompt_tokens, completion_tokens, total_tokens, None)
+
+    return {"kp_available": True, "interpretation": llm_response, "cached": False}

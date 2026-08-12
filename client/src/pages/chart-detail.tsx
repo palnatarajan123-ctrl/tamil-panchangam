@@ -29,6 +29,7 @@ import { YogasPanel } from "@/components/YogasPanel";
 import { SadeSatiPanel } from "@/components/SadeSatiPanel";
 import { ShadbalaPanel } from "@/components/ShadbalaPanel";
 import { NatalInterpretationPanel } from "@/components/NatalInterpretationPanel";
+import { KpInsightCard } from "@/components/KpInsightCard";
 import { TabbedChartViewer } from "@/components/TabbedChartViewer";
 import { 
   BirthAstroContextTable, 
@@ -317,6 +318,11 @@ export default function ChartDetail() {
           {/* Natal Chart Reading - Only for D1 */}
           {activeChartTab === "D1" && chartId && (
             <NatalInterpretationPanel chartId={chartId} />
+          )}
+
+          {/* KP Natal Insights - Only for D1, only when chart has KP data */}
+          {activeChartTab === "D1" && chartId && kpSublords && (
+            <KpInsightCard chartId={chartId} />
           )}
 
         </div>

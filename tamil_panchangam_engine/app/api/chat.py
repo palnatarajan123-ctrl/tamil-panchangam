@@ -194,6 +194,45 @@ def _build_monthly_context_block(base_chart_id: str) -> str:
         except Exception:
             pass  # predictive_signals are supplementary — don't break chat if missing
 
+        # KP natal interpretation (cached, only for charts that have kp_sublords)
+        try:
+            with get_conn() as conn:
+                _kp_bc = conn.execute(
+                    "SELECT payload FROM base_charts WHERE id = %s",
+                    (base_chart_id,),
+                ).fetchone()
+            if _kp_bc and _kp_bc[0]:
+                _kp_payload = _kp_bc[0] if isinstance(_kp_bc[0], dict) else json.loads(_kp_bc[0] or "{}")
+                if _kp_payload.get("kp_sublords"):
+                    with get_conn() as conn:
+                        kp_row = conn.execute("""
+                            SELECT content_json FROM prediction_llm_interpretation
+                            WHERE base_chart_id = ?
+                              AND period_type = 'natal'
+                              AND period_key = 'natal'
+                              AND feature_name = 'kp_natal'
+                            ORDER BY created_at DESC LIMIT 1
+                        """, [base_chart_id]).fetchone()
+                    if kp_row and kp_row[0]:
+                        kp_interp = kp_row[0] if isinstance(kp_row[0], dict) else json.loads(kp_row[0] or "{}")
+                        overall = kp_interp.get("overall_summary", "")
+                        if overall:
+                            lines.append(f"KP Natal Summary: {overall[:300]}")
+                        kp_areas = kp_interp.get("life_areas", {})
+                        area_notes = []
+                        for area_key, area_label in [
+                            ("career", "career"), ("wealth", "money"),
+                            ("relationships", "relationships"), ("health", "health"),
+                            ("gains_and_goals", "gains"),
+                        ]:
+                            note = (kp_areas.get(area_key) or {}).get("practical_note", "")
+                            if note:
+                                area_notes.append(f"{area_label}: {note}")
+                        if area_notes:
+                            lines.append("KP Life-area Notes: " + " | ".join(area_notes[:4]))
+        except Exception:
+            pass  # KP insights are supplementary — don't break chat if missing
+
         return "\n".join(lines) if len(lines) > 1 else ""
     except Exception as e:
         logger.warning(f"Failed to fetch monthly context block for {base_chart_id}: {e}")
