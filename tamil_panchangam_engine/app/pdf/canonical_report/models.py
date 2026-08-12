@@ -217,6 +217,16 @@ class KpSublordsData(BaseModel):
     entries: List[Dict[str, Any]] = []  # list of {planet, longitude, star_lord, sub_lord, sub_sub_lord}
 
 
+class KpHouseCuspsData(BaseModel):
+    """Placidus house cusp KP sublords — all 12 houses."""
+    entries: List[Dict[str, Any]] = []  # list of {house, longitude, sign_lord, star_lord, sub_lord}
+
+
+class KpCuspalSignificatorsData(BaseModel):
+    """KP cuspal significators for houses 2,6,7,8,10,11."""
+    entries: List[Dict[str, Any]] = []  # list of {house, significators (comma string)}
+
+
 # ── Natal V2 models ────────────────────────────────────────
 
 class NatalWhoYouAre(BaseModel):
@@ -301,6 +311,8 @@ class CanonicalReportData(BaseModel):
     sade_sati_data: Optional[Dict[str, Any]] = None
     shadbala_data: Optional[Dict[str, Any]] = None
     kp_sublords: Optional[KpSublordsData] = None
+    kp_house_cusps: Optional[KpHouseCuspsData] = None
+    kp_cuspal_significators: Optional[KpCuspalSignificatorsData] = None
 
     is_v4: bool = False
     v4_executive_summary: Optional[V4ExecutiveSummary] = None

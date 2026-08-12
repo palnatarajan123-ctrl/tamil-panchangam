@@ -1,7 +1,11 @@
 """
-KP Sub-lord Engine
-Computes sub-lords for each planet and house cusp using
-Krishnamurti Paddhati (KP) star-lord / sub-lord system.
+KP Sub-lord Engine — low-level calculation helpers.
+
+Superseded by kp_engine.py for full chart computation.
+This module is retained as a helper library; kp_engine.py imports
+get_star_lord, get_sub_lord, and get_sub_sub_lord from here.
+compute_kp_sublords() (planets-only, old format) is no longer called
+by any pipeline code.
 
 Sub-lord division: each nakshatra (13°20') is divided into
 9 sub-lords proportional to Vimshottari dasha periods.

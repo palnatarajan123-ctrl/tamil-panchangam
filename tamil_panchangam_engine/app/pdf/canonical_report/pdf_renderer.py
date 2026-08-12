@@ -376,33 +376,9 @@ def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
     return elements
 
 
-def _build_kp_sublords_section(data: CanonicalReportData, styles) -> List:
-    """Build KP Sub-lords section. Only called for KP charts."""
-    if not data.kp_sublords or not data.kp_sublords.entries:
-        return []
-
-    elements = []
-    elements.append(Paragraph("KP Sub-lord Analysis", styles['SectionTitle']))
-    elements.append(Paragraph(
-        "Krishnamurti Paddhati sub-lord positions indicate the ruling planets "
-        "at each level of nakshatra division. The sub-lord is the primary "
-        "significator for prediction in KP astrology.",
-        styles['BodyText']
-    ))
-    elements.append(Spacer(1, 0.2 * inch))
-
-    table_data = [["Planet", "Longitude", "Star Lord", "Sub Lord", "Sub-Sub Lord"]]
-    for entry in data.kp_sublords.entries:
-        table_data.append([
-            entry["planet"],
-            f"{entry['longitude']:.2f}\u00b0",
-            entry["star_lord"],
-            entry["sub_lord"],
-            entry["sub_sub_lord"],
-        ])
-
-    table = Table(table_data, colWidths=[1.2 * inch, 1.1 * inch, 1.2 * inch, 1.2 * inch, 1.3 * inch])
-    table.setStyle(TableStyle([
+def _kp_table_style() -> list:
+    """Shared table style for all three KP tables."""
+    return [
         ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -415,11 +391,105 @@ def _build_kp_sublords_section(data: CanonicalReportData, styles) -> List:
         ('TOPPADDING', (0, 1), (-1, -1), 5),
         ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        # Highlight sub_lord column (index 3)
-        ('FONTNAME', (3, 1), (3, -1), 'Helvetica-Bold'),
-    ]))
+    ]
 
+
+def _build_kp_sublords_section(data: CanonicalReportData, styles) -> List:
+    if not data.kp_sublords or not data.kp_sublords.entries:
+        return []
+
+    elements = []
+    elements.append(Paragraph("Planet Star / Sub / Sub-Sub Lords", styles['SubsectionTitle']))
+    elements.append(Spacer(1, 0.15 * inch))
+
+    table_data = [["Planet", "Longitude", "Star Lord", "Sub Lord", "Sub-Sub Lord"]]
+    for entry in data.kp_sublords.entries:
+        table_data.append([
+            entry["planet"],
+            f"{entry['longitude']:.2f}\u00b0",
+            entry["star_lord"],
+            entry["sub_lord"],
+            entry.get("sub_sub_lord", ""),
+        ])
+
+    style = _kp_table_style()
+    style.append(('FONTNAME', (3, 1), (3, -1), 'Helvetica-Bold'))  # bold sub-lord column
+    table = Table(table_data, colWidths=[1.2 * inch, 1.1 * inch, 1.2 * inch, 1.2 * inch, 1.3 * inch])
+    table.setStyle(TableStyle(style))
     elements.append(KeepTogether([table]))
+    return elements
+
+
+def _build_kp_house_cusps_section(data: CanonicalReportData, styles) -> List:
+    if not data.kp_house_cusps or not data.kp_house_cusps.entries:
+        return []
+
+    elements = []
+    elements.append(Spacer(1, 0.25 * inch))
+    elements.append(Paragraph("Placidus House Cusp Star / Sub Lords", styles['SubsectionTitle']))
+    elements.append(Spacer(1, 0.15 * inch))
+
+    table_data = [["House", "Longitude", "Sign Lord", "Star Lord", "Sub Lord"]]
+    for entry in data.kp_house_cusps.entries:
+        table_data.append([
+            f"H{entry['house']}",
+            f"{entry['longitude']:.2f}\u00b0",
+            entry["sign_lord"],
+            entry["star_lord"],
+            entry["sub_lord"],
+        ])
+
+    style = _kp_table_style()
+    style.append(('FONTNAME', (4, 1), (4, -1), 'Helvetica-Bold'))  # bold sub-lord column
+    table = Table(table_data, colWidths=[0.7 * inch, 1.1 * inch, 1.2 * inch, 1.2 * inch, 1.2 * inch])
+    table.setStyle(TableStyle(style))
+    elements.append(KeepTogether([table]))
+    return elements
+
+
+def _build_kp_cuspal_significators_section(data: CanonicalReportData, styles) -> List:
+    if not data.kp_cuspal_significators or not data.kp_cuspal_significators.entries:
+        return []
+
+    elements = []
+    elements.append(Spacer(1, 0.25 * inch))
+    elements.append(Paragraph("Cuspal Significators (Houses 2 \u00b7 6 \u00b7 7 \u00b7 8 \u00b7 10 \u00b7 11)", styles['SubsectionTitle']))
+    elements.append(Spacer(1, 0.15 * inch))
+
+    table_data = [["House", "Significators (in order of strength)"]]
+    for entry in data.kp_cuspal_significators.entries:
+        table_data.append([
+            f"H{entry['house']}",
+            entry["significators"],
+        ])
+
+    style = _kp_table_style()
+    style.append(('ALIGN', (1, 0), (1, -1), 'LEFT'))
+    table = Table(table_data, colWidths=[0.7 * inch, 5.3 * inch])
+    table.setStyle(TableStyle(style))
+    elements.append(KeepTogether([table]))
+    return elements
+
+
+def _build_kp_full_section(data: CanonicalReportData, styles) -> List:
+    """All three KP tables grouped together with a shared section header."""
+    if not data.kp_sublords:
+        return []
+
+    elements = []
+    elements.append(Paragraph("KP Sub-lord Analysis", styles['SectionTitle']))
+    elements.append(Paragraph(
+        "Krishnamurti Paddhati (KP) divides each nakshatra (13\u00b020') into nine "
+        "sub-portions proportional to Vimshottari dasha periods. The sub-lord "
+        "of a planet or house cusp is the primary KP significator used for "
+        "event-timing predictions. All three tables below are raw reference data "
+        "for astrology readers.",
+        styles['BodyText']
+    ))
+    elements.append(Spacer(1, 0.2 * inch))
+    elements.extend(_build_kp_sublords_section(data, styles))
+    elements.extend(_build_kp_house_cusps_section(data, styles))
+    elements.extend(_build_kp_cuspal_significators_section(data, styles))
     elements.append(PageBreak())
     return elements
 
@@ -2555,8 +2625,7 @@ def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
                     data, styles))
     # Technical appendix
     story.extend(_build_natal_snapshot(data, styles))
-    if data.kp_sublords:
-        story.extend(_build_kp_sublords_section(data, styles))
+    story.extend(_build_kp_full_section(data, styles))
     story.extend(_build_astrological_context(data, styles))
     story.extend(_build_divisional_charts(data, styles))
     story.extend(_build_yogas_section(data, styles))
@@ -2611,8 +2680,7 @@ def render_pdf(data: CanonicalReportData) -> bytes:
 
         # Technical appendix — always rendered
         story.extend(_build_natal_snapshot(data, styles))
-        if data.kp_sublords:
-            story.extend(_build_kp_sublords_section(data, styles))
+        story.extend(_build_kp_full_section(data, styles))
         story.extend(_build_divisional_charts(data, styles))
         story.extend(_build_yogas_section(data, styles))
         story.extend(_build_sade_sati_section(data, styles))
@@ -2622,8 +2690,7 @@ def render_pdf(data: CanonicalReportData) -> bytes:
         story.extend(_build_predictions(data, styles))
     else:
         story.extend(_build_natal_snapshot(data, styles))
-        if data.kp_sublords:
-            story.extend(_build_kp_sublords_section(data, styles))
+        story.extend(_build_kp_full_section(data, styles))
         story.extend(_build_divisional_charts(data, styles))
         story.extend(_build_yogas_section(data, styles))
         story.extend(_build_sade_sati_section(data, styles))

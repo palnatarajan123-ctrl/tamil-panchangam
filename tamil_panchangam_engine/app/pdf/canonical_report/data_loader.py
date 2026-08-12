@@ -34,6 +34,8 @@ from .models import (
     VedaRemedy,
     MethodologyInfo,
     KpSublordsData,
+    KpHouseCuspsData,
+    KpCuspalSignificatorsData,
     V4ExecutiveSummary,
     V4WhyThisPeriod,
     V4LifeArea,
@@ -831,16 +833,20 @@ def build_report_data(
     shadbala_raw = envelope.get("shadbala")
     shadbala_data = shadbala_raw if isinstance(shadbala_raw, dict) else None
 
-    # KP Sub-lords (only for KP charts)
+    # KP Sub-lords, house cusps, cuspal significators
     kp_sublords_data = None
+    kp_house_cusps_data = None
+    kp_cuspal_sigs_data = None
     raw_kp = payload.get("kp_sublords")
     if raw_kp and isinstance(raw_kp, dict):
         KP_ORDER = ["Lagna", "Sun", "Moon", "Mars", "Mercury",
                     "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"]
+        # new format nests planets under "planets"; old flat format kept for backcompat
+        raw_kp_planets = raw_kp.get("planets", raw_kp)
         kp_entries = []
         for planet in KP_ORDER:
-            if planet in raw_kp:
-                e = raw_kp[planet]
+            if planet in raw_kp_planets:
+                e = raw_kp_planets[planet]
                 kp_entries.append({
                     "planet": planet,
                     "longitude": round(e.get("longitude", 0), 2),
@@ -850,6 +856,31 @@ def build_report_data(
                 })
         if kp_entries:
             kp_sublords_data = KpSublordsData(entries=kp_entries)
+        # house cusps (new format only)
+        raw_cusps = raw_kp.get("house_cusps", {})
+        if raw_cusps:
+            cusp_entries = []
+            for h in range(1, 13):
+                c = raw_cusps.get(str(h), {})
+                if c:
+                    cusp_entries.append({
+                        "house": str(h),
+                        "longitude": round(c.get("longitude", 0), 2),
+                        "sign_lord": c.get("sign_lord", ""),
+                        "star_lord": c.get("star_lord", ""),
+                        "sub_lord": c.get("sub_lord", ""),
+                    })
+            if cusp_entries:
+                kp_house_cusps_data = KpHouseCuspsData(entries=cusp_entries)
+        # cuspal significators (new format only)
+        raw_sigs = raw_kp.get("cuspal_significators", {})
+        if raw_sigs:
+            sig_entries = [
+                {"house": h, "significators": ", ".join(sigs) if sigs else "—"}
+                for h, sigs in sorted(raw_sigs.items(), key=lambda x: int(x[0]))
+            ]
+            if sig_entries:
+                kp_cuspal_sigs_data = KpCuspalSignificatorsData(entries=sig_entries)
 
     # Upagrahas — from base chart payload
     upagrahas_data = payload.get("upagrahas")
@@ -937,6 +968,8 @@ def build_report_data(
         sade_sati_data=sade_sati_data,
         shadbala_data=shadbala_data,
         kp_sublords=kp_sublords_data,
+        kp_house_cusps=kp_house_cusps_data,
+        kp_cuspal_significators=kp_cuspal_sigs_data,
     )
 
 
@@ -1023,16 +1056,19 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
     sade_sati_raw = payload.get("sade_sati")
     shadbala_raw = payload.get("shadbala")
 
-    # KP Sub-lords (only for KP charts)
+    # KP Sub-lords, house cusps, cuspal significators
     kp_sublords_data = None
+    kp_house_cusps_data = None
+    kp_cuspal_sigs_data = None
     raw_kp = payload.get("kp_sublords")
     if raw_kp and isinstance(raw_kp, dict):
         KP_ORDER = ["Lagna", "Sun", "Moon", "Mars", "Mercury",
                     "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"]
+        raw_kp_planets = raw_kp.get("planets", raw_kp)
         kp_entries = []
         for planet in KP_ORDER:
-            if planet in raw_kp:
-                e = raw_kp[planet]
+            if planet in raw_kp_planets:
+                e = raw_kp_planets[planet]
                 kp_entries.append({
                     "planet": planet,
                     "longitude": round(e.get("longitude", 0), 2),
@@ -1042,6 +1078,29 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
                 })
         if kp_entries:
             kp_sublords_data = KpSublordsData(entries=kp_entries)
+        raw_cusps = raw_kp.get("house_cusps", {})
+        if raw_cusps:
+            cusp_entries = []
+            for h in range(1, 13):
+                c = raw_cusps.get(str(h), {})
+                if c:
+                    cusp_entries.append({
+                        "house": str(h),
+                        "longitude": round(c.get("longitude", 0), 2),
+                        "sign_lord": c.get("sign_lord", ""),
+                        "star_lord": c.get("star_lord", ""),
+                        "sub_lord": c.get("sub_lord", ""),
+                    })
+            if cusp_entries:
+                kp_house_cusps_data = KpHouseCuspsData(entries=cusp_entries)
+        raw_sigs = raw_kp.get("cuspal_significators", {})
+        if raw_sigs:
+            sig_entries = [
+                {"house": h, "significators": ", ".join(sigs) if sigs else "—"}
+                for h, sigs in sorted(raw_sigs.items(), key=lambda x: int(x[0]))
+            ]
+            if sig_entries:
+                kp_cuspal_sigs_data = KpCuspalSignificatorsData(entries=sig_entries)
 
     birth_details_data = payload.get("birth_details", {})
     chart_metadata = payload.get("chart_metadata", {})
@@ -1317,6 +1376,8 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
         sade_sati_data=sade_sati_raw if isinstance(sade_sati_raw, dict) else None,
         shadbala_data=shadbala_raw if isinstance(shadbala_raw, dict) else None,
         kp_sublords=kp_sublords_data,
+        kp_house_cusps=kp_house_cusps_data,
+        kp_cuspal_significators=kp_cuspal_sigs_data,
         bhinnashtakavarga=payload.get("bhinnashtakavarga") or None,
         shadbala_natal=payload.get("shadbala_natal") or None,
     )

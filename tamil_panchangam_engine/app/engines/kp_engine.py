@@ -7,7 +7,7 @@ plus cuspal significators for the six financial/relational houses (2,6,7,8,10,11
 KP for NEW charts only — no lazy backfill, no retrofit of existing charts.
 """
 
-from app.engines.kp_sublords import get_star_lord, get_sub_lord
+from app.engines.kp_sublords import get_star_lord, get_sub_lord, get_sub_sub_lord
 
 # Rasi (sign) lords in zodiac order (Aries=0 … Pisces=11)
 _SIGN_LORDS = [
@@ -96,6 +96,7 @@ def compute_kp(ephemeris: dict, cusps: list) -> dict:
             "house": 1 if name == "Lagna" else _house_of(lon, cusps),
             "star_lord": get_star_lord(lon),
             "sub_lord": get_sub_lord(lon),
+            "sub_sub_lord": get_sub_sub_lord(lon),
         }
 
     # House cusp sublords (all 12)
