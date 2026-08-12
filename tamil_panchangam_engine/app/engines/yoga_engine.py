@@ -212,6 +212,7 @@ def check_viparita_raja_yoga(
                     "name": yoga_name,
                     "category": "Viparita Raja Yoga",
                     "present": True,
+                    "planets": [lord],
                     "planet": lord,
                     "owns_house": house,
                     "placed_in": lord_house,
@@ -261,6 +262,7 @@ def check_neecha_bhanga(
                     yogas.append({
                         "name": "Neecha Bhanga Raja Yoga",
                         "present": True,
+                        "planets": [planet, deb_lord],
                         "debilitated_planet": planet,
                         "cancellation_by": deb_lord,
                         "mechanism": f"{deb_lord} (lord of debilitation sign) in kendra from Moon",
