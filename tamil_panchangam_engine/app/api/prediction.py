@@ -188,7 +188,26 @@ def generate_monthly_prediction(
                 logger.warning(f"Lazy upagraha backfill failed for {payload.base_chart_id}: {_e}")
 
     # -------------------------------------------------
-    # 1b. Lazy predictive_signals computation
+    # 1b. Lazy yogas backfill for pre-yoga-pipeline charts
+    # -------------------------------------------------
+    if not base_chart_payload.get("yogas", {}).get("yogas"):
+        try:
+            from app.engines.yoga_engine import compute_yogas
+            _ygr = compute_yogas(base_chart_payload.get("ephemeris", {}), {})
+            base_chart_payload["yogas"] = _ygr
+            # Clear any stale predictive_signals so 1c recomputes with fresh yogas
+            base_chart_payload.pop("predictive_signals", None)
+            with get_conn() as conn:
+                conn.execute(
+                    "UPDATE base_charts SET payload = payload || %s::jsonb WHERE id = %s",
+                    (json.dumps({"yogas": _ygr}), payload.base_chart_id),
+                )
+            logger.info(f"Lazy yogas backfill written: {payload.base_chart_id}")
+        except Exception as _e:
+            logger.warning(f"Lazy yogas backfill failed for {payload.base_chart_id}: {_e}")
+
+    # -------------------------------------------------
+    # 1c. Lazy predictive_signals computation
     # -------------------------------------------------
     _current_period = f"{payload.year}-{payload.month:02d}"
     _cached_signals = base_chart_payload.get("predictive_signals", {})
