@@ -96,6 +96,20 @@ def compute_lagna(jd: float, latitude: float, longitude: float) -> float:
     return lagna
 
 
+def compute_placidus_cusps(
+    jd: float, latitude: float, longitude: float, ayanamsa: str = "lahiri"
+) -> list:
+    """
+    Returns 12 sidereal Placidus house cusp longitudes (0-indexed: result[0] = house 1 cusp).
+    Sets ayanamsa mode explicitly so the result is correct regardless of call order.
+    """
+    swe.set_sid_mode(AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
+    flags = swe.FLG_SIDEREAL
+    houses, _ = swe.houses_ex(jd, latitude, longitude, b'P', flags)
+    # pyswisseph houses tuple is 0-indexed: houses[0]=H1 … houses[11]=H12 (no unused slot)
+    return [h % 360 for h in houses[:12]]
+
+
 def get_rasi(longitude: float) -> str:
     """
     Get rasi name from sidereal longitude.

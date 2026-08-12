@@ -290,12 +290,17 @@ def create_base_chart(
     )
 
     # -------------------------------------------------
-    # 3b. KP Sub-lords (only for KP ayanamsa)
+    # 3b. KP Sub-lords — all new charts; no lazy backfill, no retrofit
     # -------------------------------------------------
     kp_sublords = None
-    if ayanamsa == "kp":
-        from app.engines.kp_sublords import compute_kp_sublords
-        kp_sublords = compute_kp_sublords(ephemeris)
+    try:
+        from app.engines.ephemeris import compute_placidus_cusps
+        from app.engines.kp_engine import compute_kp
+        _jd = ephemeris.get("julian_day")
+        _cusps = compute_placidus_cusps(_jd, payload.latitude, payload.longitude, ayanamsa)
+        kp_sublords = compute_kp(ephemeris, _cusps)
+    except Exception as _kp_err:
+        logger.warning(f"KP computation skipped: {_kp_err}")
 
     # -------------------------------------------------
     # 4. Panchangam at birth
