@@ -170,6 +170,30 @@ def _build_monthly_context_block(base_chart_id: str) -> str:
                     parts.append(f"{label} ({area}): {text}")
                 lines.append("Predicted Windows: " + " | ".join(parts))
 
+        # v7: pratyantar lord + active yogas from base_chart predictive_signals
+        try:
+            with get_conn() as conn:
+                bc_row = conn.execute(
+                    "SELECT payload FROM base_charts WHERE id = %s",
+                    (base_chart_id,),
+                ).fetchone()
+            if bc_row and bc_row[0]:
+                bc_payload = bc_row[0] if isinstance(bc_row[0], dict) else json.loads(bc_row[0] or "{}")
+                ps = bc_payload.get("predictive_signals", {})
+                dp = ps.get("dasha_precision", {})
+                pt_lord = (dp.get("pratyantar") or {}).get("lord") or dp.get("pt_lord")
+                if pt_lord:
+                    lines.append(f"Pratyantar Lord: {pt_lord}")
+                active_yogas = [
+                    y.get("name") or y.get("yoga_name", "")
+                    for y in ps.get("active_yogas", [])
+                    if y.get("activation_level") in ("peak", "strong")
+                ]
+                if active_yogas:
+                    lines.append(f"Active Yogas: {', '.join(filter(None, active_yogas[:3]))}")
+        except Exception:
+            pass  # predictive_signals are supplementary — don't break chat if missing
+
         return "\n".join(lines) if len(lines) > 1 else ""
     except Exception as e:
         logger.warning(f"Failed to fetch monthly context block for {base_chart_id}: {e}")

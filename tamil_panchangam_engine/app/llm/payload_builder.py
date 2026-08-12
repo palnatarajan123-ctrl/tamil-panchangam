@@ -34,13 +34,13 @@ MAX_PROMPT_TOKENS = {
 
 MAX_COMPLETION_TOKENS = {
     "weekly": 1500,
-    "monthly": 3000,
+    "monthly": 5000,  # v7 adds event_predictions + annual_theme + yoga_summary; 3000 truncates
     "yearly": 4000
 }
 
 MAX_TOTAL_TOKENS = {
     "weekly": 3500,
-    "monthly": 7000,
+    "monthly": 8000,  # raised to accommodate v7 completion headroom
     "yearly": 8000
 }
 
