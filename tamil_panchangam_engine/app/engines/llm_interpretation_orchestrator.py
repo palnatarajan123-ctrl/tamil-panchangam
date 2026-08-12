@@ -312,29 +312,52 @@ def _score_to_strength(score: int) -> str:
 def _validate_llm_output(output: Dict[str, Any]) -> bool:
     """Validate LLM output against schema (supports v1, v2, and v3)."""
     logger.debug(f"Validating LLM output keys: {list(output.keys())}")
-    
+
     engine_version = output.get("engine_version", "")
 
-    if engine_version == "ai-interpretation-v7.0":
-        required_keys = [
-            "executive_summary", "why_this_period",
-            "life_areas", "remedies", "key_takeaways"
-        ]
-        if not all(k in output for k in required_keys):
-            missing = [k for k in required_keys if k not in output]
-            logger.warning(f"LLM v7 output missing keys: {missing}")
+    if engine_version and "v7" in engine_version:
+        # life_areas is the only truly required field
+        life_areas_raw = output.get("life_areas")
+        if life_areas_raw is None:
+            logger.warning("v7 validation failed: missing life_areas")
             return False
-        exec_summary = output.get("executive_summary", {})
-        if not exec_summary.get("main_theme"):
+
+        # Accept both dict (keyed by area name) and list
+        if isinstance(life_areas_raw, dict):
+            areas = list(life_areas_raw.values())
+        elif isinstance(life_areas_raw, list):
+            areas = life_areas_raw
+        else:
+            logger.warning(
+                f"v7 validation failed: life_areas is {type(life_areas_raw).__name__}, expected dict or list"
+            )
             return False
-        life_areas = output.get("life_areas", {})
-        if not isinstance(life_areas, dict) or len(life_areas) < 2:
+
+        if len(areas) < 2:
+            logger.warning(f"v7 validation failed: only {len(areas)} life_areas, need at least 2")
             return False
-        for area_name, area_data in life_areas.items():
-            if not isinstance(area_data, dict):
+
+        for area in areas:
+            if not isinstance(area, dict):
                 continue
-            if not area_data.get("plain_english"):
+            if not area.get("plain_english"):
+                logger.warning(f"v7 validation failed: area missing plain_english: {list(area.keys())}")
                 return False
+
+        # main_theme: prefer executive_summary.main_theme, accept top-level fallback
+        exec_summary = output.get("executive_summary", {})
+        main_theme = (
+            (exec_summary.get("main_theme") if isinstance(exec_summary, dict) else None)
+            or output.get("main_theme")
+        )
+        if not main_theme:
+            logger.warning(
+                "v7 validation failed: missing main_theme "
+                "(checked executive_summary.main_theme and top-level main_theme)"
+            )
+            return False
+
+        # event_predictions, annual_theme, yoga_activation_summary are all optional
         return True
 
     if engine_version == "ai-interpretation-v6.0":
@@ -438,20 +461,28 @@ def _validate_llm_output(output: Dict[str, Any]) -> bool:
         
         return True
     
+    # Guard: a versioned v7 response that reaches here is a validator bug, not a v1 response
+    if engine_version and "v7" in engine_version:
+        logger.error(
+            f"v7 response fell through to legacy v1 validator — bug in _validate_llm_output: "
+            f"engine_version={engine_version!r}"
+        )
+        return False
+
     required_keys = ["window_summary", "life_areas"]
-    
+
     if not all(k in output for k in required_keys):
         logger.warning(f"LLM output missing required keys. Got: {list(output.keys())}")
         return False
-    
+
     window = output.get("window_summary", {})
     logger.debug(f"Window summary keys: {list(window.keys())}")
-    
+
     has_overview = window.get("overview") or window.get("summary")
     if not has_overview:
         logger.warning(f"LLM output missing window summary/overview. Window keys: {list(window.keys())}")
         return False
-    
+
     return True
 
 

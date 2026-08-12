@@ -105,6 +105,48 @@ class TestOrchestratorPromptVersion(unittest.TestCase):
         }
         self.assertFalse(_validate_llm_output(output))
 
+    def test_v7_validation_accepts_missing_event_predictions(self):
+        """v7 is valid without event_predictions — only required when high-confidence windows exist."""
+        from app.engines.llm_interpretation_orchestrator import _validate_llm_output
+        output = {
+            "engine_version": "ai-interpretation-v7.0",
+            "executive_summary": {"main_theme": "Good period ahead"},
+            "life_areas": {
+                "career": {"plain_english": "Career is stable."},
+                "health": {"plain_english": "Health needs attention."},
+            },
+            # event_predictions, annual_theme, yoga_activation_summary deliberately absent
+        }
+        self.assertTrue(_validate_llm_output(output))
+
+    def test_v7_validation_accepts_list_life_areas(self):
+        """v7 validator must accept life_areas as a list (model drift from dict format)."""
+        from app.engines.llm_interpretation_orchestrator import _validate_llm_output
+        output = {
+            "engine_version": "ai-interpretation-v7.0",
+            "executive_summary": {"main_theme": "Challenging month"},
+            "life_areas": [
+                {"area": "career", "plain_english": "Career is demanding."},
+                {"area": "finance", "plain_english": "Finance is tight."},
+            ],
+        }
+        self.assertTrue(_validate_llm_output(output))
+
+    def test_v7_validation_accepts_short_version_string(self):
+        """Accept 'v7' and 'ai-interpretation-v7' (not just 'ai-interpretation-v7.0')."""
+        from app.engines.llm_interpretation_orchestrator import _validate_llm_output
+        for version in ("v7", "ai-interpretation-v7", "ai-interpretation-v7.0"):
+            with self.subTest(version=version):
+                output = {
+                    "engine_version": version,
+                    "executive_summary": {"main_theme": "Some theme"},
+                    "life_areas": {
+                        "career": {"plain_english": "Career ok."},
+                        "health": {"plain_english": "Health ok."},
+                    },
+                }
+                self.assertTrue(_validate_llm_output(output))
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STEP 2: Payload builder — predictive_signals injection
