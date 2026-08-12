@@ -1,6 +1,7 @@
 import app.db.sqlite_patch  # 🔴 MUST be first
 
 import os
+import subprocess
 from dotenv import load_dotenv
 load_dotenv()  # loads .env from project root (or nearest parent)
 from fastapi import FastAPI, HTTPException, Request
@@ -131,9 +132,29 @@ app.include_router(prediction_weekly_router, prefix="/api")
 app.include_router(prediction_yearly_router, prefix="/api")
 
 
+def _get_git_sha() -> str:
+    sha = os.environ.get("RENDER_GIT_COMMIT")
+    if sha:
+        return sha[:12]
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short=12", "HEAD"],
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        return "unknown"
+
+_GIT_SHA = _get_git_sha()
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/api/version")
+def get_version():
+    return {"git_sha": _GIT_SHA, "status": "ok"}
 
 app.include_router(realtime_context_router, prefix="/api")
 app.include_router(admin_llm_router,        prefix="/api")
