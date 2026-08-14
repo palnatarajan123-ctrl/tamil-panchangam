@@ -296,6 +296,34 @@ def _save_chat_message(user_id: str, base_chart_id: str, session_id: str, role: 
               datetime.now(timezone.utc).isoformat()])
 
 
+def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -> str:
+    """Render the chat system prompt from context assembled by _build_chat_context()."""
+    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(**context)
+    if context.get("divisional_summary"):
+        system_prompt = system_prompt.replace(
+            "- Key planets:",
+            f"- D10 career chart: {context['divisional_summary']}\n- Key planets:"
+        )
+    if context.get("upagraha_context"):
+        upa = context["upagraha_context"]
+        gulika_rasi = upa.get("gulika_rasi", "")
+        gulika_lord = upa.get("gulika_lord", "")
+        if gulika_rasi:
+            system_prompt += (
+                "\n\n## KARMIC SHADOW (Upagrahas)\n"
+                f"Gulika (shadow of Saturn) falls in {gulika_rasi}"
+                + (f", ruled by {gulika_lord}" if gulika_lord else "")
+                + ".\n"
+                "When the user asks about persistent struggle, hidden friction, or why "
+                "certain areas feel stuck despite good dashas — reference this karmic shadow. "
+                "Frame as karmic work in progress, not doom. "
+                "Never use the words 'Gulika' or 'Mandi' in your response.\n"
+            )
+    if reading_as_name:
+        system_prompt = f"Reading from {reading_as_name}'s chart.\n\n" + system_prompt
+    return system_prompt
+
+
 def _build_chat_context(base_chart_id: str) -> dict:
     """Assemble chart context for system prompt."""
     with get_conn() as conn:
@@ -398,6 +426,16 @@ def _build_chat_context(base_chart_id: str) -> dict:
     except Exception as e:
         logger.warning(f"Sade Sati computation failed: {e}")
 
+    # Upagraha context (Gulika/Mandi) — feeds the "KARMIC SHADOW" system prompt block
+    upagraha_context: dict = {}
+    try:
+        from app.llm.payload_builder import _build_upagraha_context
+        upagrahas = payload.get("upagrahas", {})
+        if upagrahas and not upagrahas.get("error"):
+            upagraha_context = _build_upagraha_context(upagrahas)
+    except Exception as e:
+        logger.warning(f"Upagraha context extraction failed: {e}")
+
     # Divisional signals for D10/D2/D7
     divisional_summary = ""
     try:
@@ -483,6 +521,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "monthly_summary": monthly_summary,
         "yearly_summary": yearly_summary,
         "divisional_summary": divisional_summary,
+        "upagraha_context": upagraha_context,
     }
 
 
@@ -518,29 +557,7 @@ async def chat_stream(
         logger.error(f"Failed to build chat context: {e}")
         raise HTTPException(status_code=500, detail="Failed to load chart context")
 
-    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(**context)
-    if context.get("divisional_summary"):
-        system_prompt = system_prompt.replace(
-            "- Key planets:",
-            f"- D10 career chart: {context['divisional_summary']}\n- Key planets:"
-        )
-    if context.get("upagraha_context"):
-        upa = context["upagraha_context"]
-        gulika_rasi = upa.get("gulika_rasi", "")
-        gulika_lord = upa.get("gulika_lord", "")
-        if gulika_rasi:
-            system_prompt += (
-                "\n\n## KARMIC SHADOW (Upagrahas)\n"
-                f"Gulika (shadow of Saturn) falls in {gulika_rasi}"
-                + (f", ruled by {gulika_lord}" if gulika_lord else "")
-                + ".\n"
-                "When the user asks about persistent struggle, hidden friction, or why "
-                "certain areas feel stuck despite good dashas — reference this karmic shadow. "
-                "Frame as karmic work in progress, not doom. "
-                "Never use the words 'Gulika' or 'Mandi' in your response.\n"
-            )
-    if req.reading_as_name:
-        system_prompt = f"Reading from {req.reading_as_name}'s chart.\n\n" + system_prompt
+    system_prompt = _build_system_prompt(context, req.reading_as_name)
 
     # Build family member context if this is a family chat
     family_member_context = ""
