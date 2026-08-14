@@ -24,6 +24,7 @@ tamil_panchangam_engine/data/*.db
 # ─── Generated output ────────────────────────────────
 tamil_panchangam_engine/reports/
 debug_dump/
+scripts/backfill_backups/
 
 # ─── OS / IDE ────────────────────────────────────────
 .DS_Store
