@@ -296,6 +296,59 @@ def _save_chat_message(user_id: str, base_chart_id: str, session_id: str, role: 
               datetime.now(timezone.utc).isoformat()])
 
 
+def _build_family_member_context(member_payloads: list) -> str:
+    """
+    Render the '## FAMILY CONTEXT' system-prompt block for a family chat.
+
+    Pure function -- no DB access -- extracted from what was previously
+    inline in chat_stream() so it's directly testable.
+
+    member_payloads: list of dicts, each with "role" (str),
+      "display_name" (str | None), "payload" (parsed chart payload dict).
+    """
+    member_lines = []
+    for m in member_payloads:
+        role = m["role"]
+        display_name = m.get("display_name")
+        payload = m.get("payload") or {}
+
+        birth = payload.get("birth_details", {})
+        moon = payload.get("ephemeris", {}).get("moon", {})
+        vimshottari = payload.get("dashas", {}).get("vimshottari", {})
+        dasha = resolve_antar_dasha(
+            vimshottari=vimshottari,
+            reference_date=datetime.now(timezone.utc)
+        )
+        ss = compute_sade_sati(payload)
+        ss_data = ss.get("sade_sati", {}) if ss else {}
+
+        name = display_name or birth.get("name", role)
+        nak = moon.get("nakshatra", {})
+        nak_name = nak.get("name", "") if isinstance(nak, dict) else nak
+        rasi = moon.get("rasi", "")
+        maha = dasha.get("maha", {}).get("lord", "—") if dasha else "—"
+        antar = dasha.get("antar", {}).get("lord", "—") if dasha else "—"
+        ss_active = ss_data.get("active", False)
+        ss_phase = ss_data.get("phase_name", "")
+
+        member_lines.append(
+            f"{role.upper()} — {name}: "
+            f"Nakshatra {nak_name}, Rasi {rasi}, "
+            f"Dasha {maha}›{antar}, "
+            f"Sade Sati: {'Active – ' + ss_phase if ss_active else 'None'}"
+        )
+
+    if not member_lines:
+        return ""
+
+    return (
+        "\n\n## FAMILY CONTEXT\n"
+        "You are advising this couple/family. "
+        "Use ALL members' charts when answering family questions:\n"
+        + "\n".join(member_lines)
+    )
+
+
 def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -> str:
     """Render the chat system prompt from context assembled by _build_chat_context()."""
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(**context)
@@ -572,44 +625,15 @@ async def chat_stream(
                 ORDER BY fm.role
             """, (req.group_id,)).fetchall()
 
-            member_lines = []
-            for m in members:
-                role, display_name, chart_id, payload_raw = m
-                payload = payload_raw if isinstance(payload_raw, dict) \
-                          else json.loads(payload_raw or "{}")
-                birth = payload.get("birth_details", {})
-                moon = payload.get("ephemeris", {}).get("moon", {})
-                vimshottari = payload.get("dashas", {}).get("vimshottari", {})
-                dasha = resolve_antar_dasha(
-                    vimshottari=vimshottari,
-                    reference_date=datetime.now(timezone.utc)
-                )
-                ss = compute_sade_sati(payload)
-                ss_data = ss.get("sade_sati", {}) if ss else {}
+        member_payloads = []
+        for role, display_name, chart_id, payload_raw in members:
+            payload = payload_raw if isinstance(payload_raw, dict) \
+                      else json.loads(payload_raw or "{}")
+            member_payloads.append({
+                "role": role, "display_name": display_name, "payload": payload,
+            })
 
-                name = display_name or birth.get("name", role)
-                nak = moon.get("nakshatra", {})
-                nak_name = nak.get("name", "") if isinstance(nak, dict) else nak
-                rasi = moon.get("rasi", "")
-                maha = dasha.get("maha", {}).get("lord", "—") if dasha else "—"
-                antar = dasha.get("antar", {}).get("lord", "—") if dasha else "—"
-                ss_active = ss_data.get("active", False)
-                ss_phase = ss_data.get("phase_name", "")
-
-                member_lines.append(
-                    f"{role.upper()} — {name}: "
-                    f"Nakshatra {nak_name}, Rasi {rasi}, "
-                    f"Dasha {maha}›{antar}, "
-                    f"Sade Sati: {'Active – ' + ss_phase if ss_active else 'None'}"
-                )
-
-            if member_lines:
-                family_member_context = (
-                    "\n\n## FAMILY CONTEXT\n"
-                    "You are advising this couple/family. "
-                    "Use ALL members' charts when answering family questions:\n"
-                    + "\n".join(member_lines)
-                )
+        family_member_context = _build_family_member_context(member_payloads)
 
     if family_member_context:
         system_prompt = system_prompt + family_member_context
