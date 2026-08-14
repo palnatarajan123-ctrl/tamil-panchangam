@@ -59,6 +59,7 @@ def _generate_daily_llm_guidance(result: dict, chart_name: str, base_chart_id: s
         tara = result.get("tara_bala", {})
         rahu = result.get("rahu_kaalam", {})
         yama = result.get("yamagandam", {})
+        gulika = result.get("gulika_kaalam", {})
         tithi = result.get("tithi", {})
         date_str = result.get("date", "")
 
@@ -75,7 +76,8 @@ def _generate_daily_llm_guidance(result: dict, chart_name: str, base_chart_id: s
             f"Tara Bala: {tara.get('name', '')} ({tara.get('quality', '')})\n"
             f"Tithi: {tithi.get('name', '')} {tithi.get('paksha', '')} Paksha\n"
             f"Rahu Kaalam: {rahu.get('start', '')} to {rahu.get('end', '')}\n"
-            f"Yamagandam: {yama.get('start', '')} to {yama.get('end', '')}\n\n"
+            f"Yamagandam: {yama.get('start', '')} to {yama.get('end', '')}\n"
+            f"Gulika Kaalam: {gulika.get('start', '')} to {gulika.get('end', '')}\n\n"
             f"Write exactly 2-3 sentences of practical daily guidance in plain English. "
             f"Be specific to today's tara bala quality and tithi. "
             f"Naturally mention Rahu Kaalam as 'avoid new starts between X and Y'. "
