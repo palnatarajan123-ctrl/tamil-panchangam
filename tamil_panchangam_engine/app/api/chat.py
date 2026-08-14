@@ -331,12 +331,44 @@ def _build_family_member_context(member_payloads: list) -> str:
         ss_active = ss_data.get("active", False)
         ss_phase = ss_data.get("phase_name", "")
 
-        member_lines.append(
+        line = (
             f"{role.upper()} — {name}: "
             f"Nakshatra {nak_name}, Rasi {rasi}, "
             f"Dasha {maha}›{antar}, "
             f"Sade Sati: {'Active – ' + ss_phase if ss_active else 'None'}"
         )
+
+        # Yogas -- present yoga NAMES only (not full descriptions), read
+        # directly from the already-fetched payload. Cheap: no recompute,
+        # no extra query, no per-member LLM/cache call.
+        yogas_data = payload.get("yogas", {})
+        if isinstance(yogas_data, dict) and not yogas_data.get("error"):
+            yoga_names = yogas_data.get("summary", {}).get("yoga_names", []) or []
+            if yoga_names:
+                line += f", Yogas: {', '.join(yoga_names[:5])}"
+
+        # Upagraha (Gulika/Mandi) -- reuse the same extraction as chat's own
+        # anchor-chart context and Phase 1's family predictions, matching
+        # natal_v2.2 phrasing.
+        from app.llm.payload_builder import _build_upagraha_context
+        upagraha_ctx = _build_upagraha_context(payload.get("upagrahas", {}))
+        gulika_rasi = upagraha_ctx.get("gulika_rasi", "")
+        gulika_lord = upagraha_ctx.get("gulika_lord", "")
+        if gulika_rasi:
+            line += f", Shadow point: {gulika_rasi}" + (f" ({gulika_lord})" if gulika_lord else "")
+
+        # predictive_signals and kp_sublords deliberately NOT extended to
+        # non-anchor family members here. Both require either an expensive
+        # per-member build (predictive_signals is time-window-specific
+        # narrative text) or a cached LLM interpretation lookup (kp_sublords,
+        # natal-only) -- doing that N times per family chat message would
+        # multiply DB/cost per message by family size, unbounded, for the
+        # lowest-value case ("tell me about my daughter's yogas"-style
+        # questions don't need her precise 2026-05-17 event windows). The
+        # anchor chart (whichever chart chat_stream() is running against)
+        # still gets full depth via _build_chat_context()/_build_monthly_
+        # context_block() -- this skip applies only to OTHER family members.
+        member_lines.append(line)
 
     if not member_lines:
         return ""

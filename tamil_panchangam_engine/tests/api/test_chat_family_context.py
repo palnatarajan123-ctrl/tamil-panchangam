@@ -170,5 +170,130 @@ class TestFamilyMemberContextExtractionIsNoOp(unittest.TestCase):
         self.assertEqual(old, new)
 
 
+class TestFamilyMemberContextPhase3Enrichment(unittest.TestCase):
+    """
+    Phase 3: yogas and upagraha added per non-anchor family member, read
+    directly from already-fetched payload (no new query, no per-member
+    LLM/cache call). predictive_signals and kp_sublords are deliberately
+    NOT extended here -- both would require expensive per-member work
+    (cached KP lookup, time-window narrative build) that scales unbounded
+    with family size for the lowest-value case.
+    """
+
+    def _payload_with(self, yogas=None, upagrahas=None, kp_sublords=None,
+                       predictive_signals=None, **kwargs):
+        payload = _member_payload(**kwargs)
+        if yogas is not None:
+            payload["yogas"] = yogas
+        if upagrahas is not None:
+            payload["upagrahas"] = upagrahas
+        if kp_sublords is not None:
+            payload["kp_sublords"] = kp_sublords
+        if predictive_signals is not None:
+            payload["predictive_signals"] = predictive_signals
+        return payload
+
+    def test_yogas_line_appears_for_non_anchor_member(self):
+        payload = self._payload_with(
+            role="child", name="Kid",
+            yogas={"error": None, "summary": {"yoga_names": ["Raja Yoga", "Dhana Yoga"]}},
+        )
+        ctx = chat_module._build_family_member_context(
+            [{"role": "child", "display_name": "Kid", "payload": payload}]
+        )
+        self.assertIn("Yogas: Raja Yoga, Dhana Yoga", ctx)
+
+    def test_yogas_capped_at_five(self):
+        names = [f"Yoga{i}" for i in range(8)]
+        payload = self._payload_with(
+            role="wife", name="W",
+            yogas={"error": None, "summary": {"yoga_names": names}},
+        )
+        ctx = chat_module._build_family_member_context(
+            [{"role": "wife", "display_name": "W", "payload": payload}]
+        )
+        self.assertIn(", ".join(names[:5]), ctx)
+        self.assertNotIn("Yoga7", ctx)
+
+    def test_empty_yogas_dict_no_line_no_crash(self):
+        payload = self._payload_with(role="wife", name="W", yogas={})
+        ctx = chat_module._build_family_member_context(
+            [{"role": "wife", "display_name": "W", "payload": payload}]
+        )
+        self.assertNotIn("Yogas:", ctx)
+
+    def test_shadow_point_line_appears(self):
+        payload = self._payload_with(
+            role="husband", name="H",
+            upagrahas={"gulika": {"rasi": "Taurus", "rasi_lord": "Venus"}},
+        )
+        ctx = chat_module._build_family_member_context(
+            [{"role": "husband", "display_name": "H", "payload": payload}]
+        )
+        self.assertIn("Shadow point: Taurus (Venus)", ctx)
+
+    def test_no_upagrahas_no_shadow_point_line(self):
+        payload = self._payload_with(role="husband", name="H")
+        ctx = chat_module._build_family_member_context(
+            [{"role": "husband", "display_name": "H", "payload": payload}]
+        )
+        self.assertNotIn("Shadow point", ctx)
+
+    def test_kp_sublords_present_but_excluded_from_output(self):
+        """Explicit skip decision: even when kp_sublords IS present on the
+        payload, it must not appear in non-anchor family context."""
+        payload = self._payload_with(
+            role="husband", name="H",
+            kp_sublords={
+                "planets": {}, "house_cusps": {},
+                "cuspal_significators": {"2": ["Venus", "Saturn"]},
+            },
+        )
+        ctx = chat_module._build_family_member_context(
+            [{"role": "husband", "display_name": "H", "payload": payload}]
+        )
+        self.assertNotIn("cuspal", ctx.lower())
+        self.assertNotIn("significator", ctx.lower())
+
+    def test_predictive_signals_present_but_excluded_from_output(self):
+        """Explicit skip decision: even when predictive_signals IS present,
+        event windows / active-yoga narrative must not appear for
+        non-anchor members."""
+        payload = self._payload_with(
+            role="wife", name="W",
+            predictive_signals={
+                "computed_for": "2026-08",
+                "active_yogas": [{"name": "Sarala Yoga", "currently_active": True}],
+                "event_windows": [{
+                    "window_start": "2026-05-17", "window_end": "2026-05-30",
+                    "life_area": "self", "direction": "opportunity", "confidence": "very high",
+                }],
+            },
+        )
+        ctx = chat_module._build_family_member_context(
+            [{"role": "wife", "display_name": "W", "payload": payload}]
+        )
+        self.assertNotIn("2026-05-17", ctx)
+        self.assertNotIn("window", ctx.lower())
+        self.assertNotIn("Sarala Yoga", ctx)  # only from present-yogas summary, not active_yogas
+
+    def test_full_enrichment_line_format_for_one_member(self):
+        payload = self._payload_with(
+            role="husband", name="Ravi",
+            yogas={"error": None, "summary": {"yoga_names": ["Raja Yoga"]}},
+            upagrahas={"gulika": {"rasi": "Taurus", "rasi_lord": "Venus"}},
+        )
+        ctx = chat_module._build_family_member_context(
+            [{"role": "husband", "display_name": "Ravi", "payload": payload}]
+        )
+        self.assertIn(
+            "HUSBAND — Ravi: Nakshatra Ashwini, Rasi Mesham, Dasha Saturn›Venus, "
+            "Sade Sati:",
+            ctx,
+        )
+        self.assertIn("Yogas: Raja Yoga", ctx)
+        self.assertIn("Shadow point: Taurus (Venus)", ctx)
+
+
 if __name__ == "__main__":
     unittest.main()
