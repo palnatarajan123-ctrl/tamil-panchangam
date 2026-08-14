@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chart", tags=["Natal Interpretation"])
 
-PROMPT_VERSION = "natal_v2.1"
+PROMPT_VERSION = "natal_v2.2"
 FEATURE_NAME = "natal_interpretation"
 
 KP_PROMPT_VERSION = "kp-v1.0"
@@ -69,6 +69,17 @@ Rules for Layer 2:
 - Rich, chart-specific interpretation — no generic filler
 - For KP charts: reference sub-lord significators explicitly
 - Every sentence must name a planet, house, or nakshatra
+
+UPAGRAHA / GULIKA-MANDI (when provided in the chart data above)
+- If the chart data includes a "Gulika (Mandi)" line, add ONE sentence to
+  who_you_are.karmic_shadow_note: a plain-English note about which life
+  area carries extra karmic weight due to this shadow point's placement.
+  Do not use the word "Gulika" or "Mandi" in your output — say "a shadow
+  point in your chart" or "an area that calls for extra vigilance."
+- If the chart data does NOT include a "Gulika (Mandi)" line, omit
+  who_you_are.karmic_shadow_note entirely from the output JSON.
+- Never use the words "Gulika", "Mandi", or "Upagraha" anywhere in your
+  output, in either layer.
 
 GLOBAL RULES:
 - Every sentence must be specific to THIS person's chart
@@ -115,7 +126,8 @@ Return ONLY the JSON — no markdown fences, no preamble.
       "Growth area 1 — framed as opportunity not flaw, 15 words max",
       "Growth area 2 — framed as opportunity not flaw, 15 words max"
     ],
-    "central_tension": "1-2 sentences. The core karmic push-pull of this life in plain English. What is this person's central paradox or challenge? What do they need to reconcile?"
+    "central_tension": "1-2 sentences. The core karmic push-pull of this life in plain English. What is this person's central paradox or challenge? What do they need to reconcile?",
+    "karmic_shadow_note": "OPTIONAL — 1 sentence. Only include this field if the chart data above contains a 'Gulika (Mandi)' line. Plain English karmic-obstruction note framed as 'a shadow point in your chart' or 'an area that calls for extra vigilance' — never use the words Gulika or Mandi. Omit this field entirely from the JSON if no Gulika/Mandi data was provided in the chart data."
   }},
 
   "where_you_shine": {{
@@ -319,6 +331,15 @@ def _build_natal_context(payload: Dict[str, Any]) -> str:
     else:
         lines.append("Ayanamsa: Lahiri (Chitrapaksha)")
 
+    # Gulika (Mandi) — karmic shadow point
+    from app.llm.payload_builder import _build_upagraha_context
+    upagraha_context = _build_upagraha_context(payload.get("upagrahas", {}))
+    if upagraha_context.get("gulika_rasi"):
+        lines.append(
+            f"Gulika (Mandi): {upagraha_context['gulika_rasi']}"
+            + (f", ruled by {upagraha_context['gulika_lord']}" if upagraha_context.get("gulika_lord") else "")
+        )
+
     # Current Dasha + full sequence
     if isinstance(dashas, dict):
         maha_seq = dashas.get("mahadasha_sequence", [])
@@ -345,7 +366,8 @@ def _fallback_response() -> Dict[str, Any]:
             "in_one_line": "",
             "core_strengths": [],
             "growth_edges": [],
-            "central_tension": ""
+            "central_tension": "",
+            "karmic_shadow_note": ""
         },
         "where_you_shine": {
             "natural_domains": [],
@@ -421,6 +443,31 @@ def get_natal_interpretation(request: Request, body: NatalInterpretationRequest)
             raise HTTPException(status_code=500, detail="Failed to parse chart payload")
     else:
         payload = raw_payload
+
+    # 3b. Lazy upagraha backfill for pre-v2.0 charts (same pattern as
+    # ui_birth_chart.py / prediction.py) so karmic_shadow_note can populate
+    # even for charts created before Gulika/Upagraha support existed.
+    if not payload.get("upagrahas"):
+        birth_details = payload.get("birth_details", {})
+        birth_utc_str = payload.get("birth_utc", "")
+        if birth_utc_str and birth_details:
+            try:
+                from app.engines.upagraha_engine import compute_gulika_mandi
+                birth_utc = datetime.fromisoformat(birth_utc_str.replace("Z", "+00:00"))
+                upagrahas = compute_gulika_mandi(
+                    birth_utc=birth_utc,
+                    latitude=birth_details.get("latitude", 0.0),
+                    longitude=birth_details.get("longitude", 0.0),
+                    ayanamsa=payload.get("ephemeris", {}).get("ayanamsa", "lahiri"),
+                )
+                payload["upagrahas"] = upagrahas
+                with get_conn() as conn:
+                    conn.execute(
+                        "UPDATE base_charts SET payload = payload || %s::jsonb WHERE id = %s",
+                        (json.dumps({"upagrahas": upagrahas}), base_chart_id),
+                    )
+            except Exception as e:
+                logger.warning(f"Lazy upagraha backfill failed for {base_chart_id}: {e}")
 
     # 4. Build chart context and call LLM
     chart_context = _build_natal_context(payload)
