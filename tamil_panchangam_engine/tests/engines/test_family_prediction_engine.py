@@ -13,8 +13,9 @@ live DB during development, not guessed.
 """
 
 import unittest
+from unittest.mock import MagicMock
 
-from app.engines.family_prediction_engine import _build_family_context
+from app.engines.family_prediction_engine import _build_family_context, PROMPT_VERSION, run_family_prediction
 
 
 def _base_member(role="husband", name="Test Person", **overrides):
@@ -157,6 +158,58 @@ class TestExistingFieldsRegression(unittest.TestCase):
         # Saturn position relative to this minimal fixture's Moon rasi, not on
         # anything Phase 1 touched -- just confirm the line still renders.
         self.assertIn("Sade Sati:", ctx)
+
+
+class TestPromptVersionGating(unittest.TestCase):
+    """
+    Phase C: family_predictions had NO version-gating mechanism at all --
+    caching was keyed solely on (group_id, year), so a prompt/context
+    change would silently keep serving stale cached rows for any group
+    with an existing prediction that year, with no way to detect it.
+    """
+
+    def test_prompt_version_is_family_v2_0(self):
+        """Regression guard: reverting this would silently re-enable
+        serving stale rows for every group with an existing cached
+        prediction, the same way a natal_v2.1 revert would have."""
+        self.assertEqual(PROMPT_VERSION, "family_v2.0")
+
+    def test_cache_check_query_filters_on_prompt_version(self):
+        """Confirms the real cache-check SQL (not a re-implementation)
+        includes prompt_version as a filter, mirroring the mechanism
+        verified for natal_v2.2 earlier this session."""
+        import os
+
+        mock_db = MagicMock()
+        mock_db.execute.return_value.fetchone.return_value = None  # cache miss
+
+        old_key = os.environ.pop("ANTHROPIC_API_KEY", None)
+        try:
+            result = run_family_prediction(
+                group={"id": "g1", "name": "Test"},
+                members_with_charts=[],
+                year=2026,
+                db=mock_db,
+            )
+        finally:
+            if old_key is not None:
+                os.environ["ANTHROPIC_API_KEY"] = old_key
+
+        # No API key -> bails out right after the cache check, before any
+        # LLM call, so the mock's first execute() call is the cache-check.
+        self.assertEqual(result.get("error"), "LLM not configured — ANTHROPIC_API_KEY missing")
+
+        sql, params = mock_db.execute.call_args_list[0].args
+        self.assertIn("prompt_version = ?", sql)
+        self.assertIn(PROMPT_VERSION, params)
+
+    def test_insert_writes_current_prompt_version(self):
+        """The UPSERT must write PROMPT_VERSION, not leave the column null
+        for newly-generated rows."""
+        import inspect
+        source = inspect.getsource(run_family_prediction)
+        self.assertIn("prompt_version", source)
+        self.assertIn("PROMPT_VERSION,", source)
 
 
 if __name__ == "__main__":

@@ -280,10 +280,21 @@ def bootstrap():
             child_milestones TEXT,
             executive_summary TEXT,
             llm_tokens_used INTEGER DEFAULT 0,
+            prompt_version TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(group_id, year)
         )
         """)
+        # migration: add column to existing tables (same pattern as
+        # family_groups.primary_chart_id above) -- see
+        # app/engines/family_prediction_engine.py PROMPT_VERSION for why
+        # this exists: family_predictions had no version-gating mechanism,
+        # so a prompt/context change would silently keep serving stale
+        # cached rows for any group with an existing prediction that year.
+        try:
+            conn.execute("ALTER TABLE family_predictions ADD COLUMN IF NOT EXISTS prompt_version TEXT")
+        except Exception:
+            pass
 
         conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_family_predictions_group

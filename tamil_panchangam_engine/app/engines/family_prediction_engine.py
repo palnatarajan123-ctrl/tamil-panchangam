@@ -23,6 +23,19 @@ logger = logging.getLogger(__name__)
 # Model matches the rest of the codebase
 FAMILY_PREDICTION_MODEL = "claude-sonnet-4-6"
 
+# family_predictions has no version-gating mechanism before this -- caching
+# was keyed solely on (group_id, year), with no way to distinguish "cached
+# under the current prompt/context" from "cached under an older one" (found
+# during today's audit; documented explicitly in the commit that added
+# yogas/upagraha/KP/predictive_signals context, since that content change
+# would otherwise have silently done nothing for any group with an existing
+# cached row for the current year). "family_v1.0" is the implicit,
+# never-labeled state before that change; "family_v2.0" marks the addition
+# of per-member yogas/upagraha/KP/predictive_signals context -- same
+# significance bump as v5->v6 in the individual weekly/monthly/yearly
+# prompts when upagraha context was added there.
+PROMPT_VERSION = "family_v2.0"
+
 # Load prompt once at module level
 _PROMPT_PATH = Path(__file__).parent.parent / "llm" / "prompts" / "family_prediction_prompt.txt"
 try:
@@ -212,13 +225,16 @@ def run_family_prediction(
     group_id = group["id"]
 
     # ── Cache check (same pattern as prediction_yearly.py) ───────────────────
+    # Filters on prompt_version so a row cached under an older prompt/context
+    # version is correctly treated as a cache miss and regenerated, rather
+    # than silently served stale -- same mechanism as natal_v2.2's fix.
     try:
         existing = db.execute("""
             SELECT id, executive_summary, financial_peaks, caution_windows,
                    child_milestones, raw_response
             FROM family_predictions
-            WHERE group_id = ? AND year = ?
-        """, [group_id, year]).fetchone()
+            WHERE group_id = ? AND year = ? AND prompt_version = ?
+        """, [group_id, year, PROMPT_VERSION]).fetchone()
     except Exception as e:
         logger.warning(f"Cache check failed: {e}")
         existing = None
@@ -341,14 +357,20 @@ def run_family_prediction(
         return {"error": "Failed to parse LLM response", "cached": False}
 
     # ── Persist to cache (INSERT ... ON CONFLICT DO UPDATE — PostgreSQL) ──────
+    # UNIQUE constraint stays (group_id, year) -- deliberately not widened to
+    # include prompt_version. Product intent is "one current prediction per
+    # group per year," not a history of versions; a regeneration under a new
+    # prompt_version overwrites the single row for that group/year, same as
+    # it always has. prompt_version is stored so the cache CHECK above can
+    # tell current from stale, not to preserve old-version rows.
     prediction_id = str(uuid.uuid4())
     try:
         db.execute("""
             INSERT INTO family_predictions
                 (id, group_id, year, raw_response, financial_peaks,
                  caution_windows, child_milestones, executive_summary,
-                 llm_tokens_used, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                 llm_tokens_used, prompt_version, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT (group_id, year) DO UPDATE SET
                 id = EXCLUDED.id,
                 raw_response = EXCLUDED.raw_response,
@@ -357,6 +379,7 @@ def run_family_prediction(
                 child_milestones = EXCLUDED.child_milestones,
                 executive_summary = EXCLUDED.executive_summary,
                 llm_tokens_used = EXCLUDED.llm_tokens_used,
+                prompt_version = EXCLUDED.prompt_version,
                 created_at = CURRENT_TIMESTAMP
         """, [
             prediction_id,
@@ -368,6 +391,7 @@ def run_family_prediction(
             json.dumps(parsed.get("child_milestones", [])),
             parsed.get("executive_summary", ""),
             input_tokens + output_tokens,
+            PROMPT_VERSION,
         ])
     except Exception as e:
         logger.error(f"Failed to persist family prediction: {e}")
