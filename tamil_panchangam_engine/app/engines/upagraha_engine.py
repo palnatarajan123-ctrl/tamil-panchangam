@@ -7,6 +7,11 @@ Classical Parashari method:
 - Gulika/Mandi is the segment ruled by Saturn's sub-period.
 - Gulika's position = the Ascendant (Lagna) at the moment Gulika's segment begins.
 
+Convention note: classical texts differ on whether to snapshot the Lagna at the
+START or the END of Gulika's segment. This module uses segment START (the
+Drik/Parashara convention). Some traditions use segment END instead and treat
+it as a distinct point — this is a deliberate choice, not an oversight.
+
 In South Indian Jyotisha, Gulika and Mandi are identical.
 """
 
@@ -35,16 +40,17 @@ AYANAMSA_MODES = {
 }
 
 # Gulika/Mandi daytime segment index (0-based, out of 8) by Python weekday (Mon=0)
-# Classical rule: on Sunday the 7th segment, Monday 6th, … Saturday 1st.
-# (Some texts differ by 1; this follows the common South Indian usage.)
+# Verified against reference tables (e.g. templesinindiainfo.com, anytimeastro.com):
+# Sun=7th, Mon=6th, Tue=5th, Wed=4th, Thu=3rd, Fri=2nd, Sat=1st (1-indexed).
+# Matches _GULIKA_SEGMENT in dinaphalam_engine.py (same table, 0-indexed here).
 _MANDI_DAYTIME_SEGMENT: Dict[int, int] = {
-    0: 6,  # Monday   — segment 7 (0-indexed: 6)
-    1: 5,  # Tuesday  — segment 6
-    2: 4,  # Wednesday— segment 5
-    3: 3,  # Thursday — segment 4
-    4: 2,  # Friday   — segment 3
-    5: 1,  # Saturday — segment 2
-    6: 0,  # Sunday   — segment 1
+    0: 5,  # Monday   — segment 6 (0-indexed: 5)
+    1: 4,  # Tuesday  — segment 5
+    2: 3,  # Wednesday— segment 4
+    3: 2,  # Thursday — segment 3
+    4: 1,  # Friday   — segment 2
+    5: 0,  # Saturday — segment 1
+    6: 6,  # Sunday   — segment 7
 }
 
 # Nighttime segment offsets (different sequence, not used for birth charts by default)

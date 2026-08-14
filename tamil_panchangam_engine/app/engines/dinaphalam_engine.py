@@ -30,25 +30,29 @@ _RAHU_SEGMENT: Dict[int, int] = {
 }
 
 # Yamagandam segment by weekday
+# Verified against reference tables (e.g. templesinindiainfo.com, anytimeastro.com):
+# Sun=5th, Mon=4th, Tue=3rd, Wed=2nd, Thu=1st, Fri=7th, Sat=6th.
 _YAMA_SEGMENT: Dict[int, int] = {
-    0: 5,  # Monday
-    1: 4,  # Tuesday
-    2: 3,  # Wednesday
-    3: 2,  # Thursday
-    4: 1,  # Friday
-    5: 7,  # Saturday
-    6: 6,  # Sunday
+    0: 4,  # Monday    — 4th
+    1: 3,  # Tuesday   — 3rd
+    2: 2,  # Wednesday — 2nd
+    3: 1,  # Thursday  — 1st
+    4: 7,  # Friday    — 7th
+    5: 6,  # Saturday  — 6th
+    6: 5,  # Sunday    — 5th
 }
 
 # Gulika Kaalam segment by weekday (daytime table)
+# Verified against reference tables (e.g. templesinindiainfo.com, anytimeastro.com):
+# Sun=7th, Mon=6th, Tue=5th, Wed=4th, Thu=3rd, Fri=2nd, Sat=1st.
 _GULIKA_SEGMENT: Dict[int, int] = {
-    0: 7,  # Monday    — 7th
-    1: 6,  # Tuesday   — 6th
-    2: 5,  # Wednesday — 5th
-    3: 4,  # Thursday  — 4th
-    4: 3,  # Friday    — 3rd
-    5: 2,  # Saturday  — 2nd
-    6: 1,  # Sunday    — 1st
+    0: 6,  # Monday    — 6th
+    1: 5,  # Tuesday   — 5th
+    2: 4,  # Wednesday — 4th
+    3: 3,  # Thursday  — 3rd
+    4: 2,  # Friday    — 2nd
+    5: 1,  # Saturday  — 1st
+    6: 7,  # Sunday    — 7th
 }
 
 AYANAMSA_MODES = {
