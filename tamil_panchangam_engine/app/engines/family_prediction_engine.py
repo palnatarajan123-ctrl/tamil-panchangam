@@ -16,6 +16,7 @@ from typing import Optional
 from app.engines.budget_guard import log_llm_call
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.sade_sati_engine import compute_sade_sati
+from app.llm.payload_builder import _build_upagraha_context
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,60 @@ def _build_family_context(group: dict, members_with_charts: list, year: int) -> 
         except Exception as e:
             logger.warning(f"Sade Sati computation failed for {name}: {e}")
 
+        # Yogas — present/active yoga names, pre-filtered and stored by yoga_engine
+        yoga_names = []
+        try:
+            yogas_data = payload.get("yogas", {}) if isinstance(payload, dict) else {}
+            if isinstance(yogas_data, dict) and not yogas_data.get("error"):
+                yoga_names = yogas_data.get("summary", {}).get("yoga_names", []) or []
+        except Exception as e:
+            logger.warning(f"Yoga extraction failed for {name}: {e}")
+
+        # Upagraha (Gulika/Mandi) — reuse the same extraction used by chat/natal
+        gulika_rasi = ""
+        gulika_lord = ""
+        try:
+            upagraha_ctx = _build_upagraha_context(payload.get("upagrahas", {}) if isinstance(payload, dict) else {})
+            gulika_rasi = upagraha_ctx.get("gulika_rasi", "")
+            gulika_lord = upagraha_ctx.get("gulika_lord", "")
+        except Exception as e:
+            logger.warning(f"Upagraha extraction failed for {name}: {e}")
+
+        # KP sub-lords — natal-only, optional (most charts won't have it)
+        kp_note = ""
+        try:
+            kp_sublords = payload.get("kp_sublords") if isinstance(payload, dict) else None
+            if kp_sublords:
+                cuspal = kp_sublords.get("cuspal_significators", {})
+                wealth_sigs = cuspal.get("2", []) or cuspal.get("11", [])
+                if wealth_sigs:
+                    kp_note = f"KP wealth-house significators: {', '.join(wealth_sigs[:4])}"
+        except Exception as e:
+            logger.warning(f"KP extraction failed for {name}: {e}")
+
+        # Predictive signals — active yogas + event windows relevant to THIS
+        # prediction year only (v7 monthly-signal data, not year-scoped by
+        # default, so filter defensively rather than dumping everything)
+        active_yoga_names = []
+        year_event_windows = []
+        try:
+            ps = payload.get("predictive_signals", {}) if isinstance(payload, dict) else {}
+            if isinstance(ps, dict):
+                active_yoga_names = [
+                    y.get("name", "") for y in ps.get("active_yogas", [])
+                    if isinstance(y, dict) and y.get("currently_active") and y.get("name")
+                ]
+                for w in ps.get("event_windows", []):
+                    if not isinstance(w, dict):
+                        continue
+                    if w.get("confidence") not in ("high", "very high"):
+                        continue
+                    w_start = str(w.get("window_start", ""))
+                    if w_start.startswith(str(year)):
+                        year_event_windows.append(w)
+        except Exception as e:
+            logger.warning(f"Predictive signals extraction failed for {name}: {e}")
+
         lines += [
             f"--- {role.upper()}: {name} ---",
             f"Nakshatra: {nakshatra or 'unknown'}",
@@ -111,8 +166,27 @@ def _build_family_context(group: dict, members_with_charts: list, year: int) -> 
             f"Current Antardasha: {antar_lord}",
             f"Antardasha ends: {antar_end[:10] if antar_end else 'unknown'}",
             f"Sade Sati: {'Active – ' + ss_phase if ss_active else 'Not active'}",
-            "",
         ]
+        if yoga_names:
+            lines.append(f"Present Yogas: {', '.join(yoga_names)}")
+        if gulika_rasi:
+            lines.append(
+                "Gulika (karmic shadow point): " + gulika_rasi
+                + (f", ruled by {gulika_lord}" if gulika_lord else "")
+            )
+        if kp_note:
+            lines.append(kp_note)
+        if active_yoga_names:
+            lines.append(f"Currently Active Yogas ({year}): {', '.join(active_yoga_names[:5])}")
+        if year_event_windows:
+            window_parts = []
+            for w in year_event_windows[:3]:
+                label = f"{w.get('window_start', '')} to {w.get('window_end', '')}"
+                area = str(w.get("life_area", "")).replace("_", " ")
+                direction = w.get("direction", "")
+                window_parts.append(f"{label} ({area}, {direction})")
+            lines.append(f"High-Confidence Windows ({year}): " + " | ".join(window_parts))
+        lines.append("")
 
     if husband_present and wife_present:
         lines += [

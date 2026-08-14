@@ -9,6 +9,12 @@ financial peaks/troughs, shared caution windows, and child milestones.
 - Family group name
 - For each member: name, role (husband/wife/child), nakshatra, rasi,
   current mahadasha, current antardasha, sade sati status
+- For each member, WHEN AVAILABLE (not every chart has all of these):
+  * Present yogas (classical planetary combinations)
+  * Gulika (a karmic-shadow point) rasi and its ruling planet
+  * KP wealth-house significator planets (only for KP-verified charts)
+  * Currently active yogas and high-confidence event windows for the
+    prediction year specifically (from the predictive-signals engine)
 - Current year
 - Husband and wife Porutham score (if available)
 
@@ -74,6 +80,12 @@ Valid values:
 - If a family has no children, return child_milestones as an empty array []
 - If husband/wife charts are missing, note it in executive_summary and
   return empty arrays for affected sections
+- Never use the words "Gulika", "Mandi", "Yoga" (as a Sanskrit term), or
+  "KP"/"Krishnamurti" in your output. Translate these into plain English:
+  a yoga becomes "a favorable/challenging planetary combination", Gulika
+  becomes "a shadow point in the chart", KP significators become "timing
+  indicators". This matches the plain-language convention already used in
+  individual chart interpretations.
 
 ## Classical Vedic principles to apply
 
@@ -82,6 +94,12 @@ Financial peaks/troughs:
 - Their Dasha activation periods across husband and wife charts
 - Jupiter transits (Guru peyarchi) as amplifiers
 - Ashtama Shani (Saturn in 8th from Moon) as a trough indicator
+- If a member's present yogas or KP wealth-house significators are given,
+  factor wealth-related yogas (e.g. Dhana Yoga, Raja Yoga) and strong
+  significators into peak timing
+- If a member's currently-active yogas or high-confidence event windows for
+  this year are given, weight those windows heavily — they're more precise
+  than general Dasha timing alone
 
 Shared caution windows:
 - Periods where 2+ family members simultaneously have:
@@ -89,6 +107,10 @@ Shared caution windows:
   * 6th/8th/12th house lord Dasha running
   * Malefic transit over natal Moon or Lagna
 - Rahu/Ketu transit periods over sensitive natal points
+- If a member's Gulika (shadow point) rasi is given, it can inform which
+  life area needs extra vigilance for that member specifically — but only
+  mention it when it meaningfully overlaps with an existing caution window,
+  don't force it into every section
 
 Child milestones:
 - 4th house (education) activation in child's chart
