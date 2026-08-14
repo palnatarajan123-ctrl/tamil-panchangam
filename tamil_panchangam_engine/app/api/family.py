@@ -1190,11 +1190,22 @@ def _build_member_summary(row: tuple) -> str:
     ss_suffix = f", Sade Sati active – {ss_data.get('phase_name', '')}" \
         if ss_data.get("active") else ""
 
+    # Yogas + Upagraha (Gulika/Mandi) -- shared with chat.py's
+    # _build_family_member_context() (same feature, same cost reasoning,
+    # added to both endpoints in the same change). predictive_signals and
+    # kp_sublords deliberately NOT included here -- see
+    # _build_family_yoga_upagraha_suffix()'s docstring for the full cost
+    # reasoning (same as chat.py's Phase 3 fix: per-member expansion of
+    # either would multiply DB/cost per message by family size).
+    from app.llm.payload_builder import _build_family_yoga_upagraha_suffix
+    yoga_upagraha_suffix = _build_family_yoga_upagraha_suffix(payload)
+
     return (
         f"{role.upper()} {name}: "
         f"Lagna {lagna}, Moon {moon_rasi} ({nak_name}), "
         f"Dasha {maha}›{antar}"
         f"{ss_suffix}"
+        f"{yoga_upagraha_suffix}"
     )
 
 

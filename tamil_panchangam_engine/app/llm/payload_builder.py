@@ -687,6 +687,41 @@ def _build_upagraha_context(upagrahas: dict) -> dict:
     }
 
 
+def _build_family_yoga_upagraha_suffix(payload: dict) -> str:
+    """
+    Compact ', Yogas: ..., Shadow point: ...' suffix for a family-context
+    per-member summary line. Shared between chat.py's
+    _build_family_member_context() and family.py's _build_member_summary()
+    -- both need the identical extraction/formatting, and this logic was
+    introduced fresh for family surfaces (no pre-existing divergence to
+    preserve here, unlike each call site's base nakshatra/lagna/dasha/
+    sade-sati fields, which differ between the two and are left alone
+    rather than forced into a shared shape).
+
+    Present yoga NAMES only (not full descriptions), capped at 5. Upagraha
+    (Gulika/Mandi) rasi + lord via _build_upagraha_context(). Deliberately
+    does NOT include predictive_signals or kp_sublords -- both would need
+    either an expensive per-member build or a cached LLM lookup, multiplying
+    cost per family chat message by family size. Returns "" if neither
+    yogas nor upagraha data is present.
+    """
+    suffix = ""
+
+    yogas_data = payload.get("yogas", {})
+    if isinstance(yogas_data, dict) and not yogas_data.get("error"):
+        yoga_names = yogas_data.get("summary", {}).get("yoga_names", []) or []
+        if yoga_names:
+            suffix += f", Yogas: {', '.join(yoga_names[:5])}"
+
+    upagraha_ctx = _build_upagraha_context(payload.get("upagrahas", {}))
+    gulika_rasi = upagraha_ctx.get("gulika_rasi", "")
+    gulika_lord = upagraha_ctx.get("gulika_lord", "")
+    if gulika_rasi:
+        suffix += f", Shadow point: {gulika_rasi}" + (f" ({gulika_lord})" if gulika_lord else "")
+
+    return suffix
+
+
 def _build_bav_context(bav: dict, gochara: dict) -> dict:
     """BAV transit scores for current Saturn/Jupiter/Rahu transits."""
     if not bav or bav.get("error"):
