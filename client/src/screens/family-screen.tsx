@@ -12,7 +12,7 @@ import { ChatPanel } from "@/components/ChatPanel";
 import {
   Users, Plus, Trash2, ArrowLeft, ChevronRight,
   Heart, Star, AlertCircle, CheckCircle2, XCircle,
-  MessageCircle, ChevronDown,
+  MessageCircle, ChevronDown, FileText,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -282,6 +282,7 @@ function AddMemberForm({
 
 
 function PoruthTab({ groupId, onAskJyotishi }: { groupId: string; onAskJyotishi: () => void }) {
+  const [, navigate] = useLocation();
   const { data, isLoading, error } = useQuery({
     queryKey: ["/api/family/groups", groupId, "porutham"],
     queryFn: () => apiFetch("GET", `/api/family/groups/${groupId}/porutham`),
@@ -365,21 +366,37 @@ function PoruthTab({ groupId, onAskJyotishi }: { groupId: string; onAskJyotishi:
         ))}
       </div>
 
-      {/* Entry point into family chat, already grounded in this exact
-          Porutham result (Phase F2) -- opens the same chat panel/instance
-          as the header's "Ask Jyotishi" button, no pre-filled message:
-          ChatPanel/useChat have no initial-message capability anywhere in
-          this app, and building one is a separate UX decision, not a side
-          effect of this button. */}
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full gap-1.5"
-        onClick={onAskJyotishi}
-      >
-        <MessageCircle className="h-4 w-4" />
-        Ask Jyotishi about this match
-      </Button>
+      {/* Two entry points out of this tab, both reusing existing app
+          mechanisms rather than inventing new ones (Phase F4 Part B):
+          - Chat: same chat panel/instance as the header's "Ask Jyotishi"
+            button (Phase F3), already grounded in this Porutham result
+            (Phase F2). No pre-filled message -- ChatPanel/useChat have no
+            initial-message capability anywhere in this app.
+          - PDF: navigates to the SAME predictions screen the header's own
+            "View Predictions" button already goes to, where the existing
+            "PDF" download button (family-prediction-screen.tsx, which now
+            includes the Porutham section per Part A) lives. Not a second,
+            duplicate PDF-download implementation on this tab. */}
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 gap-1.5"
+          onClick={onAskJyotishi}
+        >
+          <MessageCircle className="h-4 w-4" />
+          Ask Jyotishi about this match
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 gap-1.5"
+          onClick={() => navigate(`/family/${groupId}/predictions`)}
+        >
+          <FileText className="h-4 w-4" />
+          View Full Report (PDF)
+        </Button>
+      </div>
     </div>
   );
 }
