@@ -70,9 +70,18 @@ for a, b in VEDHA_PAIRS:
 MAHENDRA_OFFSETS = {4, 7, 10, 13, 16, 19, 22, 25, 28}
 
 # Nadi: 0=Adi, 1=Madhya, 2=Antya
+#
+# Corrected 2026-08-17 (Porutham audit, Phase 2): 6 of 27 nakshatras were
+# misclassified (Magam, Uthiram, Hastham, Swathi, Visakam, Kettai),
+# cross-checked against 4+ independent sources. Nadi is a mandatory
+# dosha category, so this mattered more than most tables here. The
+# correct pattern repeats [Adi,Madhya,Antya,Antya,Madhya,Adi,Adi,Madhya,
+# Antya] every 9 nakshatras -- verify against
+# tests/engines/test_porutham_engine.py's full 27-nakshatra table test
+# before ever touching this array again.
 NADI = [
-    0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2,
-    2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0,
+    0, 1, 2, 2, 1, 0, 0, 1, 2, 2, 1, 0,
+    0, 1, 2, 2, 1, 0, 0, 1, 2, 2, 1, 0,
     0, 1, 2,
 ]
 

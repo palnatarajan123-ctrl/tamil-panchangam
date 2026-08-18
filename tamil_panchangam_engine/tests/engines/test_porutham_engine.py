@@ -11,8 +11,8 @@ Rasi reference (0-based index):
   0=Aries, 1=Taurus, 2=Gemini, 3=Cancer, 4=Leo, 5=Virgo,
   6=Libra, 7=Scorpio, 8=Sagittarius, 9=Capricorn, 10=Aquarius, 11=Pisces
 
-NADI (0=Adi, 1=Madhya, 2=Antya):
-  [0,1,2,2,1,0,0,1,2,0,1,2,2,1,0,0,1,2,0,1,2,2,1,0,0,1,2]
+NADI (0=Adi, 1=Madhya, 2=Antya) -- corrected 2026-08-17, audit Phase 2:
+  [0,1,2,2,1,0,0,1,2,2,1,0,0,1,2,2,1,0,0,1,2,2,1,0,0,1,2]
 
 GANA (0=Deva, 1=Manushya, 2=Rakshasa) -- corrected 2026-08-17, audit Phase 1:
   [0,1,2,1,0,1,0,0,2,2,1,1,0,2,0,2,0,2,2,1,1,0,2,2,1,1,0]
@@ -27,6 +27,7 @@ from app.engines.porutham_engine import (
     score_rasi,
     compute_porutham,
     GANA,
+    NADI,
 )
 from app.engines.nakshatra_names import canonical_nakshatra_list
 
@@ -315,3 +316,45 @@ def test_ganam_gradient_manushya_rakshasa_symmetric_one():
 def test_ganam_gradient_deva_rakshasa_symmetric_zero():
     assert score_ganam(0, 2)["score"] == 0
     assert score_ganam(2, 0)["score"] == 0
+
+
+# ── Phase 2 audit regression: full 27-nakshatra Nadi table ────────────────────
+#
+# Locks in the corrected NADI table so this can't silently regress back to
+# the 6-misclassification bug the 2026-08-17 audit found. Nadi is a
+# mandatory dosha category, so a wrong table here can flip a real
+# pass/fail dealbreaker. Reference table cross-checked against 4+
+# independent sources this session (see porutham_engine.py's NADI comment).
+
+_AADI = ["Aswini", "Thiruvadirai", "Punarpoosam", "Uthiram", "Hastham",
+         "Kettai", "Moolam", "Sadayam", "Poorattadhi"]
+_MADHYA = ["Bharani", "Mirugashirisham", "Poosam", "Pooram", "Chittirai",
+           "Anusham", "Pooradam", "Avittam", "Uthirattadhi"]
+_ANTYA = ["Karthigai", "Rohini", "Ayilyam", "Magam", "Swathi", "Visakam",
+          "Uthiradam", "Thiruvonam", "Revathi"]
+
+
+@pytest.mark.parametrize("nak_name", _AADI)
+def test_nadi_table_aadi_group(nak_name):
+    idx = _nakshatra_index(nak_name)
+    assert NADI[idx] == 0, f"{nak_name} (idx {idx}) should be Aadi (0), got {NADI[idx]}"
+
+
+@pytest.mark.parametrize("nak_name", _MADHYA)
+def test_nadi_table_madhya_group(nak_name):
+    idx = _nakshatra_index(nak_name)
+    assert NADI[idx] == 1, f"{nak_name} (idx {idx}) should be Madhya (1), got {NADI[idx]}"
+
+
+@pytest.mark.parametrize("nak_name", _ANTYA)
+def test_nadi_table_antya_group(nak_name):
+    idx = _nakshatra_index(nak_name)
+    assert NADI[idx] == 2, f"{nak_name} (idx {idx}) should be Antya (2), got {NADI[idx]}"
+
+
+def test_nadi_table_covers_all_27_nakshatras_exactly_once():
+    names = canonical_nakshatra_list()
+    assert len(names) == 27
+    assert len(NADI) == 27
+    covered = set(_AADI) | set(_MADHYA) | set(_ANTYA)
+    assert covered == set(names), covered.symmetric_difference(set(names))
