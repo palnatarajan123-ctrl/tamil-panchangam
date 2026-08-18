@@ -28,6 +28,7 @@ from app.engines.porutham_engine import (
     score_rajju,
     score_vedha,
     score_yoni,
+    score_rasiyathipaty,
     compute_porutham,
     GANA,
     NADI,
@@ -36,6 +37,9 @@ from app.engines.porutham_engine import (
     VEDHA_SET,
     YONI,
     YONI_HOSTILE_PAIRS,
+    RASI_LORDS,
+    RASIYATHIPATY_FRIENDLY,
+    RASIYATHIPATY_ENEMY,
 )
 from app.engines.nakshatra_names import canonical_nakshatra_list
 
@@ -166,13 +170,20 @@ def test_total_score_within_bounds(boy_nak, boy_rasi, girl_nak, girl_rasi):
 
 def test_grade_excellent():
     """
-    Ashwini+Aries vs Purva Ashadha+Sagittarius scores 26/33 (78.8%) → Excellent.
-    Verified: Dinam=0, Ganam=5, Yoni=2, Rasi=7, Rasiyathipaty=4, Nadi=8.
+    Ashwini+Aries vs Purva Ashadha+Sagittarius scores 27/33 (81.8%) → Excellent.
+    Verified: Dinam=0, Ganam=5, Yoni=2, Rasi=7, Rasiyathipaty=5, Nadi=8.
+
+    Corrected 2026-08-17 (Porutham audit, Phase 6): Rasiyathipaty was 4,
+    not 5, under the old code -- Aries' lord Mars and Sagittarius' lord
+    Jupiter are true mutual friends (each considers the other a friend),
+    which the old gradient capped at 4 alongside asymmetric one-way
+    friendships. The corrected gradient scores genuine mutual friendship
+    the same as same-lord (5), so this pair's total moved from 26 to 27.
     """
     result = compute_porutham("Ashwini", "Aries", "Purva Ashadha", "Sagittarius")
     assert result["grade"] == "Excellent"
     assert result["mandatory_fail"] is False
-    assert result["total_score"] == 26
+    assert result["total_score"] == 27
 
 
 def test_grade_good():
@@ -623,3 +634,130 @@ def test_yoni_non_enemy_different_animal_collapses_to_neutral_two():
     """
     result = score_yoni(_nakshatra_index("Bharani"), _nakshatra_index("Swathi"))
     assert result["score"] == 2
+
+
+# ── Phase 6 audit regression: Graha Maitri friend/enemy table ─────────────────
+#
+# Locks in the corrected RASIYATHIPATY_FRIENDLY/ENEMY tables so this
+# can't silently regress back to the bug the 2026-08-17 audit found --
+# Sun, Moon, and Mars each had one wrong friend, and there was no
+# concept of "neutral" at all (everything not a friend fell to the same
+# bucket as enemy). Cross-checked against 3 independent sources this
+# session including a genuine classical Tamil-language text -- see
+# porutham_engine.py's RASIYATHIPATY_FRIENDLY comment.
+#
+# Planet index: 0=Sun, 1=Moon, 2=Mars, 3=Mercury, 4=Jupiter, 5=Venus, 6=Saturn
+
+_PLANET_NAMES = {0: "Sun", 1: "Moon", 2: "Mars", 3: "Mercury", 4: "Jupiter", 5: "Venus", 6: "Saturn"}
+
+_GRAHA_MAITRI_REFERENCE = {
+    0: {"friend": {1, 2, 4}, "enemy": {5, 6}},
+    1: {"friend": {0, 3}, "enemy": set()},
+    2: {"friend": {0, 1, 4}, "enemy": {3}},
+    3: {"friend": {0, 5}, "enemy": {1}},
+    4: {"friend": {0, 1, 2}, "enemy": {3, 5}},
+    5: {"friend": {3, 6}, "enemy": {0, 1}},
+    6: {"friend": {3, 5}, "enemy": {0, 1, 2}},
+}
+
+
+@pytest.mark.parametrize("planet", range(7))
+def test_graha_maitri_friend_set(planet):
+    assert RASIYATHIPATY_FRIENDLY[planet] == _GRAHA_MAITRI_REFERENCE[planet]["friend"], (
+        f"{_PLANET_NAMES[planet]}'s friend set is wrong"
+    )
+
+
+@pytest.mark.parametrize("planet", range(7))
+def test_graha_maitri_enemy_set(planet):
+    assert RASIYATHIPATY_ENEMY[planet] == _GRAHA_MAITRI_REFERENCE[planet]["enemy"], (
+        f"{_PLANET_NAMES[planet]}'s enemy set is wrong"
+    )
+
+
+def test_graha_maitri_categories_partition_the_other_six_planets():
+    """Every planet's friend/enemy/neutral sets should exactly partition
+    the other 6 planets (no overlaps, no gaps)."""
+    for p in range(7):
+        friend = RASIYATHIPATY_FRIENDLY[p]
+        enemy = RASIYATHIPATY_ENEMY[p]
+        assert not (friend & enemy), f"{_PLANET_NAMES[p]} has overlapping friend/enemy sets"
+        others = set(range(7)) - {p}
+        neutral = others - friend - enemy
+        assert friend | enemy | neutral == others
+
+
+def test_graha_maitri_mercury_resolved_saturn_is_neutral_not_friend():
+    """
+    The specific contested finding resolved this phase: Mercury's
+    friends are Sun and Venus only. A genuine classical Tamil-language
+    source directly confirmed Saturn is NEUTRAL to Mercury, not a
+    friend -- settling a 2-source disagreement the audit found.
+    """
+    assert 6 not in RASIYATHIPATY_FRIENDLY[3]  # Saturn not a Mercury friend
+    assert 6 not in RASIYATHIPATY_ENEMY[3]     # nor an enemy -- neutral
+
+
+def test_graha_maitri_moon_mercury_asymmetric_by_design():
+    """Moon considers Mercury a friend; Mercury considers Moon an enemy.
+    Confirmed asymmetric relationship, not a bug."""
+    assert 3 in RASIYATHIPATY_FRIENDLY[1]  # Moon -> Mercury: friend
+    assert 1 in RASIYATHIPATY_ENEMY[3]     # Mercury -> Moon: enemy
+
+
+# ── Phase 6 audit regression: Rasiyathipaty 7-tier gradient ───────────────────
+
+def test_rasiyathipaty_same_lord_five():
+    # Aries(0) and Scorpio(7) are both Mars-ruled
+    result = score_rasiyathipaty(0, 7)
+    assert result["score"] == 5
+
+
+def test_rasiyathipaty_mutual_friend_different_lords_five():
+    """
+    Aries' lord Mars and Sagittarius' lord Jupiter are true mutual
+    friends (each considers the other a friend) -- scored 5, same as
+    same-lord, per this phase's explicit product decision (the 2nd
+    gradient source didn't name this case, but didn't contradict it
+    either; mutual friendship is the strongest non-identical relationship
+    the table can express).
+    """
+    result = score_rasiyathipaty(0, 8)  # Aries(Mars) x Sagittarius(Jupiter)
+    assert result["score"] == 5
+
+
+def test_rasiyathipaty_one_friend_one_neutral_four():
+    # Cancer(Moon,1) x Aries(Mars,2): Moon->Mars neutral, Mars->Moon friend.
+    result = score_rasiyathipaty(3, 0)  # Cancer(Moon) x Aries(Mars)
+    assert result["score"] == 4
+
+
+def test_rasiyathipaty_mutual_neutral_three():
+    # Aries(Mars,2) x Taurus(Venus,5): Mars->Venus neutral, Venus->Mars neutral.
+    result = score_rasiyathipaty(0, 1)  # Aries(Mars) x Taurus(Venus)
+    assert result["score"] == 3
+
+
+def test_rasiyathipaty_one_friend_one_enemy_one():
+    # Cancer(Moon,1) x Gemini(Mercury,3): Moon->Mercury friend, Mercury->Moon enemy.
+    result = score_rasiyathipaty(3, 2)  # Cancer(Moon) x Gemini(Mercury)
+    assert result["score"] == 1
+
+
+def test_rasiyathipaty_one_neutral_one_enemy_half():
+    # Taurus(Venus,5) x Sagittarius(Jupiter,4): Venus->Jupiter neutral, Jupiter->Venus enemy.
+    result = score_rasiyathipaty(1, 8)  # Taurus(Venus) x Sagittarius(Jupiter)
+    assert result["score"] == 0.5
+
+
+def test_rasiyathipaty_mutual_enemy_zero():
+    # Leo(Sun,0) x Capricorn(Saturn,6): Sun->Saturn enemy, Saturn->Sun enemy.
+    result = score_rasiyathipaty(4, 9)  # Leo(Sun) x Capricorn(Saturn)
+    assert result["score"] == 0
+
+
+def test_rasiyathipaty_gradient_passes_at_three_and_above():
+    assert score_rasiyathipaty(0, 7)["pass"] is True   # 5
+    assert score_rasiyathipaty(0, 1)["pass"] is True   # 3
+    assert score_rasiyathipaty(3, 2)["pass"] is False  # 1
+    assert score_rasiyathipaty(4, 9)["pass"] is False  # 0

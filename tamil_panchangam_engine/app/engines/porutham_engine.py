@@ -66,7 +66,12 @@ YONI_HOSTILE_PAIRS = {(5, 6), (4, 10), (3, 12), (1, 13), (7, 9), (0, 8), (2, 11)
 
 # Rasi lord index (0=Aries..11=Pisces)
 RASI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4]
-# 0=Mars, 1=Moon, 2=Mars, 3=Mercury, 4=Jupiter, 5=Venus, 6=Saturn
+# Corrected 2026-08-17 (Porutham audit, Phase 6): this comment previously
+# mislabeled index 0 as "Mars" (a duplicate of index 2's real label) and
+# never mentioned Sun at all. Leo(4) is the only sign mapping to index 0,
+# and Leo is Sun-ruled, not Mars-ruled -- the underlying RASI_LORDS data
+# was already correct, only this comment was wrong.
+# 0=Sun, 1=Moon, 2=Mars, 3=Mercury, 4=Jupiter, 5=Venus, 6=Saturn
 
 # Rajju groups (nakshatra index groups)
 # Corrected 2026-08-17 (Porutham audit, Phase 3): every one of the 5
@@ -257,27 +262,87 @@ def score_rasi(boy_rasi: int, girl_rasi: int) -> dict:
     return {"name": "Rasi", "score": score, "max": 7, "pass": score >= 2}
 
 
+# Naisargika (natural) Graha Maitri table, keyed by RASI_LORDS's planet
+# index (0=Sun, 1=Moon, 2=Mars, 3=Mercury, 4=Jupiter, 5=Venus, 6=Saturn).
+#
+# Corrected 2026-08-17 (Porutham audit, Phase 6): the prior FRIENDLY dict
+# had Sun, Moon, and Mars each with one wrong friend (and no concept of
+# "neutral" at all -- everything not explicitly friend fell through to
+# the same bucket as enemy). Cross-checked against 3 independent
+# sources, including a genuine classical Tamil-language text that
+# resolved a contested point (see RASIYATHIPATY_ENEMY's Mercury entry).
+# This table is intentionally asymmetric: e.g. Moon considers Mercury a
+# friend, but Mercury considers Moon an enemy -- that's correct, not a
+# bug, and score_rasiyathipaty() below handles the asymmetry explicitly
+# rather than assuming symmetry.
+RASIYATHIPATY_FRIENDLY = {
+    0: {1, 2, 4},  # Sun: Moon, Mars, Jupiter
+    1: {0, 3},     # Moon: Sun, Mercury
+    2: {0, 1, 4},  # Mars: Sun, Moon, Jupiter
+    3: {0, 5},     # Mercury: Sun, Venus
+    4: {0, 1, 2},  # Jupiter: Sun, Moon, Mars
+    5: {3, 6},     # Venus: Mercury, Saturn
+    6: {3, 5},     # Saturn: Mercury, Venus
+}
+RASIYATHIPATY_ENEMY = {
+    0: {5, 6},     # Sun: Venus, Saturn
+    1: set(),      # Moon: none
+    2: {3},        # Mars: Mercury
+    3: {1},        # Mercury: Moon -- NOT Saturn, resolved via a genuine
+                   # classical Tamil source after 2 sources disagreed on
+                   # whether Saturn is a Mercury friend (it's neutral).
+    4: {3, 5},     # Jupiter: Mercury, Venus
+    5: {0, 1},     # Venus: Sun, Moon
+    6: {0, 1, 2},  # Saturn: Sun, Moon, Mars
+}
+# Anything not in FRIENDLY or ENEMY for a given planet is neutral to it
+# (each planet's 3 categories exactly partition the other 6 planets).
+
+
+def _rasiyathipaty_relation(from_planet: int, to_planet: int) -> str:
+    if to_planet in RASIYATHIPATY_FRIENDLY[from_planet]:
+        return "friend"
+    if to_planet in RASIYATHIPATY_ENEMY[from_planet]:
+        return "enemy"
+    return "neutral"
+
+
 def score_rasiyathipaty(boy_rasi: int, girl_rasi: int) -> dict:
-    """Rasiyathipaty (Graha Maitri): max 5 points."""
-    FRIENDLY = {
-        0: {3, 4, 1},  # Mars: Mercury, Jupiter, Moon
-        1: {3, 4, 0},  # Moon: Mercury, Jupiter, Mars
-        2: {0, 4, 5},  # Mars: Sun, Jupiter, Venus — reusing index for Sun
-        3: {0, 5, 6},  # Mercury: Sun, Venus, Saturn
-        4: {0, 1, 2},  # Jupiter: Sun, Moon, Mars
-        5: {3, 6},     # Venus: Mercury, Saturn
-        6: {5, 3},     # Saturn: Venus, Mercury
-    }
+    """
+    Rasiyathipaty (Graha Maitri): max 5 points.
+
+    7-tier gradient, corrected 2026-08-17 (Porutham audit, Phase 6):
+    same lord=5, mutual friends (different lords)=5, one friend + one
+    neutral=4, mutual neutral=3, one friend + one enemy=1, one neutral +
+    one enemy=0.5, mutual enemies=0. 6 of these 7 tiers were confirmed
+    by 2 independent sources; "mutual friends, different lords=5" had
+    only 1 explicit source (a 2nd source's gradient list simply didn't
+    name this case, not contradicted it) -- scored 5 per an explicit
+    product decision, treating mutual friendship as equal to same-lord
+    since it's the strongest non-identical relationship the table can
+    express.
+    """
     bl = RASI_LORDS[boy_rasi]
     gl = RASI_LORDS[girl_rasi]
     if bl == gl:
         score = 5
-    elif gl in FRIENDLY.get(bl, set()) and bl in FRIENDLY.get(gl, set()):
-        score = 4
-    elif gl in FRIENDLY.get(bl, set()) or bl in FRIENDLY.get(gl, set()):
-        score = 3
     else:
-        score = 0
+        relations = {
+            _rasiyathipaty_relation(bl, gl),
+            _rasiyathipaty_relation(gl, bl),
+        }
+        if relations == {"friend"}:
+            score = 5
+        elif relations == {"friend", "neutral"}:
+            score = 4
+        elif relations == {"neutral"}:
+            score = 3
+        elif relations == {"friend", "enemy"}:
+            score = 1
+        elif relations == {"neutral", "enemy"}:
+            score = 0.5
+        else:  # {"enemy"}
+            score = 0
     return {"name": "Rasiyathipaty", "score": score, "max": 5, "pass": score >= 3}
 
 
