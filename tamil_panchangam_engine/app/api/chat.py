@@ -296,15 +296,22 @@ def _save_chat_message(user_id: str, base_chart_id: str, session_id: str, role: 
               datetime.now(timezone.utc).isoformat()])
 
 
-def _build_family_member_context(member_payloads: list) -> str:
+def _build_family_member_context(member_payloads: list, porutham: Optional[dict] = None) -> str:
     """
     Render the '## FAMILY CONTEXT' system-prompt block for a family chat.
 
     Pure function -- no DB access -- extracted from what was previously
-    inline in chat_stream() so it's directly testable.
+    inline in chat_stream() so it's directly testable. Stays pure even with
+    Porutham added: the caller fetches (cache-first, via
+    _get_or_compute_porutham()) and passes the already-resolved dict in,
+    rather than this function reaching for a db connection itself.
 
     member_payloads: list of dicts, each with "role" (str),
       "display_name" (str | None), "payload" (parsed chart payload dict).
+    porutham: the "porutham" breakdown dict (couple-level, not per-member --
+      hence a separate parameter rather than folding into member_payloads
+      the way the per-member yoga/upagraha suffix does), or None if no
+      husband+wife pair / no resolvable result exists for this group.
     """
     member_lines = []
     for m in member_payloads:
@@ -360,11 +367,19 @@ def _build_family_member_context(member_payloads: list) -> str:
     if not member_lines:
         return ""
 
+    from app.llm.payload_builder import _format_porutham_lines
+    porutham_lines = _format_porutham_lines(porutham)
+    porutham_block = (
+        "\n\nPORUTHAM (Husband x Wife compatibility, 10-point Tamil Kuta system):\n"
+        + "\n".join(porutham_lines)
+    ) if porutham_lines else ""
+
     return (
         "\n\n## FAMILY CONTEXT\n"
         "You are advising this couple/family. "
         "Use ALL members' charts when answering family questions:\n"
         + "\n".join(member_lines)
+        + porutham_block
     )
 
 
@@ -636,7 +651,7 @@ async def chat_stream(
     if req.group_id:
         with get_conn() as conn:
             members = conn.execute("""
-                SELECT fm.role, fm.display_name, fm.chart_id,
+                SELECT fm.id, fm.role, fm.display_name, fm.chart_id,
                        bc.payload
                 FROM family_members fm
                 JOIN base_charts bc ON bc.id = fm.chart_id
@@ -645,14 +660,38 @@ async def chat_stream(
             """, (req.group_id,)).fetchall()
 
         member_payloads = []
-        for role, display_name, chart_id, payload_raw in members:
+        for member_id, role, display_name, chart_id, payload_raw in members:
             payload = payload_raw if isinstance(payload_raw, dict) \
                       else json.loads(payload_raw or "{}")
             member_payloads.append({
-                "role": role, "display_name": display_name, "payload": payload,
+                "id": str(member_id), "role": role, "display_name": display_name, "payload": payload,
             })
 
-        family_member_context = _build_family_member_context(member_payloads)
+        # Porutham -- couple-level, not per-member, so resolved once here
+        # rather than inside _build_family_member_context()'s per-member
+        # loop. Cache-first (family_porutham_cache, shared with the
+        # dedicated /porutham endpoint and Phase F1's family predictions
+        # write path) -- cheap, per Phase 1/A2's cost-reasoning precedent
+        # (compute_porutham() is pure table lookups, no ephemeris calls).
+        porutham = None
+        husband = next((m for m in member_payloads if m["role"] == "husband"), None)
+        wife = next((m for m in member_payloads if m["role"] == "wife"), None)
+        if husband and wife:
+            try:
+                from app.llm.payload_builder import _extract_nak_rasi, _get_or_compute_porutham
+                h_nak, h_rasi = _extract_nak_rasi(husband["payload"])
+                w_nak, w_rasi = _extract_nak_rasi(wife["payload"])
+                h_name = husband.get("display_name") or husband["payload"].get("birth_details", {}).get("name", "husband")
+                w_name = wife.get("display_name") or wife["payload"].get("birth_details", {}).get("name", "wife")
+                with get_conn() as conn:
+                    porutham = _get_or_compute_porutham(
+                        conn, req.group_id, husband["id"], h_name, h_nak, h_rasi,
+                        wife["id"], w_name, w_nak, w_rasi,
+                    )
+            except Exception as e:
+                logger.warning(f"Porutham lookup failed for family chat: {e}")
+
+        family_member_context = _build_family_member_context(member_payloads, porutham)
 
     if family_member_context:
         system_prompt = system_prompt + family_member_context

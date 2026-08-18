@@ -15,8 +15,9 @@ suffix logic was unified, not the pre-existing formats.
 
 import unittest
 from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
-from app.api.family import _build_member_summary
+from app.api.family import _build_member_summary, _build_porutham_chat_block
 from app.llm.payload_builder import _build_family_yoga_upagraha_suffix
 
 
@@ -149,6 +150,66 @@ class TestBuildMemberSummaryExtension(unittest.TestCase):
         self.assertIn("Dasha Saturn›Venus", summary)
         self.assertIn("Yogas: Raja Yoga", summary)
         self.assertTrue(summary.index("Dasha") < summary.index("Yogas"))
+
+
+def _row(member_id, role, display_name, payload):
+    """Matches the (fm.id, fm.role, fm.display_name, fm.chart_id, bc.payload)
+    shape family_group_chat_stream() actually fetches."""
+    return (member_id, role, display_name, "chart-x", payload)
+
+
+class TestBuildPoruthamChatBlock(unittest.TestCase):
+    """
+    Phase F2: family.py's family_group_chat_stream() (the endpoint serving
+    children-timing-screen.tsx, family-timeline-screen.tsx,
+    family-prediction-screen.tsx, child-prediction-screen.tsx) now includes
+    a couple-level Porutham block, extracted into _build_porutham_chat_block()
+    so it's testable without mocking the full async streaming flow.
+    """
+
+    def test_no_wife_returns_empty_string_no_db_call(self):
+        rows = [_row("h-id", "husband", "Ravi", _member_payload(name="Ravi"))]
+        with patch("app.api.family.get_conn") as mock_get_conn:
+            result = _build_porutham_chat_block(rows, "group-1")
+        self.assertEqual(result, "")
+        mock_get_conn.assert_not_called()
+
+    def test_husband_and_wife_renders_block(self):
+        rows = [
+            _row("h-id", "husband", "Ravi", _member_payload(name="Ravi", rasi="Mesham", nak="Ashwini")),
+            _row("w-id", "wife", "Priya", _member_payload(name="Priya", rasi="Kanni", nak="Hasta")),
+        ]
+        mock_conn = MagicMock()
+        cached_row = ({
+            "husband": {"name": "Ravi", "nakshatra": "Ashwini", "rasi": "Mesham"},
+            "wife": {"name": "Priya", "nakshatra": "Hasta", "rasi": "Kanni"},
+            "porutham": {
+                "total_score": 16, "max_score": 33, "percent": 48.5, "grade": "Average",
+                "mandatory_fail": False,
+                "points": [{"name": "Nadi", "score": 8, "max": 8, "pass": True, "mandatory": True}],
+            },
+        },)
+        mock_conn.execute.return_value.fetchone.return_value = cached_row
+        mock_cm = MagicMock()
+        mock_cm.__enter__.return_value = mock_conn
+        mock_cm.__exit__.return_value = False
+
+        with patch("app.api.family.get_conn", return_value=mock_cm):
+            result = _build_porutham_chat_block(rows, "group-1")
+
+        self.assertIn("PORUTHAM (Husband x Wife compatibility, 10-point Tamil Kuta system):", result)
+        self.assertIn("Score: 16/33 (48.5%) — Average", result)
+        self.assertIn("Nadi 8/8", result)
+
+    def test_no_cached_result_and_missing_data_returns_empty(self):
+        """Missing nak/rasi -> _get_or_compute_porutham returns None ->
+        block must be empty, not a crash or placeholder text."""
+        rows = [
+            _row("h-id", "husband", "Ravi", {"birth_details": {"name": "Ravi"}, "ephemeris": {}}),
+            _row("w-id", "wife", "Priya", {"birth_details": {"name": "Priya"}, "ephemeris": {}}),
+        ]
+        result = _build_porutham_chat_block(rows, "group-1")
+        self.assertEqual(result, "")
 
 
 if __name__ == "__main__":

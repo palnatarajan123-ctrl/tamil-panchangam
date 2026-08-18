@@ -295,5 +295,57 @@ class TestFamilyMemberContextPhase3Enrichment(unittest.TestCase):
         self.assertIn("Shadow point: Taurus (Venus)", ctx)
 
 
+class TestPoruthamInFamilyChatContext(unittest.TestCase):
+    """
+    Phase F2: _build_family_member_context() now accepts an optional
+    couple-level `porutham` dict (not per-member, hence a separate
+    parameter rather than folded into member_payloads like yogas/upagraha).
+    Stays a pure function -- chat_stream() fetches (cache-first, via
+    _get_or_compute_porutham()) and passes the resolved dict in.
+    """
+
+    def _members(self):
+        return [
+            {"id": "h-id", "role": "husband", "display_name": "Ravi", "payload": _member_payload(role="husband", name="Ravi")},
+            {"id": "w-id", "role": "wife", "display_name": "Priya", "payload": _member_payload(role="wife", name="Priya")},
+        ]
+
+    def test_no_porutham_arg_no_section_backward_compatible(self):
+        """Default (no porutham passed) must be identical to Phase A2/3
+        behavior -- confirms this addition didn't change anything for
+        callers that don't pass it."""
+        ctx = chat_module._build_family_member_context(self._members())
+        self.assertNotIn("PORUTHAM", ctx)
+
+    def test_porutham_none_no_section(self):
+        ctx = chat_module._build_family_member_context(self._members(), porutham=None)
+        self.assertNotIn("PORUTHAM", ctx)
+
+    def test_porutham_present_renders_within_family_context_block(self):
+        porutham = {
+            "total_score": 16, "max_score": 33, "percent": 48.5, "grade": "Average",
+            "mandatory_fail": False,
+            "points": [
+                {"name": "Nadi", "score": 8, "max": 8, "pass": True, "mandatory": True},
+                {"name": "Dinam", "score": 0, "max": 3, "pass": False},
+            ],
+        }
+        ctx = chat_module._build_family_member_context(self._members(), porutham=porutham)
+        self.assertIn("PORUTHAM (Husband x Wife compatibility, 10-point Tamil Kuta system):", ctx)
+        self.assertIn("Score: 16/33 (48.5%) — Average", ctx)
+        self.assertIn("Nadi 8/8", ctx)
+        self.assertIn("Dinam 0/3", ctx)
+        # Couple-level data appears once, after the per-member lines, within
+        # the same "## FAMILY CONTEXT" block -- not a separate top-level section.
+        self.assertIn("## FAMILY CONTEXT", ctx)
+        family_idx = ctx.index("## FAMILY CONTEXT")
+        porutham_idx = ctx.index("PORUTHAM")
+        self.assertGreater(porutham_idx, family_idx)
+
+    def test_empty_porutham_dict_no_section(self):
+        ctx = chat_module._build_family_member_context(self._members(), porutham={})
+        self.assertNotIn("PORUTHAM", ctx)
+
+
 if __name__ == "__main__":
     unittest.main()

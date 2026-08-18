@@ -16,8 +16,10 @@ from typing import Optional
 from app.engines.budget_guard import log_llm_call
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.sade_sati_engine import compute_sade_sati
-from app.engines.porutham_engine import compute_porutham
-from app.llm.payload_builder import _build_upagraha_context, _extract_nak_rasi
+from app.llm.payload_builder import (
+    _build_upagraha_context, _extract_nak_rasi,
+    _get_or_compute_porutham, _format_porutham_lines,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,69 +46,6 @@ try:
 except Exception as e:
     logger.error(f"Failed to load family prediction prompt: {e}")
     FAMILY_PROMPT = "You are Jyotishi. Return a valid JSON family prediction."
-
-
-def _get_or_compute_porutham(
-    db, group_id: str,
-    husband_id: Optional[str], husband_name: str, husband_nak: str, husband_rasi: str,
-    wife_id: Optional[str], wife_name: str, wife_nak: str, wife_rasi: str,
-) -> Optional[dict]:
-    """
-    Cache-first Porutham lookup -- reuses family_porutham_cache, the same
-    table and order-independent (group_id, member_id_1, member_id_2) key
-    the dedicated GET /groups/{group_id}/porutham endpoint uses, so this
-    never recomputes (or diverges from) what that endpoint would return
-    for the same pair. On a cache miss, computes and writes back in the
-    EXACT shape the endpoint itself writes (husband/wife dicts each with
-    name+nakshatra+rasi, not just nakshatra+rasi) -- the cache is genuinely
-    shared both ways, so writing a narrower shape here would silently break
-    the endpoint's own read path (its response includes "name", and
-    PoruthTab renders husband?.name || "Husband": found this exact bug
-    live while testing this function against a cache-miss group, where a
-    name-less write here caused a subsequent /porutham call to render the
-    fallback "Husband"/"Wife" labels instead of the real names).
-
-    Returns just the "porutham" breakdown dict (total_score/grade/points/...),
-    or None if nak/rasi data or member ids are missing.
-    """
-    if not husband_id or not wife_id or not husband_nak or not husband_rasi \
-            or not wife_nak or not wife_rasi:
-        return None
-
-    try:
-        cached_row = db.execute("""
-            SELECT result_json FROM family_porutham_cache
-            WHERE group_id = ?
-              AND ((member_id_1 = ? AND member_id_2 = ?)
-                OR (member_id_1 = ? AND member_id_2 = ?))
-            LIMIT 1
-        """, [group_id, husband_id, wife_id, wife_id, husband_id]).fetchone()
-        if cached_row:
-            cached = cached_row[0] if isinstance(cached_row[0], dict) else json.loads(cached_row[0])
-            return cached.get("porutham")
-    except Exception as e:
-        logger.warning(f"Porutham cache check failed: {e}")
-
-    try:
-        porutham_result = compute_porutham(
-            boy_nakshatra=husband_nak, boy_rasi=husband_rasi,
-            girl_nakshatra=wife_nak, girl_rasi=wife_rasi,
-        )
-        full_result = {
-            "husband": {"name": husband_name, "nakshatra": husband_nak, "rasi": husband_rasi},
-            "wife": {"name": wife_name, "nakshatra": wife_nak, "rasi": wife_rasi},
-            "porutham": porutham_result,
-        }
-        db.execute("""
-            INSERT INTO family_porutham_cache (group_id, member_id_1, member_id_2, result_json)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT (group_id, member_id_1, member_id_2) DO UPDATE
-            SET result_json = EXCLUDED.result_json, computed_at = NOW()
-        """, [group_id, husband_id, wife_id, json.dumps(full_result)])
-        return porutham_result
-    except Exception as e:
-        logger.warning(f"Porutham compute/cache-write failed: {e}")
-        return None
 
 
 def _build_family_context(group: dict, members_with_charts: list, year: int, db) -> str:
@@ -287,26 +226,11 @@ def _build_family_context(group: dict, members_with_charts: list, year: int, db)
         # "factor compatibility" note: that's exactly the ungrounded text
         # this replaces, and re-adding it here would make the LLM's output
         # LOOK grounded in real compatibility data when it isn't.
-        if porutham and not porutham.get("error"):
-            mandatory_fails = [
-                p["name"] for p in porutham.get("points", [])
-                if p.get("mandatory") and not p.get("pass")
-            ]
-            category_parts = []
-            for p in porutham.get("points", []):
-                if p.get("max", 0) > 0:
-                    category_parts.append(f"{p['name']} {p['score']}/{p['max']}")
-                else:
-                    category_parts.append(f"{p['name']} {'pass' if p.get('pass') else 'FAIL'}")
+        porutham_lines = _format_porutham_lines(porutham)
+        if porutham_lines:
             lines += [
                 "--- PORUTHAM (Husband x Wife compatibility, 10-point Tamil Kuta system) ---",
-                f"Score: {porutham.get('total_score')}/{porutham.get('max_score')} "
-                f"({porutham.get('percent')}%) — {porutham.get('grade')}",
-                "Mandatory categories: " + (
-                    "all passed" if not mandatory_fails
-                    else "FAILED: " + ", ".join(mandatory_fails)
-                ),
-                "Category breakdown: " + ", ".join(category_parts),
+                *porutham_lines,
                 "",
             ]
 

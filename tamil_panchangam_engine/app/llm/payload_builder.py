@@ -24,6 +24,8 @@ import logging
 from datetime import date
 from typing import Dict, Any, List, Literal, Optional
 
+from app.engines.porutham_engine import compute_porutham
+
 logger = logging.getLogger(__name__)
 
 MAX_PROMPT_TOKENS = {
@@ -693,6 +695,109 @@ def _extract_nak_rasi(payload: dict) -> tuple[str, str]:
         elif isinstance(nak_raw, str):
             nakshatra = nak_raw
     return nakshatra, rasi
+
+
+def _get_or_compute_porutham(
+    db, group_id: str,
+    husband_id: Optional[str], husband_name: str, husband_nak: str, husband_rasi: str,
+    wife_id: Optional[str], wife_name: str, wife_nak: str, wife_rasi: str,
+) -> Optional[dict]:
+    """
+    Cache-first Porutham lookup -- reuses family_porutham_cache, the same
+    table and order-independent (group_id, member_id_1, member_id_2) key
+    the dedicated GET /groups/{group_id}/porutham endpoint uses, so this
+    never recomputes (or diverges from) what that endpoint would return
+    for the same pair. On a cache miss, computes and writes back in the
+    EXACT shape the endpoint itself writes (husband/wife dicts each with
+    name+nakshatra+rasi, not just nakshatra+rasi) -- the cache is genuinely
+    shared, so writing a narrower shape here would silently break the
+    endpoint's own read path (its response includes "name", and PoruthTab
+    renders husband?.name || "Husband": found this exact bug live while
+    testing this function against a cache-miss group during Phase F1).
+
+    Moved here from app.engines.family_prediction_engine (2026-08-17,
+    Phase F2) so chat.py and family.py's family_group_chat_stream() can
+    both reuse it without either importing from a prediction engine (a
+    chat endpoint importing engine internals is an odd cross-layer
+    coupling; this module is already the established shared home for
+    family/cross-surface LLM-context helpers).
+
+    Returns just the "porutham" breakdown dict (total_score/grade/points/...),
+    or None if nak/rasi data or member ids are missing.
+    """
+    if not husband_id or not wife_id or not husband_nak or not husband_rasi \
+            or not wife_nak or not wife_rasi:
+        return None
+
+    try:
+        cached_row = db.execute("""
+            SELECT result_json FROM family_porutham_cache
+            WHERE group_id = ?
+              AND ((member_id_1 = ? AND member_id_2 = ?)
+                OR (member_id_1 = ? AND member_id_2 = ?))
+            LIMIT 1
+        """, [group_id, husband_id, wife_id, wife_id, husband_id]).fetchone()
+        if cached_row:
+            cached = cached_row[0] if isinstance(cached_row[0], dict) else json.loads(cached_row[0])
+            return cached.get("porutham")
+    except Exception as e:
+        logger.warning(f"Porutham cache check failed: {e}")
+
+    try:
+        porutham_result = compute_porutham(
+            boy_nakshatra=husband_nak, boy_rasi=husband_rasi,
+            girl_nakshatra=wife_nak, girl_rasi=wife_rasi,
+        )
+        full_result = {
+            "husband": {"name": husband_name, "nakshatra": husband_nak, "rasi": husband_rasi},
+            "wife": {"name": wife_name, "nakshatra": wife_nak, "rasi": wife_rasi},
+            "porutham": porutham_result,
+        }
+        db.execute("""
+            INSERT INTO family_porutham_cache (group_id, member_id_1, member_id_2, result_json)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (group_id, member_id_1, member_id_2) DO UPDATE
+            SET result_json = EXCLUDED.result_json, computed_at = NOW()
+        """, [group_id, husband_id, wife_id, json.dumps(full_result)])
+        return porutham_result
+    except Exception as e:
+        logger.warning(f"Porutham compute/cache-write failed: {e}")
+        return None
+
+
+def _format_porutham_lines(porutham: Optional[dict]) -> List[str]:
+    """
+    Render a compute_porutham() result (the "porutham" sub-dict returned by
+    _get_or_compute_porutham(), or a cached row's ["porutham"] value) into
+    the compact text lines shared across all three consumers -- family
+    predictions and both family chat implementations -- so the phrasing
+    can't silently diverge between surfaces the way the underlying
+    computation itself once could have. Returns [] (nothing to add) if
+    porutham is falsy or carries an error.
+    """
+    if not porutham or porutham.get("error"):
+        return []
+
+    mandatory_fails = [
+        p["name"] for p in porutham.get("points", [])
+        if p.get("mandatory") and not p.get("pass")
+    ]
+    category_parts = []
+    for p in porutham.get("points", []):
+        if p.get("max", 0) > 0:
+            category_parts.append(f"{p['name']} {p['score']}/{p['max']}")
+        else:
+            category_parts.append(f"{p['name']} {'pass' if p.get('pass') else 'FAIL'}")
+
+    return [
+        f"Score: {porutham.get('total_score')}/{porutham.get('max_score')} "
+        f"({porutham.get('percent')}%) — {porutham.get('grade')}",
+        "Mandatory categories: " + (
+            "all passed" if not mandatory_fails
+            else "FAILED: " + ", ".join(mandatory_fails)
+        ),
+        "Category breakdown: " + ", ".join(category_parts),
+    ]
 
 
 def _build_upagraha_context(upagrahas: dict) -> dict:

@@ -29,7 +29,7 @@ from app.core.auth import get_current_user
 from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.engines.porutham_engine import compute_porutham
-from app.llm.payload_builder import _extract_nak_rasi
+from app.llm.payload_builder import _extract_nak_rasi, _get_or_compute_porutham, _format_porutham_lines
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.budget_guard import log_llm_call
@@ -1199,6 +1199,48 @@ def _build_member_summary(row: tuple) -> str:
     )
 
 
+def _build_porutham_chat_block(rows: list, group_id: str) -> str:
+    """
+    Build the couple-level PORUTHAM block for family_group_chat_stream()'s
+    system prompt, or "" if there's no husband+wife pair (or no resolvable
+    result). Extracted from what was inline in the endpoint so it's
+    directly testable without mocking the full async streaming flow --
+    mirrors chat.py's _build_family_member_context() extraction pattern.
+
+    rows: the raw (fm.id, fm.role, fm.display_name, fm.chart_id, bc.payload)
+      tuples already fetched by the endpoint -- no new query.
+    """
+    husband_row = next((r for r in rows if r[1] == "husband"), None)
+    wife_row = next((r for r in rows if r[1] == "wife"), None)
+    if not husband_row or not wife_row:
+        return ""
+
+    try:
+        h_id, _, h_display, _, h_payload_raw = husband_row
+        w_id, _, w_display, _, w_payload_raw = wife_row
+        h_payload = h_payload_raw if isinstance(h_payload_raw, dict) else json.loads(h_payload_raw or "{}")
+        w_payload = w_payload_raw if isinstance(w_payload_raw, dict) else json.loads(w_payload_raw or "{}")
+        h_nak, h_rasi = _extract_nak_rasi(h_payload)
+        w_nak, w_rasi = _extract_nak_rasi(w_payload)
+        h_name = h_display or h_payload.get("birth_details", {}).get("name", "husband")
+        w_name = w_display or w_payload.get("birth_details", {}).get("name", "wife")
+        with get_conn() as conn:
+            porutham = _get_or_compute_porutham(
+                conn, group_id, str(h_id), h_name, h_nak, h_rasi,
+                str(w_id), w_name, w_nak, w_rasi,
+            )
+        porutham_lines = _format_porutham_lines(porutham)
+        if not porutham_lines:
+            return ""
+        return (
+            "\n\nPORUTHAM (Husband x Wife compatibility, 10-point Tamil Kuta system):\n"
+            + "\n".join(porutham_lines)
+        )
+    except Exception as e:
+        logger.warning(f"Porutham lookup failed for family chat: {e}")
+        return ""
+
+
 @router.post("/groups/{group_id}/chat/stream")
 async def family_group_chat_stream(
     group_id: str,
@@ -1241,6 +1283,16 @@ async def family_group_chat_stream(
     family_block = _build_family_yearly_block(group_id)
     if family_block:
         system_prompt = system_prompt + "\n\n" + family_block
+
+    # Porutham -- couple-level, not per-member, so resolved once here
+    # rather than inside _build_member_summary()'s per-row loop. Same
+    # cache-first helper as chat.py's family chat and Phase F1's family
+    # predictions -- family_porutham_cache is shared across all three, so
+    # this never diverges from what the dedicated /porutham endpoint would
+    # return for the same pair.
+    porutham_block = _build_porutham_chat_block(rows, group_id)
+    if porutham_block:
+        system_prompt += porutham_block
 
     history_trimmed = req.history[-12:]
     messages = [{"role": m.role, "content": m.content} for m in history_trimmed]
