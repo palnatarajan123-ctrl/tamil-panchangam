@@ -471,6 +471,101 @@ def _build_kp_cuspal_significators_section(data: CanonicalReportData, styles) ->
     return elements
 
 
+def _prospect_table_style() -> list:
+    """Shared table style for prospect category tables -- mirrors
+    family_report/family_pdf_renderer.py's _build_porutham() header-table
+    style (2-column Category/Result), adapted to this file's own
+    _kp_table_style() color/font conventions so it visually matches its
+    siblings here rather than the family PDF's."""
+    return [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.Color(0.95, 0.95, 0.95)),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('TOPPADDING', (0, 1), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+    ]
+
+
+def _build_one_prospect_entry(entry: dict, styles) -> List:
+    """One candidate's full category breakdown, wrapped in KeepTogether so
+    it doesn't split mid-table across a page. Full depth (all 10
+    categories), not a summary line -- this is a downloadable report a
+    reader can revisit later, unlike the chat surface's Phase G2 summary
+    line, so completeness matters more than compactness here."""
+    block = []
+    other_name = entry.get("other_name") or "Candidate"
+    score = entry.get("score")
+    max_score = entry.get("max_score")
+    percent = entry.get("percent")
+    grade = entry.get("grade") or ""
+    points = entry.get("points") or []
+    if not points:
+        return []
+
+    block.append(Paragraph(other_name, styles['SubsectionTitle']))
+    summary_bits = []
+    if score is not None and max_score is not None:
+        summary_bits.append(f"{score}/{max_score}")
+    if percent is not None:
+        summary_bits.append(f"{percent}%")
+    if grade:
+        summary_bits.append(grade)
+    if summary_bits:
+        block.append(Paragraph(" · ".join(summary_bits), styles['MutedText']))
+    block.append(Spacer(1, 0.1 * inch))
+
+    table_data = [["Category", "Result"]]
+    for p in points:
+        name = p.get("name", "")
+        if p.get("mandatory"):
+            name = f"{name} (mandatory)"
+        if p.get("max", 0) > 0:
+            result = f"{p.get('score', 0)}/{p.get('max', 0)}"
+        else:
+            result = "Pass" if p.get("pass") else "FAIL"
+        table_data.append([name, result])
+
+    table = Table(table_data, colWidths=[3.5 * inch, 2.0 * inch])
+    table.setStyle(TableStyle(_prospect_table_style()))
+    block.append(table)
+    block.append(Spacer(1, 0.2 * inch))
+    return [KeepTogether(block)]
+
+
+def _build_prospects_section(data: CanonicalReportData, styles) -> List:
+    """
+    Phase G3: renders one full sub-section per active Phase G1 prospect
+    link on this chart -- see load_prospects_for_chart()'s docstring for
+    why this is unscoped by user_id. Omitted entirely (not an empty
+    heading) when there are no resolvable prospects, matching this file's
+    _build_kp_full_section() precedent.
+    """
+    if not data.prospects or not data.prospects.entries:
+        return []
+
+    elements = []
+    elements.append(Paragraph("Compatibility Checks (Porutham)", styles['SectionTitle']))
+    elements.append(Paragraph(
+        "Tamil Jathagam Porutham (10-point Kuta compatibility matching) results "
+        "for every candidate this chart has been checked against. Rajju, Vedha, "
+        "and Nadi are traditionally treated as mandatory categories.",
+        styles['BodyText']
+    ))
+    elements.append(Spacer(1, 0.15 * inch))
+
+    for entry in data.prospects.entries:
+        elements.extend(_build_one_prospect_entry(entry, styles))
+
+    return elements
+
+
 def _build_kp_full_section(data: CanonicalReportData, styles) -> List:
     """All three KP tables grouped together with a shared section header."""
     if not data.kp_sublords:
@@ -2626,6 +2721,7 @@ def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
     # Technical appendix
     story.extend(_build_natal_snapshot(data, styles))
     story.extend(_build_kp_full_section(data, styles))
+    story.extend(_build_prospects_section(data, styles))
     story.extend(_build_astrological_context(data, styles))
     story.extend(_build_divisional_charts(data, styles))
     story.extend(_build_yogas_section(data, styles))
@@ -2681,6 +2777,7 @@ def render_pdf(data: CanonicalReportData) -> bytes:
         # Technical appendix — always rendered
         story.extend(_build_natal_snapshot(data, styles))
         story.extend(_build_kp_full_section(data, styles))
+        story.extend(_build_prospects_section(data, styles))
         story.extend(_build_divisional_charts(data, styles))
         story.extend(_build_yogas_section(data, styles))
         story.extend(_build_sade_sati_section(data, styles))
@@ -2691,6 +2788,7 @@ def render_pdf(data: CanonicalReportData) -> bytes:
     else:
         story.extend(_build_natal_snapshot(data, styles))
         story.extend(_build_kp_full_section(data, styles))
+        story.extend(_build_prospects_section(data, styles))
         story.extend(_build_divisional_charts(data, styles))
         story.extend(_build_yogas_section(data, styles))
         story.extend(_build_sade_sati_section(data, styles))

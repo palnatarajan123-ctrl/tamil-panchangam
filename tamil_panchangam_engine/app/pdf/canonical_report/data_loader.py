@@ -36,6 +36,7 @@ from .models import (
     KpSublordsData,
     KpHouseCuspsData,
     KpCuspalSignificatorsData,
+    ProspectsData,
     V4ExecutiveSummary,
     V4WhyThisPeriod,
     V4LifeArea,
@@ -98,6 +99,59 @@ def load_base_chart(base_chart_id: str) -> Dict[str, Any]:
         
         columns = [desc[0] for desc in conn.description]
         return dict(zip(columns, result))
+
+
+def load_prospects_for_chart(base_chart_id: str) -> Optional[ProspectsData]:
+    """
+    Phase G3: Phase G1 chart-to-chart prospect Porutham links for this
+    chart, unscoped by user_id (see ProspectsData's docstring -- this
+    pipeline has no auth/user context anywhere, confirmed before
+    implementing). Queries porutham_prospects directly rather than the
+    /charts/{chart_id}/prospects endpoint since that endpoint enforces
+    per-user ownership this pipeline can't provide.
+
+    Reuses app.api.prospects._get_or_compute_prospect_porutham() for the
+    cache-first lookup (same helper G1/G2 already use) rather than
+    duplicating it. Returns None if there are no links or none resolve --
+    the section is omitted entirely, not rendered empty.
+    """
+    try:
+        with get_conn() as conn:
+            rows = conn.execute("""
+                SELECT id, source_chart_id, candidate_chart_id, source_role, result_json
+                FROM porutham_prospects
+                WHERE source_chart_id = ? OR candidate_chart_id = ?
+                ORDER BY created_at DESC
+            """, [base_chart_id, base_chart_id]).fetchall()
+            if not rows:
+                return None
+
+            from app.api.prospects import _get_or_compute_prospect_porutham
+            entries = []
+            for pid, src_id, cand_id, source_role, result_raw in rows:
+                other_chart_id = str(cand_id) if str(src_id) == base_chart_id else str(src_id)
+                result = _get_or_compute_prospect_porutham(
+                    conn, (pid, src_id, cand_id, source_role, result_raw)
+                )
+                if not result:
+                    continue
+                other_side = result["boy"] if result["boy"]["chart_id"] == other_chart_id else result["girl"]
+                porutham = result.get("porutham") or {}
+                if not porutham.get("points"):
+                    continue
+                entries.append({
+                    "other_name": other_side.get("name") or "Candidate",
+                    "score": porutham.get("total_score"),
+                    "max_score": porutham.get("max_score"),
+                    "percent": porutham.get("percent"),
+                    "grade": porutham.get("grade"),
+                    "points": porutham.get("points", []),
+                })
+    except Exception as e:
+        logger.warning(f"Failed to load prospects for chart {base_chart_id}: {e}")
+        return None
+
+    return ProspectsData(entries=entries) if entries else None
 
 
 def load_prediction(base_chart_id: str, year: int, month: int) -> Dict[str, Any]:
@@ -882,6 +936,9 @@ def build_report_data(
             if sig_entries:
                 kp_cuspal_sigs_data = KpCuspalSignificatorsData(entries=sig_entries)
 
+    # Phase G3: Phase G1 chart-to-chart prospect Porutham links
+    prospects_data = load_prospects_for_chart(base_chart_id)
+
     # Upagrahas — from base chart payload
     upagrahas_data = payload.get("upagrahas")
     if upagrahas_data and upagrahas_data.get("error"):
@@ -970,6 +1027,7 @@ def build_report_data(
         kp_sublords=kp_sublords_data,
         kp_house_cusps=kp_house_cusps_data,
         kp_cuspal_significators=kp_cuspal_sigs_data,
+        prospects=prospects_data,
     )
 
 
@@ -1101,6 +1159,9 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
             ]
             if sig_entries:
                 kp_cuspal_sigs_data = KpCuspalSignificatorsData(entries=sig_entries)
+
+    # Phase G3: Phase G1 chart-to-chart prospect Porutham links
+    prospects_data = load_prospects_for_chart(base_chart_id)
 
     birth_details_data = payload.get("birth_details", {})
     chart_metadata = payload.get("chart_metadata", {})
@@ -1378,6 +1439,7 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
         kp_sublords=kp_sublords_data,
         kp_house_cusps=kp_house_cusps_data,
         kp_cuspal_significators=kp_cuspal_sigs_data,
+        prospects=prospects_data,
         bhinnashtakavarga=payload.get("bhinnashtakavarga") or None,
         shadbala_natal=payload.get("shadbala_natal") or None,
     )

@@ -227,6 +227,21 @@ class KpCuspalSignificatorsData(BaseModel):
     entries: List[Dict[str, Any]] = []  # list of {house, significators (comma string)}
 
 
+class ProspectsData(BaseModel):
+    """
+    Phase G3: Phase G1 chart-to-chart prospect Porutham links for this
+    chart. Unscoped by user_id -- this PDF pipeline has no auth/user
+    context anywhere (confirmed before implementing), and every other
+    section here (KP, yogas, sade sati) is already chart-intrinsic rather
+    than user-scoped, so this follows the same precedent rather than
+    special-casing prospects.
+    """
+    entries: List[Dict[str, Any]] = []
+    # list of {other_name, score, max_score, percent, grade, points}
+    # where points mirrors compute_porutham()'s own point list:
+    # [{name, score, max, pass, mandatory?}, ...]
+
+
 # ── Natal V2 models ────────────────────────────────────────
 
 class NatalWhoYouAre(BaseModel):
@@ -313,6 +328,7 @@ class CanonicalReportData(BaseModel):
     kp_sublords: Optional[KpSublordsData] = None
     kp_house_cusps: Optional[KpHouseCuspsData] = None
     kp_cuspal_significators: Optional[KpCuspalSignificatorsData] = None
+    prospects: Optional[ProspectsData] = None
 
     is_v4: bool = False
     v4_executive_summary: Optional[V4ExecutiveSummary] = None
