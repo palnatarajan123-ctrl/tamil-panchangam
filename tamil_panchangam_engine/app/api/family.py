@@ -1288,6 +1288,56 @@ def _build_porutham_chat_block(rows: list, group_id: str) -> str:
         return ""
 
 
+def _build_prospect_chat_block(user_id: str, base_chart_id: str) -> str:
+    """
+    Build the '## COMPATIBILITY CHECKS' block for family_group_chat_stream(),
+    or "" if base_chart_id has no active Phase G1 prospect links.
+
+    Extracted (rather than left inline in the endpoint) to match this
+    file's own established pattern -- _build_porutham_chat_block() above is
+    extracted for the same reason. Confirmed this endpoint's base_chart_id
+    (previously used only for log_llm_call()'s cost attribution) is a real
+    chart id that can carry its own prospect links independent of family
+    membership -- same as chat.py's chat_stream(), so this reuses chat.py's
+    _build_prospect_context() rather than duplicating the rendering logic
+    (no circular import: chat.py doesn't import from family.py). Anchored
+    on base_chart_id only, not fanned out per family member, for the same
+    cost reasons _build_member_summary() above already declines to expand
+    predictive_signals/kp_sublords per member.
+    """
+    try:
+        with get_conn() as conn:
+            prospect_rows = conn.execute("""
+                SELECT id, source_chart_id, candidate_chart_id, source_role, result_json
+                FROM porutham_prospects
+                WHERE user_id = %s AND (source_chart_id = %s OR candidate_chart_id = %s)
+            """, (user_id, base_chart_id, base_chart_id)).fetchall()
+
+            from app.api.prospects import _get_or_compute_prospect_porutham
+            prospects = []
+            for pid, src_id, cand_id, source_role, result_raw in prospect_rows:
+                other_chart_id = str(cand_id) if str(src_id) == base_chart_id else str(src_id)
+                result = _get_or_compute_prospect_porutham(
+                    conn, (pid, src_id, cand_id, source_role, result_raw)
+                )
+                if not result:
+                    continue
+                other_side = result["boy"] if result["boy"]["chart_id"] == other_chart_id else result["girl"]
+                porutham = result.get("porutham") or {}
+                prospects.append({
+                    "other_name": other_side.get("name") or "a candidate",
+                    "score": porutham.get("total_score"),
+                    "max_score": porutham.get("max_score"),
+                    "grade": porutham.get("grade"),
+                })
+
+        from app.api.chat import _build_prospect_context
+        return _build_prospect_context(prospects)
+    except Exception as e:
+        logger.warning(f"Prospect context lookup failed for family chat: {e}")
+        return ""
+
+
 @router.post("/groups/{group_id}/chat/stream")
 async def family_group_chat_stream(
     group_id: str,
@@ -1340,6 +1390,10 @@ async def family_group_chat_stream(
     porutham_block = _build_porutham_chat_block(rows, group_id)
     if porutham_block:
         system_prompt += porutham_block
+
+    prospect_block = _build_prospect_chat_block(user_id, req.base_chart_id)
+    if prospect_block:
+        system_prompt += prospect_block
 
     history_trimmed = req.history[-12:]
     messages = [{"role": m.role, "content": m.content} for m in history_trimmed]

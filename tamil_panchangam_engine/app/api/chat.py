@@ -383,6 +383,41 @@ def _build_family_member_context(member_payloads: list, porutham: Optional[dict]
     )
 
 
+def _build_prospect_context(prospects: list) -> str:
+    """
+    Render a compact '## COMPATIBILITY CHECKS' system-prompt block for
+    Phase G1 chart-to-chart prospect links anchored on the chart this chat
+    is running against.
+
+    Cost-conscious by design, same reasoning Phase F2 applied to
+    non-anchor family members: one summary line per prospect (candidate
+    name + score + grade), not the full 10-category breakdown -- a chart
+    with several prospects would otherwise bloat every chat message. Full
+    breakdown stays reachable via GET /prospects/{id}/porutham, the same
+    "summary in chat, detail in the dedicated view" split family Porutham
+    already uses in _build_family_member_context() below.
+
+    prospects: list of dicts with "other_name", "score", "max_score", "grade".
+    Chat is a conversational surface (unlike family predictions/PDF), so
+    classical terms are used freely here -- same convention as the
+    PORUTHAM block in _build_family_member_context().
+    """
+    lines = [
+        f"- {p['other_name']}: {p['score']}/{p['max_score']} Porutham points ({p['grade']})"
+        for p in prospects if p.get("score") is not None
+    ]
+    if not lines:
+        return ""
+    return (
+        "\n\n## COMPATIBILITY CHECKS\n"
+        "This person has been checked for Tamil Jathagam Porutham compatibility "
+        "against the following candidate(s):\n"
+        + "\n".join(lines)
+        + "\nIf asked about a specific match, use this score/grade directly. "
+          "A full category-by-category breakdown is available in the app if the user wants more detail."
+    )
+
+
 def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -> str:
     """Render the chat system prompt from context assembled by _build_chat_context()."""
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(**context)
@@ -695,6 +730,44 @@ async def chat_stream(
 
     if family_member_context:
         system_prompt = system_prompt + family_member_context
+
+    # Prospect awareness (Phase G2) -- Phase G1's chart-to-chart Porutham
+    # links, independent of family groups. Anchored on base_chart_id
+    # regardless of whether this is also a family chat (group_id set
+    # above): a prospect link belongs to a chart, not a group, so a chart
+    # already in a family group can still have its own separate prospect
+    # checks worth surfacing.
+    try:
+        with get_conn() as conn:
+            prospect_rows = conn.execute("""
+                SELECT id, source_chart_id, candidate_chart_id, source_role, result_json
+                FROM porutham_prospects
+                WHERE user_id = ? AND (source_chart_id = ? OR candidate_chart_id = ?)
+            """, [user_id, req.base_chart_id, req.base_chart_id]).fetchall()
+
+            from app.api.prospects import _get_or_compute_prospect_porutham
+            prospects = []
+            for pid, src_id, cand_id, source_role, result_raw in prospect_rows:
+                other_chart_id = str(cand_id) if str(src_id) == req.base_chart_id else str(src_id)
+                result = _get_or_compute_prospect_porutham(
+                    conn, (pid, src_id, cand_id, source_role, result_raw)
+                )
+                if not result:
+                    continue
+                other_side = result["boy"] if result["boy"]["chart_id"] == other_chart_id else result["girl"]
+                porutham = result.get("porutham") or {}
+                prospects.append({
+                    "other_name": other_side.get("name") or "a candidate",
+                    "score": porutham.get("total_score"),
+                    "max_score": porutham.get("max_score"),
+                    "grade": porutham.get("grade"),
+                })
+
+        prospect_context = _build_prospect_context(prospects)
+        if prospect_context:
+            system_prompt = system_prompt + prospect_context
+    except Exception as e:
+        logger.warning(f"Prospect context lookup failed for chat: {e}")
 
     # Enrich with child prediction context if requested
     if req.context_type and req.context_type.startswith("child:"):

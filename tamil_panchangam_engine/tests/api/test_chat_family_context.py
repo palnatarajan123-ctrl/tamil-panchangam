@@ -347,5 +347,63 @@ class TestPoruthamInFamilyChatContext(unittest.TestCase):
         self.assertNotIn("PORUTHAM", ctx)
 
 
+class TestBuildProspectContext(unittest.TestCase):
+    """
+    Phase G2: _build_prospect_context() renders Phase G1's chart-to-chart
+    prospect links into a compact chat system-prompt block -- summary line
+    per prospect (candidate name + score + grade), not the full 10-category
+    breakdown, mirroring Phase F2's cost-conscious non-anchor-member pattern.
+    Pure function -- chat_stream() resolves the prospect rows/porutham via
+    DB + _get_or_compute_prospect_porutham() and passes plain dicts in.
+    """
+
+    def test_empty_list_no_section(self):
+        ctx = chat_module._build_prospect_context([])
+        self.assertEqual(ctx, "")
+
+    def test_single_prospect_renders_summary_line(self):
+        ctx = chat_module._build_prospect_context(
+            [{"other_name": "Priya", "score": 16, "max_score": 33, "grade": "Average"}]
+        )
+        self.assertIn("## COMPATIBILITY CHECKS", ctx)
+        self.assertIn("- Priya: 16/33 Porutham points (Average)", ctx)
+
+    def test_multiple_prospects_each_get_a_line(self):
+        ctx = chat_module._build_prospect_context([
+            {"other_name": "Priya", "score": 16, "max_score": 33, "grade": "Average"},
+            {"other_name": "Divya", "score": 28, "max_score": 33, "grade": "Excellent"},
+        ])
+        self.assertIn("- Priya: 16/33 Porutham points (Average)", ctx)
+        self.assertIn("- Divya: 28/33 Porutham points (Excellent)", ctx)
+
+    def test_prospect_with_no_score_skipped_not_crashed(self):
+        """A prospect whose Porutham couldn't be resolved (score=None,
+        e.g. missing nak/rasi on one chart) must be silently omitted, not
+        rendered as 'None/None' or crash the format string."""
+        ctx = chat_module._build_prospect_context([
+            {"other_name": "Priya", "score": None, "max_score": None, "grade": None},
+        ])
+        self.assertEqual(ctx, "")
+
+    def test_mixed_resolved_and_unresolved_only_resolved_rendered(self):
+        ctx = chat_module._build_prospect_context([
+            {"other_name": "Priya", "score": 16, "max_score": 33, "grade": "Average"},
+            {"other_name": "Unresolved", "score": None, "max_score": None, "grade": None},
+        ])
+        self.assertIn("Priya", ctx)
+        self.assertNotIn("Unresolved", ctx)
+
+    def test_full_breakdown_not_inlined(self):
+        """Cost-conscious guard: the block must stay summary-level -- no
+        per-category names should ever appear here (that's exclusively the
+        dedicated prospect view's job)."""
+        ctx = chat_module._build_prospect_context(
+            [{"other_name": "Priya", "score": 16, "max_score": 33, "grade": "Average"}]
+        )
+        for category in ["Dinam", "Ganam", "Yoni", "Rasi", "Rasiyathipaty",
+                          "Rajju", "Vedha", "Mahendra", "Stree Deergha", "Nadi"]:
+            self.assertNotIn(category, ctx)
+
+
 if __name__ == "__main__":
     unittest.main()

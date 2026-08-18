@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 
 from app.api.family import (
     _build_member_summary, _build_porutham_chat_block, _resolve_porutham_for_pdf,
+    _build_prospect_chat_block,
 )
 from app.llm.payload_builder import _build_family_yoga_upagraha_suffix
 
@@ -262,6 +263,60 @@ class TestResolvePoruthamForPdf(unittest.TestCase):
         ]
         porutham, husband_name, wife_name = _resolve_porutham_for_pdf(members, "group-1")
         self.assertIsNone(porutham)
+
+
+class TestBuildProspectChatBlock(unittest.TestCase):
+    """
+    Phase G2 (extended): family_group_chat_stream()'s req.base_chart_id
+    was previously used only for log_llm_call()'s cost attribution --
+    confirmed live it's a real chart id that can independently carry
+    Phase G1 prospect links, same as chat.py's chat_stream(). Extracted
+    to match this file's own _build_porutham_chat_block() precedent.
+    """
+
+    def _cm(self, conn):
+        cm = MagicMock()
+        cm.__enter__.return_value = conn
+        cm.__exit__.return_value = False
+        return cm
+
+    def test_no_prospects_returns_empty_string(self):
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = []
+        with patch("app.api.family.get_conn", return_value=self._cm(mock_conn)):
+            result = _build_prospect_chat_block("u1", "chart-1")
+        self.assertEqual(result, "")
+
+    def test_resolvable_prospect_renders_compatibility_checks_block(self):
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = [
+            ("p1", "chart-1", "chart-2", "boy", {
+                "boy": {"chart_id": "chart-1", "name": "AN Sr", "nakshatra": "Ashwini", "rasi": "Mesham"},
+                "girl": {"chart_id": "chart-2", "name": "KK", "nakshatra": "Swati", "rasi": "Thulam"},
+                "porutham": {"total_score": 23, "max_score": 33, "grade": "Good"},
+            }),
+        ]
+        with patch("app.api.family.get_conn", return_value=self._cm(mock_conn)):
+            result = _build_prospect_chat_block("u1", "chart-1")
+        self.assertIn("## COMPATIBILITY CHECKS", result)
+        self.assertIn("KK: 23/33 Porutham points (Good)", result)
+
+    def test_unresolvable_prospect_omitted_not_crashed(self):
+        """result_json missing (cache miss) and the follow-on chart lookup
+        also failing (fetchone -> None) must degrade to no block, not a crash."""
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = [
+            ("p1", "chart-1", "chart-2", "boy", None),
+        ]
+        mock_conn.execute.return_value.fetchone.return_value = None
+        with patch("app.api.family.get_conn", return_value=self._cm(mock_conn)):
+            result = _build_prospect_chat_block("u1", "chart-1")
+        self.assertEqual(result, "")
+
+    def test_db_error_returns_empty_string_no_crash(self):
+        with patch("app.api.family.get_conn", side_effect=RuntimeError("db down")):
+            result = _build_prospect_chat_block("u1", "chart-1")
+        self.assertEqual(result, "")
 
 
 if __name__ == "__main__":
