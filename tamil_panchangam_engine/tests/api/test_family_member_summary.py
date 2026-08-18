@@ -230,10 +230,12 @@ class TestResolvePoruthamForPdf(unittest.TestCase):
         members = [self._item("h-id", "husband", "Ravi", _member_payload(name="Ravi"))]
         with patch("app.api.family.get_conn") as mock_get_conn:
             result = _resolve_porutham_for_pdf(members, "group-1")
-        self.assertEqual(result, (None, None, None))
+        self.assertEqual(result, (None, None, None, None))
         mock_get_conn.assert_not_called()
 
-    def test_husband_and_wife_resolves_porutham_and_names(self):
+    def test_husband_and_wife_resolves_porutham_names_and_commentary(self):
+        """Phase H3: also confirms the cached "commentary" field flows
+        through as the 4th return value, since the PDF renderer needs it."""
         members = [
             self._item("h-id", "husband", "Ravi", _member_payload(name="Ravi", rasi="Mesham", nak="Ashwini")),
             self._item("w-id", "wife", "Priya", _member_payload(name="Priya", rasi="Kanni", nak="Hasta")),
@@ -243,6 +245,7 @@ class TestResolvePoruthamForPdf(unittest.TestCase):
             "husband": {"name": "Ravi", "nakshatra": "Ashwini", "rasi": "Mesham"},
             "wife": {"name": "Priya", "nakshatra": "Hasta", "rasi": "Kanni"},
             "porutham": {"total_score": 16, "max_score": 33, "grade": "Average", "points": []},
+            "commentary": "Cached commentary text.",
         },)
         mock_conn.execute.return_value.fetchone.return_value = cached_row
         mock_cm = MagicMock()
@@ -250,19 +253,21 @@ class TestResolvePoruthamForPdf(unittest.TestCase):
         mock_cm.__exit__.return_value = False
 
         with patch("app.api.family.get_conn", return_value=mock_cm):
-            porutham, husband_name, wife_name = _resolve_porutham_for_pdf(members, "group-1")
+            porutham, husband_name, wife_name, commentary = _resolve_porutham_for_pdf(members, "group-1")
 
         self.assertEqual(porutham, {"total_score": 16, "max_score": 33, "grade": "Average", "points": []})
         self.assertEqual(husband_name, "Ravi")
         self.assertEqual(wife_name, "Priya")
+        self.assertEqual(commentary, "Cached commentary text.")
 
     def test_missing_nak_rasi_returns_all_none(self):
         members = [
             self._item("h-id", "husband", "Ravi", {"birth_details": {"name": "Ravi"}, "ephemeris": {}}),
             self._item("w-id", "wife", "Priya", {"birth_details": {"name": "Priya"}, "ephemeris": {}}),
         ]
-        porutham, husband_name, wife_name = _resolve_porutham_for_pdf(members, "group-1")
+        porutham, husband_name, wife_name, commentary = _resolve_porutham_for_pdf(members, "group-1")
         self.assertIsNone(porutham)
+        self.assertIsNone(commentary)
 
 
 class TestBuildProspectChatBlock(unittest.TestCase):

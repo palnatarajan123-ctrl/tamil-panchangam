@@ -237,9 +237,12 @@ class ProspectsData(BaseModel):
     special-casing prospects.
     """
     entries: List[Dict[str, Any]] = []
-    # list of {other_name, score, max_score, percent, grade, points}
+    # list of {other_name, score, max_score, percent, grade, points, commentary}
     # where points mirrors compute_porutham()'s own point list:
     # [{name, score, max, pass, mandatory?}, ...]
+    # commentary (Phase H3): the cached prospect-tone LLM commentary from
+    # _get_or_compute_prospect_porutham(), or None for cache rows that
+    # predate that field.
 
 
 # ── Natal V2 models ────────────────────────────────────────

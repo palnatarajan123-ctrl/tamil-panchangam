@@ -120,6 +120,22 @@ class TestBuildPorutham(unittest.TestCase):
         self.assertIn("Husband", text)
         self.assertIn("Wife", text)
 
+    def test_commentary_renders_between_summary_and_table(self):
+        """Phase H3: commentary paragraph renders when passed."""
+        elements = _build_porutham(
+            _real_porutham(), "PN", "Arthi", self.styles,
+            commentary="This is the mechanism explanation.",
+        )
+        text = _flatten_text(elements)
+        self.assertIn("This is the mechanism explanation.", text)
+
+    def test_no_commentary_renders_without_error(self):
+        """Older cached rows / callers that don't pass commentary -- must
+        still render the rest of the section fine (default is None)."""
+        elements = _build_porutham(_real_porutham(), "PN", "Arthi", self.styles)
+        text = _flatten_text(elements)
+        self.assertIn("Compatibility (Porutham)", text)
+
 
 class TestRenderFamilyPdfWithPorutham(unittest.TestCase):
     """Full render_family_pdf() -- confirms no crash and valid PDF bytes
@@ -141,6 +157,18 @@ class TestRenderFamilyPdfWithPorutham(unittest.TestCase):
             group_name="Test Group", member_names=["A", "B"], year=2026,
             prediction=self._base_prediction(),
             porutham=_real_porutham(), husband_name="Ravi", wife_name="Priya",
+        )
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+        self.assertGreater(len(pdf_bytes), 1000)
+
+    def test_with_porutham_commentary_produces_valid_pdf_no_crash(self):
+        """Phase H3: passing porutham_commentary through the full render
+        path doesn't break generation."""
+        pdf_bytes = render_family_pdf(
+            group_name="Test Group", member_names=["A", "B"], year=2026,
+            prediction=self._base_prediction(),
+            porutham=_real_porutham(), husband_name="Ravi", wife_name="Priya",
+            porutham_commentary="This is the mechanism explanation.",
         )
         self.assertTrue(pdf_bytes.startswith(b"%PDF"))
         self.assertGreater(len(pdf_bytes), 1000)

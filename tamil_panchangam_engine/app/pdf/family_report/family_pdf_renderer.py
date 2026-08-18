@@ -324,6 +324,7 @@ def _build_child_milestones(milestones: list, styles) -> List:
 
 def _build_porutham(
     porutham: Optional[dict], husband_name: Optional[str], wife_name: Optional[str], styles,
+    commentary: Optional[str] = None,
 ) -> List:
     """
     Dedicated Porutham (10-point Tamil Kuta compatibility) table.
@@ -339,10 +340,15 @@ def _build_porutham(
     Ganam, etc.) as data labels -- appropriate for a technical table, same
     distinction canonical_report/pdf_renderer.py's KP tables already draw
     between plain-language narrative prose and a labeled technical table.
-    No accompanying narrative prose is generated here (there's no LLM
-    output for Porutham specifically, only the plain-language folding into
-    caution_windows Phase F1 already does), so there's no jargon-in-prose
-    risk to guard against in this particular section.
+
+    commentary (Phase H3): the LLM-generated, family-tone paragraph cached
+    alongside the Porutham result since Phase H1, explaining the mechanism
+    behind the grade (e.g. a mandatory-category fail overriding the raw
+    percentage). Rendered between the score summary and the category
+    table, same placement as the UI's PoruthamBreakdown component (Phase
+    H2) so the PDF and in-app view read consistently. Older cached rows
+    predating this field simply omit the paragraph -- no backfill here
+    either, matching Phase H2's same call.
 
     Guards for no-pairing / no-result the same way every other section in
     this file guards on empty input: returns [] so nothing renders, not a
@@ -367,6 +373,14 @@ def _build_porutham(
     )
     elements.append(Paragraph(f"<b>{names_line}</b><br/>{score_line}", summary_style))
     elements.append(Spacer(1, 0.1 * inch))
+
+    if commentary:
+        commentary_style = ParagraphStyle(
+            'PoruthamCommentary', parent=styles['FamilyBody'],
+            spaceAfter=12, leading=14,
+        )
+        elements.append(Paragraph(commentary, commentary_style))
+        elements.append(Spacer(1, 0.1 * inch))
 
     header = [
         Paragraph("Category", styles['FamilyTableHeader']),
@@ -696,6 +710,7 @@ def render_family_pdf(
     porutham: Optional[dict] = None,
     husband_name: Optional[str] = None,
     wife_name: Optional[str] = None,
+    porutham_commentary: Optional[str] = None,
 ) -> bytes:
     """
     Render the family prediction as a PDF and return raw bytes.
@@ -704,9 +719,13 @@ def render_family_pdf(
     porutham/husband_name/wife_name: optional, only present when the group
     has a resolvable husband+wife pairing (see get_family_predictions_pdf()
     in app/api/family.py, which fetches it via the shared
-    _get_or_compute_porutham() rather than a new lookup). None for a
-    single-member or no-pairing group -- _build_porutham() below then
+    _get_or_compute_full_family_porutham() rather than a new lookup). None
+    for a single-member or no-pairing group -- _build_porutham() below then
     correctly renders nothing rather than a broken/empty section.
+
+    porutham_commentary (Phase H3): the cached family-tone commentary
+    paragraph from the same lookup, threaded through separately since it
+    lives alongside (not inside) the porutham dict in the cache shape.
     """
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -728,7 +747,7 @@ def render_family_pdf(
     # Placement: immediately after Shared Caution Windows, not end-of-
     # document -- same subject matter (couple relationship dynamics) as
     # the caution-window narrative Phase F1 already grounds in this data.
-    story += _build_porutham(porutham, husband_name, wife_name, styles)
+    story += _build_porutham(porutham, husband_name, wife_name, styles, porutham_commentary)
     story += _build_child_milestones(prediction.get("child_milestones", []), styles)
     story += _build_key_takeaways(prediction.get("key_takeaways", []), styles)
     story += _build_footer(styles)

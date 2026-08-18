@@ -146,6 +146,7 @@ def load_prospects_for_chart(base_chart_id: str) -> Optional[ProspectsData]:
                     "percent": porutham.get("percent"),
                     "grade": porutham.get("grade"),
                     "points": porutham.get("points", []),
+                    "commentary": result.get("commentary"),
                 })
     except Exception as e:
         logger.warning(f"Failed to load prospects for chart {base_chart_id}: {e}")

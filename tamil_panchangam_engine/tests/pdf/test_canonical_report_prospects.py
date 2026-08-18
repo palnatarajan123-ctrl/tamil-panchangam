@@ -115,6 +115,23 @@ class TestBuildOneProspectEntry(unittest.TestCase):
         text = _flatten_text(elements)
         self.assertIn("Candidate", text)
 
+    def test_commentary_renders_when_present(self):
+        """Phase H3: cached prospect-tone commentary renders between the
+        score summary and the category table."""
+        entry = _real_entry()
+        entry["commentary"] = "This is the mechanism explanation."
+        elements = _build_one_prospect_entry(entry, self.styles)
+        text = _flatten_text(elements)
+        self.assertIn("This is the mechanism explanation.", text)
+
+    def test_no_commentary_key_renders_without_error(self):
+        """Older cache rows predating Phase H1 have no "commentary" key at
+        all -- must render fine, not crash on a missing key."""
+        entry = _real_entry()
+        elements = _build_one_prospect_entry(entry, self.styles)
+        text = _flatten_text(elements)
+        self.assertIn("KK", text)  # still renders normally
+
 
 class TestBuildProspectsSection(unittest.TestCase):
     def setUp(self):
@@ -191,6 +208,26 @@ class TestLoadProspectsForChart(unittest.TestCase):
         self.assertEqual(len(result.entries), 1)
         self.assertEqual(result.entries[0]["other_name"], "KK")
         self.assertEqual(result.entries[0]["score"], 23)
+        self.assertIsNone(result.entries[0]["commentary"])  # not in cached row
+
+    def test_commentary_threaded_through_from_cache_row(self):
+        """Phase H3: a cached row that DOES have a "commentary" field
+        (post-Phase-H1 cache write) must carry it into the entry dict."""
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = [
+            ("p1", "chart-1", "chart-2", "boy", {
+                "boy": {"chart_id": "chart-1", "name": "AN Sr", "nakshatra": "X", "rasi": "Y"},
+                "girl": {"chart_id": "chart-2", "name": "KK", "nakshatra": "A", "rasi": "B"},
+                "porutham": {
+                    "total_score": 23, "max_score": 33, "percent": 69.7, "grade": "Good",
+                    "points": [{"name": "Nadi", "score": 8, "max": 8, "pass": True, "mandatory": True}],
+                },
+                "commentary": "Cached prospect commentary.",
+            }),
+        ]
+        with patch("app.pdf.canonical_report.data_loader.get_conn", return_value=self._cm(conn)):
+            result = load_prospects_for_chart("chart-1")
+        self.assertEqual(result.entries[0]["commentary"], "Cached prospect commentary.")
 
     def test_no_resolvable_points_returns_none(self):
         """A prospect row whose Porutham has no points (e.g. missing

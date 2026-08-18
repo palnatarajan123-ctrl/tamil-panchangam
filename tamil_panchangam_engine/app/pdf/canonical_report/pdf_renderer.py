@@ -521,6 +521,16 @@ def _build_one_prospect_entry(entry: dict, styles) -> List:
         block.append(Paragraph(" · ".join(summary_bits), styles['MutedText']))
     block.append(Spacer(1, 0.1 * inch))
 
+    # Commentary (Phase H3): cached prospect-tone LLM explanation of the
+    # mechanism behind the grade, same placement (between score summary
+    # and category table) as the family PDF section and the UI's
+    # PoruthamBreakdown component. Older cache rows without it simply
+    # omit the paragraph.
+    commentary = entry.get("commentary")
+    if commentary:
+        block.append(Paragraph(commentary, styles['BodyText']))
+        block.append(Spacer(1, 0.15 * inch))
+
     table_data = [["Category", "Result"]]
     for p in points:
         name = p.get("name", "")
