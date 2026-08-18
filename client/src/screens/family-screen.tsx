@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ChatPanel } from "@/components/ChatPanel";
+import { PoruthamBreakdown, type PoruthResult } from "@/components/PoruthamBreakdown";
 import {
   Users, Plus, Trash2, ArrowLeft, ChevronRight,
-  Heart, Star, AlertCircle, CheckCircle2, XCircle,
+  Heart, Star, AlertCircle,
   MessageCircle, ChevronDown, FileText,
 } from "lucide-react";
 
@@ -50,24 +51,6 @@ interface FamilyGroup {
   members?: FamilyMember[];
 }
 
-interface PoruthPoint {
-  name: string;
-  score: number;
-  max: number;
-  pass: boolean;
-  mandatory?: boolean;
-}
-
-interface PoruthResult {
-  total_score: number;
-  max_score: number;
-  percent: number;
-  grade: string;
-  mandatory_fail: boolean;
-  points: PoruthPoint[];
-  error?: string;
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -98,23 +81,6 @@ const ROLE_COLORS: Record<string, string> = {
   child: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
   other: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
 };
-
-function GradeTag({ grade, mandatoryFail }: { grade: string; mandatoryFail: boolean }) {
-  const colors: Record<string, string> = {
-    Excellent: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
-    Good: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-    Average: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-    Poor: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-    Unknown: "bg-gray-100 text-gray-600",
-  };
-  const label = mandatoryFail ? `${grade} (dosha)` : grade;
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm font-medium ${colors[grade] ?? colors.Unknown}`}>
-      {mandatoryFail && <AlertCircle className="h-3 w-3" />}
-      {label}
-    </span>
-  );
-}
 
 // ── Sub-views ─────────────────────────────────────────────────────────────────
 
@@ -309,62 +275,13 @@ function PoruthTab({ groupId, onAskJyotishi }: { groupId: string; onAskJyotishi:
 
   return (
     <div className="space-y-4">
-      {/* Header pair */}
-      <div className="flex items-center gap-3 justify-center py-2">
-        <div className="text-center">
-          <p className="font-medium">{husband?.name || "Husband"}</p>
-          <p className="text-xs text-muted-foreground">{husband?.nakshatra} · {husband?.rasi}</p>
-        </div>
-        <Heart className="h-5 w-5 text-rose-400" />
-        <div className="text-center">
-          <p className="font-medium">{wife?.name || "Wife"}</p>
-          <p className="text-xs text-muted-foreground">{wife?.nakshatra} · {wife?.rasi}</p>
-        </div>
-      </div>
-
-      {/* Score card */}
-      <Card>
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <span className="text-3xl font-bold">{result.total_score}</span>
-              <span className="text-muted-foreground text-sm"> / {result.max_score}</span>
-            </div>
-            <GradeTag grade={result.grade} mandatoryFail={result.mandatory_fail} />
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all"
-              style={{ width: `${result.percent}%` }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">{result.percent}%</p>
-        </CardContent>
-      </Card>
-
-      {/* Points breakdown */}
-      <div className="space-y-1">
-        {result.points.map((pt) => (
-          <div key={pt.name} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
-            <div className="flex items-center gap-2">
-              {pt.mandatory && !pt.pass ? (
-                <XCircle className="h-4 w-4 text-destructive flex-shrink-0" />
-              ) : pt.pass ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-              ) : (
-                <XCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              )}
-              <span className="text-sm">{pt.name}</span>
-              {pt.mandatory && (
-                <span className="text-xs text-muted-foreground">(mandatory)</span>
-              )}
-            </div>
-            <span className="text-sm font-medium tabular-nums">
-              {pt.max > 0 ? `${pt.score}/${pt.max}` : (pt.pass ? "✓" : "✗")}
-            </span>
-          </div>
-        ))}
-      </div>
+      <PoruthamBreakdown
+        personA={husband ?? {}}
+        personB={wife ?? {}}
+        personALabel="Husband"
+        personBLabel="Wife"
+        result={result}
+      />
 
       {/* Two entry points out of this tab, both reusing existing app
           mechanisms rather than inventing new ones (Phase F4 Part B):

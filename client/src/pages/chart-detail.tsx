@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { StatusBadge } from "@/components/status-badge";
+import { CompatibilityChecksSection } from "@/components/CompatibilityChecksSection";
 import { DashaTimeline } from "@/components/DashaTimeline";
 import { YogasPanel } from "@/components/YogasPanel";
 import { SadeSatiPanel } from "@/components/SadeSatiPanel";
@@ -371,6 +372,8 @@ export default function ChartDetail() {
               Generate Predictions
             </Button>
           </Link>
+
+          {chartId && <CompatibilityChecksSection chartId={chartId} />}
         </div>
       </div>
     </div>

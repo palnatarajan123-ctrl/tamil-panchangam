@@ -12,6 +12,7 @@ import Predictions from "@/pages/predictions.legacy"; // legacy
 import Health from "@/pages/health";
 import Docs from "@/pages/docs";
 import ChartDetail from "@/pages/chart-detail";
+import ProspectDetail from "@/pages/prospect-detail";
 import AdminLLM from "@/pages/admin-llm";
 import MethodologyPage from "@/pages/methodology";
 import Login from "@/pages/login";
@@ -111,6 +112,14 @@ function Router() {
       <Route
         path="/chart/:id/predictions"
         component={PredictionScreen}
+      />
+
+      {/* ---------------------------------
+         Phase G1-G4: chart-to-chart prospect Porutham detail view
+         --------------------------------- */}
+      <Route
+        path="/chart/:chartId/prospects/:prospectId"
+        component={ProspectDetail}
       />
 
       {/* ---------------------------------
