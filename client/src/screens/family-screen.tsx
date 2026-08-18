@@ -281,7 +281,7 @@ function AddMemberForm({
 }
 
 
-function PoruthTab({ groupId }: { groupId: string }) {
+function PoruthTab({ groupId, onAskJyotishi }: { groupId: string; onAskJyotishi: () => void }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["/api/family/groups", groupId, "porutham"],
     queryFn: () => apiFetch("GET", `/api/family/groups/${groupId}/porutham`),
@@ -364,6 +364,22 @@ function PoruthTab({ groupId }: { groupId: string }) {
           </div>
         ))}
       </div>
+
+      {/* Entry point into family chat, already grounded in this exact
+          Porutham result (Phase F2) -- opens the same chat panel/instance
+          as the header's "Ask Jyotishi" button, no pre-filled message:
+          ChatPanel/useChat have no initial-message capability anywhere in
+          this app, and building one is a separate UX decision, not a side
+          effect of this button. */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full gap-1.5"
+        onClick={onAskJyotishi}
+      >
+        <MessageCircle className="h-4 w-4" />
+        Ask Jyotishi about this match
+      </Button>
     </div>
   );
 }
@@ -630,7 +646,9 @@ function GroupDetail({
         </div>
       )}
 
-      {activeTab === "compatibility" && <PoruthTab groupId={groupId} />}
+      {activeTab === "compatibility" && (
+        <PoruthTab groupId={groupId} onAskJyotishi={() => setChatOpen(true)} />
+      )}
     </div>
 
     {chatOpen && primaryChartId && (
