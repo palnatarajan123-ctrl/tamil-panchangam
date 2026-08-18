@@ -15,10 +15,17 @@ from app.engines.nakshatra_names import canonical_nakshatra_list, nakshatra_inde
 NAKSHATRA_NAMES = canonical_nakshatra_list()
 
 # Gana: 0=Deva, 1=Manushya, 2=Rakshasa
+#
+# Corrected 2026-08-17 (Porutham correctness audit, Phase 1): the prior
+# table had 8 of 27 nakshatras misclassified -- Bharani, Karthigai,
+# Rohini, Mirugashirisham, Thiruvadirai, Uthiram, Visakam, Uthirattadhi --
+# cross-checked against 3+ independent sources this session. Verify
+# against tests/engines/test_porutham_engine.py's full 27-nakshatra table
+# test before ever touching this array again.
 GANA = [
-    0, 2, 1, 0, 1, 2, 0, 0, 2, 2, 1, 0,
-    0, 2, 0, 1, 0, 2, 2, 1, 1, 0, 2, 2,
-    1, 0, 0,
+    0, 1, 2, 1, 0, 1, 0, 0, 2, 2, 1, 1,
+    0, 2, 0, 2, 0, 2, 2, 1, 1, 0, 2, 2,
+    1, 1, 0,
 ]
 
 # Yoni animal index 0-13 (each animal pair shares compatibility)
@@ -111,20 +118,33 @@ def score_dinam(boy_nak: int, girl_nak: int) -> dict:
 
 
 def score_ganam(boy_nak: int, girl_nak: int) -> dict:
-    """Ganam (Gana): max 6 points."""
+    """
+    Ganam (Gana): max 6 points.
+
+    Corrected 2026-08-17 (Porutham audit, Phase 1) to a fully symmetric
+    grid: same=6, Deva+Manushya=5, Deva+Rakshasa=0, Manushya+Rakshasa=1 --
+    each regardless of which side is boy vs girl. The previous version
+    had an "intentional asymmetry" for Deva+Manushya (boy=Deva/girl=
+    Manushya=5, reversed=0) that a fresh 2-source check this session
+    could not corroborate: one numeric source gave a symmetric grid, and
+    a second (Tamil-context, prokerala.com's dedicated Gana Porutham
+    page) was internally inconsistent about Manushya<->Rakshasa
+    directionality within its own text. Per this session's contested-
+    finding tiebreak rule (don't encode asymmetry on single-source
+    confidence), this is scored symmetrically. If you find a citable
+    classical Tamil source that establishes genuine directionality here,
+    this is the place to revisit it.
+    """
     bg = GANA[boy_nak]
     gg = GANA[girl_nak]
+    pair = {bg, gg}
     if bg == gg:
         score = 6
-    elif bg == 0 and gg == 1:  # Deva + Manushya — intentional asymmetry: boy=Deva/girl=Manushya=5, reversed=0 (classical texts treat male Deva more favourably)
+    elif pair == {0, 1}:  # Deva + Manushya
         score = 5
-    elif bg == 1 and gg == 0:
-        score = 0
-    elif bg == 0 and gg == 2:  # Deva + Rakshasa
-        score = 0
-    elif bg == 1 and gg == 2:  # Manushya + Rakshasa
-        score = 0
-    else:
+    elif pair == {1, 2}:  # Manushya + Rakshasa
+        score = 1
+    else:  # Deva + Rakshasa
         score = 0
     return {"name": "Ganam", "score": score, "max": 6, "pass": score >= 5}
 

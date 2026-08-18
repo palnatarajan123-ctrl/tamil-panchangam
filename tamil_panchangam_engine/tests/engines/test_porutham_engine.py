@@ -14,8 +14,8 @@ Rasi reference (0-based index):
 NADI (0=Adi, 1=Madhya, 2=Antya):
   [0,1,2,2,1,0,0,1,2,0,1,2,2,1,0,0,1,2,0,1,2,2,1,0,0,1,2]
 
-GANA (0=Deva, 1=Manushya, 2=Rakshasa):
-  [0,2,1,0,1,2,0,0,2,2,1,0,0,2,0,1,0,2,2,1,1,0,2,2,1,0,0]
+GANA (0=Deva, 1=Manushya, 2=Rakshasa) -- corrected 2026-08-17, audit Phase 1:
+  [0,1,2,1,0,1,0,0,2,2,1,1,0,2,0,2,0,2,2,1,1,0,2,2,1,1,0]
 """
 
 import pytest
@@ -26,7 +26,9 @@ from app.engines.porutham_engine import (
     score_ganam,
     score_rasi,
     compute_porutham,
+    GANA,
 )
+from app.engines.nakshatra_names import canonical_nakshatra_list
 
 
 # ── 1. Nadi dosha — same Nadi ─────────────────────────────────────────────────
@@ -58,10 +60,20 @@ def test_nadi_different_nadi_full_score():
 
 
 # ── 3. Gana same ──────────────────────────────────────────────────────────────
+#
+# Corrected 2026-08-17 (Porutham audit, Phase 1): the prior versions of
+# tests 3-5 below asserted against the OLD, buggy GANA table -- their
+# docstrings claimed Rohini(3)=Deva and Mirugashirisham(4)=Manushya,
+# which were 2 of the 8 misclassified nakshatras the audit found and
+# fixed (both are actually Manushya and Deva respectively). Replaced with
+# nakshatra pairs whose Gana is unaffected by the fix, and updated the
+# Deva+Manushya case to the corrected symmetric scoring (was asymmetric:
+# 5 one way, 0 reversed; now 5 both ways -- see score_ganam()'s docstring
+# for why the asymmetry wasn't kept).
 
 def test_gana_same_full_score():
-    """Ashwini(0, Deva) and Rohini(3, Deva) → same Gana → score=6."""
-    result = score_ganam(0, 3)
+    """Ashwini(0, Deva) and Mirugashirisham(4, Deva) → same Gana → score=6."""
+    result = score_ganam(0, 4)
     assert result["score"] == 6
     assert result["pass"] is True
 
@@ -70,23 +82,21 @@ def test_gana_same_full_score():
 
 def test_gana_deva_plus_manushya():
     """
-    Ashwini(0, Deva) boy + Mrigashira(4, Manushya) girl → score=5.
-    Note: engine returns 5 (not 3) for this combination.
-    Reversed (boy=Manushya, girl=Deva) scores 0.
+    Ashwini(0, Deva) + Bharani(1, Manushya) → score=5, symmetric --
+    confirmed the same in both directions (see score_ganam() docstring).
     """
-    result = score_ganam(0, 4)
+    result = score_ganam(0, 1)
     assert result["score"] == 5
 
-    # Reversed direction is unfavorable
-    result_rev = score_ganam(4, 0)
-    assert result_rev["score"] == 0
+    result_rev = score_ganam(1, 0)
+    assert result_rev["score"] == 5
 
 
 # ── 5. Gana Deva + Rakshasa ───────────────────────────────────────────────────
 
 def test_gana_deva_plus_rakshasa_zero():
-    """Ashwini(0, Deva) + Bharani(1, Rakshasa) → score=0."""
-    result = score_ganam(0, 1)
+    """Ashwini(0, Deva) + Karthigai(2, Rakshasa) → score=0."""
+    result = score_ganam(0, 2)
     assert result["score"] == 0
     assert result["pass"] is False
 
@@ -158,12 +168,19 @@ def test_grade_excellent():
 
 def test_grade_good():
     """
-    Rohini+Cancer vs Swati+Libra scores 19/33 (57.6%) → Good.
+    Ashwini+Aries vs Bharani+Aries scores 20/33 (60.6%) → Good.
+
+    Corrected 2026-08-17 (Porutham audit, Phase 1): the prior example
+    (Rohini+Cancer vs Swati+Libra, expected 19/33) baked in the old
+    buggy Gana table's misclassification of Rohini as Deva -- under the
+    corrected table that pair now scores 18/33 (54.5%), just under the
+    Good threshold, landing in Average instead. Replaced with a pair
+    unaffected by the Gana fix.
     """
-    result = compute_porutham("Rohini", "Cancer", "Swati", "Libra")
+    result = compute_porutham("Ashwini", "Aries", "Bharani", "Aries")
     assert result["grade"] == "Good"
     assert result["mandatory_fail"] is False
-    assert result["total_score"] == 19
+    assert result["total_score"] == 20
 
 
 def test_grade_poor_via_mandatory_fail():
@@ -226,3 +243,75 @@ def test_rasi_index_unrecognized_returns_none():
 
 def test_rasi_index_empty_returns_none():
     assert _rasi_index("") is None
+
+
+# ── Phase 1 audit regression: full 27-nakshatra Gana table ────────────────────
+#
+# Locks in the corrected GANA table so this can't silently regress back to
+# the 8-misclassification bug the 2026-08-17 audit found. Reference table
+# cross-checked against 3+ independent sources this session (see
+# porutham_engine.py's GANA comment).
+
+_DEVA = ["Aswini", "Mirugashirisham", "Punarpoosam", "Poosam", "Hastham",
+         "Swathi", "Anusham", "Thiruvonam", "Revathi"]
+_MANUSHYA = ["Bharani", "Rohini", "Thiruvadirai", "Pooram", "Uthiram",
+             "Pooradam", "Uthiradam", "Poorattadhi", "Uthirattadhi"]
+_RAKSHASA = ["Karthigai", "Ayilyam", "Magam", "Chittirai", "Visakam",
+             "Kettai", "Moolam", "Avittam", "Sadayam"]
+
+
+@pytest.mark.parametrize("nak_name", _DEVA)
+def test_gana_table_deva_group(nak_name):
+    idx = _nakshatra_index(nak_name)
+    assert GANA[idx] == 0, f"{nak_name} (idx {idx}) should be Deva (0), got {GANA[idx]}"
+
+
+@pytest.mark.parametrize("nak_name", _MANUSHYA)
+def test_gana_table_manushya_group(nak_name):
+    idx = _nakshatra_index(nak_name)
+    assert GANA[idx] == 1, f"{nak_name} (idx {idx}) should be Manushya (1), got {GANA[idx]}"
+
+
+@pytest.mark.parametrize("nak_name", _RAKSHASA)
+def test_gana_table_rakshasa_group(nak_name):
+    idx = _nakshatra_index(nak_name)
+    assert GANA[idx] == 2, f"{nak_name} (idx {idx}) should be Rakshasa (2), got {GANA[idx]}"
+
+
+def test_gana_table_covers_all_27_nakshatras_exactly_once():
+    names = canonical_nakshatra_list()
+    assert len(names) == 27
+    assert len(GANA) == 27
+    covered = set(_DEVA) | set(_MANUSHYA) | set(_RAKSHASA)
+    assert covered == set(names), covered.symmetric_difference(set(names))
+
+
+# ── Phase 1 audit regression: Ganam scoring gradient (symmetric) ──────────────
+
+def test_ganam_gradient_same_gana_six_regardless_of_which_gana():
+    # Deva+Deva, Manushya+Manushya, Rakshasa+Rakshasa
+    assert score_ganam(0, 4)["score"] == 6   # Deva+Deva
+    assert score_ganam(1, 3)["score"] == 6   # Manushya+Manushya
+    assert score_ganam(2, 8)["score"] == 6   # Rakshasa+Rakshasa
+
+
+def test_ganam_gradient_deva_manushya_symmetric_five():
+    assert score_ganam(0, 1)["score"] == 5
+    assert score_ganam(1, 0)["score"] == 5
+
+
+def test_ganam_gradient_manushya_rakshasa_symmetric_one():
+    """
+    Corrected 2026-08-17: prior code had this at 0 both directions. A
+    fresh 2nd-source check for genuine directionality here was
+    inconclusive (the Tamil-context source was internally inconsistent
+    about which direction is worse), so per this session's tiebreak rule
+    this stays symmetric rather than encoding an unconfirmed asymmetry.
+    """
+    assert score_ganam(1, 2)["score"] == 1
+    assert score_ganam(2, 1)["score"] == 1
+
+
+def test_ganam_gradient_deva_rakshasa_symmetric_zero():
+    assert score_ganam(0, 2)["score"] == 0
+    assert score_ganam(2, 0)["score"] == 0
