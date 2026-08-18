@@ -394,6 +394,46 @@ def bootstrap():
             ON family_porutham_cache(group_id)
         """)
 
+        # porutham_prospects (Phase G1) -- chart-to-chart compatibility
+        # links, independent of family_groups. A prospect link IS the
+        # pairing entity (unlike family_porutham_cache, which caches
+        # against a group's members that exist regardless of any specific
+        # pairing), so its computed Porutham result lives directly on this
+        # row (result_json) rather than in a separate cache table --
+        # decided during G1 rather than mirroring family_porutham_cache's
+        # separate-table shape, since here it would just duplicate this
+        # table's own primary key.
+        #
+        # source_role records which chart is the "boy" input to
+        # compute_porutham() (the other is "girl") -- required because
+        # several Porutham categories (Dinam, Mahendra, Stree Deergha) are
+        # direction-sensitive and chart payloads carry no reliable gender
+        # field (checked: birth_details.gender exists in the schema but is
+        # null on every chart in the DB today).
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS porutham_prospects (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            source_chart_id TEXT NOT NULL REFERENCES base_charts(id) ON DELETE CASCADE,
+            candidate_chart_id TEXT NOT NULL REFERENCES base_charts(id) ON DELETE CASCADE,
+            source_role TEXT NOT NULL CHECK (source_role IN ('boy', 'girl')),
+            result_json JSONB,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+        """)
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_porutham_prospects_user
+            ON porutham_prospects(user_id)
+        """)
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_porutham_prospects_source
+            ON porutham_prospects(source_chart_id)
+        """)
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_porutham_prospects_candidate
+            ON porutham_prospects(candidate_chart_id)
+        """)
+
         conn.commit()
         logger.info("PostgreSQL schema bootstrapped successfully")
     except Exception as e:
