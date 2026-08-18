@@ -670,6 +670,31 @@ def _build_panchangam_context(panchangam_birth: dict) -> dict:
     }
 
 
+def _extract_nak_rasi(payload: dict) -> tuple[str, str]:
+    """
+    Extract moon nakshatra name and rasi name from chart payload.
+
+    Moved here from app.api.family (2026-08-17) so it can be shared with
+    app.engines.family_prediction_engine without a circular import --
+    family.py already imports run_family_prediction from that module, so
+    the reverse import isn't possible at module scope. This module has no
+    dependents importing back from either of those, so it's a safe shared
+    home (same reasoning as _build_family_yoga_upagraha_suffix above).
+    """
+    ephemeris = payload.get("ephemeris", {}) if isinstance(payload, dict) else {}
+    moon = ephemeris.get("moon", {})
+    rasi = ""
+    nakshatra = ""
+    if isinstance(moon, dict):
+        rasi = moon.get("rasi", "")
+        nak_raw = moon.get("nakshatra", {})
+        if isinstance(nak_raw, dict):
+            nakshatra = nak_raw.get("name", "")
+        elif isinstance(nak_raw, str):
+            nakshatra = nak_raw
+    return nakshatra, rasi
+
+
 def _build_upagraha_context(upagrahas: dict) -> dict:
     """Build Gulika/Mandi context for LLM payload."""
     if not upagrahas or upagrahas.get("error"):

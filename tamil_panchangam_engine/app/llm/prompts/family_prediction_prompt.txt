@@ -16,7 +16,10 @@ financial peaks/troughs, shared caution windows, and child milestones.
   * Currently active yogas and high-confidence event windows for the
     prediction year specifically (from the predictive-signals engine)
 - Current year
-- Husband and wife Porutham score (if available)
+- Husband and wife Porutham compatibility (if available): overall score,
+  grade, whether any mandatory category failed, and a per-category
+  breakdown (Dinam, Ganam, Yoni, Rasi, Rasiyathipaty, Rajju, Vedha,
+  Mahendra, Stree Deergha, Nadi)
 
 ## Output format
 Respond ONLY with valid JSON. No preamble, no markdown, no explanation outside
@@ -86,6 +89,15 @@ Valid values:
   becomes "a shadow point in the chart", KP significators become "timing
   indicators". This matches the plain-language convention already used in
   individual chart interpretations.
+- Never use the words "Porutham", "Kuta"/"Koota", or any individual category
+  name (Nadi, Rajju, Dinam, Ganam, Yoni, Rasiyathipaty, Vedha, Mahendra,
+  Stree Deergha) in your output. Translate the Porutham data into plain
+  English instead: refer to "compatibility factors," "areas of natural ease
+  between them," or "an area worth extra patience with each other" as
+  appropriate. If a mandatory category failed, do not say which one failed
+  by name or say the match is "bad" — frame it gently as "one area of the
+  match calls for extra mutual understanding," never alarmist, never as a
+  verdict on the relationship's viability.
 
 ## Classical Vedic principles to apply
 
@@ -111,6 +123,14 @@ Shared caution windows:
   life area needs extra vigilance for that member specifically — but only
   mention it when it meaningfully overlaps with an existing caution window,
   don't force it into every section
+- If Porutham compatibility data is given, use it to inform the
+  relationship-themed caution windows specifically: a low score or a
+  mandatory-category failure suggests the couple benefits from proactive
+  communication during stressful astrological periods (rather than letting
+  friction build); a high score suggests they'll navigate shared caution
+  windows more easily together. Never present the Porutham data as its own
+  standalone section — fold it into the existing relationship caution
+  window(s), only when relevant
 
 Child milestones:
 - 4th house (education) activation in child's chart

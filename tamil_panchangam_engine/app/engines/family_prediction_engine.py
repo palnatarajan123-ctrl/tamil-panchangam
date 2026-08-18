@@ -16,7 +16,8 @@ from typing import Optional
 from app.engines.budget_guard import log_llm_call
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.sade_sati_engine import compute_sade_sati
-from app.llm.payload_builder import _build_upagraha_context
+from app.engines.porutham_engine import compute_porutham
+from app.llm.payload_builder import _build_upagraha_context, _extract_nak_rasi
 
 logger = logging.getLogger(__name__)
 
@@ -45,21 +46,80 @@ except Exception as e:
     FAMILY_PROMPT = "You are Jyotishi. Return a valid JSON family prediction."
 
 
-def _extract_nakshatra_name(moon: dict) -> str:
-    """Extract nakshatra name from moon dict — handles dict or string."""
-    nak_raw = moon.get("nakshatra", {})
-    if isinstance(nak_raw, dict):
-        return nak_raw.get("name", "")
-    return str(nak_raw) if nak_raw else ""
+def _get_or_compute_porutham(
+    db, group_id: str,
+    husband_id: Optional[str], husband_name: str, husband_nak: str, husband_rasi: str,
+    wife_id: Optional[str], wife_name: str, wife_nak: str, wife_rasi: str,
+) -> Optional[dict]:
+    """
+    Cache-first Porutham lookup -- reuses family_porutham_cache, the same
+    table and order-independent (group_id, member_id_1, member_id_2) key
+    the dedicated GET /groups/{group_id}/porutham endpoint uses, so this
+    never recomputes (or diverges from) what that endpoint would return
+    for the same pair. On a cache miss, computes and writes back in the
+    EXACT shape the endpoint itself writes (husband/wife dicts each with
+    name+nakshatra+rasi, not just nakshatra+rasi) -- the cache is genuinely
+    shared both ways, so writing a narrower shape here would silently break
+    the endpoint's own read path (its response includes "name", and
+    PoruthTab renders husband?.name || "Husband": found this exact bug
+    live while testing this function against a cache-miss group, where a
+    name-less write here caused a subsequent /porutham call to render the
+    fallback "Husband"/"Wife" labels instead of the real names).
+
+    Returns just the "porutham" breakdown dict (total_score/grade/points/...),
+    or None if nak/rasi data or member ids are missing.
+    """
+    if not husband_id or not wife_id or not husband_nak or not husband_rasi \
+            or not wife_nak or not wife_rasi:
+        return None
+
+    try:
+        cached_row = db.execute("""
+            SELECT result_json FROM family_porutham_cache
+            WHERE group_id = ?
+              AND ((member_id_1 = ? AND member_id_2 = ?)
+                OR (member_id_1 = ? AND member_id_2 = ?))
+            LIMIT 1
+        """, [group_id, husband_id, wife_id, wife_id, husband_id]).fetchone()
+        if cached_row:
+            cached = cached_row[0] if isinstance(cached_row[0], dict) else json.loads(cached_row[0])
+            return cached.get("porutham")
+    except Exception as e:
+        logger.warning(f"Porutham cache check failed: {e}")
+
+    try:
+        porutham_result = compute_porutham(
+            boy_nakshatra=husband_nak, boy_rasi=husband_rasi,
+            girl_nakshatra=wife_nak, girl_rasi=wife_rasi,
+        )
+        full_result = {
+            "husband": {"name": husband_name, "nakshatra": husband_nak, "rasi": husband_rasi},
+            "wife": {"name": wife_name, "nakshatra": wife_nak, "rasi": wife_rasi},
+            "porutham": porutham_result,
+        }
+        db.execute("""
+            INSERT INTO family_porutham_cache (group_id, member_id_1, member_id_2, result_json)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (group_id, member_id_1, member_id_2) DO UPDATE
+            SET result_json = EXCLUDED.result_json, computed_at = NOW()
+        """, [group_id, husband_id, wife_id, json.dumps(full_result)])
+        return porutham_result
+    except Exception as e:
+        logger.warning(f"Porutham compute/cache-write failed: {e}")
+        return None
 
 
-def _build_family_context(group: dict, members_with_charts: list, year: int) -> str:
+def _build_family_context(group: dict, members_with_charts: list, year: int, db) -> str:
     """
     Assemble all member chart data into a single context string for the LLM.
 
     members_with_charts: list of dicts, each with:
-      "member": family_members row dict (role, display_name, ...)
+      "member": family_members row dict (role, display_name, id, ...)
       "payload": parsed chart payload dict
+    db: connection for the Porutham cache lookup (see PORUTHAM section below)
+        -- reuses family_porutham_cache, same table/key shape as the
+        dedicated /porutham endpoint, so this never diverges from what
+        that endpoint would return for the same pair.
     """
     now = datetime.now(timezone.utc)
 
@@ -72,6 +132,8 @@ def _build_family_context(group: dict, members_with_charts: list, year: int) -> 
 
     husband_present = any(i["member"]["role"] == "husband" for i in members_with_charts)
     wife_present = any(i["member"]["role"] == "wife" for i in members_with_charts)
+    husband_item = next((i for i in members_with_charts if i["member"]["role"] == "husband"), None)
+    wife_item = next((i for i in members_with_charts if i["member"]["role"] == "wife"), None)
 
     for item in members_with_charts:
         member = item["member"]
@@ -80,11 +142,11 @@ def _build_family_context(group: dict, members_with_charts: list, year: int) -> 
         birth = payload.get("birth_details", {}) if isinstance(payload, dict) else {}
         name = member.get("display_name") or birth.get("name", role)
 
-        # Moon nakshatra + rasi
-        ephemeris = payload.get("ephemeris", {}) if isinstance(payload, dict) else {}
-        moon = ephemeris.get("moon", {}) if isinstance(ephemeris, dict) else {}
-        nakshatra = _extract_nakshatra_name(moon)
-        rasi = moon.get("rasi", "") if isinstance(moon, dict) else ""
+        # Moon nakshatra + rasi -- shared extraction with family.py's
+        # /porutham endpoint and the PORUTHAM section below, so a couple's
+        # nak/rasi can never silently diverge between what this prediction
+        # sees and what a direct Porutham check would compute.
+        nakshatra, rasi = _extract_nak_rasi(payload if isinstance(payload, dict) else {})
 
         # Current Dasha — resolve_antar_dasha returns {"maha": {...}, "antar": {...}}
         maha_lord = "—"
@@ -201,13 +263,52 @@ def _build_family_context(group: dict, members_with_charts: list, year: int) -> 
             lines.append(f"High-Confidence Windows ({year}): " + " | ".join(window_parts))
         lines.append("")
 
-    if husband_present and wife_present:
-        lines += [
-            "--- PORUTHAM ---",
-            "Note: Husband and wife charts are both present.",
-            "Factor Kuta compatibility into financial and relationship caution analysis.",
-            "",
-        ]
+    if husband_present and wife_present and husband_item and wife_item:
+        porutham = None
+        try:
+            husband_member = husband_item["member"]
+            wife_member = wife_item["member"]
+            husband_id = husband_member.get("id")
+            wife_id = wife_member.get("id")
+            husband_payload = husband_item["payload"] if isinstance(husband_item["payload"], dict) else {}
+            wife_payload = wife_item["payload"] if isinstance(wife_item["payload"], dict) else {}
+            husband_name = husband_member.get("display_name") or husband_payload.get("birth_details", {}).get("name", "husband")
+            wife_name = wife_member.get("display_name") or wife_payload.get("birth_details", {}).get("name", "wife")
+            husband_nak, husband_rasi = _extract_nak_rasi(husband_payload)
+            wife_nak, wife_rasi = _extract_nak_rasi(wife_payload)
+            porutham = _get_or_compute_porutham(
+                db, group["id"], husband_id, husband_name, husband_nak, husband_rasi,
+                wife_id, wife_name, wife_nak, wife_rasi,
+            )
+        except Exception as e:
+            logger.warning(f"Porutham lookup failed: {e}")
+
+        # No result -> no section at all. Not falling back to a generic
+        # "factor compatibility" note: that's exactly the ungrounded text
+        # this replaces, and re-adding it here would make the LLM's output
+        # LOOK grounded in real compatibility data when it isn't.
+        if porutham and not porutham.get("error"):
+            mandatory_fails = [
+                p["name"] for p in porutham.get("points", [])
+                if p.get("mandatory") and not p.get("pass")
+            ]
+            category_parts = []
+            for p in porutham.get("points", []):
+                if p.get("max", 0) > 0:
+                    category_parts.append(f"{p['name']} {p['score']}/{p['max']}")
+                else:
+                    category_parts.append(f"{p['name']} {'pass' if p.get('pass') else 'FAIL'}")
+            lines += [
+                "--- PORUTHAM (Husband x Wife compatibility, 10-point Tamil Kuta system) ---",
+                f"Score: {porutham.get('total_score')}/{porutham.get('max_score')} "
+                f"({porutham.get('percent')}%) — {porutham.get('grade')}",
+                "Mandatory categories: " + (
+                    "all passed" if not mandatory_fails
+                    else "FAILED: " + ", ".join(mandatory_fails)
+                ),
+                "Category breakdown: " + ", ".join(category_parts),
+                "",
+            ]
 
     return "\n".join(lines)
 
@@ -274,7 +375,7 @@ def run_family_prediction(
         logger.warning(f"Budget check failed: {e}")
 
     # ── Build context ─────────────────────────────────────────────────────────
-    context = _build_family_context(group, members_with_charts, year)
+    context = _build_family_context(group, members_with_charts, year, db)
     user_message = (
         f"Here is the family chart data for analysis:\n\n{context}\n\n"
         f"Generate the family prediction JSON for {year} following the schema "

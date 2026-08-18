@@ -29,6 +29,7 @@ from app.core.auth import get_current_user
 from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.engines.porutham_engine import compute_porutham
+from app.llm.payload_builder import _extract_nak_rasi
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.budget_guard import log_llm_call
@@ -90,20 +91,9 @@ def _chart_owned_by_user(conn, chart_id: str, user_id: str) -> bool:
     return row is not None
 
 
-def _extract_nak_rasi(payload: dict) -> tuple[str, str]:
-    """Extract moon nakshatra name and rasi name from chart payload."""
-    ephemeris = payload.get("ephemeris", {}) if isinstance(payload, dict) else {}
-    moon = ephemeris.get("moon", {})
-    rasi = ""
-    nakshatra = ""
-    if isinstance(moon, dict):
-        rasi = moon.get("rasi", "")
-        nak_raw = moon.get("nakshatra", {})
-        if isinstance(nak_raw, dict):
-            nakshatra = nak_raw.get("name", "")
-        elif isinstance(nak_raw, str):
-            nakshatra = nak_raw
-    return nakshatra, rasi
+# _extract_nak_rasi moved to app.llm.payload_builder (2026-08-17) so
+# app.engines.family_prediction_engine can share it without a circular
+# import (this module imports run_family_prediction from that engine).
 
 
 def _member_row_to_dict(row, payload: Optional[dict] = None) -> dict:
