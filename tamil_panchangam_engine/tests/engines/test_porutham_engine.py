@@ -27,12 +27,15 @@ from app.engines.porutham_engine import (
     score_rasi,
     score_rajju,
     score_vedha,
+    score_yoni,
     compute_porutham,
     GANA,
     NADI,
     RAJJU_GROUPS,
     VEDHA_PAIRS,
     VEDHA_SET,
+    YONI,
+    YONI_HOSTILE_PAIRS,
 )
 from app.engines.nakshatra_names import canonical_nakshatra_list
 
@@ -515,3 +518,108 @@ def test_vedha_unpaired_nakshatras_never_clash(nak_name):
     idx = _nakshatra_index(nak_name)
     for a, b in VEDHA_SET:
         assert idx not in (a, b), f"{nak_name} unexpectedly appears in a Vedha pair"
+
+
+# ── Phase 5 audit regression: full 27-nakshatra Yoni animal table ─────────────
+#
+# Locks in the corrected YONI table so this can't silently regress back
+# to the scrambled table the 2026-08-17 audit found -- 13 of 14 reference
+# animal-pairs were split across different engine codes, essentially a
+# total mismatch. Cross-checked against 3 independent sources this
+# session (resolving a genuine Purva/Uttara Phalguni Rat-vs-Cow ambiguity
+# between the first 2 with a 3rd) -- see porutham_engine.py's YONI
+# comment.
+
+_YONI_REFERENCE_GROUPS = {
+    "Horse": ["Aswini", "Sadayam"],
+    "Elephant": ["Bharani", "Revathi"],
+    "Goat": ["Karthigai", "Poosam"],
+    "Serpent": ["Rohini", "Mirugashirisham"],
+    "Dog": ["Thiruvadirai", "Moolam"],
+    "Cat": ["Punarpoosam", "Ayilyam"],
+    "Rat": ["Magam", "Pooram"],
+    "Cow": ["Uthiram", "Uthirattadhi"],
+    "Buffalo": ["Hastham", "Swathi"],
+    "Tiger": ["Chittirai", "Visakam"],
+    "Deer": ["Anusham", "Kettai"],
+    "Monkey": ["Pooradam", "Thiruvonam"],
+    "Mongoose": ["Uthiradam"],
+    "Lion": ["Avittam", "Poorattadhi"],
+}
+
+_YONI_SWORN_ENEMIES = [
+    ("Cat", "Rat"), ("Dog", "Deer"), ("Serpent", "Mongoose"),
+    ("Elephant", "Lion"), ("Cow", "Tiger"), ("Horse", "Buffalo"),
+    ("Monkey", "Goat"),
+]
+
+
+@pytest.mark.parametrize("animal,members", _YONI_REFERENCE_GROUPS.items())
+def test_yoni_table_group_members_share_one_animal_code(animal, members):
+    """Every nakshatra paired under one animal must land on the SAME
+    engine YONI code as its partner -- this is what actually broke
+    before the fix (13 of 14 pairs were split across different codes)."""
+    codes = set(YONI[_nakshatra_index(m)] for m in members)
+    assert len(codes) == 1, f"{animal} members {members} should share one code, got {codes}"
+
+
+def test_yoni_table_covers_all_27_nakshatras_exactly_once():
+    names = canonical_nakshatra_list()
+    assert len(names) == 27
+    assert len(YONI) == 27
+    covered = set()
+    for members in _YONI_REFERENCE_GROUPS.values():
+        covered |= set(members)
+    assert covered == set(names), covered.symmetric_difference(set(names))
+
+
+def test_yoni_table_purva_uttara_phalguni_rat_cow_resolved():
+    """
+    The specific ambiguity the audit found and resolved with a 3rd
+    source: Magha+Purva Phalguni=Rat (not Uttara Phalguni), Uttara
+    Phalguni+Uttara Bhadrapada=Cow (not Purva Phalguni).
+    """
+    magha = YONI[_nakshatra_index("Magam")]
+    purva_phalguni = YONI[_nakshatra_index("Pooram")]
+    uttara_phalguni = YONI[_nakshatra_index("Uthiram")]
+    uttara_bhadrapada = YONI[_nakshatra_index("Uthirattadhi")]
+    assert magha == purva_phalguni, "Magha and Purva Phalguni should share the Rat code"
+    assert uttara_phalguni == uttara_bhadrapada, "Uttara Phalguni and Uttara Bhadrapada should share the Cow code"
+    assert magha != uttara_phalguni
+
+
+@pytest.mark.parametrize("animal_a,animal_b", _YONI_SWORN_ENEMIES)
+def test_yoni_sworn_enemy_pair_scores_zero(animal_a, animal_b):
+    nak_a = _YONI_REFERENCE_GROUPS[animal_a][0]
+    nak_b = _YONI_REFERENCE_GROUPS[animal_b][0]
+    result = score_yoni(_nakshatra_index(nak_a), _nakshatra_index(nak_b))
+    assert result["score"] == 0, f"{animal_a}-{animal_b} should be a sworn-enemy pair scoring 0"
+
+
+def test_yoni_sworn_enemy_pairs_cover_all_14_animals_with_no_leftovers():
+    """Structural sanity check: 7 pairs x 2 animals = all 14 animals,
+    exactly once each -- confirms the enemy list is complete, not
+    partial."""
+    covered = set()
+    for a, b in _YONI_SWORN_ENEMIES:
+        covered.add(a)
+        covered.add(b)
+    assert covered == set(_YONI_REFERENCE_GROUPS.keys())
+    assert len(_YONI_SWORN_ENEMIES) == 7
+
+
+def test_yoni_same_animal_scores_four():
+    result = score_yoni(_nakshatra_index("Aswini"), _nakshatra_index("Sadayam"))
+    assert result["score"] == 4
+
+
+def test_yoni_non_enemy_different_animal_collapses_to_neutral_two():
+    """
+    Deliberate, flagged Phase 5 decision: no source this session gave
+    the complete Friendly/Neutral/Rival 3-way split, so every non-same,
+    non-sworn-enemy pair collapses to 2 rather than guessing which of
+    the 3 middle tiers it belongs to. Elephant+Buffalo (neither same nor
+    a documented sworn-enemy pair) is the AN Sr x KK real test case.
+    """
+    result = score_yoni(_nakshatra_index("Bharani"), _nakshatra_index("Swathi"))
+    assert result["score"] == 2

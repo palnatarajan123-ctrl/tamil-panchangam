@@ -28,20 +28,41 @@ GANA = [
     1, 1, 0,
 ]
 
-# Yoni animal index 0-13 (each animal pair shares compatibility)
+# Yoni animal index 0-13: 0=Horse, 1=Elephant, 2=Goat, 3=Serpent, 4=Dog,
+# 5=Cat, 6=Rat, 7=Cow, 8=Buffalo, 9=Tiger, 10=Deer, 11=Monkey,
+# 12=Mongoose (only 1 nakshatra, no pair), 13=Lion.
+#
+# Corrected 2026-08-17 (Porutham audit, Phase 5): the prior table was
+# almost totally scrambled -- 13 of 14 reference animal-pairs were split
+# across different codes (mechanically verified, not estimated).
+# Cross-checked against 3 independent sources this session, including
+# resolving a genuine Purva/Uttara Phalguni Rat-vs-Cow ambiguity between
+# 2 of them with a 3rd (astroanuradha.com): Magha+Purva Phalguni=Rat,
+# Uttara Phalguni+Uttara Bhadrapada=Cow.
 YONI = [
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 2, 9, 6,
-    10, 11, 5, 12, 4, 8, 3, 9, 0, 7, 13, 13,
-    1, 12, 11,
+    0, 1, 2, 3, 3, 4, 5, 2, 5, 6, 6, 7,
+    8, 9, 8, 9, 10, 10, 4, 11, 12, 11, 13, 0,
+    13, 7, 1,
 ]
-# Yoni gender: M=male, F=female (alternating within pair)
+# Yoni gender: M=male, F=female (alternating within pair). NOT currently
+# read by score_yoni() -- left as-is (unused, not re-derived) since
+# gender-based scoring nuance was explicitly out of scope for this phase;
+# see the audit's Phase 5 gate discussion before ever wiring this in.
 YONI_GENDER = [
     "M", "M", "F", "M", "F", "F", "F", "M", "F", "M", "F", "M",
     "F", "F", "M", "M", "M", "F", "F", "F", "F", "F", "M", "F",
     "F", "F", "F",
 ]
-# Hostile yoni pairs (animal indices)
-YONI_HOSTILE_PAIRS = {(0, 3), (1, 8), (2, 12), (4, 13), (5, 6), (7, 9), (10, 11)}
+# Sworn-enemy yoni pairs (animal indices) -- score 0. 7 pairs, confirmed
+# across 2+ independent sources, cleanly covering all 14 animals with no
+# leftovers (a useful structural sanity check that the list is complete).
+# The middle tiers (Friendly=3, Neutral=2, Rival=1) that a fully-sourced
+# 5-tier gradient would need are NOT implemented -- no source found this
+# session reproduces the complete 14x14 friend/neutral/rival grid despite
+# several being referenced as containing one. Per the Phase 5 decision:
+# every non-same, non-sworn-enemy pair collapses to Neutral (2) until
+# that grid is sourced -- this is a deliberate, flagged gap, not a bug.
+YONI_HOSTILE_PAIRS = {(5, 6), (4, 10), (3, 12), (1, 13), (7, 9), (0, 8), (2, 11)}
 
 # Rasi lord index (0=Aries..11=Pisces)
 RASI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4]
@@ -191,11 +212,17 @@ def score_ganam(boy_nak: int, girl_nak: int) -> dict:
 
 
 def score_yoni(boy_nak: int, girl_nak: int) -> dict:
-    """Yoni: max 4 points."""
+    """
+    Yoni: max 4 points.
+
+    3-tier scoring (same=4, sworn-enemy=0, else=2) is a deliberate,
+    flagged decision as of the 2026-08-17 audit's Phase 5, not the full
+    classical 5-tier gradient (Friendly=3, Neutral=2, Rival=1 as
+    distinct tiers) -- see YONI_HOSTILE_PAIRS's comment for why the
+    middle tiers aren't split out.
+    """
     by = YONI[boy_nak]
     gy = YONI[girl_nak]
-    bg = YONI_GENDER[boy_nak]
-    gg = YONI_GENDER[girl_nak]
 
     if by == gy:
         score = 4
