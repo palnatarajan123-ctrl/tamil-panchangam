@@ -28,8 +28,10 @@ from pydantic import BaseModel
 from app.core.auth import get_current_user
 from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import get_base_chart_by_id
-from app.engines.porutham_engine import compute_porutham
-from app.llm.payload_builder import _extract_nak_rasi, _get_or_compute_porutham, _format_porutham_lines
+from app.llm.payload_builder import (
+    _extract_nak_rasi, _get_or_compute_porutham, _format_porutham_lines,
+    _get_or_compute_full_family_porutham,
+)
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.budget_guard import log_llm_call
@@ -419,47 +421,23 @@ def get_porutham(group_id: str, user: dict = Depends(get_current_user)):
     if not wife["nakshatra"] or not wife["rasi"]:
         raise HTTPException(status_code=422, detail="Wife chart missing nakshatra/rasi data")
 
-    id1, id2 = husband_id, wife_id
-
-    # Check cache
+    # Cache-first compute, via the single canonical read/write path
+    # (Phase H1) -- this endpoint used to have its own inline cache
+    # logic, duplicated from _get_or_compute_porutham(). Consolidated
+    # after finding that duplication meant a commentary field added only
+    # to the other function would never reach real cache-misses, since
+    # this endpoint (what PoruthTab actually calls) was usually the
+    # first writer. See _get_or_compute_full_family_porutham()'s
+    # docstring for the full reasoning.
     with get_conn() as conn:
-        cached_row = conn.execute("""
-            SELECT result_json FROM family_porutham_cache
-            WHERE group_id = %s
-              AND ((member_id_1 = %s AND member_id_2 = %s)
-                OR (member_id_1 = %s AND member_id_2 = %s))
-            LIMIT 1
-        """, (group_id, id1, id2, id2, id1)).fetchone()
+        full_result = _get_or_compute_full_family_porutham(
+            conn, group_id,
+            husband_id, husband["name"], husband["nakshatra"], husband["rasi"],
+            wife_id, wife["name"], wife["nakshatra"], wife["rasi"],
+        )
 
-    if cached_row:
-        result_json = cached_row[0] if isinstance(cached_row[0], dict) else json.loads(cached_row[0])
-        return result_json
-
-    result = compute_porutham(
-        boy_nakshatra=husband["nakshatra"], boy_rasi=husband["rasi"],
-        girl_nakshatra=wife["nakshatra"], girl_rasi=wife["rasi"],
-    )
-
-    full_result = {
-        "husband": husband,
-        "wife": wife,
-        "porutham": result,
-    }
-
-    # Cache result
-    try:
-        with get_conn() as conn:
-            conn.execute("""
-                INSERT INTO family_porutham_cache
-                    (group_id, member_id_1, member_id_2, result_json)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (group_id, member_id_1, member_id_2) DO UPDATE
-                SET result_json = EXCLUDED.result_json,
-                    computed_at = NOW()
-            """, (group_id, id1, id2, json.dumps(full_result)))
-            conn.commit()
-    except Exception as e:
-        logger.warning(f"Porutham cache write failed: {e}")
+    if full_result is None:
+        raise HTTPException(status_code=500, detail="Failed to compute Porutham")
 
     return full_result
 

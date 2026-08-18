@@ -14,7 +14,7 @@ live DB during development, not guessed.
 
 import json
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from app.engines.family_prediction_engine import _build_family_context, PROMPT_VERSION, run_family_prediction
 
@@ -256,16 +256,27 @@ class TestGetOrComputePorutham(unittest.TestCase):
         self.assertEqual(mock_db.execute.call_count, 1)
 
     def test_cache_miss_computes_and_writes_name_field(self):
-        """Regression test for the found-and-fixed bug: the write-back must
-        include 'name', not just nakshatra/rasi."""
+        """
+        Regression test for the found-and-fixed bug: the write-back must
+        include 'name', not just nakshatra/rasi.
+
+        Patches _generate_porutham_commentary (Phase H1) so this stays a
+        fast, offline unit test -- without this patch, is_llm_enabled()
+        hits the REAL database (it doesn't use the mocked db param, it
+        calls get_conn() internally) and, if enabled, this test would
+        make a real, billed Anthropic API call. Caught live: this exact
+        test took 1.32s unpatched vs 0.60s with ANTHROPIC_API_KEY unset,
+        confirming a real network call was happening.
+        """
         mock_db = MagicMock()
         mock_db.execute.return_value.fetchone.return_value = None  # cache miss
 
         from app.engines.family_prediction_engine import _get_or_compute_porutham
-        result = _get_or_compute_porutham(
-            mock_db, "group-1", "h-id", "Ravi", "Ashwini", "Mesham",
-            "w-id", "Priya", "Hasta", "Kanni",
-        )
+        with patch("app.llm.payload_builder._generate_porutham_commentary", return_value="Test commentary."):
+            result = _get_or_compute_porutham(
+                mock_db, "group-1", "h-id", "Ravi", "Ashwini", "Mesham",
+                "w-id", "Priya", "Hasta", "Kanni",
+            )
         self.assertIsNotNone(result)
         self.assertIn("total_score", result)
 
@@ -279,6 +290,7 @@ class TestGetOrComputePorutham(unittest.TestCase):
         self.assertEqual(written["wife"]["name"], "Priya")
         self.assertIn("nakshatra", written["husband"])
         self.assertIn("rasi", written["husband"])
+        self.assertEqual(written["commentary"], "Test commentary.")
 
     def test_missing_nak_rasi_returns_none_no_db_call(self):
         mock_db = MagicMock()

@@ -107,6 +107,15 @@ class TestGetOrComputeProspectPorutham(unittest.TestCase):
         conn.execute.assert_not_called()
 
     def test_cache_miss_computes_and_writes_full_shape(self):
+        """
+        Patches _generate_porutham_commentary (Phase H1) so this stays a
+        fast, offline unit test -- without this patch, is_llm_enabled()
+        hits the REAL database (it doesn't use the mocked conn param, it
+        calls get_conn() internally) and, if enabled, this test would
+        make a real, billed Anthropic API call. Caught live this session:
+        a sibling test took 1.32s unpatched vs 0.60s with
+        ANTHROPIC_API_KEY unset, confirming a real network call.
+        """
         boy_payload = {
             "birth_details": {"name": "Ravi"},
             "ephemeris": {"moon": {"nakshatra": {"name": "Ashwini"}, "rasi": "Mesham"}},
@@ -118,18 +127,21 @@ class TestGetOrComputeProspectPorutham(unittest.TestCase):
         # 2 chart fetches (boy, girl) + 1 write-back UPDATE
         conn = _seq_conn(("c1", boy_payload, False), ("c2", girl_payload, False), None)
 
-        result = _get_or_compute_prospect_porutham(conn, ("p1", "c1", "c2", "boy", None))
+        with patch("app.api.prospects._generate_porutham_commentary", return_value="Test commentary."):
+            result = _get_or_compute_prospect_porutham(conn, ("p1", "c1", "c2", "boy", None))
 
         self.assertIsNotNone(result)
         self.assertEqual(result["boy"], {"chart_id": "c1", "name": "Ravi", "nakshatra": "Ashwini", "rasi": "Mesham"})
         self.assertEqual(result["girl"], {"chart_id": "c2", "name": "Priya", "nakshatra": "Hasta", "rasi": "Kanni"})
         self.assertIn("total_score", result["porutham"])
+        self.assertEqual(result["commentary"], "Test commentary.")
 
         update_sql, update_params = conn.execute.call_args_list[2].args
         self.assertIn("UPDATE porutham_prospects", update_sql)
         written = json.loads(update_params[0])
         self.assertEqual(written["boy"]["nakshatra"], "Ashwini")
         self.assertEqual(written["girl"]["nakshatra"], "Hasta")
+        self.assertEqual(written["commentary"], "Test commentary.")
 
     def test_source_role_girl_swaps_boy_girl_assignment(self):
         """source_chart_id is the 'girl' input when source_role='girl' --
@@ -145,7 +157,8 @@ class TestGetOrComputeProspectPorutham(unittest.TestCase):
         # boy_id resolves to candidate ("c2") first, girl_id to source ("c1")
         conn = _seq_conn(("c2", candidate_payload, False), ("c1", source_payload, False), None)
 
-        result = _get_or_compute_prospect_porutham(conn, ("p1", "c1", "c2", "girl", None))
+        with patch("app.api.prospects._generate_porutham_commentary", return_value=None):
+            result = _get_or_compute_prospect_porutham(conn, ("p1", "c1", "c2", "girl", None))
 
         self.assertEqual(result["boy"]["chart_id"], "c2")
         self.assertEqual(result["boy"]["name"], "Ravi")
@@ -354,20 +367,37 @@ class TestConvertProspectToFamily(unittest.TestCase):
         self.assertEqual(conn.execute.call_count, 1)  # nothing else ran
 
     def test_byte_identical_porutham_carried_into_family_cache(self):
-        """The core Phase G1 guarantee: convert-to-family must not
-        recompute -- the porutham sub-dict written into
-        family_porutham_cache must be byte-identical to what the prospect
-        already had cached."""
+        """
+        The core Phase G1 guarantee: convert-to-family must not recompute
+        -- the porutham sub-dict written into family_porutham_cache must
+        be byte-identical to what the prospect already had cached.
+
+        Patches _generate_porutham_commentary (Phase H1) for the same
+        real-network-call reason documented on
+        test_cache_miss_computes_and_writes_full_shape above -- this
+        function is called unconditionally in convert_prospect_to_family()
+        (a fresh FAMILY-toned commentary is generated for the new group,
+        separate from the prospect's own commentary; see
+        prospects.py's comment on this call site) regardless of whether
+        the prospect's own porutham was itself a cache hit.
+        """
         row, stored = self._cached_row()
         # SELECT prospect, INSERT group, INSERT husband member,
         # INSERT wife member, INSERT family_porutham_cache
         conn = _seq_conn(row, None, None, None, None)
-        with patch("app.api.prospects.get_conn", return_value=_cm(conn)):
+        with patch("app.api.prospects.get_conn", return_value=_cm(conn)), \
+             patch("app.api.prospects._generate_porutham_commentary", return_value="Family commentary.") as mock_commentary:
             result = convert_prospect_to_family("p1", USER)
 
         self.assertEqual(result["name"], "Ravi & Priya")
         self.assertEqual(result["member_count"], 2)
         self.assertEqual(conn.execute.call_count, 5)
+
+        # Fresh family-tone commentary was requested (not the prospect's
+        # own cached one, which isn't even fetched here since result_json
+        # was already the full cache-hit shape without needing a 2nd call).
+        mock_commentary.assert_called_once()
+        self.assertEqual(mock_commentary.call_args.kwargs.get("tone"), "family")
 
         cache_sql, cache_params = conn.execute.call_args_list[4].args
         self.assertIn("INSERT INTO family_porutham_cache", cache_sql)
@@ -375,6 +405,7 @@ class TestConvertProspectToFamily(unittest.TestCase):
         self.assertEqual(written["porutham"], stored["porutham"])
         self.assertEqual(written["husband"], {"name": "Ravi", "nakshatra": "Ashwini", "rasi": "Mesham"})
         self.assertEqual(written["wife"], {"name": "Priya", "nakshatra": "Hasta", "rasi": "Kanni"})
+        self.assertEqual(written["commentary"], "Family commentary.")
 
         # husband/wife role mapping: boy -> husband, girl -> wife
         husband_sql, husband_params = conn.execute.call_args_list[2].args
@@ -387,7 +418,8 @@ class TestConvertProspectToFamily(unittest.TestCase):
     def test_admin_convert_creates_group_under_prospect_owner_not_admin(self):
         row, _ = self._cached_row(owner="other-user")
         conn = _seq_conn(row, None, None, None, None)
-        with patch("app.api.prospects.get_conn", return_value=_cm(conn)):
+        with patch("app.api.prospects.get_conn", return_value=_cm(conn)), \
+             patch("app.api.prospects._generate_porutham_commentary", return_value=None):
             convert_prospect_to_family("p1", ADMIN)
 
         group_sql, group_params = conn.execute.call_args_list[1].args
@@ -397,7 +429,8 @@ class TestConvertProspectToFamily(unittest.TestCase):
     def test_prospect_link_untouched_no_delete_or_update_of_prospect_row(self):
         row, _ = self._cached_row()
         conn = _seq_conn(row, None, None, None, None)
-        with patch("app.api.prospects.get_conn", return_value=_cm(conn)):
+        with patch("app.api.prospects.get_conn", return_value=_cm(conn)), \
+             patch("app.api.prospects._generate_porutham_commentary", return_value=None):
             convert_prospect_to_family("p1", USER)
         for call in conn.execute.call_args_list:
             sql = call.args[0]

@@ -24,7 +24,7 @@ from app.core.auth import get_current_user
 from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.engines.porutham_engine import compute_porutham
-from app.llm.payload_builder import _extract_nak_rasi
+from app.llm.payload_builder import _extract_nak_rasi, _generate_porutham_commentary
 from app.api.family import _chart_owned_by_user
 
 logger = logging.getLogger(__name__)
@@ -72,8 +72,17 @@ def _get_or_compute_prospect_porutham(conn, prospect_row: tuple) -> Optional[dic
     directly on porutham_prospects.result_json rather than a second table.
 
     prospect_row: (id, source_chart_id, candidate_chart_id, source_role, result_json)
-    Returns {"boy": {chart_id, name, nakshatra, rasi}, "girl": {...}, "porutham": {...}},
-    or None if either chart or its nakshatra/rasi can't be resolved.
+    Returns {"boy": {chart_id, name, nakshatra, rasi}, "girl": {...}, "porutham": {...},
+    "commentary": str | None}, or None if either chart or its nakshatra/
+    rasi can't be resolved.
+
+    Generates explanatory commentary once, on cache-miss, alongside the
+    rest of the computation (Phase H1, 2026-08-18) -- "prospect" tone
+    (direct decision-support), never regenerated on a cache hit. Unlike
+    the family side, there was only ever one compute+cache path here (no
+    duplication risk to consolidate -- see
+    _get_or_compute_full_family_porutham()'s docstring for why that one
+    needed consolidating first).
     """
     prospect_id, source_chart_id, candidate_chart_id, source_role, result_raw = prospect_row
     if result_raw:
@@ -99,10 +108,15 @@ def _get_or_compute_prospect_porutham(conn, prospect_row: tuple) -> Optional[dic
         boy_nakshatra=boy_nak, boy_rasi=boy_rasi,
         girl_nakshatra=girl_nak, girl_rasi=girl_rasi,
     )
+    commentary = _generate_porutham_commentary(
+        porutham_result, boy_name, girl_name, tone="prospect",
+        db=conn, log_chart_id=boy_id,
+    )
     full_result = {
         "boy": {"chart_id": boy_id, "name": boy_name, "nakshatra": boy_nak, "rasi": boy_rasi},
         "girl": {"chart_id": girl_id, "name": girl_name, "nakshatra": girl_nak, "rasi": girl_rasi},
         "porutham": porutham_result,
+        "commentary": commentary,
     }
     try:
         conn.execute(
@@ -327,10 +341,23 @@ def convert_prospect_to_family(prospect_id: str, user: dict = Depends(get_curren
             VALUES (?, ?, ?, 'wife', ?, 0)
         """, [wife_id, group_id, girl["chart_id"], girl_name])
 
+        # The scored "porutham" sub-dict is carried over verbatim -- no
+        # recompute, per this endpoint's own established guarantee
+        # (verified byte-identical in Phase G1's tests). Commentary is
+        # NOT carried over from the prospect, though: that was generated
+        # in "prospect" (direct, decision-support) tone, but this couple
+        # is now a formed family group, which needs "family" (softer,
+        # already-married) tone per Phase H1's design. Same underlying
+        # score, freshly-generated explanation for the new context.
+        family_commentary = _generate_porutham_commentary(
+            result["porutham"], boy_name, girl_name, tone="family",
+            db=conn, log_chart_id=group_id,
+        )
         family_cache_result = {
             "husband": {"name": boy["name"], "nakshatra": boy["nakshatra"], "rasi": boy["rasi"]},
             "wife": {"name": girl["name"], "nakshatra": girl["nakshatra"], "rasi": girl["rasi"]},
             "porutham": result["porutham"],
+            "commentary": family_commentary,
         }
         conn.execute("""
             INSERT INTO family_porutham_cache (group_id, member_id_1, member_id_2, result_json)

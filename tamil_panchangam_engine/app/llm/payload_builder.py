@@ -21,6 +21,7 @@ Token Guardrails (HARD LIMITS):
 
 import json
 import logging
+import os
 from datetime import date
 from typing import Dict, Any, List, Literal, Optional
 
@@ -697,33 +698,184 @@ def _extract_nak_rasi(payload: dict) -> tuple[str, str]:
     return nakshatra, rasi
 
 
-def _get_or_compute_porutham(
+# ── Porutham explanatory commentary (Phase H1, 2026-08-18) ────────────────────
+#
+# Short LLM-generated paragraph explaining the MECHANISM behind a Porutham
+# grade (not just restating it) -- specifically naming which mandatory
+# category(ies) failed, if any, and stating plainly that a mandatory-
+# category fail overrides the percentage-based grade entirely. Generated
+# once at compute time and cached alongside the rest of the Porutham
+# result; never regenerated on a cache hit.
+#
+# Jargon convention differs deliberately from family_prediction_engine.py's
+# FAMILY_PROMPT (which explicitly forbids the words "Porutham"/"Nadi"/
+# "Rajju"/etc. in its output): that prompt is a narrative yearly forecast
+# where Porutham is folded in as one supporting input among many --
+# CLAUDE.md's "written report" register. This commentary instead explains
+# the Porutham RESULT ITSELF, sitting directly beside the same category
+# table (Nadi, Rajju, ...) that family_report/family_pdf_renderer.py and
+# canonical_report/pdf_renderer.py already render with those names as data
+# labels -- CLAUDE.md's "technical table" register, where classical terms
+# are established as appropriate. Confirmed this distinction deliberately
+# rather than copying the narrative-prompt's jargon ban by default.
+_PORUTHAM_COMMENTARY_MODEL = "claude-sonnet-4-6"
+
+_FAMILY_PORUTHAM_COMMENTARY_SYSTEM = """You are explaining a Tamil Jathagam Porutham (10-point Kuta compatibility) result to a family member using this app, for a couple who are ALREADY MARRIED.
+
+You will be given both people's names, the total score, percentage, grade, whether any mandatory category (Rajju, Vedha, or Nadi) failed, and the full 10-category breakdown.
+
+Write a short paragraph (3-5 sentences) that:
+- Explains the MECHANISM behind the grade, not just restates it. If a mandatory category failed, name which one(s) explicitly by name, and explain plainly that a mandatory-category fail overrides the percentage-based grade entirely, regardless of how high the raw score is.
+- Uses Porutham terminology directly (Nadi, Rajju, Vedha, Dinam, Ganam, Yoni, Rasi, Rasiyathipaty, Mahendra, Stree Deergha) -- this is a technical explanation of a score sitting beside its own category table, not casual conversation, so classical terms are expected and appropriate here.
+- Frames any mandatory-category fail as a traditional consideration worth being aware of, NOT a fatalistic verdict. Never say or imply the marriage "will" or "won't" work, is "doomed," or anything evaluative about the relationship's future or viability.
+- Uses a SOFTER tone appropriate for an already-married couple: acknowledge they are already together, do not dramatize the result as bad news, do not use language like "your score is worse than you thought." Read as informational context, not a warning.
+- Is purely descriptive. Never tell the reader what to do or decide.
+- Has no disclaimers, no "consult an astrologer" hedging, no call to action.
+
+Output ONLY the paragraph text. No JSON, no markdown, no preamble, no heading."""
+
+_PROSPECT_PORUTHAM_COMMENTARY_SYSTEM = """You are explaining a Tamil Jathagam Porutham (10-point Kuta compatibility) result to someone using this app who is actively evaluating a POTENTIAL marriage match -- a prospect, not yet married.
+
+You will be given both people's names, the total score, percentage, grade, whether any mandatory category (Rajju, Vedha, or Nadi) failed, and the full 10-category breakdown.
+
+Write a short paragraph (3-5 sentences) that:
+- Explains the MECHANISM behind the grade, not just restates it. If a mandatory category failed, name which one(s) explicitly by name, and explain plainly that a mandatory-category fail overrides the percentage-based grade entirely, regardless of how high the raw score is.
+- Uses Porutham terminology directly (Nadi, Rajju, Vedha, Dinam, Ganam, Yoni, Rasi, Rasiyathipaty, Mahendra, Stree Deergha) -- this is a technical explanation of a score sitting beside its own category table, not casual conversation, so classical terms are expected and appropriate here.
+- Is DIRECT about what failed and why it's traditionally weighted heavily -- this is active decision-support for someone weighing a match, so clarity matters more than softening here.
+- Frames any mandatory-category fail as a traditional consideration to weigh, NOT a fatalistic verdict. Never say or imply the marriage "will" or "won't" work, or tell the reader they "should" or "shouldn't" marry this person.
+- Is purely descriptive. Describe what the tradition says the categories mean -- never tell the reader what to personally decide.
+- Has no disclaimers, no "consult an astrologer" hedging, no call to action.
+
+Output ONLY the paragraph text. No JSON, no markdown, no preamble, no heading."""
+
+
+def _build_porutham_commentary_input(
+    porutham: dict, person_a_label: str, person_a_name: str,
+    person_b_label: str, person_b_name: str,
+) -> str:
+    """Compact text block describing a Porutham result, fed as the user
+    message to the commentary LLM call. Shared by both family and
+    prospect tones -- only the label ("Husband"/"Wife" vs "Person A"/
+    "Person B") and system prompt differ by tone."""
+    lines = [
+        f"{person_a_label}: {person_a_name or 'Unknown'}",
+        f"{person_b_label}: {person_b_name or 'Unknown'}",
+        f"Total score: {porutham.get('total_score')}/{porutham.get('max_score')} ({porutham.get('percent')}%)",
+        f"Grade: {porutham.get('grade')}",
+        f"Mandatory category fail: {'YES' if porutham.get('mandatory_fail') else 'NO'}",
+    ]
+    if porutham.get("mandatory_fail"):
+        failed = [p["name"] for p in porutham.get("points", []) if p.get("mandatory") and not p.get("pass")]
+        lines.append(f"Failed mandatory categories: {', '.join(failed)}")
+    lines.append("Full category breakdown:")
+    for p in porutham.get("points", []):
+        if p.get("max", 0) > 0:
+            result_str = f"{p['score']}/{p['max']}"
+        else:
+            result_str = "Pass" if p.get("pass") else "FAIL"
+        mand = " (mandatory)" if p.get("mandatory") else ""
+        lines.append(f"  {p['name']}{mand}: {result_str}")
+    return "\n".join(lines)
+
+
+def _generate_porutham_commentary(
+    porutham: dict, person_a_name: str, person_b_name: str, tone: str,
+    db=None, log_chart_id: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Generate a short (3-5 sentence) explanatory commentary for a Porutham
+    result, in either "family" (already-married, softer) or "prospect"
+    (active decision-support, direct) tone.
+
+    Returns None on any failure (LLM disabled, no API key, call error) --
+    commentary is an enrichment on top of an already-working Porutham
+    computation, never a reason to fail it. Follows the exact
+    is_llm_enabled()-gate / try-except-return-None pattern used by
+    daily.py's _generate_daily_llm_guidance() for the same reason: a
+    short, low-token, generate-once-and-cache text field.
+    """
+    from app.engines.llm_interpretation_orchestrator import is_llm_enabled
+    if not is_llm_enabled():
+        return None
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return None
+
+    if tone == "family":
+        system_prompt = _FAMILY_PORUTHAM_COMMENTARY_SYSTEM
+        person_a_label, person_b_label = "Husband", "Wife"
+    else:
+        system_prompt = _PROSPECT_PORUTHAM_COMMENTARY_SYSTEM
+        person_a_label, person_b_label = "Person A", "Person B"
+
+    user_message = _build_porutham_commentary_input(
+        porutham, person_a_label, person_a_name, person_b_label, person_b_name
+    )
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model=_PORUTHAM_COMMENTARY_MODEL,
+            max_tokens=1000,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+        )
+        commentary = response.content[0].text.strip()
+
+        if db is not None and log_chart_id is not None:
+            try:
+                from app.engines.budget_guard import log_llm_call
+                log_llm_call(
+                    db=db,
+                    chart_id=log_chart_id,
+                    call_type=f"porutham_commentary_{tone}",
+                    period="once",
+                    input_tokens=response.usage.input_tokens,
+                    output_tokens=response.usage.output_tokens,
+                )
+            except Exception as log_err:
+                logger.warning(f"porutham_commentary log_llm_call failed: {log_err}")
+
+        return commentary
+    except Exception as e:
+        logger.warning(f"Porutham commentary generation failed ({tone}): {e}")
+        return None
+
+
+def _get_or_compute_full_family_porutham(
     db, group_id: str,
     husband_id: Optional[str], husband_name: str, husband_nak: str, husband_rasi: str,
     wife_id: Optional[str], wife_name: str, wife_nak: str, wife_rasi: str,
 ) -> Optional[dict]:
     """
-    Cache-first Porutham lookup -- reuses family_porutham_cache, the same
-    table and order-independent (group_id, member_id_1, member_id_2) key
-    the dedicated GET /groups/{group_id}/porutham endpoint uses, so this
-    never recomputes (or diverges from) what that endpoint would return
-    for the same pair. On a cache miss, computes and writes back in the
-    EXACT shape the endpoint itself writes (husband/wife dicts each with
-    name+nakshatra+rasi, not just nakshatra+rasi) -- the cache is genuinely
-    shared, so writing a narrower shape here would silently break the
-    endpoint's own read path (its response includes "name", and PoruthTab
-    renders husband?.name || "Husband": found this exact bug live while
-    testing this function against a cache-miss group during Phase F1).
+    Cache-first Porutham lookup returning the FULL cached shape
+    ({"husband":..., "wife":..., "porutham":..., "commentary":...}), not
+    just the porutham sub-dict.
 
-    Moved here from app.engines.family_prediction_engine (2026-08-17,
-    Phase F2) so chat.py and family.py's family_group_chat_stream() can
-    both reuse it without either importing from a prediction engine (a
-    chat endpoint importing engine internals is an odd cross-layer
-    coupling; this module is already the established shared home for
-    family/cross-surface LLM-context helpers).
+    This is the single canonical read/write path for
+    family_porutham_cache -- consolidated 2026-08-18 (Phase H1) after
+    finding TWO independent places wrote this cache on a miss: this
+    function's own prior body, and family.py's dedicated GET
+    /groups/{group_id}/porutham endpoint's own inline cache-write logic.
+    That endpoint is what PoruthTab (the primary UI surface) actually
+    calls, so it was the most likely FIRST writer of a fresh cache row in
+    real usage -- if only this function had been taught to generate
+    commentary, real cache-misses driven from the UI would have written
+    rows with no commentary at all, which every other reader would then
+    treat as a permanent cache hit and never regenerate. Same "two
+    implementations, fixed one, missed the other" risk this session
+    already hit once with chat.py vs family.py's two chat
+    implementations -- consolidating into one function here instead of
+    patching two copies in parallel.
 
-    Returns just the "porutham" breakdown dict (total_score/grade/points/...),
-    or None if nak/rasi data or member ids are missing.
+    family.py's endpoint now calls this directly and returns the full
+    dict; _get_or_compute_porutham() below (used by chat.py and
+    family_prediction_engine.py, which only ever needed the "porutham"
+    sub-dict) now just unwraps this function's result.
+
+    Generates commentary once, on cache-miss, alongside the rest of the
+    computation -- never regenerated on a cache hit.
     """
     if not husband_id or not wife_id or not husband_nak or not husband_rasi \
             or not wife_nak or not wife_rasi:
@@ -739,7 +891,7 @@ def _get_or_compute_porutham(
         """, [group_id, husband_id, wife_id, wife_id, husband_id]).fetchone()
         if cached_row:
             cached = cached_row[0] if isinstance(cached_row[0], dict) else json.loads(cached_row[0])
-            return cached.get("porutham")
+            return cached
     except Exception as e:
         logger.warning(f"Porutham cache check failed: {e}")
 
@@ -748,10 +900,15 @@ def _get_or_compute_porutham(
             boy_nakshatra=husband_nak, boy_rasi=husband_rasi,
             girl_nakshatra=wife_nak, girl_rasi=wife_rasi,
         )
+        commentary = _generate_porutham_commentary(
+            porutham_result, husband_name, wife_name, tone="family",
+            db=db, log_chart_id=group_id,
+        )
         full_result = {
             "husband": {"name": husband_name, "nakshatra": husband_nak, "rasi": husband_rasi},
             "wife": {"name": wife_name, "nakshatra": wife_nak, "rasi": wife_rasi},
             "porutham": porutham_result,
+            "commentary": commentary,
         }
         db.execute("""
             INSERT INTO family_porutham_cache (group_id, member_id_1, member_id_2, result_json)
@@ -759,10 +916,29 @@ def _get_or_compute_porutham(
             ON CONFLICT (group_id, member_id_1, member_id_2) DO UPDATE
             SET result_json = EXCLUDED.result_json, computed_at = NOW()
         """, [group_id, husband_id, wife_id, json.dumps(full_result)])
-        return porutham_result
+        return full_result
     except Exception as e:
         logger.warning(f"Porutham compute/cache-write failed: {e}")
         return None
+
+
+def _get_or_compute_porutham(
+    db, group_id: str,
+    husband_id: Optional[str], husband_name: str, husband_nak: str, husband_rasi: str,
+    wife_id: Optional[str], wife_name: str, wife_nak: str, wife_rasi: str,
+) -> Optional[dict]:
+    """
+    Backward-compatible wrapper around _get_or_compute_full_family_porutham()
+    for callers (chat.py, family_prediction_engine.py) that only need the
+    "porutham" breakdown dict (total_score/grade/points/...), not the
+    full husband/wife/commentary shape. See that function's docstring for
+    why the cache read/write logic now lives there instead of here.
+    """
+    full = _get_or_compute_full_family_porutham(
+        db, group_id, husband_id, husband_name, husband_nak, husband_rasi,
+        wife_id, wife_name, wife_nak, wife_rasi,
+    )
+    return full.get("porutham") if full else None
 
 
 def _format_porutham_lines(porutham: Optional[dict]) -> List[str]:
