@@ -125,6 +125,11 @@ for a, b in VEDHA_PAIRS:
     VEDHA_SET.add((min(a, b), max(a, b)))
 
 # Mahendra nakshatras (counted 4, 7, 10, 13, 16, 19, 22, 25, 28 from boy's)
+# Confirmed correct 2026-08-17 (Porutham audit, Phase 9) -- no fix. The
+# 8 reachable offsets {4,7,10,13,16,19,22,25} match 2 independent
+# sources exactly, and the direction (girl-to-boy count) matches too.
+# "28" here is unreachable dead code, not a bug: the formula below
+# (% 27 + 1) can only ever produce 1-27, so 28 never fires either way.
 MAHENDRA_OFFSETS = {4, 7, 10, 13, 16, 19, 22, 25, 28}
 
 # Nadi: 0=Adi, 1=Madhya, 2=Antya

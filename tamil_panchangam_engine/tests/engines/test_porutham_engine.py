@@ -40,7 +40,9 @@ from app.engines.porutham_engine import (
     RASI_LORDS,
     RASIYATHIPATY_FRIENDLY,
     RASIYATHIPATY_ENEMY,
+    score_mahendra,
     score_stree_deergha,
+    MAHENDRA_OFFSETS,
 )
 from app.engines.nakshatra_names import canonical_nakshatra_list
 
@@ -792,6 +794,49 @@ def test_rasiyathipaty_gradient_passes_at_three_and_above():
     assert score_rasiyathipaty(0, 1)["pass"] is True   # 3
     assert score_rasiyathipaty(3, 2)["pass"] is False  # 1
     assert score_rasiyathipaty(4, 9)["pass"] is False  # 0
+
+
+# ── Phase 9 audit regression: Mahendra confirmed correct, no fix ──────────────
+#
+# Locks in the CURRENT (already-correct) behavior so a future session
+# doesn't "fix" this without realizing it was already confirmed against
+# 2 independent sources during the 2026-08-17 audit. Direction (count
+# girl-to-boy) and the 8 reachable offsets both matched.
+
+_MAHENDRA_FAVORABLE_OFFSETS = {4, 7, 10, 13, 16, 19, 22, 25}
+
+
+@pytest.mark.parametrize("offset", sorted(_MAHENDRA_FAVORABLE_OFFSETS))
+def test_mahendra_favorable_offset_passes(offset):
+    """girl_nak positioned exactly `offset` steps (1-based) after boy_nak
+    should pass."""
+    boy_nak = _nakshatra_index("Aswini")  # index 0
+    girl_nak = (boy_nak + offset - 1) % 27
+    result = score_mahendra(boy_nak, girl_nak)
+    assert result["pass"] is True, f"offset {offset} should be favorable"
+
+
+@pytest.mark.parametrize("offset", [o for o in range(1, 28) if o not in _MAHENDRA_FAVORABLE_OFFSETS])
+def test_mahendra_unfavorable_offset_fails(offset):
+    boy_nak = _nakshatra_index("Aswini")
+    girl_nak = (boy_nak + offset - 1) % 27
+    result = score_mahendra(boy_nak, girl_nak)
+    assert result["pass"] is False, f"offset {offset} should be unfavorable"
+
+
+def test_mahendra_offset_28_is_unreachable_dead_code():
+    """The formula (% 27 + 1) can only ever produce 1-27 -- 28 in
+    MAHENDRA_OFFSETS is confirmed-harmless dead code, not a bug."""
+    assert 28 in MAHENDRA_OFFSETS
+    for boy_nak in range(27):
+        for girl_nak in range(27):
+            offset = (girl_nak - boy_nak) % 27 + 1
+            assert offset != 28
+
+
+def test_mahendra_not_mandatory():
+    result = score_mahendra(_nakshatra_index("Aswini"), _nakshatra_index("Rohini"))
+    assert result.get("mandatory") is False
 
 
 # ── Phase 8 audit regression: Stree Deergha deliberate convention ─────────────
