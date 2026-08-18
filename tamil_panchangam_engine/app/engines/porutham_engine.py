@@ -48,12 +48,21 @@ RASI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4]
 # 0=Mars, 1=Moon, 2=Mars, 3=Mercury, 4=Jupiter, 5=Venus, 6=Saturn
 
 # Rajju groups (nakshatra index groups)
+# Corrected 2026-08-17 (Porutham audit, Phase 3): every one of the 5
+# groups below was previously scrambled -- each reference group was split
+# across 2-3 different engine groups, essentially a total mismatch, not
+# isolated errors. Rajju is a mandatory dosha category (same group =
+# automatic fail), so this was the highest-stakes fix in the whole audit.
+# Cross-checked against 3 independent sources this session, all agreeing
+# exactly (one of them Tamil-context specific). Verify against
+# tests/engines/test_porutham_engine.py's full 27-nakshatra table test
+# before ever touching this array again.
 RAJJU_GROUPS = [
-    {0, 7, 8, 17, 18, 25},   # Pada (feet)
-    {1, 6, 9, 16, 19, 24},   # Kati (waist)
-    {2, 5, 10, 15, 20, 23},  # Nabhi (navel)
-    {3, 4, 11, 12, 21, 22},  # Kanta (neck)
-    {13, 14, 26},             # Shira (head)
+    {0, 8, 9, 17, 18, 26},    # Pada (feet)
+    {1, 7, 10, 16, 19, 25},   # Kati (waist)
+    {2, 6, 11, 15, 20, 24},   # Nabhi (navel)
+    {3, 5, 12, 14, 21, 23},   # Kantha (neck)
+    {4, 13, 22},               # Siro (head)
 ]
 
 # Vedha pairs (nakshatra index pairs that cause vedha)

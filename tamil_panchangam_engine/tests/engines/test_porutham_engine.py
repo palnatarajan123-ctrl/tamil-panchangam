@@ -25,9 +25,11 @@ from app.engines.porutham_engine import (
     score_nadi,
     score_ganam,
     score_rasi,
+    score_rajju,
     compute_porutham,
     GANA,
     NADI,
+    RAJJU_GROUPS,
 )
 from app.engines.nakshatra_names import canonical_nakshatra_list
 
@@ -358,3 +360,82 @@ def test_nadi_table_covers_all_27_nakshatras_exactly_once():
     assert len(NADI) == 27
     covered = set(_AADI) | set(_MADHYA) | set(_ANTYA)
     assert covered == set(names), covered.symmetric_difference(set(names))
+
+
+# ── Phase 3 audit regression: full 27-nakshatra Rajju group table ─────────────
+#
+# Locks in the corrected RAJJU_GROUPS so this can't silently regress back
+# to the scrambled-table bug the 2026-08-17 audit found -- every one of
+# the 5 groups was previously split across 2-3 different engine groups,
+# essentially a total mismatch. Rajju is a mandatory dosha category, so
+# this was the highest-stakes fix in the whole audit. Reference groups
+# cross-checked against 3 independent sources this session (all agreeing
+# exactly, one Tamil-context specific) -- see porutham_engine.py's
+# RAJJU_GROUPS comment.
+
+_SIRO = ["Chittirai", "Mirugashirisham", "Avittam"]
+_KANTHA = ["Thiruvadirai", "Rohini", "Swathi", "Hastham", "Thiruvonam", "Sadayam"]
+_NABHI = ["Karthigai", "Uthiram", "Punarpoosam", "Visakam", "Poorattadhi", "Uthiradam"]
+_KATI = ["Poosam", "Bharani", "Pooram", "Anusham", "Uthirattadhi", "Pooradam"]
+_PADA = ["Aswini", "Ayilyam", "Magam", "Moolam", "Kettai", "Revathi"]
+
+_RAJJU_REFERENCE_GROUPS = {
+    "Siro": _SIRO, "Kantha": _KANTHA, "Nabhi": _NABHI, "Kati": _KATI, "Pada": _PADA,
+}
+
+
+@pytest.mark.parametrize("group_name,members", _RAJJU_REFERENCE_GROUPS.items())
+def test_rajju_table_group_members_share_one_engine_group(group_name, members):
+    """Every nakshatra in a reference group must land in the SAME engine
+    group as every other member of that reference group (not just the
+    right size) -- this is what actually broke before the fix."""
+    idxs = [_nakshatra_index(m) for m in members]
+    engine_groups_hit = set()
+    for idx in idxs:
+        for gi, group in enumerate(RAJJU_GROUPS):
+            if idx in group:
+                engine_groups_hit.add(gi)
+    assert len(engine_groups_hit) == 1, (
+        f"{group_name} members {members} should all share one engine "
+        f"RAJJU_GROUPS entry, but landed in {len(engine_groups_hit)}"
+    )
+
+
+def test_rajju_table_covers_all_27_nakshatras_exactly_once():
+    names = canonical_nakshatra_list()
+    assert len(names) == 27
+    assert sum(len(g) for g in RAJJU_GROUPS) == 27
+    covered = set(_SIRO) | set(_KANTHA) | set(_NABHI) | set(_KATI) | set(_PADA)
+    assert covered == set(names), covered.symmetric_difference(set(names))
+
+
+def test_rajju_table_group_sizes():
+    """Siro has 3 members; the other four have 6 each."""
+    sizes = sorted(len(g) for g in RAJJU_GROUPS)
+    assert sizes == [3, 6, 6, 6, 6]
+
+
+def test_rajju_same_group_fails():
+    """Two nakshatras in the same reference group (e.g. both Pada) -> fail."""
+    result = score_rajju(_nakshatra_index("Aswini"), _nakshatra_index("Ayilyam"))
+    assert result["pass"] is False
+    assert result["mandatory"] is True
+
+
+def test_rajju_different_group_passes():
+    result = score_rajju(_nakshatra_index("Bharani"), _nakshatra_index("Swathi"))
+    assert result["pass"] is True
+
+
+def test_rajju_no_cancellation_exception_logic():
+    """
+    Confirmed by the audit: no classically-recognized cancellation/
+    exception mechanism exists for Rajju dosha -- flat same-group=fail is
+    correct as-is, not a gap to fill. This test just locks in that the
+    function stays a pure group-membership check (no extra parameters,
+    no special-casing) so a well-intentioned future "add the exception"
+    change doesn't get made without discussion.
+    """
+    import inspect
+    sig = inspect.signature(score_rajju)
+    assert list(sig.parameters) == ["boy_nak", "girl_nak"]
