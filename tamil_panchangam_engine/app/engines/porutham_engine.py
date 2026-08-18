@@ -241,7 +241,35 @@ def score_yoni(boy_nak: int, girl_nak: int) -> dict:
 
 
 def score_rasi(boy_rasi: int, girl_rasi: int) -> dict:
-    """Rasi (Rashikuta): max 7 points."""
+    """
+    Rasi (Rashikuta): max 7 points.
+
+    Corrected 2026-08-17 (Porutham audit, Phase 7): the 4th/10th
+    positional relationship (diff=3,9) was scored 0 (unfavorable); fixed
+    to 7 (favorable, full marks) -- 3 of 4 sources found this session
+    place it in the same "auspicious" tier as 1/7 and 3/11, including
+    one clean, unhedged explicit source (astroyogi.com) giving it 7, and
+    a Tamil-context source (dineshcheramastro.com) listing it among
+    "1,3,4,5,7,9,11 acceptable" positions. Only one source dissented, and
+    even that source hedged its own number ("some texts accept, others
+    reject").
+
+    The 5th/9th relationship (diff=4,8) was flagged in the audit as
+    possibly wrong (scored 7, but 2 of 3 generic sources suggested
+    unfavorable) -- resolved as NO CHANGE after finding a Tamil-context
+    source (dineshcheramastro.com) explicitly calling 5-9 "very good...
+    one of the most favorable combinations," directly matching this
+    engine's existing treatment. Per this session's tiebreak rule
+    (prefer Tamil/South-Indian-tradition sources over generic ones), the
+    engine was already right here.
+
+    Two additional exception mechanisms surfaced during this research --
+    an "Eka Rasi" same-sign exception (8 specific nakshatra pairs treated
+    as favorable despite same-sign) and a 6th/8th cancellation tied to
+    Rasiyathipaty friendship -- deliberately NOT implemented here. Both
+    are new capabilities, not table corrections, and were explicitly out
+    of scope for this phase pending a separate go-ahead.
+    """
     diff = (girl_rasi - boy_rasi) % 12
     if diff in {0}:
         score = 0
@@ -250,7 +278,7 @@ def score_rasi(boy_rasi: int, girl_rasi: int) -> dict:
     elif diff in {2, 10}:
         score = 2
     elif diff in {3, 9}:
-        score = 0
+        score = 7
     elif diff in {4, 8}:
         score = 7
     elif diff in {5, 7}:

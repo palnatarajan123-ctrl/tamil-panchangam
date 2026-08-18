@@ -138,9 +138,39 @@ def test_rasi_saptama_seventh():
 
 
 def test_rasi_saptama_fifth_from_boy():
-    """diff=4 (5th from boy) also scores 7 — same scoring band."""
+    """
+    diff=4 (5th from boy, i.e. the 5th/9th relationship) also scores 7 --
+    same scoring band as diff=6.
+
+    Confirmed 2026-08-17 (Porutham audit, Phase 7): the audit initially
+    flagged this as a possible bug (2 of 3 generic sources suggested
+    unfavorable), but a Tamil-context source (dineshcheramastro.com)
+    explicitly calls 5-9 "very good... one of the most favorable
+    combinations," directly matching this existing treatment. Per this
+    session's tiebreak rule, no change was made -- this locks in that
+    the value stays 7, not a regression guard against a fix that never
+    happened.
+    """
     result = score_rasi(0, 4)
     assert result["score"] == 7
+
+
+# ── Phase 7 audit regression: 4th/10th positional relationship ────────────────
+
+def test_rasi_4th_10th_position_now_favorable():
+    """
+    Corrected 2026-08-17 (Porutham audit, Phase 7): diff=3 (4th position)
+    and diff=9 (10th position) were scored 0 (unfavorable); fixed to 7
+    (favorable, full marks) -- 3 of 4 sources this session place this in
+    the same auspicious tier as 1/7 and 3/11.
+    """
+    result_4th = score_rasi(0, 3)   # Aries boy, Cancer girl -> diff=3
+    assert result_4th["score"] == 7
+    assert result_4th["pass"] is True
+
+    result_10th = score_rasi(0, 9)  # Aries boy, Capricorn girl -> diff=9
+    assert result_10th["score"] == 7
+    assert result_10th["pass"] is True
 
 
 # ── 8. Total score always 0–33 ────────────────────────────────────────────────
