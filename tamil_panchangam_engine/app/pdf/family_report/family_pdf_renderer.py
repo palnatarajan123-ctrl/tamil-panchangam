@@ -7,7 +7,7 @@ Uses ReportLab Platypus — same card-style layout as canonical_report/pdf_rende
 import io
 import logging
 from datetime import date
-from typing import List
+from typing import List, Optional
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -322,6 +322,77 @@ def _build_child_milestones(milestones: list, styles) -> List:
     return elements
 
 
+def _build_porutham(
+    porutham: Optional[dict], husband_name: Optional[str], wife_name: Optional[str], styles,
+) -> List:
+    """
+    Dedicated Porutham (10-point Tamil Kuta compatibility) table.
+
+    Placement decision: called right after _build_caution_windows() in
+    render_family_pdf() below, NOT at end-of-document. Same subject matter
+    as Shared Caution Windows -- Phase F1 already grounds the relationship-
+    themed caution window narrative in this exact data, so the concrete
+    numbers belong immediately next to that narrative, not detached from it.
+
+    Jargon: this is a written-report surface (same convention as Phase F1's
+    prompt), so the table uses classical category labels (Nadi, Rajju,
+    Ganam, etc.) as data labels -- appropriate for a technical table, same
+    distinction canonical_report/pdf_renderer.py's KP tables already draw
+    between plain-language narrative prose and a labeled technical table.
+    No accompanying narrative prose is generated here (there's no LLM
+    output for Porutham specifically, only the plain-language folding into
+    caution_windows Phase F1 already does), so there's no jargon-in-prose
+    risk to guard against in this particular section.
+
+    Guards for no-pairing / no-result the same way every other section in
+    this file guards on empty input: returns [] so nothing renders, not a
+    broken or empty-looking section.
+    """
+    if not porutham or porutham.get("error"):
+        return []
+    points = porutham.get("points", [])
+    if not points:
+        return []
+
+    elements = [Paragraph("Compatibility (Porutham)", styles['FamilySectionTitle'])]
+
+    summary_style = ParagraphStyle(
+        'PoruthamSummary', parent=styles['FamilyBody'],
+        alignment=TA_CENTER, spaceAfter=10,
+    )
+    names_line = f"{husband_name or 'Husband'} &amp; {wife_name or 'Wife'}"
+    score_line = (
+        f"{porutham.get('total_score')}/{porutham.get('max_score')} "
+        f"({porutham.get('percent')}%) — {porutham.get('grade')}"
+    )
+    elements.append(Paragraph(f"<b>{names_line}</b><br/>{score_line}", summary_style))
+    elements.append(Spacer(1, 0.1 * inch))
+
+    header = [
+        Paragraph("Category", styles['FamilyTableHeader']),
+        Paragraph("Result", styles['FamilyTableHeader']),
+    ]
+    rows = [header]
+    for p in points:
+        name = str(p.get("name", ""))
+        if p.get("mandatory"):
+            name += " (mandatory)"
+        if p.get("max", 0) > 0:
+            result = f"{p.get('score', 0)}/{p.get('max', 0)}"
+        else:
+            result = "Pass" if p.get("pass") else "Fail"
+        rows.append([
+            Paragraph(name, styles['FamilyTableCell']),
+            Paragraph(result, styles['FamilyTableCell']),
+        ])
+
+    table = Table(rows, colWidths=[300, 140], repeatRows=1)
+    table.setStyle(_header_table_style(COLORS["primary"]))
+    elements.append(KeepTogether([table]))
+    elements.append(Spacer(1, 0.2 * inch))
+    return elements
+
+
 def _build_key_takeaways(takeaways: list, styles) -> List:
     if not takeaways:
         return []
@@ -622,10 +693,20 @@ def render_family_pdf(
     member_names: List[str],
     year: int,
     prediction: dict,
+    porutham: Optional[dict] = None,
+    husband_name: Optional[str] = None,
+    wife_name: Optional[str] = None,
 ) -> bytes:
     """
     Render the family prediction as a PDF and return raw bytes.
     Mirrors the streaming pattern of canonical pdf_renderer.py.
+
+    porutham/husband_name/wife_name: optional, only present when the group
+    has a resolvable husband+wife pairing (see get_family_predictions_pdf()
+    in app/api/family.py, which fetches it via the shared
+    _get_or_compute_porutham() rather than a new lookup). None for a
+    single-member or no-pairing group -- _build_porutham() below then
+    correctly renders nothing rather than a broken/empty section.
     """
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -644,6 +725,10 @@ def render_family_pdf(
     story += _build_executive_summary(prediction.get("executive_summary", ""), styles)
     story += _build_financial_peaks(prediction.get("financial_peaks", []), styles)
     story += _build_caution_windows(prediction.get("caution_windows", []), styles)
+    # Placement: immediately after Shared Caution Windows, not end-of-
+    # document -- same subject matter (couple relationship dynamics) as
+    # the caution-window narrative Phase F1 already grounds in this data.
+    story += _build_porutham(porutham, husband_name, wife_name, styles)
     story += _build_child_milestones(prediction.get("child_milestones", []), styles)
     story += _build_key_takeaways(prediction.get("key_takeaways", []), styles)
     story += _build_footer(styles)

@@ -17,7 +17,9 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-from app.api.family import _build_member_summary, _build_porutham_chat_block
+from app.api.family import (
+    _build_member_summary, _build_porutham_chat_block, _resolve_porutham_for_pdf,
+)
 from app.llm.payload_builder import _build_family_yoga_upagraha_suffix
 
 
@@ -210,6 +212,56 @@ class TestBuildPoruthamChatBlock(unittest.TestCase):
         ]
         result = _build_porutham_chat_block(rows, "group-1")
         self.assertEqual(result, "")
+
+
+class TestResolvePoruthamForPdf(unittest.TestCase):
+    """
+    Phase F4 Part A: extracted from what was inline in
+    get_family_predictions_pdf() -- mirrors _build_porutham_chat_block()'s
+    extraction pattern, but for _load_members_with_charts()'s
+    {"member": {...}, "payload": {...}} shape rather than raw row tuples.
+    """
+
+    def _item(self, member_id, role, display_name, payload):
+        return {"member": {"id": member_id, "role": role, "display_name": display_name}, "payload": payload}
+
+    def test_no_wife_returns_all_none_no_db_call(self):
+        members = [self._item("h-id", "husband", "Ravi", _member_payload(name="Ravi"))]
+        with patch("app.api.family.get_conn") as mock_get_conn:
+            result = _resolve_porutham_for_pdf(members, "group-1")
+        self.assertEqual(result, (None, None, None))
+        mock_get_conn.assert_not_called()
+
+    def test_husband_and_wife_resolves_porutham_and_names(self):
+        members = [
+            self._item("h-id", "husband", "Ravi", _member_payload(name="Ravi", rasi="Mesham", nak="Ashwini")),
+            self._item("w-id", "wife", "Priya", _member_payload(name="Priya", rasi="Kanni", nak="Hasta")),
+        ]
+        mock_conn = MagicMock()
+        cached_row = ({
+            "husband": {"name": "Ravi", "nakshatra": "Ashwini", "rasi": "Mesham"},
+            "wife": {"name": "Priya", "nakshatra": "Hasta", "rasi": "Kanni"},
+            "porutham": {"total_score": 16, "max_score": 33, "grade": "Average", "points": []},
+        },)
+        mock_conn.execute.return_value.fetchone.return_value = cached_row
+        mock_cm = MagicMock()
+        mock_cm.__enter__.return_value = mock_conn
+        mock_cm.__exit__.return_value = False
+
+        with patch("app.api.family.get_conn", return_value=mock_cm):
+            porutham, husband_name, wife_name = _resolve_porutham_for_pdf(members, "group-1")
+
+        self.assertEqual(porutham, {"total_score": 16, "max_score": 33, "grade": "Average", "points": []})
+        self.assertEqual(husband_name, "Ravi")
+        self.assertEqual(wife_name, "Priya")
+
+    def test_missing_nak_rasi_returns_all_none(self):
+        members = [
+            self._item("h-id", "husband", "Ravi", {"birth_details": {"name": "Ravi"}, "ephemeris": {}}),
+            self._item("w-id", "wife", "Priya", {"birth_details": {"name": "Priya"}, "ephemeris": {}}),
+        ]
+        porutham, husband_name, wife_name = _resolve_porutham_for_pdf(members, "group-1")
+        self.assertIsNone(porutham)
 
 
 if __name__ == "__main__":

@@ -606,6 +606,48 @@ def get_family_predictions(
     return result
 
 
+def _resolve_porutham_for_pdf(members_with_charts: list, group_id: str):
+    """
+    Resolve (porutham, husband_name, wife_name) for the family PDF, or
+    (None, None, None) if there's no husband+wife pairing / no resolvable
+    result. Extracted from what was inline in get_family_predictions_pdf()
+    so it's directly testable, mirroring the _build_porutham_chat_block()
+    extraction pattern from Phase F2.
+
+    Uses _get_or_compute_porutham() (payload_builder.py) -- the same
+    cache-first lookup Phase F1/F2 already use, not a fourth copy.
+
+    members_with_charts: list of {"member": {...with "id"/"role"/
+      "display_name"...}, "payload": {...}} dicts, the shape
+      _load_members_with_charts() returns (used by this endpoint,
+      different from family_group_chat_stream()'s raw row tuples --
+      that's why this isn't shared with _build_porutham_chat_block()
+      despite doing conceptually the same thing).
+    """
+    husband_item = next((i for i in members_with_charts if i["member"]["role"] == "husband"), None)
+    wife_item = next((i for i in members_with_charts if i["member"]["role"] == "wife"), None)
+    if not husband_item or not wife_item:
+        return None, None, None
+
+    try:
+        h_payload = husband_item["payload"] if isinstance(husband_item["payload"], dict) else {}
+        w_payload = wife_item["payload"] if isinstance(wife_item["payload"], dict) else {}
+        h_nak, h_rasi = _extract_nak_rasi(h_payload)
+        w_nak, w_rasi = _extract_nak_rasi(w_payload)
+        husband_name = husband_item["member"].get("display_name") or h_payload.get("birth_details", {}).get("name", "Husband")
+        wife_name = wife_item["member"].get("display_name") or w_payload.get("birth_details", {}).get("name", "Wife")
+        with get_conn() as conn:
+            porutham = _get_or_compute_porutham(
+                conn, group_id,
+                str(husband_item["member"].get("id")), husband_name, h_nak, h_rasi,
+                str(wife_item["member"].get("id")), wife_name, w_nak, w_rasi,
+            )
+        return porutham, husband_name, wife_name
+    except Exception as e:
+        logger.warning(f"Porutham lookup failed for family PDF: {e}")
+        return None, None, None
+
+
 @router.get("/groups/{group_id}/predictions/pdf")
 def get_family_predictions_pdf(
     group_id: str,
@@ -640,12 +682,17 @@ def get_family_predictions_pdf(
         for item in members_with_charts
     ]
 
+    porutham, husband_name, wife_name = _resolve_porutham_for_pdf(members_with_charts, group_id)
+
     try:
         pdf_bytes = render_family_pdf(
             group_name=group["name"],
             member_names=member_names,
             year=year,
             prediction=prediction,
+            porutham=porutham,
+            husband_name=husband_name,
+            wife_name=wife_name,
         )
     except Exception as e:
         logger.error(f"Family PDF render failed: {e}")
