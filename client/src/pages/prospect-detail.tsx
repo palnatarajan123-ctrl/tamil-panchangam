@@ -18,6 +18,7 @@ interface ProspectPoruthamResponse {
   boy: PoruthamPerson & { chart_id: string };
   girl: PoruthamPerson & { chart_id: string };
   porutham: PoruthResult;
+  commentary?: string | null;
 }
 
 async function apiJson(method: string, path: string, body?: unknown) {
@@ -117,6 +118,7 @@ export default function ProspectDetail() {
               personALabel="Groom"
               personBLabel="Bride"
               result={data.porutham}
+              commentary={data.commentary}
             />
           </CardContent>
         </Card>

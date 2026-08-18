@@ -55,12 +55,14 @@ export function PoruthamBreakdown({
   personALabel = "Person A",
   personBLabel = "Person B",
   result,
+  commentary,
 }: {
   personA: PoruthamPerson;
   personB: PoruthamPerson;
   personALabel?: string;
   personBLabel?: string;
   result: PoruthResult;
+  commentary?: string | null;
 }) {
   return (
     <div className="space-y-4">
@@ -96,6 +98,24 @@ export function PoruthamBreakdown({
           <p className="text-xs text-muted-foreground mt-1">{result.percent}%</p>
         </CardContent>
       </Card>
+
+      {/* Commentary (Phase H2) -- LLM-generated explanation of the
+          mechanism behind the grade, cached at compute time alongside
+          the score. Older cached rows predating this field simply won't
+          have it -- render nothing rather than backfilling on read. */}
+      {commentary && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-primary">✦</span>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              About This Result
+            </p>
+          </div>
+          <p className="text-sm text-foreground leading-relaxed">
+            {commentary}
+          </p>
+        </div>
+      )}
 
       {/* Points breakdown */}
       <div className="space-y-1">
