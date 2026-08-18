@@ -40,6 +40,7 @@ from app.engines.porutham_engine import (
     RASI_LORDS,
     RASIYATHIPATY_FRIENDLY,
     RASIYATHIPATY_ENEMY,
+    score_stree_deergha,
 )
 from app.engines.nakshatra_names import canonical_nakshatra_list
 
@@ -791,3 +792,25 @@ def test_rasiyathipaty_gradient_passes_at_three_and_above():
     assert score_rasiyathipaty(0, 1)["pass"] is True   # 3
     assert score_rasiyathipaty(3, 2)["pass"] is False  # 1
     assert score_rasiyathipaty(4, 9)["pass"] is False  # 0
+
+
+# ── Phase 8 audit regression: Stree Deergha deliberate convention ─────────────
+#
+# No fix this phase (genuinely contested across sources, no Tamil-
+# specific tiebreaker found). This locks in the current, documented
+# convention (diff>=9, flat pass/fail, girl-to-boy direction) so a
+# future session sees it's a deliberate choice, not an oversight.
+
+def test_stree_deergha_direction_and_threshold_documented_convention():
+    boy_nak = _nakshatra_index("Aswini")  # index 0
+    # diff=8 (just under threshold) -> fail
+    assert score_stree_deergha(boy_nak, 8)["pass"] is False
+    # diff=9 (at threshold) -> pass
+    assert score_stree_deergha(boy_nak, 9)["pass"] is True
+    # diff=13 (well past threshold) -> pass
+    assert score_stree_deergha(boy_nak, 13)["pass"] is True
+
+
+def test_stree_deergha_not_mandatory():
+    result = score_stree_deergha(_nakshatra_index("Aswini"), _nakshatra_index("Uthiram"))
+    assert result.get("mandatory") is False

@@ -401,7 +401,32 @@ def score_mahendra(boy_nak: int, girl_nak: int) -> dict:
 
 
 def score_stree_deergha(boy_nak: int, girl_nak: int) -> dict:
-    """Stree Deergha: pass/fail (girl's nak must be 9+ away from boy's)."""
+    """
+    Stree Deergha: pass/fail (girl's nak must be 9+ away from boy's).
+
+    Reviewed 2026-08-17 (Porutham audit, Phase 8) -- no fix, deliberate
+    convention. This is the least-documented Kuta researched this
+    session: sources genuinely disagree with each other, not just with
+    this engine. Direction (count girl-to-boy) is unanimous across every
+    source that addresses it -- high confidence, matches this code.
+    The threshold and pass/fail-vs-graduated shape are NOT settled:
+    - One source: flat pass/fail at diff>=9 (matches this code exactly).
+    - Three sources (near-identical wording, possibly one shared
+      upstream origin rather than fully independent): two-tier graduated
+      (diff>13="Uttamam"/excellent, diff>7="Madhyamam"/acceptable).
+    - One source: same two-tier shape but diff>15, not diff>13.
+    - One source: continuous "further is always better" framing across
+      the full 27-star cycle, no real upper cap.
+    None of the graduated-shape sources state whether "Madhyamam" counts
+    as a full pass, a partial pass, or a family's discretionary call in
+    the standard 10-Porutham tally -- that distinction is itself
+    unresolved in the source material, not just unimplemented here.
+    Given no clean classical Tamil-language source was found to break
+    this tie (unlike Rajju, Vedha, and the Rasi 5th/9th question, all
+    resolved this session with one), diff>=9 flat pass/fail stands as
+    this engine's deliberate, documented choice -- not a confirmed bug,
+    and not silently guessed at either.
+    """
     diff = (girl_nak - boy_nak) % 27
     passed = diff >= 9
     return {"name": "Stree Deergha", "score": 0, "max": 0, "pass": passed, "mandatory": False}
