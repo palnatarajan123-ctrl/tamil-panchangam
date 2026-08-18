@@ -26,10 +26,13 @@ from app.engines.porutham_engine import (
     score_ganam,
     score_rasi,
     score_rajju,
+    score_vedha,
     compute_porutham,
     GANA,
     NADI,
     RAJJU_GROUPS,
+    VEDHA_PAIRS,
+    VEDHA_SET,
 )
 from app.engines.nakshatra_names import canonical_nakshatra_list
 
@@ -439,3 +442,76 @@ def test_rajju_no_cancellation_exception_logic():
     import inspect
     sig = inspect.signature(score_rajju)
     assert list(sig.parameters) == ["boy_nak", "girl_nak"]
+
+
+# ── Phase 4 audit regression: full Vedha clash-pair table ─────────────────────
+#
+# Locks in the corrected VEDHA_PAIRS so this can't silently regress back
+# to the fully-mismatched table (plus the dead, out-of-range (9,27)
+# Magha placeholder) the 2026-08-17 audit found. Vedha is a mandatory
+# dosha category, so a wrong or unreachable pair here can hide a real
+# dealbreaker. Cross-checked against 2 independent sources this session,
+# agreeing exactly -- see porutham_engine.py's VEDHA_PAIRS comment.
+
+_VEDHA_REFERENCE_PAIRS = [
+    ("Karthigai", "Visakam"), ("Aswini", "Kettai"), ("Rohini", "Swathi"),
+    ("Bharani", "Anusham"), ("Thiruvadirai", "Thiruvonam"),
+    ("Punarpoosam", "Uthiradam"), ("Poosam", "Pooradam"),
+    ("Ayilyam", "Moolam"), ("Magam", "Revathi"),
+    ("Pooram", "Uthirattadhi"), ("Uthiram", "Poorattadhi"),
+    ("Hastham", "Sadayam"),
+]
+
+_VEDHA_UNPAIRED = ["Mirugashirisham", "Chittirai", "Avittam"]
+
+
+@pytest.mark.parametrize("nak_a,nak_b", _VEDHA_REFERENCE_PAIRS)
+def test_vedha_table_reference_pair_fails(nak_a, nak_b):
+    result = score_vedha(_nakshatra_index(nak_a), _nakshatra_index(nak_b))
+    assert result["pass"] is False, f"{nak_a}-{nak_b} should be a Vedha clash"
+    assert result["mandatory"] is True
+
+
+def test_vedha_table_has_exactly_12_pairs():
+    assert len(VEDHA_PAIRS) == 12
+    assert len(VEDHA_SET) == 12
+
+
+def test_vedha_table_covers_24_of_27_nakshatras():
+    names = canonical_nakshatra_list()
+    paired = set()
+    for a, b in _VEDHA_REFERENCE_PAIRS:
+        paired.add(a)
+        paired.add(b)
+    assert len(paired) == 24
+    unpaired = set(names) - paired
+    assert unpaired == set(_VEDHA_UNPAIRED)
+
+
+def test_vedha_magha_and_ashlesha_reachable_not_dead_indices():
+    """
+    Regression test for the exact bug found: the old code's dead
+    (9, 27) placeholder meant Magha could NEVER fail Vedha against any
+    real nakshatra, regardless of partner. Confirm both Magha and
+    Ashlesha now correctly clash with their real partners.
+    """
+    magha = _nakshatra_index("Magam")
+    revati = _nakshatra_index("Revathi")
+    ashlesha = _nakshatra_index("Ayilyam")
+    mula = _nakshatra_index("Moolam")
+
+    assert score_vedha(magha, revati)["pass"] is False
+    assert score_vedha(ashlesha, mula)["pass"] is False
+
+    # Sanity: Magha does NOT clash with an unrelated nakshatra
+    assert score_vedha(magha, _nakshatra_index("Aswini"))["pass"] is True
+
+
+@pytest.mark.parametrize("nak_name", _VEDHA_UNPAIRED)
+def test_vedha_unpaired_nakshatras_never_clash(nak_name):
+    """Mirugashirisham, Chittirai, Avittam have no documented Vedha
+    partner in either source -- confirm they never appear in VEDHA_SET
+    (not a bug; this is the correct, sourced state)."""
+    idx = _nakshatra_index(nak_name)
+    for a, b in VEDHA_SET:
+        assert idx not in (a, b), f"{nak_name} unexpectedly appears in a Vedha pair"

@@ -66,10 +66,33 @@ RAJJU_GROUPS = [
 ]
 
 # Vedha pairs (nakshatra index pairs that cause vedha)
+# Corrected 2026-08-17 (Porutham audit, Phase 4): every one of the prior
+# pairs was wrong -- none of the 13 original pairs (plus the dead,
+# out-of-range (9,27) placeholder) survived. That placeholder's comment
+# claimed "no pair for Ashlesha/Magha," but 2 independent sources this
+# session confirmed BOTH have a real clash partner (Ashlesha-Mula,
+# Magha-Revati) -- so the old code meant Magha could never fail Vedha
+# against anyone, regardless of partner. Vedha is a mandatory dosha
+# category, so this mattered. 12 pairs cover 24 of 27 nakshatras;
+# Mirugashirisham, Chittirai, and Avittam have no documented clash
+# partner in either source and are intentionally absent here (not a
+# bug -- they simply never appear in VEDHA_SET, so any pairing
+# involving them correctly evaluates as "not vedha"). Verify against
+# tests/engines/test_porutham_engine.py's full pair-list test before
+# ever touching this array again.
 VEDHA_PAIRS = [
-    (0, 18), (1, 17), (2, 16), (3, 15), (4, 14),
-    (5, 13), (6, 12), (7, 11), (8, 10), (9, 27),  # 27 = no pair for Ashlesha/Magha
-    (19, 25), (20, 24), (21, 23), (22, 26),
+    (2, 15),   # Karthigai - Visakam
+    (0, 17),   # Aswini - Kettai
+    (3, 14),   # Rohini - Swathi
+    (1, 16),   # Bharani - Anusham
+    (5, 21),   # Thiruvadirai - Thiruvonam
+    (6, 20),   # Punarpoosam - Uthiradam
+    (7, 19),   # Poosam - Pooradam
+    (8, 18),   # Ayilyam - Moolam
+    (9, 26),   # Magam - Revathi
+    (10, 25),  # Pooram - Uthirattadhi
+    (11, 24),  # Uthiram - Poorattadhi
+    (12, 23),  # Hastham - Sadayam
 ]
 VEDHA_SET = set()
 for a, b in VEDHA_PAIRS:
