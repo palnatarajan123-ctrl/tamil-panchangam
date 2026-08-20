@@ -119,6 +119,7 @@ export default function ProspectDetail() {
               personBLabel="Bride"
               result={data.porutham}
               commentary={data.commentary}
+              context="prospect"
             />
           </CardContent>
         </Card>

@@ -282,6 +282,7 @@ function PoruthTab({ groupId, onAskJyotishi }: { groupId: string; onAskJyotishi:
         personBLabel="Wife"
         result={result}
         commentary={data?.commentary}
+        context="family"
       />
 
       {/* Two entry points out of this tab, both reusing existing app

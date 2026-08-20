@@ -56,6 +56,7 @@ export function PoruthamBreakdown({
   personBLabel = "Person B",
   result,
   commentary,
+  context = "prospect",
 }: {
   personA: PoruthamPerson;
   personB: PoruthamPerson;
@@ -63,6 +64,7 @@ export function PoruthamBreakdown({
   personBLabel?: string;
   result: PoruthResult;
   commentary?: string | null;
+  context?: "family" | "prospect";
 }) {
   return (
     <div className="space-y-4">
@@ -89,6 +91,17 @@ export function PoruthamBreakdown({
             </div>
             <GradeTag grade={result.grade} mandatoryFail={result.mandatory_fail} />
           </div>
+          {/* Family-context-only softening (2026-08-20): the "(dosha)"
+              badge alone can read as an alarming verdict for a couple
+              already married, sometimes decades. Doesn't touch the badge
+              itself (color/score/wording) -- just adds adjacent context
+              pointing at the commentary below. Prospect context is
+              unchanged; this is deliberately not shown there. */}
+          {context === "family" && result.mandatory_fail && (
+            <p className="text-xs text-muted-foreground mb-2">
+              Traditional screening flag — see note below
+            </p>
+          )}
           <div className="h-2 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full bg-primary rounded-full transition-all"
