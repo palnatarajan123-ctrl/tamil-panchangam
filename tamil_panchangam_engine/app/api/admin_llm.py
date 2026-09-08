@@ -15,9 +15,10 @@ All endpoints are prefixed with /admin/llm
 import logging
 from typing import List, Optional
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
+from app.core.auth import require_admin
 from app.db.postgres import get_conn
 from app.engines.budget_guard import get_monthly_summary
 from app.engines.llm_interpretation_orchestrator import (
@@ -74,7 +75,7 @@ class ToggleResponse(BaseModel):
 
 
 @router.get("/status", response_model=LLMStatusResponse)
-def get_llm_status():
+def get_llm_status(_admin: dict = Depends(require_admin)):
     """Get current LLM status and configuration."""
     provider_info = openai_provider.get_provider_info()
     
@@ -88,14 +89,14 @@ def get_llm_status():
 
 
 @router.get("/usage/monthly", response_model=MonthlyUsageResponse)
-def get_monthly_usage():
+def get_monthly_usage(_admin: dict = Depends(require_admin)):
     """Get token usage for current month."""
     usage = get_monthly_token_usage()
     return MonthlyUsageResponse(**usage)
 
 
 @router.get("/usage/recent", response_model=List[RecentCallEntry])
-def get_recent_calls(limit: int = 20):
+def get_recent_calls(limit: int = 20, _admin: dict = Depends(require_admin)):
     """Get recent LLM calls."""
     try:
         with get_conn() as conn:
@@ -125,7 +126,7 @@ def get_recent_calls(limit: int = 20):
 
 
 @router.get("/fallback-summary", response_model=List[FallbackSummaryEntry])
-def get_fallback_summary():
+def get_fallback_summary(_admin: dict = Depends(require_admin)):
     """Get fallback reasons summary for current month."""
     try:
         with get_conn() as conn:
@@ -149,7 +150,7 @@ def get_fallback_summary():
 
 
 @router.post("/toggle", response_model=ToggleResponse)
-def toggle_llm(request: ToggleRequest):
+def toggle_llm(request: ToggleRequest, _admin: dict = Depends(require_admin)):
     """Enable or disable LLM interpretation."""
     success = set_llm_enabled(request.enabled)
 
@@ -179,7 +180,7 @@ def toggle_llm(request: ToggleRequest):
 # ── New v2 endpoints ─────────────────────────────────────────────────────
 
 @router.get("/summary")
-def llm_summary_v2():
+def llm_summary_v2(_admin: dict = Depends(require_admin)):
     """Monthly cost/budget summary for admin dashboard v2."""
     try:
         return get_monthly_summary()
@@ -189,7 +190,7 @@ def llm_summary_v2():
 
 
 @router.get("/calls")
-def llm_calls_list(page: int = 1, per_page: int = 20, call_type: Optional[str] = None):
+def llm_calls_list(page: int = 1, per_page: int = 20, call_type: Optional[str] = None, _admin: dict = Depends(require_admin)):
     """Paginated list of LLM calls from llm_calls table."""
     offset = (page - 1) * per_page
     try:
@@ -246,7 +247,7 @@ class BudgetUpdateRequest(BaseModel):
 
 
 @router.post("/budget")
-def update_budget(request: BudgetUpdateRequest):
+def update_budget(request: BudgetUpdateRequest, _admin: dict = Depends(require_admin)):
     """Update monthly budget config."""
     try:
         with get_conn() as conn:
@@ -281,7 +282,7 @@ class ClearCacheResponse(BaseModel):
 
 
 @router.post("/clear-cache", response_model=ClearCacheResponse)
-def clear_interpretation_cache(request: ClearCacheRequest):
+def clear_interpretation_cache(request: ClearCacheRequest, _admin: dict = Depends(require_admin)):
     """Clear cached LLM interpretations. If base_chart_id provided, clears only that chart's cache."""
     try:
         with get_conn() as conn:
