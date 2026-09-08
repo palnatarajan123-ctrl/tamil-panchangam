@@ -58,9 +58,13 @@ export default function AdminLLM() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // Normalized to the shared apiRequest helper (was a bare fetch with
+      // no auth header at all) -- part of this session's whole-tree audit.
+      // These backend routes currently have no auth check of their own
+      // either (separate finding, reported this session).
       const [sumRes, callsRes] = await Promise.all([
-        fetch("/api/admin/llm/summary"),
-        fetch(`/api/admin/llm/calls?page=${page}&per_page=20${typeFilter ? `&call_type=${typeFilter}` : ""}`),
+        apiRequest("GET", "/api/admin/llm/summary"),
+        apiRequest("GET", `/api/admin/llm/calls?page=${page}&per_page=20${typeFilter ? `&call_type=${typeFilter}` : ""}`),
       ]);
       const sum: LLMSummary = await sumRes.json();
       const callData = await callsRes.json();
@@ -77,13 +81,9 @@ export default function AdminLLM() {
   useEffect(() => { load(); }, [load]);
 
   const saveBudget = async () => {
-    await fetch("/api/admin/llm/budget", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        monthly_budget_usd: parseFloat(budgetInput),
-        auto_pause_threshold_pct: parseInt(thresholdInput),
-      }),
+    await apiRequest("POST", "/api/admin/llm/budget", {
+      monthly_budget_usd: parseFloat(budgetInput),
+      auto_pause_threshold_pct: parseInt(thresholdInput),
     });
     setEditBudget(false);
     load();

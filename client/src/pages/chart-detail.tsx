@@ -50,7 +50,6 @@ import {
 } from "lucide-react";
 
 import { apiRequest } from "@/lib/queryClient";
-import { getAccessToken } from "@/lib/auth";
 import { adaptBirthChart } from "@/adapters/birthChartAdapter";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -106,16 +105,11 @@ export default function ChartDetail() {
 
   const saveChartMutation = useMutation({
     mutationFn: async (data: { nickname: string }) => {
-      const res = await fetch("/api/user/charts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
-        },
-        body: JSON.stringify({
-          base_chart_id: chartId,
-          nickname: data.nickname,
-        }),
+      // Normalized to the shared apiRequest helper (was a hand-rolled
+      // manual-token fetch), same audit pass as usePrediction.ts's fix.
+      const res = await apiRequest("POST", "/api/user/charts", {
+        base_chart_id: chartId,
+        nickname: data.nickname,
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json();

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { adaptPredictionResponse } from "@/adapters/predictionAdapter";
 import { PeriodType } from "@/types/prediction";
 
@@ -54,11 +55,12 @@ export function usePrediction(params: UsePredictionParams) {
     enabled: Boolean(baseChartId && period),
 
     queryFn: async () => {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      // Monthly/weekly/yearly prediction endpoints now require auth
+      // (security fix, 2026-09-08) -- use the shared apiRequest helper so
+      // the bearer token is attached, instead of a bare fetch() that would
+      // 401. Same bug class as DailyView.tsx and getQueryFn, a third
+      // instance found in production post-deploy testing.
+      const res = await apiRequest("POST", endpoint, payload);
 
       if (!res.ok) {
         const text = await res.text();

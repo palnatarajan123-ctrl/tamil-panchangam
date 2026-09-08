@@ -2,6 +2,7 @@ import { useParams } from "wouter";
 import React, { useState, useEffect, useRef } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { usePrediction } from "@/hooks/usePrediction";
+import { apiRequest } from "@/lib/queryClient";
 
 import { MonthlyPredictionView } from "@/components/prediction/MonthlyPredictionView";
 import { DailyView } from "@/components/prediction/DailyView";
@@ -27,7 +28,6 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { getAccessToken } from "@/lib/auth";
 import { ChatPanel } from "@/components/ChatPanel";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -151,7 +151,9 @@ export default function PredictionScreen() {
         const statusUrl = period === "monthly"
           ? `/api/prediction/monthly/llm-status?${new URLSearchParams({ base_chart_id: id, year: year.toString(), month: index.toString() })}`
           : `/api/prediction/yearly/llm-status?${new URLSearchParams({ base_chart_id: id, year: year.toString() })}`;
-        const res = await fetch(statusUrl);
+        // llm-status now requires auth (security fix, 2026-09-08) -- see
+        // usePrediction.ts for the same fix on the main prediction call.
+        const res = await apiRequest("GET", statusUrl);
         if (!res.ok) return;
         const json = await res.json();
         if (json.status === "ready") {
@@ -187,9 +189,14 @@ export default function PredictionScreen() {
   const { data: baseChart } = useQuery({
     queryKey: ["base-chart", id],
     queryFn: async () => {
-      const res = await fetch(`/api/base-chart/${id}`);
-      if (!res.ok) return null;
-      return res.json();
+      // /api/base-chart/{id} now requires auth + ownership (security fix,
+      // 2026-09-08) -- use the shared apiRequest helper.
+      try {
+        const res = await apiRequest("GET", `/api/base-chart/${id}`);
+        return res.json();
+      } catch {
+        return null;
+      }
     },
     enabled: !!id,
   });
@@ -211,11 +218,13 @@ export default function PredictionScreen() {
     setEnhancing(true);
     setLlmDisabledMessage(null);
     try {
-      const token = getAccessToken();
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const statusRes = await fetch("/api/admin/llm/status", { headers });
+      // Normalized to the shared apiRequest helper (was a hand-rolled
+      // manual-token pattern) so this doesn't become yet another auth
+      // variant to track -- see usePrediction.ts for the actual bug this
+      // session found, this call site wasn't broken (these two admin
+      // endpoints currently have no backend auth check at all, a separate
+      // finding reported this session) but was still worth normalizing.
+      const statusRes = await apiRequest("GET", "/api/admin/llm/status");
       const statusJson = await statusRes.json();
 
       if (!statusJson.llm_enabled) {
@@ -223,11 +232,7 @@ export default function PredictionScreen() {
         return;
       }
 
-      await fetch("/api/admin/llm/clear-cache", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ base_chart_id: id }),
-      });
+      await apiRequest("POST", "/api/admin/llm/clear-cache", { base_chart_id: id });
 
       queryClient.invalidateQueries({
         queryKey: ["prediction", id, period, year, index, undefined],

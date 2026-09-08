@@ -1,6 +1,7 @@
 import { useParams, Link } from "wouter";
 import React, { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -123,7 +124,9 @@ export default function Predictions() {
   const { data: chart, isLoading, error } = useQuery({
     queryKey: ["/api/base-chart", baseChartId],
     queryFn: async () => {
-      const res = await fetch(`/api/base-chart/${baseChartId}`);
+      // /api/base-chart/{id} now requires auth + ownership (security fix,
+      // 2026-09-08) -- use the shared apiRequest helper.
+      const res = await apiRequest("GET", `/api/base-chart/${baseChartId}`);
       if (!res.ok) throw new Error("Birth chart not found");
       return res.json();
     },
@@ -155,11 +158,9 @@ export default function Predictions() {
         endpoint = "/api/prediction/yearly";
       }
 
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      // Prediction endpoints now require auth (security fix, 2026-09-08) --
+      // use the shared apiRequest helper, same fix as usePrediction.ts.
+      const res = await apiRequest("POST", endpoint, payload);
 
       if (!res.ok) {
         throw new Error(await res.text());
@@ -188,7 +189,8 @@ export default function Predictions() {
               year: pendingYear.toString(),
               month: pendingMonth.toString(),
             });
-            const res = await fetch(`/api/prediction/monthly/llm-status?${params}`);
+            // llm-status now requires auth (security fix, 2026-09-08).
+            const res = await apiRequest("GET", `/api/prediction/monthly/llm-status?${params}`);
             if (!res.ok) return;
             const json = await res.json();
             if (json.status === "ready") {
@@ -281,8 +283,10 @@ export default function Predictions() {
         params.append("month", lastPredictionParams.month.toString());
       }
       
-      const res = await fetch(`/api/reports/pdf?${params.toString()}`);
-      
+      // /api/reports/pdf now requires auth + ownership (security fix,
+      // 2026-09-08) -- use the shared apiRequest helper.
+      const res = await apiRequest("GET", `/api/reports/pdf?${params.toString()}`);
+
       if (!res.ok) {
         const errorText = await res.text();
         throw new Error(errorText || "Failed to generate PDF");

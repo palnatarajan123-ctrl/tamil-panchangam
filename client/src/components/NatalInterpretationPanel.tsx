@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/accordion";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { getAccessToken } from "@/lib/auth";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -177,10 +176,11 @@ export function NatalInterpretationPanel({ chartId }: { chartId: string }) {
   async function downloadPdf() {
     setDownloading(true);
     try {
-      const token = getAccessToken();
-      const res = await fetch(`/api/reports/birth-chart-pdf?base_chart_id=${chartId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      // Normalized to the shared apiRequest helper (was a hand-rolled
+      // manual-token fetch) -- this endpoint also requires ownership now
+      // (security fix, 2026-09-08), matching the natal-interpretation call
+      // below which already used apiRequest correctly.
+      const res = await apiRequest("GET", `/api/reports/birth-chart-pdf?base_chart_id=${chartId}`);
       if (!res.ok) throw new Error("Download failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

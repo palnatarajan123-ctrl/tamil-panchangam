@@ -14,7 +14,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { getAccessToken } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -75,10 +75,10 @@ export function KpInsightCard({ chartId }: { chartId: string }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["/api/chart/kp-interpretation", chartId],
     queryFn: async () => {
-      const token = getAccessToken();
-      const res = await fetch(`/api/chart/${chartId}/kp-interpretation`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      // Normalized to the shared apiRequest helper (was a hand-rolled
+      // manual-token fetch, working but a variant this session's audit
+      // flagged for consistency -- see usePrediction.ts for the actual bug).
+      const res = await apiRequest("GET", `/api/chart/${chartId}/kp-interpretation`);
       if (!res.ok) throw new Error("KP interpretation request failed");
       return res.json() as Promise<{
         kp_available: boolean;
