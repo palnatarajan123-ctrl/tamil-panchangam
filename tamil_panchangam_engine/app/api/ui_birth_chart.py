@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 import json
 
 from app.db.postgres import get_conn
+from app.core.auth import get_current_user
+from app.repositories.base_chart_repo import user_owns_chart
 from app.services.birth_chart_builder import build_birth_chart_view_model
 
 router = APIRouter(prefix="/ui", tags=["ui"])
@@ -10,6 +12,7 @@ router = APIRouter(prefix="/ui", tags=["ui"])
 @router.get("/birth-chart")
 def get_birth_chart_ui(
     base_chart_id: str = Query(...),
+    user: dict = Depends(get_current_user),
 ):
     """
     UI-safe birth chart endpoint.
@@ -32,7 +35,9 @@ def get_birth_chart_ui(
         [base_chart_id],
     ).fetchone()
 
-    if not row:
+    # Ownership check (security fix, 2026-09-08): 404 either way so a
+    # non-owner can't tell whether the chart exists.
+    if not row or not user_owns_chart(conn, user, base_chart_id):
         raise HTTPException(
             status_code=404,
             detail="Base chart not found",

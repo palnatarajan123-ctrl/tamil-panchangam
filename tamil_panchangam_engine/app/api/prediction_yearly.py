@@ -15,9 +15,10 @@ def _safe_json(val):
     return json.loads(val)
 
 from app.core.limiter import limiter
+from app.core.auth import get_current_user
 
 from app.db.session import get_db
-from app.repositories.base_chart_repo import get_base_chart_by_id
+from app.repositories.base_chart_repo import get_base_chart_by_id, user_owns_chart
 from app.repositories.yearly_prediction_repo import save_yearly_prediction, get_yearly_prediction
 from app.db.postgres import get_conn
 
@@ -55,7 +56,7 @@ def _normalize_confidence(synthesis: Dict[str, Any]) -> Dict[str, Any]:
 
 @limiter.limit("10/hour")
 @router.post("/yearly")
-def generate_yearly_prediction(request: Request, payload: dict, db=Depends(get_db)):
+def generate_yearly_prediction(request: Request, payload: dict, db=Depends(get_db), user: dict = Depends(get_current_user)):
     """
     EPIC-9
     Yearly prediction endpoint.
@@ -81,7 +82,9 @@ def generate_yearly_prediction(request: Request, payload: dict, db=Depends(get_d
     # --------------------------------------------------
     base_chart_record = get_base_chart_by_id(db, base_chart_id)
 
-    if not base_chart_record:
+    # Ownership check (security fix, 2026-09-08): 404 either way so a
+    # non-owner can't tell whether the chart exists.
+    if not base_chart_record or not user_owns_chart(db, user, base_chart_id):
         raise HTTPException(status_code=404, detail="Birth chart not found")
 
     # --------------------------------------------------

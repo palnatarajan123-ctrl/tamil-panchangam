@@ -13,12 +13,13 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 
 from app.core.limiter import limiter
+from app.core.auth import get_current_user
 from app.db.postgres import get_conn
-from app.repositories.base_chart_repo import get_base_chart_by_id
+from app.repositories.base_chart_repo import get_base_chart_by_id, user_owns_chart
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled
 from app.engines.budget_guard import log_llm_call
 from app.llm.providers import anthropic_provider
@@ -413,12 +414,19 @@ def _fallback_response() -> Dict[str, Any]:
 
 @limiter.limit("3/hour")
 @router.post("/natal-interpretation")
-def get_natal_interpretation(request: Request, body: NatalInterpretationRequest):
+def get_natal_interpretation(request: Request, body: NatalInterpretationRequest, user: dict = Depends(get_current_user)):
     """
     Generate (or return cached) natal chart AI interpretation.
     One LLM call per chart — cached permanently afterward.
     """
     base_chart_id = body.base_chart_id
+
+    # 0. Ownership check (security fix, 2026-09-08): checked BEFORE the
+    # cache lookup below, so a non-owner can't infer chart existence from
+    # response shape/timing either. 404 either way.
+    with get_conn() as conn:
+        if not user_owns_chart(conn, user, base_chart_id):
+            raise HTTPException(status_code=404, detail="Base chart not found")
 
     # 1. Check cache first
     cached = _get_cached(base_chart_id)
@@ -650,7 +658,7 @@ def _load_kp_system_prompt() -> str:
 
 @limiter.limit("5/hour")
 @router.get("/{chart_id}/kp-interpretation")
-def get_kp_interpretation(chart_id: str, request: Request):
+def get_kp_interpretation(chart_id: str, request: Request, user: dict = Depends(get_current_user)):
     """
     Return (or generate and cache) a KP natal interpretation for this chart.
     Returns 200 with kp_available=False if the chart pre-dates KP computation.
@@ -658,8 +666,10 @@ def get_kp_interpretation(chart_id: str, request: Request):
     # 1. Fetch chart
     with get_conn() as conn:
         record = get_base_chart_by_id(conn, chart_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Base chart not found")
+        # Ownership check (security fix, 2026-09-08): 404 either way so a
+        # non-owner can't tell whether the chart exists.
+        if not record or not user_owns_chart(conn, user, chart_id):
+            raise HTTPException(status_code=404, detail="Base chart not found")
 
     raw_payload = record["payload"]
     payload = raw_payload if isinstance(raw_payload, dict) else json.loads(raw_payload or "{}")

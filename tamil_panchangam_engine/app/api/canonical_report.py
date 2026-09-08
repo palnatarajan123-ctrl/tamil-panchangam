@@ -6,11 +6,14 @@ THIS IS THE SINGLE ENTRY POINT FOR ALL PDF GENERATION.
 There must be NO other PDF generation endpoints.
 """
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Depends
 from fastapi.responses import Response
 from typing import Optional
 import logging
 from app.core.limiter import limiter
+from app.core.auth import get_current_user
+from app.db.postgres import get_conn
+from app.repositories.base_chart_repo import user_owns_chart
 
 from app.pdf.canonical_report import build_canonical_report, REPORT_VERSION
 from app.pdf.canonical_report.report_builder import (
@@ -32,6 +35,7 @@ def generate_pdf_report(
     report_type: str = Query(..., description="Report type: 'monthly' or 'yearly'"),
     year: int = Query(..., description="Prediction year"),
     month: Optional[int] = Query(None, description="Prediction month (required for monthly)"),
+    user: dict = Depends(get_current_user),
 ):
     """
     Generate a canonical PDF report.
@@ -68,7 +72,13 @@ def generate_pdf_report(
             status_code=400,
             detail="Month must be between 1 and 12"
         )
-    
+
+    # Ownership check (security fix, 2026-09-08): 404 either way so a
+    # non-owner can't tell whether the chart exists.
+    with get_conn() as conn:
+        if not user_owns_chart(conn, user, base_chart_id):
+            raise HTTPException(status_code=404, detail="Base chart not found")
+
     try:
         pdf_bytes = build_canonical_report(
             base_chart_id=base_chart_id,
@@ -103,6 +113,7 @@ def generate_pdf_report(
 def generate_birth_chart_pdf(
     request: Request,
     base_chart_id: str = Query(..., description="Base chart UUID"),
+    user: dict = Depends(get_current_user),
 ):
     """
     Generate a birth-chart-only PDF (no prediction required).
@@ -110,6 +121,12 @@ def generate_birth_chart_pdf(
     Includes: cover, natal snapshot, divisional charts, yogas,
     sade sati, shadbala, methodology appendix.
     """
+    # Ownership check (security fix, 2026-09-08): 404 either way so a
+    # non-owner can't tell whether the chart exists.
+    with get_conn() as conn:
+        if not user_owns_chart(conn, user, base_chart_id):
+            raise HTTPException(status_code=404, detail="Base chart not found")
+
     try:
         pdf_bytes = build_birth_chart_report(base_chart_id=base_chart_id)
     except ReportBuildError as e:
@@ -141,6 +158,7 @@ def preview_pdf_report(
     report_type: str = Query(..., description="Report type: 'monthly' or 'yearly'"),
     year: int = Query(..., description="Prediction year"),
     month: Optional[int] = Query(None, description="Prediction month (required for monthly)"),
+    user: dict = Depends(get_current_user),
 ):
     """
     Preview a PDF report inline (same as generate but displayed in browser).
@@ -157,7 +175,13 @@ def preview_pdf_report(
             status_code=400,
             detail="report_type must be 'monthly' or 'yearly'"
         )
-    
+
+    # Ownership check (security fix, 2026-09-08): 404 either way so a
+    # non-owner can't tell whether the chart exists.
+    with get_conn() as conn:
+        if not user_owns_chart(conn, user, base_chart_id):
+            raise HTTPException(status_code=404, detail="Base chart not found")
+
     try:
         pdf_bytes = build_canonical_report(
             base_chart_id=base_chart_id,

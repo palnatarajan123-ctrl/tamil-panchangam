@@ -13,7 +13,8 @@ def _safe_json(val):
 
 
 from app.db.session import get_db
-from app.repositories.base_chart_repo import get_base_chart_by_id
+from app.core.auth import get_current_user
+from app.repositories.base_chart_repo import get_base_chart_by_id, user_owns_chart
 from app.repositories.prediction_repo import get_monthly_prediction
 
 from app.engines.prediction_envelope import build_monthly_prediction_envelope
@@ -49,7 +50,7 @@ def _normalize_confidence(synthesis: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.post("/weekly")
-def generate_weekly_prediction(payload: dict, db=Depends(get_db)):
+def generate_weekly_prediction(payload: dict, db=Depends(get_db), user: dict = Depends(get_current_user)):
     """
     Weekly prediction — derives from the corresponding monthly prediction.
 
@@ -69,6 +70,11 @@ def generate_weekly_prediction(payload: dict, db=Depends(get_db)):
             status_code=400,
             detail="Missing base_chart_id, year, or week"
         )
+
+    # Ownership check (security fix, 2026-09-08): 404 either way so a
+    # non-owner can't tell whether the chart exists.
+    if not user_owns_chart(db, user, base_chart_id):
+        raise HTTPException(status_code=404, detail="Base chart not found")
 
     # Map ISO week → approximate month (used for monthly cache lookup)
     approx_month = min(12, max(1, (int(week) - 1) // 4 + 1))

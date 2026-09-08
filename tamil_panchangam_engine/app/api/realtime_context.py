@@ -6,11 +6,12 @@ Provides current-moment astrological context for a birth chart.
 This is separate from cached predictions - computed fresh on each request.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 import json
 
 from app.db.postgres import get_conn
-from app.repositories.base_chart_repo import get_base_chart_by_id
+from app.core.auth import get_current_user
+from app.repositories.base_chart_repo import get_base_chart_by_id, user_owns_chart
 from app.engines.realtime_context_engine import compute_realtime_context
 
 
@@ -34,7 +35,7 @@ ENGLISH_TO_TAMIL_RASI = {
 
 
 @router.get("/context/{base_chart_id}")
-def get_realtime_context(base_chart_id: str):
+def get_realtime_context(base_chart_id: str, user: dict = Depends(get_current_user)):
     """
     Get real-time astrological context for a birth chart.
     
@@ -44,8 +45,11 @@ def get_realtime_context(base_chart_id: str):
     
     with get_conn() as conn:
         base_chart = get_base_chart_by_id(conn, base_chart_id)
-    
-    if base_chart is None:
+        # Ownership check (security fix, 2026-09-08): 404 either way so a
+        # non-owner can't tell whether the chart exists.
+        owns_chart = user_owns_chart(conn, user, base_chart_id)
+
+    if base_chart is None or not owns_chart:
         raise HTTPException(
             status_code=404,
             detail=f"Base chart not found: {base_chart_id}",

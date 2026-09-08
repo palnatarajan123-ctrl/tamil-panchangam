@@ -24,7 +24,7 @@ from app.repositories.prediction_repo import (
     get_monthly_prediction,
     save_monthly_prediction,
 )
-from app.repositories.base_chart_repo import get_base_chart_by_id
+from app.repositories.base_chart_repo import get_base_chart_by_id, user_owns_chart
 
 from app.engines.prediction_envelope import build_monthly_prediction_envelope
 from app.engines.synthesis_engine import synthesize_from_envelope
@@ -36,7 +36,7 @@ from app.engines.explainability_filter import apply_explainability
 from app.engines.llm_interpretation_orchestrator import generate_llm_interpretation, is_llm_enabled
 from app.engines.corner_case_detector import assess_calculation_confidence
 
-from app.core.auth import require_admin
+from app.core.auth import require_admin, get_current_user
 
 from app.models.schema import (
     MonthlyPredictionRequest,
@@ -103,12 +103,16 @@ def _run_llm_background(
 
 
 @router.get("/monthly/llm-status")
-def get_monthly_llm_status(base_chart_id: str, year: int, month: int):
+def get_monthly_llm_status(base_chart_id: str, year: int, month: int, user: dict = Depends(get_current_user)):
     """
     Polling endpoint: returns "ready" only when llm_interpretation has been
     merged into monthly_predictions (not just written to prediction_llm_interpretation).
     This prevents the race where the frontend re-fetches before the merge completes.
     """
+    with get_conn() as conn:
+        if not user_owns_chart(conn, user, base_chart_id):
+            raise HTTPException(status_code=404, detail="Base chart not found")
+
     existing = get_monthly_prediction(
         base_chart_id=base_chart_id, year=year, month=month
     )
@@ -129,6 +133,7 @@ def generate_monthly_prediction(
     request: Request,
     payload: MonthlyPredictionRequest,
     background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user),
 ):
     """
     EPIC-4 + EPIC-6 + EPIC-8 + EPIC-3
@@ -142,8 +147,11 @@ def generate_monthly_prediction(
             conn,
             payload.base_chart_id,
         )
+        owns_chart = user_owns_chart(conn, user, payload.base_chart_id)
 
-    if base_chart is None:
+    # Ownership check (security fix, 2026-09-08): 404 either way so a
+    # non-owner can't tell whether the chart exists.
+    if base_chart is None or not owns_chart:
         raise HTTPException(
             status_code=404,
             detail=f"Base chart not found: {payload.base_chart_id}",

@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session
 
 from app.db.session import get_db
+from app.core.auth import get_current_user
+from app.repositories.base_chart_repo import user_owns_chart
 from app.services.prediction_aggregation_service import (
     build_prediction_report_snapshot,
 )
@@ -18,6 +20,7 @@ def get_monthly_ui_report(
     year: int,
     month: int,
     db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
     """
     EPIC-7.3
@@ -27,6 +30,11 @@ def get_monthly_ui_report(
     - Maps to UI read model
     - No computation or mutation
     """
+
+    # Ownership check (security fix, 2026-09-08): 404 either way so a
+    # non-owner can't tell whether the chart exists.
+    if not user_owns_chart(db, user, base_chart_id):
+        raise HTTPException(status_code=404, detail="Base chart not found")
 
     try:
         snapshot = build_prediction_report_snapshot(
