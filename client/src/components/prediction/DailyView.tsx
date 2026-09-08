@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Card,
   CardContent,
@@ -80,7 +81,10 @@ export function DailyView({ baseChartId, date }: DailyViewProps) {
   const { data, isLoading, error } = useQuery<DailyData>({
     queryKey: ["daily", baseChartId, dateParam],
     queryFn: async () => {
-      const res = await fetch(`/api/prediction/daily?${params}`);
+      // /api/prediction/daily now requires auth (security fix, 2026-09-08)
+      // -- use the shared apiRequest helper so the bearer token is attached,
+      // instead of a bare fetch() that would now 401.
+      const res = await apiRequest("GET", `/api/prediction/daily?${params}`);
       if (!res.ok) throw new Error("Failed to load daily data");
       return res.json();
     },

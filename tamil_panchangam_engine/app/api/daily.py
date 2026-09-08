@@ -12,8 +12,10 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request, Depends
 from app.db.postgres import get_conn
+from app.core.auth import get_current_user
+from app.core.limiter import limiter
 from app.engines.dinaphalam_engine import compute_dinaphalam
 from app.utils.time_utils import get_timezone_from_coordinates
 
@@ -115,13 +117,23 @@ def _generate_daily_llm_guidance(result: dict, chart_name: str, base_chart_id: s
         return None
 
 
+@limiter.limit("10/hour")
 @router.get("/daily")
 def get_daily_prediction(
+    request: Request,
     base_chart_id: str = Query(..., description="Base chart ID"),
     date: Optional[str] = Query(None, description="Date YYYY-MM-DD (defaults to today UTC)"),
+    user: dict = Depends(get_current_user),
 ):
     """
     Return daily Panchangam and inauspicious windows for a base chart.
+
+    Requires auth (Depends(get_current_user), REQUIRED not optional) --
+    this endpoint makes a direct synchronous LLM call on every request with
+    no caching, and was previously reachable with zero auth and zero rate
+    limit (see security audit, 2026-09-08). Rate limit added as defense-in-
+    depth on top of auth, matching the 10/hour convention used elsewhere
+    (prediction.py's /monthly, prediction_yearly.py's /yearly).
 
     Response includes:
     - rahu_kaalam, yamagandam, gulika_kaalam (start/end local time)
