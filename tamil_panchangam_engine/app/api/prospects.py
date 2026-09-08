@@ -141,10 +141,14 @@ def create_prospect(req: CreateProspectRequest, user: dict = Depends(get_current
 
     user_id = user["id"]
     with get_conn() as conn:
+        # 404, not 403 (security fix, 2026-09-08, matching the
+        # don't-reveal-existence policy applied across every chart_id-scoped
+        # endpoint this session): a non-owner shouldn't learn whether an ID
+        # they don't own even exists.
         if not _can_access_chart(conn, req.source_chart_id, user):
-            raise HTTPException(status_code=403, detail="Source chart not owned by you")
+            raise HTTPException(status_code=404, detail="Source chart not found")
         if not _can_access_chart(conn, req.candidate_chart_id, user):
-            raise HTTPException(status_code=403, detail="Candidate chart not owned by you")
+            raise HTTPException(status_code=404, detail="Candidate chart not found")
 
         existing = conn.execute("""
             SELECT id FROM porutham_prospects
@@ -181,8 +185,10 @@ def list_prospects_for_chart(chart_id: str, user: dict = Depends(get_current_use
     """
     user_id = user["id"]
     with get_conn() as conn:
+        # 404, not 403 (security fix, 2026-09-08) -- same reasoning as
+        # create_prospect() above.
         if not _can_access_chart(conn, chart_id, user):
-            raise HTTPException(status_code=403, detail="Chart not owned by you")
+            raise HTTPException(status_code=404, detail="Chart not found")
 
         if user.get("role") == "admin":
             rows = conn.execute("""
@@ -236,10 +242,10 @@ def get_prospect_porutham(prospect_id: str, user: dict = Depends(get_current_use
             SELECT id, user_id, source_chart_id, candidate_chart_id, source_role, result_json
             FROM porutham_prospects WHERE id = ?
         """, [prospect_id]).fetchone()
-        if not row:
+        # Same 404 for "doesn't exist" and "exists but isn't yours"
+        # (security fix, 2026-09-08) -- don't reveal existence either way.
+        if not row or (user.get("role") != "admin" and str(row[1]) != user_id):
             raise HTTPException(status_code=404, detail="Prospect not found")
-        if user.get("role") != "admin" and str(row[1]) != user_id:
-            raise HTTPException(status_code=403, detail="Not your prospect link")
 
         result = _get_or_compute_prospect_porutham(
             conn, (row[0], row[2], row[3], row[4], row[5])
@@ -261,10 +267,10 @@ def delete_prospect(prospect_id: str, user: dict = Depends(get_current_user)):
         row = conn.execute(
             "SELECT user_id FROM porutham_prospects WHERE id = ?", [prospect_id]
         ).fetchone()
-        if not row:
+        # Same 404 for "doesn't exist" and "exists but isn't yours"
+        # (security fix, 2026-09-08).
+        if not row or (user.get("role") != "admin" and str(row[0]) != user_id):
             raise HTTPException(status_code=404, detail="Prospect not found")
-        if user.get("role") != "admin" and str(row[0]) != user_id:
-            raise HTTPException(status_code=403, detail="Not your prospect link")
         conn.execute("DELETE FROM porutham_prospects WHERE id = ?", [prospect_id])
 
 
@@ -299,11 +305,13 @@ def convert_prospect_to_family(prospect_id: str, user: dict = Depends(get_curren
             SELECT id, user_id, source_chart_id, candidate_chart_id, source_role, result_json
             FROM porutham_prospects WHERE id = ?
         """, [prospect_id]).fetchone()
+        # Same 404 for "doesn't exist" and "exists but isn't yours"
+        # (security fix, 2026-09-08).
         if not row:
             raise HTTPException(status_code=404, detail="Prospect not found")
         prospect_owner_id = str(row[1])
         if user.get("role") != "admin" and prospect_owner_id != user_id:
-            raise HTTPException(status_code=403, detail="Not your prospect link")
+            raise HTTPException(status_code=404, detail="Prospect not found")
 
         result = _get_or_compute_prospect_porutham(
             conn, (row[0], row[2], row[3], row[4], row[5])

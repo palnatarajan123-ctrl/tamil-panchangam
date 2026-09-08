@@ -70,15 +70,29 @@ class AddMemberRequest(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _assert_group_owner(conn, group_id: str, user_id: str) -> dict:
-    """Return group row or raise 404/403."""
+    """Return group row or raise 404.
+
+    Non-owner response changed from 403 to 404 (security fix, 2026-09-08):
+    same "don't reveal existence" reasoning already applied to base-chart
+    and prospects endpoints this session -- a 403 confirmed the group_id
+    was real, just not the requester's. Both "doesn't exist" and "exists
+    but isn't yours" now return the identical 404, indistinguishable to
+    the caller.
+
+    Note: unlike user_owns_chart()/prospects.py's checks, this function
+    has no admin bypass -- it only receives user_id (a string), not the
+    full user dict, so role can't be checked here without a signature
+    change across all 20 call sites. Not adding that now since it wasn't
+    asked for and would be a real behavior change beyond the status-code
+    alignment; flagging it as a pre-existing property, not introduced by
+    this fix.
+    """
     row = conn.execute(
         "SELECT id, user_id, name, primary_chart_id, created_at, updated_at FROM family_groups WHERE id = ?",
         [group_id]
     ).fetchone()
-    if not row:
+    if not row or row[1] != user_id:
         raise HTTPException(status_code=404, detail="Group not found")
-    if row[1] != user_id:
-        raise HTTPException(status_code=403, detail="Not your group")
     return {"id": row[0], "user_id": row[1], "name": row[2],
             "primary_chart_id": row[3],
             "created_at": str(row[4]), "updated_at": str(row[5])}

@@ -3,7 +3,8 @@
 Phase G1: chart-to-chart Porutham prospect links (app/api/prospects.py) --
 the schema/data-model foundation G2 (chat), G3 (PDF), and G4 (frontend)
 all build on. Live verification against real dev-DB data (real creation,
-real cross-account 403, real duplicate 409, real delete+404, and a
+real cross-account 404 (security fix, 2026-09-08: was 403, changed to not
+reveal existence to a non-owner), real duplicate 409, real delete+404, and a
 byte-identical convert-to-family carryover) already proved this works
 today; these mocked unit tests exist so a later refactor of this module
 or an adjacent one (G2/G3/G4 touching the same helpers) has regression
@@ -205,7 +206,9 @@ class TestCreateProspect(unittest.TestCase):
         with patch("app.api.prospects.get_conn", return_value=_cm(conn)):
             with self.assertRaises(HTTPException) as ctx:
                 create_prospect(self._req(), USER)
-        self.assertEqual(ctx.exception.status_code, 403)
+        # 404, not 403 (security fix, 2026-09-08): don't reveal that the
+        # resource exists at all to a non-owner.
+        self.assertEqual(ctx.exception.status_code, 404)
         self.assertIn("Source chart", ctx.exception.detail)
         self.assertEqual(conn.execute.call_count, 1)
 
@@ -214,7 +217,9 @@ class TestCreateProspect(unittest.TestCase):
         with patch("app.api.prospects.get_conn", return_value=_cm(conn)):
             with self.assertRaises(HTTPException) as ctx:
                 create_prospect(self._req(), USER)
-        self.assertEqual(ctx.exception.status_code, 403)
+        # 404, not 403 (security fix, 2026-09-08): don't reveal that the
+        # resource exists at all to a non-owner.
+        self.assertEqual(ctx.exception.status_code, 404)
         self.assertIn("Candidate chart", ctx.exception.detail)
         self.assertEqual(conn.execute.call_count, 2)
 
@@ -255,7 +260,9 @@ class TestListProspectsForChart(unittest.TestCase):
         with patch("app.api.prospects.get_conn", return_value=_cm(conn)):
             with self.assertRaises(HTTPException) as ctx:
                 list_prospects_for_chart("c1", USER)
-        self.assertEqual(ctx.exception.status_code, 403)
+        # 404, not 403 (security fix, 2026-09-08): don't reveal that the
+        # resource exists at all to a non-owner.
+        self.assertEqual(ctx.exception.status_code, 404)
 
 
 class TestGetProspectPorutham(unittest.TestCase):
@@ -272,7 +279,9 @@ class TestGetProspectPorutham(unittest.TestCase):
         with patch("app.api.prospects.get_conn", return_value=_cm(conn)):
             with self.assertRaises(HTTPException) as ctx:
                 get_prospect_porutham("p1", USER)
-        self.assertEqual(ctx.exception.status_code, 403)
+        # 404, not 403 (security fix, 2026-09-08): don't reveal that the
+        # resource exists at all to a non-owner.
+        self.assertEqual(ctx.exception.status_code, 404)
 
     def test_owner_cache_hit_returns_result(self):
         stored = {"boy": {"name": "Ravi"}, "girl": {"name": "Priya"}, "porutham": {"total_score": 16}}
@@ -304,7 +313,9 @@ class TestDeleteProspect(unittest.TestCase):
         with patch("app.api.prospects.get_conn", return_value=_cm(conn)):
             with self.assertRaises(HTTPException) as ctx:
                 delete_prospect("p1", USER)
-        self.assertEqual(ctx.exception.status_code, 403)
+        # 404, not 403 (security fix, 2026-09-08): don't reveal that the
+        # resource exists at all to a non-owner.
+        self.assertEqual(ctx.exception.status_code, 404)
         self.assertEqual(conn.execute.call_count, 1)  # no DELETE ran
 
     def test_admin_can_delete_another_users_prospect(self):
@@ -363,7 +374,9 @@ class TestConvertProspectToFamily(unittest.TestCase):
         with patch("app.api.prospects.get_conn", return_value=_cm(conn)):
             with self.assertRaises(HTTPException) as ctx:
                 convert_prospect_to_family("p1", USER)
-        self.assertEqual(ctx.exception.status_code, 403)
+        # 404, not 403 (security fix, 2026-09-08): don't reveal that the
+        # resource exists at all to a non-owner.
+        self.assertEqual(ctx.exception.status_code, 404)
         self.assertEqual(conn.execute.call_count, 1)  # nothing else ran
 
     def test_byte_identical_porutham_carried_into_family_cache(self):
