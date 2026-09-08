@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime
 from typing import List, Optional
 from app.core.limiter import limiter
-from app.core.auth import get_current_user_optional
+from app.core.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -81,17 +81,29 @@ from app.services.birth_chart_builder import build_birth_chart_view_model
 from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import insert_base_chart
 from app.repositories.base_chart_repo import get_base_chart_by_id
+from app.repositories.base_chart_repo import user_owns_chart
 
 
 router = APIRouter(prefix="/base-chart", tags=["Base Chart"])
 
 
 def _verify_turnstile(token: str) -> bool:
+    """Verify Cloudflare Turnstile token. Returns True if valid.
+
+    Security fix (2026-09-08): the previous bypass condition was
+    `os.getenv("RENDER") is None and os.getenv("VERCEL") is None`, which
+    silently skipped verification (returning True) for ANY deployment that
+    wasn't specifically flagged RENDER or VERCEL -- not just localhost. An
+    infra-detection heuristic is the wrong tool for a security gate; a
+    misconfigured or differently-hosted deployment could inherit an open
+    bypass with no one noticing. Replaced with an explicit opt-in flag
+    that must be deliberately set, and defaults to enforcing verification
+    everywhere else, including local dev unless a developer sets it.
+    """
     import os
-    # Bypass Turnstile for local development
-    if os.getenv("RENDER") is None and os.getenv("VERCEL") is None:
+    if os.getenv("DISABLE_TURNSTILE", "false").lower() == "true":
         return True
-    """Verify Cloudflare Turnstile token. Returns True if valid."""
+
     secret = os.getenv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA")
     try:
         with httpx.Client(timeout=5.0) as client:
@@ -160,12 +172,14 @@ def load_charts_from_db():
 # ============================================================
 
 @router.get("/birth-chart")
-def get_birth_chart_ui(base_chart_id: str):
+def get_birth_chart_ui(base_chart_id: str, user: dict = Depends(get_current_user)):
     with get_conn() as conn:
         record = get_base_chart_by_id(conn, base_chart_id)
-
-    if not record:
-        raise HTTPException(404, "Base chart not found")
+        # Ownership check (security fix, 2026-09-08): 404 either way (chart
+        # missing, or exists but isn't yours) so a non-owner can't tell
+        # which case it is.
+        if not record or not user_owns_chart(conn, user, base_chart_id):
+            raise HTTPException(404, "Base chart not found")
 
     import json
     payload = json.loads(record["payload"])
@@ -184,7 +198,7 @@ def create_base_chart(
     request: Request,
     payload: BaseChartCreateRequest,
     force_recalculate: bool = False,
-    current_user: Optional[dict] = Depends(get_current_user_optional),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Immutable birth chart creation with deduplication.
@@ -201,9 +215,26 @@ def create_base_chart(
     # -------------------------------------------------
     # 0a. Turnstile verification
     # -------------------------------------------------
-    token = payload.turnstile_token
-    if token and not _verify_turnstile(token):
-        raise HTTPException(status_code=403, detail="CAPTCHA verification failed. Please try again.")
+    # Security fix (2026-09-08): previously `if token and not _verify(...)`,
+    # which skipped verification ENTIRELY whenever the caller simply omitted
+    # turnstile_token -- meaning a direct API call (curl/script) bypassed
+    # Turnstile completely, in production, regardless of environment. Now
+    # required unless DISABLE_TURNSTILE=true (dev/test escape hatch).
+    #
+    # Kept post-auth (Phase 2 already requires a valid login here) rather
+    # than dropped: a valid JWT alone doesn't prove a human is driving the
+    # request, and /api/auth/register has no bot-verification of its own
+    # (IP rate-limited only) -- so a scripted client can still cheaply mint
+    # accounts and hammer /create in a loop. Turnstile is the only layer
+    # that specifically targets that gap; rate limiting alone is easily
+    # defeated by IP rotation. Registering accounts fast enough to matter
+    # is a separate, real residual gap (see phase report) -- out of scope
+    # for "chart-creation and prediction-related" but worth a follow-up.
+    import os as _os
+    if _os.getenv("DISABLE_TURNSTILE", "false").lower() != "true":
+        token = payload.turnstile_token
+        if not token or not _verify_turnstile(token):
+            raise HTTPException(status_code=403, detail="CAPTCHA verification failed. Please try again.")
 
     # -------------------------------------------------
     # 0. Check for existing chart with same birth data
@@ -502,7 +533,22 @@ def create_base_chart(
 # ============================================================
 
 @router.get("/list", response_model=List[BaseChartSummary])
-def list_base_charts():
+def list_base_charts(user: dict = Depends(get_current_user)):
+    # Owner filter (security fix, 2026-09-08): this previously returned
+    # every chart in the store regardless of who was asking. Admins see
+    # everything (matches the role check already used elsewhere in this
+    # file, e.g. the auto-save-on-create logic above); everyone else sees
+    # only charts they own via user_charts.
+    if user.get("role") == "admin":
+        owned_ids = None  # sentinel: no filtering
+    else:
+        with get_conn() as conn:
+            rows = conn.execute(
+                "SELECT base_chart_id FROM user_charts WHERE user_id = ?",
+                [user["id"]],
+            ).fetchall()
+        owned_ids = {row[0] for row in rows}
+
     return [
         BaseChartSummary(
             base_chart_id=chart["id"],
@@ -510,6 +556,7 @@ def list_base_charts():
             locked=chart["locked"],
         )
         for chart in BASE_CHART_STORE.values()
+        if owned_ids is None or chart["id"] in owned_ids
     ]
 
 
@@ -518,7 +565,7 @@ def list_base_charts():
 # ============================================================
 
 @router.get("/{base_chart_id}", response_model=BaseChartDetail)
-def get_base_chart(base_chart_id: str):
+def get_base_chart(base_chart_id: str, user: dict = Depends(get_current_user)):
     chart = BASE_CHART_STORE.get(base_chart_id)
 
     if chart is None:
@@ -526,6 +573,16 @@ def get_base_chart(base_chart_id: str):
             status_code=404,
             detail=f"Base chart not found: {base_chart_id}",
         )
+
+    # Ownership check (security fix, 2026-09-08): same 404 either way (chart
+    # missing, or exists but isn't yours) so a non-owner can't distinguish
+    # the two cases.
+    with get_conn() as conn:
+        if not user_owns_chart(conn, user, base_chart_id):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Base chart not found: {base_chart_id}",
+            )
 
     # Compute functional_roles on-the-fly if missing (for charts loaded from DuckDB)
     chart_data = chart["data"]
