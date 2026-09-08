@@ -75,9 +75,27 @@ export const getQueryFn = <T>({ on401 }: {
   async ({ queryKey }) => {
     const url = queryKey.join("/") as string;
 
-    const res = await fetch(url, {
+    let res = await fetch(url, {
+      headers: authHeaders(),
       credentials: "include",
     });
+
+    // Auto-refresh on 401, same pattern as apiRequest() (security fix,
+    // 2026-09-08 -- this default queryFn previously sent no auth header at
+    // all, so every useQuery() relying on it silently 401'd the moment its
+    // endpoint started requiring auth, e.g. chart-list.tsx's
+    // /api/base-chart/list).
+    if (res.status === 401) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        res = await fetch(url, {
+          headers: { Authorization: `Bearer ${newToken}` },
+          credentials: "include",
+        });
+      } else {
+        clearTokens();
+      }
+    }
 
     if (on401 === "returnNull" && res.status === 401) {
       return null as T;

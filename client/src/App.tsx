@@ -53,6 +53,32 @@ function AdminRoute({ children }: { children: ReactNode }) {
 }
 
 /* -------------------------------------------------
+   AUTH ROUTE GUARD (security fix, 2026-09-08)
+
+   Chart creation and every prediction-related screen now require a
+   logged-in user, matching the backend's Phase 2 auth requirement on the
+   endpoints these screens call. Unlike AdminRoute (which silently renders
+   nothing and lets the user sit on a blank page), this redirects to
+   /login so a logged-out visitor has a clear path forward instead of a
+   dead end.
+-------------------------------------------------- */
+
+function AuthRoute({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigate("/login");
+    }
+  }, [user, isLoading, navigate]);
+
+  if (isLoading) return null;
+  if (!user) return null;
+  return <>{children}</>;
+}
+
+/* -------------------------------------------------
    ROUTER (ALL ROUTES LIVE HERE)
 -------------------------------------------------- */
 
@@ -60,25 +86,29 @@ function Router() {
   return (
     <Switch>
       {/* ---------------------------------
-         Predictions Routes
+         Predictions Routes (auth required, security fix 2026-09-08)
          --------------------------------- */}
-      <Route path="/predictions/:id" component={Predictions} />
+      <Route path="/predictions/:id">
+        <AuthRoute><Predictions /></AuthRoute>
+      </Route>
       <Route path="/predictions">
-        <div className="container max-w-2xl mx-auto py-12">
-          <Card>
-            <CardContent className="py-10 text-center space-y-4">
-              <div className="text-muted-foreground">
-                Please open a specific birth chart first, then generate predictions.
-              </div>
-              <Link href="/">
-                <Button variant="outline">Go to Birth Charts</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
+        <AuthRoute>
+          <div className="container max-w-2xl mx-auto py-12">
+            <Card>
+              <CardContent className="py-10 text-center space-y-4">
+                <div className="text-muted-foreground">
+                  Please open a specific birth chart first, then generate predictions.
+                </div>
+                <Link href="/">
+                  <Button variant="outline">Go to Birth Charts</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        </AuthRoute>
       </Route>
 
-      {/* Static pages */}
+      {/* Static pages (correctly public) */}
       <Route path="/health" component={Health} />
       <Route path="/docs" component={Docs} />
       <Route path="/methodology" component={MethodologyPage} />
@@ -86,15 +116,29 @@ function Router() {
         <AdminRoute><AdminLLM /></AdminRoute>
       </Route>
 
-      {/* Auth pages */}
+      {/* Auth pages (correctly public) */}
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
-      <Route path="/my-charts" component={MyCharts} />
-      <Route path="/family/:groupId/members/:memberId/predictions" component={ChildPredictionScreen} />
-      <Route path="/family/:groupId/children-timing" component={ChildrenTimingScreen} />
-      <Route path="/family/:groupId/timeline" component={FamilyTimelineScreen} />
-      <Route path="/family/:groupId/predictions" component={FamilyPredictionScreen} />
-      <Route path="/family" component={FamilyScreen} />
+
+      {/* Auth required (security fix, 2026-09-08) */}
+      <Route path="/my-charts">
+        <AuthRoute><MyCharts /></AuthRoute>
+      </Route>
+      <Route path="/family/:groupId/members/:memberId/predictions">
+        <AuthRoute><ChildPredictionScreen /></AuthRoute>
+      </Route>
+      <Route path="/family/:groupId/children-timing">
+        <AuthRoute><ChildrenTimingScreen /></AuthRoute>
+      </Route>
+      <Route path="/family/:groupId/timeline">
+        <AuthRoute><FamilyTimelineScreen /></AuthRoute>
+      </Route>
+      <Route path="/family/:groupId/predictions">
+        <AuthRoute><FamilyPredictionScreen /></AuthRoute>
+      </Route>
+      <Route path="/family">
+        <AuthRoute><FamilyScreen /></AuthRoute>
+      </Route>
 
       {/* Admin dashboard */}
       <Route path="/admin">
@@ -102,30 +146,34 @@ function Router() {
       </Route>
 
       {/* ---------------------------------
-         Birth Chart (STRUCTURE)
+         Birth Chart (STRUCTURE) -- auth required, security fix 2026-09-08
          --------------------------------- */}
-      <Route path="/chart/:id" component={ChartDetail} />
+      <Route path="/chart/:id">
+        <AuthRoute><ChartDetail /></AuthRoute>
+      </Route>
 
       {/* ---------------------------------
-         EPIC-6 Predictions (DERIVED)
+         EPIC-6 Predictions (DERIVED) -- auth required, security fix 2026-09-08
          --------------------------------- */}
-      <Route
-        path="/chart/:id/predictions"
-        component={PredictionScreen}
-      />
+      <Route path="/chart/:id/predictions">
+        <AuthRoute><PredictionScreen /></AuthRoute>
+      </Route>
 
       {/* ---------------------------------
          Phase G1-G4: chart-to-chart prospect Porutham detail view
+         -- auth required, security fix 2026-09-08
          --------------------------------- */}
-      <Route
-        path="/chart/:chartId/prospects/:prospectId"
-        component={ProspectDetail}
-      />
+      <Route path="/chart/:chartId/prospects/:prospectId">
+        <AuthRoute><ProspectDetail /></AuthRoute>
+      </Route>
 
       {/* ---------------------------------
-         Home (MUST BE LAST)
+         Home (MUST BE LAST) -- auth required, security fix 2026-09-08
+         (chart creation flow lives here)
          --------------------------------- */}
-      <Route path="/" component={Home} />
+      <Route path="/">
+        <AuthRoute><Home /></AuthRoute>
+      </Route>
 
       {/* Fallback */}
       <Route component={NotFound} />
