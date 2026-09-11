@@ -68,6 +68,91 @@ stale" and "confirmed real" looked like in practice):
   a direct DB update. Same singleton-row pattern as the existing field,
   straightforward to add to that endpoint's request/response models when
   someone needs it.
+- **Several screens still use a local bare `fetch()` + manual
+  `authHeaders()` instead of the shared `apiRequest()` helper** —
+  `family-timeline-screen.tsx`, `children-timing-screen.tsx`,
+  `family-screen.tsx` (has its own local `apiFetch()` reimplementation,
+  not just an inline call), `child-prediction-screen.tsx`,
+  `RerunLLMButton.tsx`, `useChat.ts`. Found during the 2026-09-11 PDF
+  auth investigation (Issue 1) while checking for other instances of the
+  same bug class. Lower severity than Issue 1's `window.open()` calls —
+  these DO send a token, so they're not "always 401" — but they miss
+  `apiRequest()`'s auto-refresh-on-401 retry, so any of them can fail for
+  a user with a just-expired access token. Not fixed now (out of scope
+  for a PDF-specific bug), same class as the already-fixed
+  `family-prediction-screen.tsx` instance.
+- **Weekly/yearly prompt-token margins weren't re-verified after the
+  Issue 2 fix** (2026-09-11, `payload_builder.py`'s `MAX_PROMPT_TOKENS`).
+  Monthly was confirmed stale (0 real margin against a real chart) and
+  raised 2000→2600; weekly (600-token margin) and yearly (1500-token
+  margin) look comfortable by the same total-budget-minus-completion
+  arithmetic, but that's arithmetic, not a real measured payload the way
+  monthly's fix was. `test_payload_size_validation.py`'s
+  `test_monthly_prompt_cap_has_real_margin_under_total_budget` already
+  checks the margin invariant for all three periods going forward, so a
+  future regression there won't go unnoticed the way this one did — but
+  if weekly/yearly ever show the same "existing chart fine, new chart
+  stuck on an old version" symptom, check this file's `MAX_PROMPT_TOKENS`
+  first before assuming a new root cause.
+
+## 2026-09-11 regression investigation retrospective (Issue 4)
+
+Four issues investigated in one pass; git history (`v3.3.1-auth-followup..HEAD`
+against every relevant file) confirmed upfront that none were caused by
+that session's own commits — all three real bugs found were pre-existing,
+just newly surfaced by more thorough manual testing. What let each one
+through, and whether the added test actually closes that shape of gap
+(not just the specific bug):
+
+- **Issue 1 (PDF "Not authenticated")**: the gap was a missing
+  *authenticated-success-path* assertion, not a missing route. The auth
+  sweep (backlog #2) already proved these routes reject unauthenticated
+  requests — and still does; that was never broken. What no test
+  checked: does a real, valid, correctly-attached token actually reach
+  the route at all. A client-side bug (`window.open()` can't attach an
+  `Authorization` header) is invisible to any backend-only test, sweep or
+  ownership-scoped alike, no matter how thorough — the token simply never
+  arrives. `test_pdf_auth_success.py` adds the missing owner-gets-200
+  half for PDF specifically; it does NOT retroactively cover the other
+  authenticated routes that might have the same "only rejection tested,
+  never success" gap — that was a quick spot-check (see the bare-`fetch()`
+  note above), not an audit.
+- **Issue 2 (Monthly stuck at v1.0)**: the gap was that
+  `payload_builder.py`'s size-validation threshold had zero test coverage
+  at all, at any size. A fixture built from "a new chart" vs "an old
+  chart" would have missed this regardless, because the bug was never
+  about chart age — it was payload size proximity to a threshold that
+  drifted stale as the payload-building logic grew richer. The first
+  version of `test_payload_size_validation.py` written for this
+  investigation used a hand-approximated fixture that measured 818
+  tokens against a 2000-token threshold — nowhere near the boundary, it
+  would have passed whether the bug was fixed or not. Rewritten to use
+  `extract_payload_inputs()`'s actual output from the real chart that
+  reproduced the bug (`fixtures_monthly_payload_inputs.json`) instead of
+  approximated data, plus a structural margin-invariant test so the
+  *threshold* itself is guarded going forward, not just this one
+  chart's numbers.
+- **Issue 3 (chat context)**: not a coverage gap in the same sense — no
+  test previously covered `_build_chat_context()`'s monthly/yearly
+  summary extraction at all for any version. Found by direct inspection
+  while verifying the parameter-passing the task asked about, not by a
+  failing test. `test_chat_context.py` now covers v7 (current), v4 (no
+  regression), and the graceful-fallback path when `executive_summary` is
+  absent/malformed.
+- **Cross-cutting lesson**: two of three real bugs (Issues 1 and 2) were
+  invisible to look-for-rejection-only tests. A sweep or ownership test
+  proves "wrong things are refused" — it says nothing about "right things
+  are accepted correctly," and that second half needs its own explicit
+  assertions, route by route, not an assumption that passing the first
+  half implies the second.
+
+**Confirmed, not a bug**: `family.py`'s family-group chat
+(`family_group_chat_stream()`) does not share Issue 3's stale
+version-check — it builds its per-member context differently (via
+`payload_builder.py`'s shared helpers per the two-chat-implementations
+note below), not through `chat.py`'s `_build_chat_context()`. Checked,
+not assumed, given this file's own standing warning that a fix to one
+chat implementation doesn't reach the other.
 
 **Considered and closed, not pending** (investigated with real data
 2026-08-14 — don't re-open without new evidence):
@@ -79,18 +164,28 @@ stale" and "confirmed real" looked like in practice):
   declined for cost (multiplies per-member, unbounded with family size,
   for the lowest-value case). Reaffirmed given the history-cap finding
   above showed no token headroom elsewhere to justify adding cost here.
-- "Login requires two submits" (was: Turnstile token not ready before
-  submit enabled) — investigated 2026-09-10, closed stale, not fixed.
-  The premise was wrong on both counts: the login screen isn't under
-  `client/src/screens/` (it's `client/src/pages/login.tsx`), and
-  Turnstile is wired into nothing in the login flow, client or server —
-  it only gates `base_chart.py`'s `/create` route. Full static trace
-  ruled out all three hypothesized mechanisms (Turnstile gate, silent
-  error-handling, stale closure); automated repro via curl, both locally
-  and against the live prod Vercel+Render stack, got a clean 200 on
-  attempt #1 every time, no delay, no lockout. Don't re-open on the
-  Turnstile hypothesis; if it resurfaces, check Render's cold-start
-  behavior (free-tier services spin down after ~15min idle) instead.
+
+**"Login requires two submits" — superseded, actually fixed, see commit
+`03aecfc`** (the entry that used to live here said "closed stale, not
+fixed" as of 2026-09-10 — wrong, corrected 2026-09-11 once new evidence
+reopened it). The 2026-09-10 investigation correctly found the Turnstile
+hypothesis false, but closed the whole issue on a headless-only trace
+that couldn't reproduce it — exactly the kind of premature closure this
+file's own header warns about. Real root cause, found 2026-09-11: login.tsx
+called `navigate("/")` immediately after `setUser()` in the same
+synchronous block; wouter's `navigate()` triggers an unbatched
+`dispatchEvent()` (confirmed in wouter's own source, with the
+maintainers' own TODO acknowledging it), which could force `AuthRoute` to
+re-render on a stale `user = null` before React flushed the pending
+`setUser()` update, silently bouncing back to `/login`. Fixed by removing
+all imperative navigation from login/register and adding `GuestRoute`
+(effect-driven, mirroring `AuthRoute`'s already-correct pattern). Real
+Chrome-for-Testing browser confirmed: single submit, `/login` → `/` in
+~925ms, no bounce. See `client/src/__tests__/auth-navigation-race.test.tsx`
+for the regression test and its own documented limitation (a headless
+repro couldn't be made to fail against a reintroduced bug via realistic
+DOM-driven interaction — real-browser testing is what actually closed
+this, not the automated suite alone).
 
 ## Architecture notes (learned the hard way — read before assuming)
 
