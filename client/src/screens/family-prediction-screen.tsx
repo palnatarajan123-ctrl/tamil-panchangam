@@ -3,6 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { authHeaders } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -322,11 +323,17 @@ export default function FamilyPredictionScreen() {
 
   const handlePdfDownload = async () => {
     try {
-      const res = await fetch(
-        `/api/family/groups/${groupId}/predictions/pdf?year=${year}`,
-        { headers: authHeaders() }
+      // Was a bare fetch() + manual authHeaders() -- sends a token if one
+      // exists, but (unlike apiRequest()) never retries on a since-expired
+      // access token via the refresh flow every other authenticated call
+      // in this app gets. Not the "always 401" bug (Issue 1, other PDF
+      // buttons used window.open() and could send no header at all), but
+      // the same "not migrated to the shared helper" class -- fixed while
+      // in this file for Issue 1.
+      const res = await apiRequest(
+        "GET",
+        `/api/family/groups/${groupId}/predictions/pdf?year=${year}`
       );
-      if (!res.ok) throw new Error("PDF download failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

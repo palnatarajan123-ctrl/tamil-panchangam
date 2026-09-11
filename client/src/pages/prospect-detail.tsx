@@ -38,6 +38,7 @@ export default function ProspectDetail() {
   const [chatOpen, setChatOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [convertError, setConvertError] = useState("");
+  const [pdfDownloading, setPdfDownloading] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["/api/prospects", prospectId, "porutham"],
@@ -141,11 +142,32 @@ export default function ProspectDetail() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => window.open(`/api/reports/birth-chart-pdf?base_chart_id=${chartId}`, "_blank")}
+            disabled={pdfDownloading}
+            onClick={async () => {
+              // window.open() can't attach an Authorization header --
+              // this route has required auth since Phase 2 (commit
+              // 4f92c61), so this always 401'd "Not authenticated"
+              // regardless of chart state. Fixed to the same
+              // apiRequest()+blob pattern NatalInterpretationPanel.tsx's
+              // PDF download already uses (Issue 1, 2026-09-11).
+              setPdfDownloading(true);
+              try {
+                const res = await apiRequest("GET", `/api/reports/birth-chart-pdf?base_chart_id=${chartId}`);
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `natal_chart_${chartId.slice(0, 8)}.pdf`;
+                a.click();
+                URL.revokeObjectURL(url);
+              } finally {
+                setPdfDownloading(false);
+              }
+            }}
             data-testid="button-view-pdf-prospect"
           >
             <FileText className="h-4 w-4" />
-            View PDF
+            {pdfDownloading ? "Preparing PDF…" : "View PDF"}
           </Button>
           <Button
             variant="outline"

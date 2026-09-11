@@ -93,6 +93,7 @@ export default function PredictionScreen() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [chatOpen, setChatOpen] = useState(false);
+  const [pdfDownloading, setPdfDownloading] = useState(false);
 
   const now = new Date();
   const baseYear = now.getFullYear();
@@ -324,21 +325,42 @@ export default function PredictionScreen() {
               <Button
                 variant="outline"
                 className="gap-2"
-                onClick={() => {
-                  const params = new URLSearchParams({
-                    base_chart_id: id,
-                    report_type: period,
-                    year: year.toString(),
-                  });
-                  if (period === "monthly") {
-                    params.append("month", index.toString());
+                disabled={pdfDownloading}
+                onClick={async () => {
+                  // window.open() (pre-2026-09-08) predates this route
+                  // requiring auth -- it can't attach an Authorization
+                  // header at all, so it always 401'd "Not authenticated"
+                  // once Depends(get_current_user) was made required
+                  // (Phase 2, commit 4f92c61), on every chart regardless
+                  // of state. Fixed to the same apiRequest()+blob pattern
+                  // NatalInterpretationPanel.tsx's PDF download already
+                  // uses (Issue 1, 2026-09-11).
+                  setPdfDownloading(true);
+                  try {
+                    const params = new URLSearchParams({
+                      base_chart_id: id,
+                      report_type: period,
+                      year: year.toString(),
+                    });
+                    if (period === "monthly") {
+                      params.append("month", index.toString());
+                    }
+                    const res = await apiRequest("GET", `/api/reports/pdf?${params.toString()}`);
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `${period}-report-${id.slice(0, 8)}-${year}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } finally {
+                    setPdfDownloading(false);
                   }
-                  window.open(`/api/reports/pdf?${params.toString()}`, "_blank");
                 }}
                 data-testid="button-download-pdf"
               >
                 <Download className="h-4 w-4" />
-                Download Full Report (PDF)
+                {pdfDownloading ? "Preparing PDF…" : "Download Full Report (PDF)"}
               </Button>
 
               {showEnhanceButton && (
