@@ -26,6 +26,7 @@ from reportlab.platypus import (
     HRFlowable,
 )
 from reportlab.graphics.shapes import Drawing, Rect, Group
+from reportlab.pdfgen import canvas as pdfcanvas
 import base64
 
 from .models import CanonicalReportData
@@ -2940,6 +2941,51 @@ def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
     return buffer.read()
 
 
+class _NumberedCanvas(pdfcanvas.Canvas):
+    """Standard two-pass "Page X of Y" canvas: showPage() snapshots each
+    page's drawing state instead of finalizing it immediately, and
+    save() replays every snapshot once the total page count is known,
+    stamping the running header + footer onto each page at that point.
+    Skips the cover page (page 1) -- it's self-evidently page 1 and
+    doesn't need a header repeating its own title back at it.
+    """
+
+    def __init__(self, *args, header_text: str = "", **kwargs):
+        pdfcanvas.Canvas.__init__(self, *args, **kwargs)
+        self._saved_page_states = []
+        self._header_text = header_text
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self._draw_page_decoration(num_pages)
+            pdfcanvas.Canvas.showPage(self)
+        pdfcanvas.Canvas.save(self)
+
+    def _draw_page_decoration(self, page_count: int):
+        if self._pageNumber == 1:
+            return
+
+        page_width, page_height = A4
+        muted = colors.Color(*COLORS["muted"])
+
+        self.setFont('Helvetica', 8)
+        self.setFillColor(muted)
+        self.drawString(MARGIN, page_height - 32, self._header_text)
+        self.setStrokeColor(muted)
+        self.setLineWidth(0.5)
+        self.line(MARGIN, page_height - 38, page_width - MARGIN, page_height - 38)
+
+        self.setFont('Helvetica', 8)
+        self.setFillColor(muted)
+        self.drawCentredString(page_width / 2, 28, f"Page {self._pageNumber} of {page_count}")
+
+
 def render_pdf(data: CanonicalReportData, include_technical_appendix: bool = True) -> bytes:
     """
     Render complete PDF from report data.
@@ -3026,7 +3072,12 @@ def render_pdf(data: CanonicalReportData, include_technical_appendix: bool = Tru
     if include_technical_appendix:
         story.extend(_build_methodology_appendix(data, styles))
 
-    doc.build(story)
+    header_text = f"Tamil Panchangam — {data.report_type} Astrology Report — {data.period_label}"
+
+    def _canvas_factory(*args, **kwargs):
+        return _NumberedCanvas(*args, header_text=header_text, **kwargs)
+
+    doc.build(story, canvasmaker=_canvas_factory)
 
     buffer.seek(0)
     return buffer.read()
