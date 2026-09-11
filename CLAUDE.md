@@ -94,6 +94,29 @@ stale" and "confirmed real" looked like in practice):
   if weekly/yearly ever show the same "existing chart fine, new chart
   stuck on an old version" symptom, check this file's `MAX_PROMPT_TOKENS`
   first before assuming a new root cause.
+- **PDF download call-site consolidation**: `window.open()` was the root
+  cause of Issue 1 (can't attach Authorization header) — this is the
+  third instance of the "multiple independent copies drift" bug class in
+  this project (two family-chat implementations, six bare-`fetch()` call
+  sites, now PDF). Consider a single shared `downloadAuthenticatedFile()`
+  helper (fetch + blob + programmatic download) used everywhere instead
+  of ad-hoc `window.open()`/`fetch()`/`apiRequest()` mixes for file
+  downloads specifically. Finding, not a fix — not built.
+- **Hardcoded version-string gating is fragile**: Issue 3's root cause
+  was `"v4"/"v5" in engine_version` silently failing to match v6/v7 with
+  no error, just quiet degradation. Worth a repo-wide grep for other
+  places gating logic on a hardcoded version-string allowlist rather than
+  checking response shape/structure — same failure mode (works, then
+  silently breaks on the next version bump) could be lurking elsewhere.
+  Finding, not a fix — not built.
+- **Ownership sweep test gap, generalized**: `test_ownership_sweep.py`
+  proved "authenticated owner gets 200" for base-chart/predictions/
+  prospects/family — PDF endpoints were missing from that list until
+  Issue 1 forced adding one. Worth a deliberate pass confirming every
+  endpoint requiring auth has a corresponding "real valid token → real
+  200" test, not just the rejection-path coverage from the original auth
+  sweep. Don't build this — it's a breadth-check across the whole API,
+  not a quick add.
 
 ## 2026-09-11 regression investigation retrospective (Issue 4)
 
