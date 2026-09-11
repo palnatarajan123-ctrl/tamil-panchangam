@@ -31,7 +31,21 @@ logger = logging.getLogger(__name__)
 
 MAX_PROMPT_TOKENS = {
     "weekly": 1400,
-    "monthly": 2000,
+    # Issue 2 fix (2026-09-11): 2000 was stale -- MAX_TOTAL_TOKENS(8000) -
+    # MAX_COMPLETION_TOKENS(5000) already budgets 3000 real prompt tokens,
+    # but this explicit sub-cap hadn't been raised to match since the v7
+    # payload additions (yogas/KP/upagraha/shadbala context) grew the
+    # typical monthly payload. A real chart measured at 2001 estimated
+    # tokens (estimate_tokens() is a crude len//4 heuristic, not an exact
+    # tokenizer -- 2000 left ZERO margin for that imprecision) tripped
+    # validate_payload_size()'s "prompt_too_large" branch and silently
+    # fell back to the deterministic ai-interpretation-v1.0 result instead
+    # of ever calling the LLM -- no error, no visible failure, just a
+    # response that looked like a cache/version bug but wasn't. 2600
+    # leaves real margin under the 3000 ceiling the total-budget math
+    # already allows, instead of matching whatever the last chart that
+    # prompted a bump happened to need.
+    "monthly": 2600,
     "yearly": 2500
 }
 

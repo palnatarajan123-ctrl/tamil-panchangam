@@ -1,0 +1,1216 @@
+{
+  "period_type": "monthly",
+  "period_label": "Sep 2026",
+  "lagna": "Unknown",
+  "moon_nakshatra": "Unknown",
+  "moon_rasi": "",
+  "active_dasha": {
+    "mahadasha": "Mercury",
+    "antardasha": "Rahu"
+  },
+  "life_area_scores": {
+    "career": 64,
+    "finance": 56,
+    "relationships": 62,
+    "health": 60,
+    "personal_growth": 63
+  },
+  "top_signals_by_life_area": {
+    "career": [
+      {
+        "key": "GOCHARA_RAHU_KETU",
+        "contrib": 0.465,
+        "weights": {
+          "house_w": 0.35,
+          "planet_w": 0.35,
+          "src_bias": 0.95,
+          "valence": "pos"
+        },
+        "rationale": "Rahu-Ketu axis 5-11 (favorable)",
+        "interpretive_hint": "supports progress through favorable timing and external circumstances aligning more easily"
+      },
+      {
+        "key": "DRISHTI_Mars_H1",
+        "contrib": -0.235,
+        "weights": {
+          "house_w": 0.2,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 1 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Mars_H4",
+        "contrib": -0.131,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 4 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Mars_H5",
+        "contrib": -0.131,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 5 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Rahu_H2",
+        "contrib": -0.366,
+        "weights": {
+          "house_w": 0.35,
+          "planet_w": 0.35,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Rahu aspects house 2 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Rahu_H4",
+        "contrib": -0.183,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.35,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Rahu aspects house 4 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      }
+    ],
+    "finance": [
+      {
+        "key": "GOCHARA_RAHU_KETU",
+        "contrib": 0.798,
+        "weights": {
+          "house_w": 0.8,
+          "planet_w": 0.4,
+          "src_bias": 0.95,
+          "valence": "pos"
+        },
+        "rationale": "Rahu-Ketu axis 5-11 (favorable)",
+        "interpretive_hint": "supports progress through favorable timing and external circumstances aligning more easily"
+      },
+      {
+        "key": "DRISHTI_Mars_H1",
+        "contrib": -0.131,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 1 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Mars_H4",
+        "contrib": -0.131,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 4 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Mars_H5",
+        "contrib": -0.131,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 5 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Rahu_H2",
+        "contrib": -0.731,
+        "weights": {
+          "house_w": 1.0,
+          "planet_w": 0.4,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Rahu aspects house 2 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Rahu_H4",
+        "contrib": -0.209,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.4,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Rahu aspects house 4 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      }
+    ],
+    "relationships": [
+      {
+        "key": "GOCHARA_RAHU_KETU",
+        "contrib": 0.166,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "pos"
+        },
+        "rationale": "Rahu-Ketu axis 5-11 (favorable)",
+        "interpretive_hint": "supports progress through favorable timing and external circumstances aligning more easily"
+      },
+      {
+        "key": "DRISHTI_Mars_H1",
+        "contrib": -0.235,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.45,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 1 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Mars_H4",
+        "contrib": -0.235,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.45,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 4 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Mars_H5",
+        "contrib": -0.47,
+        "weights": {
+          "house_w": 0.45,
+          "planet_w": 0.45,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 5 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Rahu_H2",
+        "contrib": -0.314,
+        "weights": {
+          "house_w": 0.35,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Rahu aspects house 2 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Rahu_H4",
+        "contrib": -0.131,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Rahu aspects house 4 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      }
+    ],
+    "health": [
+      {
+        "key": "GOCHARA_RAHU_KETU",
+        "contrib": 0.166,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "pos"
+        },
+        "rationale": "Rahu-Ketu axis 5-11 (favorable)",
+        "interpretive_hint": "supports progress through favorable timing and external circumstances aligning more easily"
+      },
+      {
+        "key": "DRISHTI_Mars_H1",
+        "contrib": -0.653,
+        "weights": {
+          "house_w": 0.75,
+          "planet_w": 0.5,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 1 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Mars_H4",
+        "contrib": -0.261,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.5,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 4 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Mars_H5",
+        "contrib": -0.261,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.5,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 5 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Rahu_H2",
+        "contrib": -0.131,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Rahu aspects house 2 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Rahu_H4",
+        "contrib": -0.131,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.25,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Rahu aspects house 4 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      }
+    ],
+    "personal_growth": [
+      {
+        "key": "GOCHARA_RAHU_KETU",
+        "contrib": 0.266,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.4,
+          "src_bias": 0.95,
+          "valence": "pos"
+        },
+        "rationale": "Rahu-Ketu axis 5-11 (favorable)",
+        "interpretive_hint": "supports progress through favorable timing and external circumstances aligning more easily"
+      },
+      {
+        "key": "DRISHTI_Mars_H1",
+        "contrib": -0.078,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.15,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 1 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Mars_H4",
+        "contrib": -0.078,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.15,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 4 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Mars_H5",
+        "contrib": -0.418,
+        "weights": {
+          "house_w": 0.65,
+          "planet_w": 0.15,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Mars aspects house 5 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Rahu_H2",
+        "contrib": -0.209,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.4,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Rahu aspects house 2 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      },
+      {
+        "key": "DRISHTI_Rahu_H4",
+        "contrib": -0.209,
+        "weights": {
+          "house_w": 0.0,
+          "planet_w": 0.4,
+          "src_bias": 0.95,
+          "valence": "neg"
+        },
+        "rationale": "Rahu aspects house 4 (challenging)",
+        "interpretive_hint": "introduces subtle tensions that call for measured responses"
+      }
+    ]
+  },
+  "transit_context": {
+    "Jupiter": {
+      "rasi": "Cancer",
+      "house_from_moon": 4,
+      "effect": "neutral"
+    },
+    "Saturn": {
+      "rasi": "Pisces",
+      "house_from_moon": 12,
+      "effect": "mixed",
+      "phase": "neutral"
+    },
+    "Rahu": {
+      "rasi": "Aquarius",
+      "house_from_moon": 11,
+      "effect": "favorable"
+    },
+    "Ketu": {
+      "rasi": "Leo",
+      "house_from_moon": 5,
+      "effect": "favorable"
+    }
+  },
+  "dasha_timing": null,
+  "birth_year": 1995,
+  "lagnadipathi_status": null,
+  "saturn_phase": "neutral",
+  "rahu_ketu_axis": {
+    "rahu_house": 11,
+    "ketu_house": 5,
+    "axis": "5-11",
+    "theme": "creativity_gains"
+  },
+  "yogas": null,
+  "chandrashtama_periods": [
+    {
+      "day": "1",
+      "warning": "Sensitive Moon transit"
+    },
+    {
+      "day": "7",
+      "warning": "Sensitive Moon transit"
+    },
+    {
+      "day": "16",
+      "warning": "Sensitive Moon transit"
+    },
+    {
+      "day": "28",
+      "warning": "Sensitive Moon transit"
+    }
+  ],
+  "nakshatra_pada": null,
+  "sade_sati_data": {
+    "moon_sign": 8,
+    "moon_sign_name": "Vrischikam (Scorpio)",
+    "current_saturn_sign": 12,
+    "current_saturn_sign_name": "Meenam (Pisces)",
+    "saturn_house_from_moon": 5,
+    "reference_date": "2026-09-11",
+    "sade_sati": {
+      "active": false,
+      "phase": null,
+      "phase_name": null,
+      "effects": [],
+      "remedies": [],
+      "current_phase_ends": null,
+      "all_windows": [],
+      "summary": "Not active (Saturn in H5 from Moon)"
+    },
+    "ashtama_shani": {
+      "active": false,
+      "effects": [],
+      "remedies": [],
+      "ends": null,
+      "summary": "Not active"
+    },
+    "kantaka_shani": {
+      "active": false,
+      "effects": [],
+      "ends": null,
+      "summary": "Not active"
+    },
+    "alert_level": "low",
+    "error": null
+  },
+  "shadbala_data": {
+    "planets": {
+      "Sun": {
+        "total_shashtiamsas": 201.14,
+        "rupas": 3.352,
+        "percent_strength": 67.0,
+        "strength_label": "Strong",
+        "components": {
+          "sthana_bala": {
+            "score": 18.0,
+            "placement": "neutral_sign",
+            "sign": 8,
+            "house": 9,
+            "kendra_bonus": 0.0,
+            "trikona_bonus": 3.0
+          },
+          "dig_bala": {
+            "score": 50.0,
+            "house": 9,
+            "peak_house": 10,
+            "distance_from_peak": 1
+          },
+          "chesta_bala": {
+            "score": 46.14,
+            "motion": "mean",
+            "speed": 1.0106,
+            "mean_speed": 0.9856
+          },
+          "naisargika_bala": {
+            "score": 60.0,
+            "note": "Fixed natural strength"
+          },
+          "drik_bala": {
+            "score": 27.0,
+            "net_raw": -3.0,
+            "aspects_received": [
+              {
+                "from": "Saturn",
+                "strength": -3.0,
+                "aspect_type": "H10"
+              }
+            ]
+          }
+        },
+        "is_retrograde": false,
+        "sign": 8,
+        "house": 9
+      },
+      "Moon": {
+        "total_shashtiamsas": 142.16,
+        "rupas": 2.369,
+        "percent_strength": 47.4,
+        "strength_label": "Moderate",
+        "components": {
+          "sthana_bala": {
+            "score": 3.0,
+            "placement": "debilitation",
+            "sign": 8,
+            "house": 9,
+            "kendra_bonus": 0.0,
+            "trikona_bonus": 3.0
+          },
+          "dig_bala": {
+            "score": 10.0,
+            "house": 9,
+            "peak_house": 4,
+            "distance_from_peak": 5
+          },
+          "chesta_bala": {
+            "score": 50.73,
+            "motion": "mean",
+            "speed": 14.8549,
+            "mean_speed": 13.1764
+          },
+          "naisargika_bala": {
+            "score": 51.43,
+            "note": "Fixed natural strength"
+          },
+          "drik_bala": {
+            "score": 27.0,
+            "net_raw": -3.0,
+            "aspects_received": [
+              {
+                "from": "Saturn",
+                "strength": -3.0,
+                "aspect_type": "H10"
+              }
+            ]
+          }
+        },
+        "is_retrograde": false,
+        "sign": 8,
+        "house": 9
+      },
+      "Mars": {
+        "total_shashtiamsas": 187.14,
+        "rupas": 3.119,
+        "percent_strength": 62.4,
+        "strength_label": "Strong",
+        "components": {
+          "sthana_bala": {
+            "score": 20.0,
+            "placement": "neutral_sign",
+            "sign": 9,
+            "house": 10,
+            "kendra_bonus": 5.0,
+            "trikona_bonus": 0.0
+          },
+          "dig_bala": {
+            "score": 60.0,
+            "house": 10,
+            "peak_house": 10,
+            "distance_from_peak": 0
+          },
+          "chesta_bala": {
+            "score": 60.0,
+            "motion": "fast",
+            "speed": 0.7497,
+            "mean_speed": 0.524
+          },
+          "naisargika_bala": {
+            "score": 17.14,
+            "note": "Fixed natural strength"
+          },
+          "drik_bala": {
+            "score": 30.0,
+            "net_raw": 0.0,
+            "aspects_received": []
+          }
+        },
+        "is_retrograde": false,
+        "sign": 9,
+        "house": 10
+      },
+      "Mercury": {
+        "total_shashtiamsas": 142.2,
+        "rupas": 2.37,
+        "percent_strength": 47.4,
+        "strength_label": "Moderate",
+        "components": {
+          "sthana_bala": {
+            "score": 18.0,
+            "placement": "neutral_sign",
+            "sign": 8,
+            "house": 9,
+            "kendra_bonus": 0.0,
+            "trikona_bonus": 3.0
+          },
+          "dig_bala": {
+            "score": 20.0,
+            "house": 9,
+            "peak_house": 1,
+            "distance_from_peak": 4
+          },
+          "chesta_bala": {
+            "score": 51.49,
+            "motion": "mean",
+            "speed": 1.5827,
+            "mean_speed": 1.3833
+          },
+          "naisargika_bala": {
+            "score": 25.71,
+            "note": "Fixed natural strength"
+          },
+          "drik_bala": {
+            "score": 27.0,
+            "net_raw": -3.0,
+            "aspects_received": [
+              {
+                "from": "Saturn",
+                "strength": -3.0,
+                "aspect_type": "H10"
+              }
+            ]
+          }
+        },
+        "is_retrograde": false,
+        "sign": 8,
+        "house": 9
+      },
+      "Jupiter": {
+        "total_shashtiamsas": 159.29,
+        "rupas": 2.655,
+        "percent_strength": 53.1,
+        "strength_label": "Moderate",
+        "components": {
+          "sthana_bala": {
+            "score": 18.0,
+            "placement": "neutral_sign",
+            "sign": 8,
+            "house": 9,
+            "kendra_bonus": 0.0,
+            "trikona_bonus": 3.0
+          },
+          "dig_bala": {
+            "score": 20.0,
+            "house": 9,
+            "peak_house": 1,
+            "distance_from_peak": 4
+          },
+          "chesta_bala": {
+            "score": 60.0,
+            "motion": "fast",
+            "speed": 0.2194,
+            "mean_speed": 0.0831
+          },
+          "naisargika_bala": {
+            "score": 34.29,
+            "note": "Fixed natural strength"
+          },
+          "drik_bala": {
+            "score": 27.0,
+            "net_raw": -3.0,
+            "aspects_received": [
+              {
+                "from": "Saturn",
+                "strength": -3.0,
+                "aspect_type": "H10"
+              }
+            ]
+          }
+        },
+        "is_retrograde": false,
+        "sign": 8,
+        "house": 9
+      },
+      "Venus": {
+        "total_shashtiamsas": 146.61,
+        "rupas": 2.444,
+        "percent_strength": 48.9,
+        "strength_label": "Moderate",
+        "components": {
+          "sthana_bala": {
+            "score": 18.0,
+            "placement": "neutral_sign",
+            "sign": 8,
+            "house": 9,
+            "kendra_bonus": 0.0,
+            "trikona_bonus": 3.0
+          },
+          "dig_bala": {
+            "score": 10.0,
+            "house": 9,
+            "peak_house": 4,
+            "distance_from_peak": 5
+          },
+          "chesta_bala": {
+            "score": 46.61,
+            "motion": "mean",
+            "speed": 1.2429,
+            "mean_speed": 1.2
+          },
+          "naisargika_bala": {
+            "score": 45.0,
+            "note": "Fixed natural strength"
+          },
+          "drik_bala": {
+            "score": 27.0,
+            "net_raw": -3.0,
+            "aspects_received": [
+              {
+                "from": "Saturn",
+                "strength": -3.0,
+                "aspect_type": "H10"
+              }
+            ]
+          }
+        },
+        "is_retrograde": false,
+        "sign": 8,
+        "house": 9
+      },
+      "Saturn": {
+        "total_shashtiamsas": 117.8,
+        "rupas": 1.963,
+        "percent_strength": 39.3,
+        "strength_label": "Moderate",
+        "components": {
+          "sthana_bala": {
+            "score": 45.0,
+            "placement": "own_sign",
+            "sign": 11,
+            "house": 12,
+            "kendra_bonus": 0.0,
+            "trikona_bonus": 0.0
+          },
+          "dig_bala": {
+            "score": 10.0,
+            "house": 12,
+            "peak_house": 7,
+            "distance_from_peak": 5
+          },
+          "chesta_bala": {
+            "score": 1.23,
+            "motion": "slow",
+            "speed": 0.0009,
+            "mean_speed": 0.0335
+          },
+          "naisargika_bala": {
+            "score": 8.57,
+            "note": "Fixed natural strength"
+          },
+          "drik_bala": {
+            "score": 53.0,
+            "net_raw": 23.0,
+            "aspects_received": [
+              {
+                "from": "Sun",
+                "strength": -6.0,
+                "aspect_type": "H4"
+              },
+              {
+                "from": "Mars",
+                "strength": -2.5,
+                "aspect_type": "H3"
+              },
+              {
+                "from": "Moon",
+                "strength": 5.25,
+                "aspect_type": "H4"
+              },
+              {
+                "from": "Venus",
+                "strength": 9.0,
+                "aspect_type": "H4"
+              },
+              {
+                "from": "Jupiter",
+                "strength": 11.25,
+                "aspect_type": "H4"
+              },
+              {
+                "from": "Mercury",
+                "strength": 6.0,
+                "aspect_type": "H4"
+              }
+            ]
+          }
+        },
+        "is_retrograde": false,
+        "sign": 11,
+        "house": 12
+      }
+    },
+    "ranking": [
+      "Sun",
+      "Mars",
+      "Jupiter",
+      "Venus",
+      "Mercury",
+      "Moon",
+      "Saturn"
+    ],
+    "strongest_planet": "Sun",
+    "weakest_planet": "Saturn",
+    "summary": {
+      "strongest": "Sun",
+      "weakest": "Saturn",
+      "very_strong_count": 0,
+      "weak_count": 0
+    },
+    "error": null
+  },
+  "ayanamsa": "lahiri",
+  "kp_sublords": {
+    "planets": {
+      "Sun": {
+        "house": 8,
+        "sub_lord": "Mercury",
+        "longitude": 215.76606891111538,
+        "star_lord": "Saturn",
+        "sub_sub_lord": "Ketu"
+      },
+      "Ketu": {
+        "house": 1,
+        "sub_lord": "Ketu",
+        "longitude": 0.73561253872208,
+        "star_lord": "Ketu",
+        "sub_sub_lord": "Mercury"
+      },
+      "Mars": {
+        "house": 9,
+        "sub_lord": "Ketu",
+        "longitude": 240.00704718744535,
+        "star_lord": "Ketu",
+        "sub_sub_lord": "Ketu"
+      },
+      "Moon": {
+        "house": 8,
+        "sub_lord": "Rahu",
+        "longitude": 211.73866898803126,
+        "star_lord": "Jupiter",
+        "sub_sub_lord": "Jupiter"
+      },
+      "Rahu": {
+        "house": 7,
+        "sub_lord": "Mercury",
+        "longitude": 180.73561253872208,
+        "star_lord": "Mars",
+        "sub_sub_lord": "Sun"
+      },
+      "Lagna": {
+        "house": 1,
+        "sub_lord": "Mercury",
+        "longitude": 336.48380454841947,
+        "star_lord": "Saturn",
+        "sub_sub_lord": "Mars"
+      },
+      "Venus": {
+        "house": 9,
+        "sub_lord": "Saturn",
+        "longitude": 239.7452814427823,
+        "star_lord": "Mercury",
+        "sub_sub_lord": "Jupiter"
+      },
+      "Saturn": {
+        "house": 12,
+        "sub_lord": "Mercury",
+        "longitude": 324.1942058935927,
+        "star_lord": "Jupiter",
+        "sub_sub_lord": "Ketu"
+      },
+      "Jupiter": {
+        "house": 9,
+        "sub_lord": "Jupiter",
+        "longitude": 236.72053958678663,
+        "star_lord": "Mercury",
+        "sub_sub_lord": "Mercury"
+      },
+      "Mercury": {
+        "house": 8,
+        "sub_lord": "Saturn",
+        "longitude": 215.27448984039023,
+        "star_lord": "Saturn",
+        "sub_sub_lord": "Jupiter"
+      }
+    },
+    "house_cusps": {
+      "1": {
+        "sub_lord": "Mercury",
+        "longitude": 336.48380454841947,
+        "sign_lord": "Jupiter",
+        "star_lord": "Saturn"
+      },
+      "2": {
+        "sub_lord": "Saturn",
+        "longitude": 10.21524773311205,
+        "sign_lord": "Mars",
+        "star_lord": "Ketu"
+      },
+      "3": {
+        "sub_lord": "Venus",
+        "longitude": 39.73337859124194,
+        "sign_lord": "Venus",
+        "star_lord": "Sun"
+      },
+      "4": {
+        "sub_lord": "Moon",
+        "longitude": 66.42049700899311,
+        "sign_lord": "Mercury",
+        "star_lord": "Mars"
+      },
+      "5": {
+        "sub_lord": "Rahu",
+        "longitude": 93.13012059804016,
+        "sign_lord": "Moon",
+        "star_lord": "Jupiter"
+      },
+      "6": {
+        "sub_lord": "Venus",
+        "longitude": 122.70597185717772,
+        "sign_lord": "Sun",
+        "star_lord": "Ketu"
+      },
+      "7": {
+        "sub_lord": "Mercury",
+        "longitude": 156.48380454841947,
+        "sign_lord": "Mercury",
+        "star_lord": "Sun"
+      },
+      "8": {
+        "sub_lord": "Jupiter",
+        "longitude": 190.21524773311205,
+        "sign_lord": "Venus",
+        "star_lord": "Rahu"
+      },
+      "9": {
+        "sub_lord": "Venus",
+        "longitude": 219.73337859124194,
+        "sign_lord": "Mars",
+        "star_lord": "Saturn"
+      },
+      "10": {
+        "sub_lord": "Rahu",
+        "longitude": 246.4204970089931,
+        "sign_lord": "Jupiter",
+        "star_lord": "Ketu"
+      },
+      "11": {
+        "sub_lord": "Saturn",
+        "longitude": 273.13012059804015,
+        "sign_lord": "Saturn",
+        "star_lord": "Sun"
+      },
+      "12": {
+        "sub_lord": "Venus",
+        "longitude": 302.7059718571777,
+        "sign_lord": "Saturn",
+        "star_lord": "Mars"
+      }
+    },
+    "cuspal_significators": {
+      "2": [
+        "Mars",
+        "Rahu"
+      ],
+      "6": [
+        "Sun"
+      ],
+      "7": [
+        "Rahu",
+        "Mercury",
+        "Jupiter",
+        "Venus"
+      ],
+      "8": [
+        "Mercury",
+        "Moon",
+        "Sun",
+        "Jupiter",
+        "Venus"
+      ],
+      "10": [
+        "Jupiter",
+        "Moon",
+        "Saturn"
+      ],
+      "11": [
+        "Saturn",
+        "Mercury",
+        "Sun"
+      ]
+    }
+  },
+  "divisional_signals": {
+    "d10_career": {
+      "note": "D10 Dasamsa shows career destiny",
+      "key_placements": [
+        {
+          "planet": "Sun",
+          "sign": "Leo",
+          "dignity": "neutral"
+        },
+        {
+          "planet": "Saturn",
+          "sign": "Libra",
+          "dignity": "neutral"
+        }
+      ]
+    },
+    "d2_wealth": {
+      "note": "D2 Hora shows wealth potential",
+      "key_placements": [
+        {
+          "planet": "Jupiter",
+          "sign": "Leo",
+          "dignity": "neutral"
+        },
+        {
+          "planet": "Venus",
+          "sign": "Leo",
+          "dignity": "neutral"
+        }
+      ]
+    },
+    "d7_children": {
+      "note": "D7 Saptamsa shows children/creativity",
+      "key_placements": [
+        {
+          "planet": "Jupiter",
+          "sign": "Scorpio",
+          "dignity": "neutral"
+        }
+      ]
+    }
+  },
+  "panchangam_context": {
+    "tithi": {
+      "name": "Krishna Pournami / Amavasya",
+      "index": 29,
+      "paksha": "Krishna",
+      "tithi_number": 15
+    },
+    "vara": {
+      "tamil": "Budhan",
+      "english": "Wednesday"
+    },
+    "yoga": {
+      "name": "Atiganda",
+      "index": 5
+    },
+    "note": "Birth Tithi and Vara carry classical significance for chart character."
+  },
+  "shadbala_detail": {
+    "planets": [
+      {
+        "planet": "Sun",
+        "rupas": 3.4,
+        "strength": "Strong",
+        "can_deliver": false
+      },
+      {
+        "planet": "Mars",
+        "rupas": 3.1,
+        "strength": "Strong",
+        "can_deliver": false
+      },
+      {
+        "planet": "Moon",
+        "rupas": 2.4,
+        "strength": "Moderate",
+        "can_deliver": false
+      },
+      {
+        "planet": "Venus",
+        "rupas": 2.4,
+        "strength": "Moderate",
+        "can_deliver": false
+      },
+      {
+        "planet": "Saturn",
+        "rupas": 2.0,
+        "strength": "Moderate",
+        "can_deliver": false
+      },
+      {
+        "planet": "Jupiter",
+        "rupas": 2.7,
+        "strength": "Moderate",
+        "can_deliver": false
+      },
+      {
+        "planet": "Mercury",
+        "rupas": 2.4,
+        "strength": "Moderate",
+        "can_deliver": false
+      }
+    ],
+    "strongest": "Sun",
+    "weakest": "Saturn",
+    "note": "Shadbala measures how much each planet can actually deliver its promise. A planet with low strength gives diluted results even in a good dasha."
+  },
+  "bav_context": {
+    "saturn": {
+      "bav_score": 2,
+      "strength": "weak"
+    },
+    "jupiter": {
+      "bav_score": 4,
+      "strength": "moderate"
+    },
+    "rahu": {
+      "bav_score": null,
+      "strength": "moderate"
+    },
+    "note": "BAV score: 5+ = strong transit, 3-4 = moderate, 1-2 = weak/friction."
+  },
+  "upagraha_context": {
+    "gulika_rasi": "Capricorn",
+    "gulika_lord": "Saturn",
+    "note": "Gulika (Mandi) marks karmic obstruction points. Its placement shows areas requiring extra vigilance and remediation."
+  },
+  "predictive_signals": {
+    "dasha_precision": {
+      "md_lord": "Mercury",
+      "ad_lord": "Rahu",
+      "pt_lord": "Jupiter"
+    },
+    "event_windows": [
+      {
+        "start": "",
+        "end": "",
+        "life_area": "self",
+        "confidence": "very high",
+        "signal_count": 6
+      },
+      {
+        "start": "",
+        "end": "",
+        "life_area": "self",
+        "confidence": "very high",
+        "signal_count": 6
+      },
+      {
+        "start": "",
+        "end": "",
+        "life_area": "self",
+        "confidence": "very high",
+        "signal_count": 6
+      },
+      {
+        "start": "",
+        "end": "",
+        "life_area": "self",
+        "confidence": "very high",
+        "signal_count": 6
+      },
+      {
+        "start": "",
+        "end": "",
+        "life_area": "self",
+        "confidence": "very high",
+        "signal_count": 6
+      }
+    ],
+    "active_yogas": [
+      {
+        "name": "Gaja Kesari Yoga",
+        "activation_level": "peak",
+        "life_area": "self"
+      },
+      {
+        "name": "Raja Yoga",
+        "activation_level": "peak",
+        "life_area": "self"
+      },
+      {
+        "name": "Raja Yoga",
+        "activation_level": "peak",
+        "life_area": "self"
+      }
+    ],
+    "varshaphal": {
+      "year": 2026,
+      "lagna": "Kumbham",
+      "varshesha": "Saturn",
+      "strength": "weak",
+      "muntha": "Thulam"
+    }
+  }
+}
