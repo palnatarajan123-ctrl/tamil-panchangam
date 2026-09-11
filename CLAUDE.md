@@ -282,6 +282,23 @@ this, not the automated suite alone).
   both implementations above. Their *base* fields (nakshatra/rasi vs
   lagna/moon, sade-sati-always-shown vs conditional) are NOT unified —
   they'd already diverged before anyone looked; don't assume they match.
+- **Prediction-generation spinner/status messaging is duplicated across
+  two files**, same trap as the family chat note above:
+  `client/src/screens/prediction-screen.tsx` (routed at
+  `/chart/:id/predictions`, the one real in-app navigation reaches —
+  `chart-detail.tsx` links here) and `client/src/pages/predictions.legacy.tsx`
+  (routed at `/predictions/:id`, but as of the 2026-09-11 spinner-copy
+  fix, confirmed to have zero in-app links pointing at it anymore — only
+  reachable by a direct/bookmarked URL, not truly dead like
+  `predictions_ui.py` was, just orphaned). Both independently derive
+  `llmPending` from the same `llm_status === "pending"` response field
+  and render their own copy of the "Generating your interpretation…"
+  spinner — fixing the wording in one and missing the other reproduces
+  this exact mistake. Third/fourth occurrence of "multiple independent
+  copies drift" in this project (family chat, bare-`fetch()` call sites,
+  PDF download, now this) — see the PDF-consolidation backlog entry
+  above for the same underlying suggestion (one shared component/helper)
+  applied to a different surface.
 - **`is_llm_enabled()` (`llm_interpretation_orchestrator.py`) is THE
   single source of truth for "may the LLM be called right now, anywhere"
   — as of 2026-09-11, not before.** It used to check only

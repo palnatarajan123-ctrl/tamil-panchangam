@@ -349,7 +349,7 @@ export default function PredictionScreen() {
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
           <Loader2 className="h-8 w-8 animate-spin" />
           <p className="text-base font-medium">Generating your interpretation…</p>
-          <p className="text-sm">This takes a few seconds</p>
+          <p className="text-sm">This can take up to two minutes</p>
         </div>
       )}
 
