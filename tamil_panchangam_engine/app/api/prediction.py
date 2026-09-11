@@ -108,6 +108,34 @@ def get_monthly_llm_status(base_chart_id: str, year: int, month: int, user: dict
     Polling endpoint: returns "ready" only when llm_interpretation has been
     merged into monthly_predictions (not just written to prediction_llm_interpretation).
     This prevents the race where the frontend re-fetches before the merge completes.
+
+    Checks fallback_reason, not just presence (2026-09-11 follow-up to the
+    stale-fallback-cache fix above): llm_interpretation being present isn't
+    enough on its own -- a chart stuck on a stale fallback ALREADY has
+    llm_interpretation present (it's the fallback content itself), so a
+    presence-only check reported "ready" immediately whenever
+    generate_monthly_prediction() kicked off a fresh retry for exactly
+    that case, before the retry had actually finished. The frontend would
+    stop polling and redisplay the still-stale content for one refetch
+    cycle.
+
+    Any fallback_reason (including "llm_disabled") is treated as "not
+    ready" here, uniformly -- deliberately NOT special-casing
+    "llm_disabled" as an exception the way _check_cache() does one layer
+    down. generate_monthly_prediction()'s retry trigger (above) is
+    likewise unconditional on the reason string: it retries whenever
+    is_llm_enabled() is currently true, regardless of what the stale
+    fallback_reason says, so a chart cached while LLM was off correctly
+    gets a fresh attempt the moment it's re-enabled. Special-casing
+    "llm_disabled" as always-ready here would reintroduce this exact same
+    race for that one reason: the POST endpoint might retry it, but
+    polling would already have told the frontend "ready, stop" based on
+    the stale row before that retry finished. If LLM is still genuinely
+    disabled, the POST endpoint never sets llm_status="pending" in the
+    first place (its own is_llm_enabled() guard skips the retry and
+    returns llm_status=None), so the frontend never starts polling this
+    endpoint for that case at all -- this "pending" fallback response is
+    reachable only while a real retry is in flight.
     """
     with get_conn() as conn:
         if not user_owns_chart(conn, user, base_chart_id):
@@ -122,7 +150,8 @@ def get_monthly_llm_status(base_chart_id: str, year: int, month: int, user: dict
             if isinstance(existing["interpretation"], str)
             else existing["interpretation"]
         )
-        if interp.get("llm_interpretation"):
+        fallback_reason = interp.get("llm_metadata", {}).get("fallback_reason")
+        if interp.get("llm_interpretation") and fallback_reason is None:
             return {"status": "ready"}
     return {"status": "pending"}
 
@@ -326,6 +355,45 @@ def generate_monthly_prediction(
                 },
                 "timeline": [],
             }
+
+        # Stale fallback-tagged cache entry (2026-09-11 follow-up to
+        # Issue 2): a fallback result (fallback_reason set -- e.g.
+        # prompt_too_large, budget_exceeded, a real Anthropic API error)
+        # was being cached and served identically to a real one. Once a
+        # chart+period combo hit ANY fallback, it stayed stuck showing
+        # that exact fallback content -- and its ORIGINAL timestamp --
+        # forever, even after the underlying cause was fixed (e.g. the
+        # token-limit fix), because this cache-hit branch never
+        # distinguished "done, real result" from "done, only because
+        # generation failed." Confirmed against a real stale row from
+        # before that fix (created 2026-09-11 17:12:55,
+        # fallback_reason="prompt_too_large") still being served hours
+        # after the fix was deployed and confirmed live. A fallback is a
+        # failure-to-generate signal, not a valid cacheable result: don't
+        # treat it as a final cache hit for the LLM portion -- re-kick a
+        # background regeneration attempt, same as a genuine cache miss,
+        # so a fix actually reaches previously-stuck charts instead of
+        # only helping brand-new ones. The deterministic/envelope/
+        # synthesis portions are still served from cache immediately,
+        # same as the already-merged case -- only the LLM retry is new.
+        existing_fallback_reason = (interpretation or {}).get("llm_metadata", {}).get("fallback_reason")
+        if existing_fallback_reason and is_llm_enabled():
+            logger.info(
+                f"Stale fallback cache entry detected ({existing_fallback_reason}) for "
+                f"{payload.base_chart_id}/monthly/{payload.year}-{payload.month:02d} -- "
+                f"re-attempting LLM generation instead of re-serving it."
+            )
+            background_tasks.add_task(
+                _run_llm_background,
+                base_chart_id=payload.base_chart_id,
+                envelope=envelope,
+                synthesis=synthesis,
+                ai_interpretation=(interpretation or {}).get("ai_interpretation", {}),
+                year=payload.year,
+                month=payload.month,
+                base_chart_payload=base_chart_payload,
+            )
+            llm_status = "pending"
 
     else:
         # -------------------------------------------------

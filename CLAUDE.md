@@ -94,6 +94,22 @@ stale" and "confirmed real" looked like in practice):
   if weekly/yearly ever show the same "existing chart fine, new chart
   stuck on an old version" symptom, check this file's `MAX_PROMPT_TOKENS`
   first before assuming a new root cause.
+- **Stale fallback-tagged cache rows (2026-09-11 follow-up to Issue 2,
+  fixed at the `prediction.py` layer) may still have a matching latent
+  issue one layer down**, in `llm_interpretation_orchestrator.py`'s
+  `_check_cache()`: it special-cases `fallback_reason == "llm_disabled"`
+  as always-reusable, regardless of whether `is_llm_enabled()` is
+  CURRENTLY true — meaning if LLM was off when a period was first
+  generated, then re-enabled later, `_check_cache()` would still hand
+  back the stale disabled-era fallback if it's ever reached with that
+  cache key again. `prediction.py`'s own retry trigger (this fix) doesn't
+  carve out this same exception, so in practice `_check_cache()` won't be
+  reached with a stale `llm_disabled` row anymore for Monthly — but
+  Yearly calls `generate_llm_interpretation()` (and therefore
+  `_check_cache()`) directly and unconditionally on every request, so
+  this exact latent inconsistency may still be live there. Not verified
+  either way — flagging, not fixed, since it's one layer deeper than
+  tonight's fix and wasn't the reported symptom.
 - **PDF download call-site consolidation**: `window.open()` was the root
   cause of Issue 1 (can't attach Authorization header) — this is the
   third instance of the "multiple independent copies drift" bug class in
