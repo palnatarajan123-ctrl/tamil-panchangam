@@ -219,6 +219,20 @@ def bootstrap():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
+        # user_id (Task 3/backlog #1, 2026-09-10): nullable, new-only --
+        # existing rows stay NULL (chart_id -> user isn't reliably 1:1,
+        # see base_chart.py's fingerprint dedup, so there's no accurate way
+        # to backfill it). Per-account cap checks simply see $0 spend for
+        # any call logged before this column existed or by a caller not
+        # yet updated to pass it -- exactly the "no backfill, cap applies
+        # going forward" scope agreed for this feature.
+        conn.execute("""
+        ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS user_id TEXT
+        """)
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_llm_calls_user_created
+            ON llm_calls(user_id, created_at)
+        """)
 
         # llm_budget — singleton budget config row (id always = 1)
         conn.execute("""
@@ -232,6 +246,12 @@ def bootstrap():
             paused_at TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+        """)
+        # per_account_daily_cap_usd (Task 3/backlog #1, 2026-09-10): a
+        # single default cap applying to every account, independent of
+        # (and in addition to) the global monthly_budget_usd cap above.
+        conn.execute("""
+        ALTER TABLE llm_budget ADD COLUMN IF NOT EXISTS per_account_daily_cap_usd REAL DEFAULT 2.0
         """)
 
         conn.execute("""

@@ -8,6 +8,8 @@ import logging
 from datetime import date
 import calendar
 
+from fastapi import HTTPException, status
+
 from app.db.postgres import get_conn
 
 logger = logging.getLogger(__name__)
@@ -23,10 +25,19 @@ def compute_cost(input_tokens: int, output_tokens: int) -> float:
 
 def log_llm_call(db, chart_id: str, call_type: str, period: str,
                  input_tokens: int, output_tokens: int,
-                 status: str = "success", fallback_reason: str = None) -> float:
+                 status: str = "success", fallback_reason: str = None,
+                 user_id: str = None) -> float:
     """
     Unified logger for all LLM calls (prediction + chat).
     Returns cost_usd logged.
+
+    user_id (Task 3/backlog #1, 2026-09-10): optional, appended at the end
+    so every existing positional/keyword call site keeps working unchanged
+    -- defaults to NULL, matching the "no backfill" scope of the
+    per-account cap this enables (see bootstrap.py's column comment).
+    Callers that have a user in scope should pass it so their own spend
+    counts toward that account's cap; callers that don't (background
+    tasks, engine-internal helpers with no request context) are unaffected.
     """
     cost_usd = compute_cost(input_tokens, output_tokens)
     total_tokens = input_tokens + output_tokens
@@ -34,10 +45,10 @@ def log_llm_call(db, chart_id: str, call_type: str, period: str,
     db.execute("""
         INSERT INTO llm_calls
             (id, chart_id, call_type, period, input_tokens, output_tokens,
-             total_tokens, cost_usd, status, fallback_reason, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+             total_tokens, cost_usd, status, fallback_reason, user_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     """, [str(uuid.uuid4()), chart_id, call_type, period, input_tokens, output_tokens,
-          total_tokens, cost_usd, status, fallback_reason])
+          total_tokens, cost_usd, status, fallback_reason, user_id])
 
     if status == "success":
         _check_budget(db)
@@ -78,6 +89,59 @@ def _check_budget(db) -> None:
             """)
     except Exception as e:
         logger.warning(f"Budget check failed: {e}")
+
+
+def get_user_daily_spend(db, user_id: str) -> float:
+    """Total cost_usd logged for this user today (server-local date via
+    CURRENT_DATE), successful calls only -- same 'status = success' filter
+    _check_budget() uses for the global cap. Calls with no user_id (either
+    predating this column, or from a call site not yet updated to pass it)
+    never count toward any account's total by construction."""
+    result = db.execute("""
+        SELECT COALESCE(SUM(cost_usd), 0.0) AS total
+        FROM llm_calls
+        WHERE user_id = ?
+          AND created_at::DATE = CURRENT_DATE
+          AND status = 'success'
+    """, [user_id]).fetchone()
+    return float(result[0]) if result else 0.0
+
+
+def check_user_llm_cap(db, user_id: str) -> None:
+    """Per-account daily spend cap (Task 3/backlog #1, 2026-09-10) --
+    independent of, and in addition to, the global monthly auto-pause in
+    _check_budget(). Raises HTTPException(429) with a clear detail message
+    if this account has already reached or exceeded its daily cap;
+    otherwise returns None and the caller proceeds. Call this BEFORE
+    making the LLM call (it's a pre-flight gate, unlike _check_budget()
+    which runs after logging a call) -- at the same point a route already
+    checks is_llm_enabled(), so a capped account never reaches the
+    downstream API call at all.
+
+    Same reuse-the-existing-pattern approach as _check_budget(): reads the
+    singleton llm_budget row's per_account_daily_cap_usd rather than a
+    hardcoded constant, so it's adjustable the same way monthly_budget_usd
+    already is (admin_llm.py's /budget endpoint doesn't expose this field
+    yet -- follow-up, not required for this feature to function with its
+    $2.00/day default).
+    """
+    try:
+        budget = db.execute("SELECT per_account_daily_cap_usd FROM llm_budget WHERE id = 1").fetchone()
+    except Exception as e:
+        logger.warning(f"Per-account budget lookup failed, allowing call: {e}")
+        return
+
+    cap = budget[0] if budget and budget[0] is not None else 2.0
+    spend = get_user_daily_spend(db, user_id)
+
+    if spend >= cap:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"Daily AI usage limit reached for this account "
+                f"(${spend:.2f} of ${cap:.2f}). This resets at midnight UTC."
+            ),
+        )
 
 
 def get_monthly_summary() -> dict:

@@ -46,15 +46,45 @@ def _get_base_chart_payload(base_chart_id: str) -> dict:
         raise HTTPException(status_code=500, detail="Failed to load base chart")
 
 
-def _generate_daily_llm_guidance(result: dict, chart_name: str, base_chart_id: str) -> Optional[str]:
-    """2-3 sentence personalized daily guidance. Low token usage."""
+def _generate_daily_llm_guidance(
+    result: dict, chart_name: str, base_chart_id: str, user_id: Optional[str] = None,
+) -> tuple[Optional[str], bool]:
+    """2-3 sentence personalized daily guidance. Low token usage.
+
+    Returns (guidance, capped). Unlike natal_interpretation.py's two
+    routes (whose entire value IS the LLM output, hard-429'd on cap --
+    see that file), this route already computes and returns real,
+    non-LLM Panchangam data (tithi/nakshatra/yoga/rahu-kaalam/etc.)
+    regardless of LLM outcome. Discarding that with a 429 just because
+    the LLM commentary specifically is capped would be a strictly worse
+    response than the existing is_llm_enabled()-disabled case already
+    degrades to (silently returning llm_guidance=None, 200 OK) -- a
+    per-account budget cap is the same *kind* of condition as that
+    global switch (temporary LLM unavailability, not an identity/security
+    failure like Turnstile/auth), so it gets the same graceful-degradation
+    treatment, not Turnstile's hard-stop treatment. The caller surfaces
+    `capped` as a distinct `llm_capped` response key.
+    """
     from app.engines.llm_interpretation_orchestrator import is_llm_enabled
     if not is_llm_enabled():
-        return None
+        return None, False
+
+    # Per-account daily cap (Task 3/backlog #1, 2026-09-10): checked at the
+    # same point as the global is_llm_enabled() gate above, before making
+    # the paid Anthropic call.
+    if user_id:
+        from app.engines.budget_guard import check_user_llm_cap
+        try:
+            with get_conn() as conn:
+                check_user_llm_cap(conn, user_id)
+        except HTTPException as e:
+            if e.status_code == 429:
+                return None, True
+            raise
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        return None
+        return None, False
 
     try:
         nak = result.get("nakshatra", {})
@@ -106,15 +136,16 @@ def _generate_daily_llm_guidance(result: dict, chart_name: str, base_chart_id: s
                     period=date_str,
                     input_tokens=response.usage.input_tokens,
                     output_tokens=response.usage.output_tokens,
+                    user_id=user_id,
                 )
         except Exception as log_err:
             logger.warning(f"daily_guidance log_llm_call failed: {log_err}")
 
-        return guidance
+        return guidance, False
 
     except Exception as e:
         logger.warning(f"Daily LLM guidance failed: {e}")
-        return None
+        return None, False
 
 
 @limiter.limit("10/hour")
@@ -191,14 +222,16 @@ def get_daily_prediction(
         ayanamsa=ayanamsa,
     )
 
-    llm_guidance = _generate_daily_llm_guidance(
+    llm_guidance, llm_capped = _generate_daily_llm_guidance(
         result=result,
         chart_name=birth_details.get("name", ""),
         base_chart_id=base_chart_id,
+        user_id=user["id"],
     )
 
     return {
         "base_chart_id": base_chart_id,
         **result,
         "llm_guidance": llm_guidance,
+        "llm_capped": llm_capped,
     }

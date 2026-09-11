@@ -21,7 +21,7 @@ from app.core.auth import get_current_user
 from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import get_base_chart_by_id, user_owns_chart
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled
-from app.engines.budget_guard import log_llm_call
+from app.engines.budget_guard import log_llm_call, check_user_llm_cap
 from app.llm.providers import anthropic_provider
 
 logger = logging.getLogger(__name__)
@@ -234,6 +234,7 @@ def _save_cache(
     completion_tokens: int,
     total_tokens: int,
     fallback_reason: Optional[str],
+    user_id: Optional[str] = None,
 ) -> None:
     try:
         with get_conn() as conn:
@@ -255,6 +256,28 @@ def _save_cache(
                     INSERT INTO llm_token_usage (id, feature_name, prompt_version, total_tokens, created_at)
                     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """, [str(uuid.uuid4()), FEATURE_NAME, PROMPT_VERSION, total_tokens])
+            # log_llm_call (Task 3/backlog #1, 2026-09-10): this route
+            # previously never logged to llm_calls at all -- unlike its KP
+            # sibling (_save_kp_cache below), which already does. Added
+            # here, mirroring that sibling's exact pattern, because the new
+            # per-account cap this enables would otherwise never see this
+            # route's own (7000-max-token, the most expensive single call
+            # in the app) spend. Pre-existing gap, not introduced by this
+            # change -- flagged separately, not silently normalized.
+            try:
+                log_llm_call(
+                    db=conn,
+                    chart_id=base_chart_id,
+                    call_type="natal_interpretation",
+                    period="natal",
+                    input_tokens=prompt_tokens,
+                    output_tokens=completion_tokens,
+                    status="success" if not fallback_reason else "fallback",
+                    fallback_reason=fallback_reason,
+                    user_id=user_id,
+                )
+            except Exception as _lg_err:
+                logger.warning(f"log_llm_call failed for natal: {_lg_err}")
     except Exception as e:
         logger.error(f"Failed to save natal cache: {e}")
 
@@ -437,6 +460,12 @@ def get_natal_interpretation(request: Request, body: NatalInterpretationRequest,
     if not is_llm_enabled() or not anthropic_provider.is_available():
         return {"interpretation": _fallback_response(), "cached": False, "llm_disabled": True}
 
+    # 2b. Per-account daily cap (Task 3/backlog #1, 2026-09-10): raises
+    # HTTPException(429) if this account is already at/over its daily
+    # cap -- checked before the (expensive, 7000-max-token) LLM call.
+    with get_conn() as conn:
+        check_user_llm_cap(conn, user["id"])
+
     # 3. Fetch base chart
     with get_conn() as conn:
         record = get_base_chart_by_id(conn, base_chart_id)
@@ -499,7 +528,8 @@ def get_natal_interpretation(request: Request, body: NatalInterpretationRequest,
         fallback["llm_error"] = error
         _save_cache(
             base_chart_id, fallback, provider, model,
-            prompt_tokens, completion_tokens, total_tokens, error or "llm_failed"
+            prompt_tokens, completion_tokens, total_tokens, error or "llm_failed",
+            user_id=user["id"],
         )
         return {"interpretation": fallback, "cached": False, "llm_error": error}
 
@@ -515,7 +545,8 @@ def get_natal_interpretation(request: Request, body: NatalInterpretationRequest,
     # 6. Cache and return
     _save_cache(
         base_chart_id, llm_response, provider, model,
-        prompt_tokens, completion_tokens, total_tokens, None
+        prompt_tokens, completion_tokens, total_tokens, None,
+        user_id=user["id"],
     )
 
     return {"interpretation": llm_response, "cached": False}
@@ -552,6 +583,7 @@ def _save_kp_cache(
     completion_tokens: int,
     total_tokens: int,
     fallback_reason: Optional[str],
+    user_id: Optional[str] = None,
 ) -> None:
     try:
         with get_conn() as conn:
@@ -578,6 +610,7 @@ def _save_kp_cache(
                     output_tokens=completion_tokens,
                     status="success" if not fallback_reason else "fallback",
                     fallback_reason=fallback_reason,
+                    user_id=user_id,
                 )
             except Exception as _lg_err:
                 logger.warning(f"log_llm_call failed for KP: {_lg_err}")
@@ -688,6 +721,11 @@ def get_kp_interpretation(chart_id: str, request: Request, user: dict = Depends(
     if not is_llm_enabled() or not anthropic_provider.is_available():
         return {"kp_available": True, "interpretation": _kp_fallback_response(), "cached": False, "llm_disabled": True}
 
+    # 4b. Per-account daily cap (Task 3/backlog #1, 2026-09-10): raises
+    # HTTPException(429) if this account is already at/over its daily cap.
+    with get_conn() as conn:
+        check_user_llm_cap(conn, user["id"])
+
     # 5. Build context and call LLM
     context = _build_kp_context(payload)
     system_prompt = _load_kp_system_prompt()
@@ -709,7 +747,8 @@ def get_kp_interpretation(chart_id: str, request: Request, user: dict = Depends(
         logger.warning(f"KP LLM call failed: {error}")
         fallback = _kp_fallback_response(error or "llm_failed")
         _save_kp_cache(chart_id, fallback, provider, model,
-                       prompt_tokens, completion_tokens, total_tokens, error or "llm_failed")
+                       prompt_tokens, completion_tokens, total_tokens, error or "llm_failed",
+                       user_id=user["id"])
         return {"kp_available": True, "interpretation": fallback, "cached": False, "llm_error": error}
 
     # 6. Ensure required keys present
@@ -718,6 +757,7 @@ def get_kp_interpretation(chart_id: str, request: Request, user: dict = Depends(
 
     # 7. Cache and return
     _save_kp_cache(chart_id, llm_response, provider, model,
-                   prompt_tokens, completion_tokens, total_tokens, None)
+                   prompt_tokens, completion_tokens, total_tokens, None,
+                   user_id=user["id"])
 
     return {"kp_available": True, "interpretation": llm_response, "cached": False}
