@@ -581,23 +581,33 @@ def _build_chat_context(base_chart_id: str) -> dict:
             mdata = monthly[0] if isinstance(monthly[0], dict) else json.loads(monthly[0] or "{}")
             llm = mdata.get("llm_interpretation", {})
             if isinstance(llm, dict):
-                engine_ver = llm.get("engine_version", "")
                 exec_sum = llm.get("executive_summary", {})
-                if "v5" in engine_ver or "v4" in engine_ver:
-                    if isinstance(exec_sum, dict):
-                        why = llm.get("why_this_period", {})
-                        monthly_summary = (
-                            f"Theme: {exec_sum.get('main_theme', '')}\n"
-                            f"Period: {exec_sum.get('year_in_one_line', '')}\n"
-                            f"Dasha: {why.get('dasha_plain', '') if isinstance(why, dict) else ''}\n"
-                            f"Strongest: {exec_sum.get('strongest_area', '')}\n"
-                            f"Watch: {exec_sum.get('watch_area', '')}"
-                        ).strip() or "not available"
-                        one_lines = exec_sum.get("one_lines", {})
-                        if one_lines:
-                            monthly_summary += "\nArea snapshot: " + "; ".join(
-                                f"{k.replace('_',' ')}: {v}" for k, v in one_lines.items()
-                            )
+                # Issue 3 fix (2026-09-11): was gated on "v5"/"v4" in
+                # engine_version specifically -- v6 and v7 (the CURRENT
+                # version, confirmed ai-interpretation-v7.0 -- see Issue
+                # 2) were never matched, silently falling through to
+                # "not available" even when a real monthly prediction had
+                # just been generated. v7's executive_summary shape turns
+                # out to already have main_theme/best_use/one_lines/
+                # strongest_area/watch_area/year_in_one_line -- the same
+                # fields this block already reads -- so checking
+                # structurally (does main_theme exist) instead of by
+                # version string both fixes v6/v7 today and stops this
+                # from recurring at the next version bump.
+                if isinstance(exec_sum, dict) and exec_sum.get("main_theme"):
+                    why = llm.get("why_this_period", {})
+                    monthly_summary = (
+                        f"Theme: {exec_sum.get('main_theme', '')}\n"
+                        f"Period: {exec_sum.get('year_in_one_line', '')}\n"
+                        f"Dasha: {why.get('dasha_plain', '') if isinstance(why, dict) else ''}\n"
+                        f"Strongest: {exec_sum.get('strongest_area', '')}\n"
+                        f"Watch: {exec_sum.get('watch_area', '')}"
+                    ).strip() or "not available"
+                    one_lines = exec_sum.get("one_lines", {})
+                    if one_lines:
+                        monthly_summary += "\nArea snapshot: " + "; ".join(
+                            f"{k.replace('_',' ')}: {v}" for k, v in one_lines.items()
+                        )
                 elif isinstance(exec_sum, str) and exec_sum:
                     monthly_summary = exec_sum[:200]
                 else:
@@ -614,9 +624,10 @@ def _build_chat_context(base_chart_id: str) -> dict:
             ydata = yearly[0] if isinstance(yearly[0], dict) else json.loads(yearly[0] or "{}")
             llm = ydata.get("llm_interpretation", {})
             if isinstance(llm, dict):
-                engine_ver = llm.get("engine_version", "")
                 exec_sum = llm.get("executive_summary", {})
-                if ("v5" in engine_ver or "v4" in engine_ver) and isinstance(exec_sum, dict):
+                # Issue 3 fix (2026-09-11) -- same v4/v5-only gate as the
+                # monthly summary above, same fix: check structurally.
+                if isinstance(exec_sum, dict) and exec_sum.get("main_theme"):
                     yearly_summary = (
                         f"Theme: {exec_sum.get('main_theme', '')}\n"
                         f"Best use: {exec_sum.get('best_use', '')}"

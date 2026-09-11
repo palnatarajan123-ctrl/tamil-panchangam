@@ -137,6 +137,123 @@ def _pre_refactor_build_system_prompt(context: dict, reading_as_name=None) -> st
     return system_prompt
 
 
+def _mock_conn_for_payload_with_predictions(
+    payload: dict, monthly_interpretation=None, yearly_interpretation=None
+) -> MagicMock:
+    """Same shape as _mock_conn_for_payload but lets the monthly/yearly
+    prediction rows carry a real interpretation dict, for testing
+    _build_chat_context()'s monthly_summary/yearly_summary extraction."""
+    conn = MagicMock()
+    conn.execute.return_value.fetchone.side_effect = [
+        (payload,),
+        (monthly_interpretation,) if monthly_interpretation is not None else None,
+        (yearly_interpretation,) if yearly_interpretation is not None else None,
+    ]
+    conn_cm = MagicMock()
+    conn_cm.__enter__.return_value = conn
+    conn_cm.__exit__.return_value = False
+    return conn_cm
+
+
+class TestChatMonthlyYearlySummaryVersionHandling(unittest.TestCase):
+    """Issue 3 (2026-09-11 regression investigation): monthly_summary/
+    yearly_summary were gated on "v5"/"v4" in engine_version specifically
+    -- v6 and v7 (the CURRENT version; a real generation measured
+    engine_version="ai-interpretation-v7.0", see Issue 2) were never
+    matched, silently falling through to "not available" even when a real
+    prediction had just been generated for that exact chart. Fixed to
+    check structurally (does executive_summary.main_theme exist) instead
+    of by version string, using a real v7 executive_summary shape
+    (main_theme/best_use/one_lines/strongest_area/watch_area/
+    year_in_one_line) captured during that investigation -- not a
+    fabricated shape."""
+
+    def _v7_executive_summary(self):
+        return {
+            "main_theme": "September 2026 favors finance while relationships need patience.",
+            "best_use": "Consolidate financial progress and stay low-key on career moves.",
+            "strongest_area": "finance",
+            "watch_area": "relationships",
+            "year_in_one_line": "A steady, inward-focused month.",
+            "one_lines": {
+                "career": "Steady effort matters more than bold moves this month.",
+                "finance": "Good window to build and protect savings.",
+            },
+        }
+
+    def test_v7_monthly_summary_is_populated_not_not_available(self):
+        payload = _base_payload(with_upagrahas=False)
+        monthly_interp = {
+            "llm_interpretation": {
+                "engine_version": "ai-interpretation-v7.0",
+                "executive_summary": self._v7_executive_summary(),
+                "why_this_period": {"dasha_plain": "Mars-Jupiter period."},
+            }
+        }
+        with patch.object(
+            chat_module, "get_conn",
+            return_value=_mock_conn_for_payload_with_predictions(payload, monthly_interp),
+        ):
+            context = chat_module._build_chat_context("fake-chart-id")
+
+        self.assertNotEqual(context["monthly_summary"], "not available")
+        self.assertIn("finance", context["monthly_summary"])
+        self.assertIn("Mars-Jupiter period", context["monthly_summary"])
+
+    def test_v7_yearly_summary_is_populated_not_not_available(self):
+        payload = _base_payload(with_upagrahas=False)
+        yearly_interp = {
+            "llm_interpretation": {
+                "engine_version": "ai-interpretation-v7.0",
+                "executive_summary": self._v7_executive_summary(),
+            }
+        }
+        with patch.object(
+            chat_module, "get_conn",
+            return_value=_mock_conn_for_payload_with_predictions(
+                payload, monthly_interpretation=None, yearly_interpretation=yearly_interp
+            ),
+        ):
+            context = chat_module._build_chat_context("fake-chart-id")
+
+        self.assertNotEqual(context["yearly_summary"], "not available")
+        self.assertIn("finance", context["yearly_summary"])
+
+    def test_v4_monthly_summary_still_works_no_regression(self):
+        payload = _base_payload(with_upagrahas=False)
+        monthly_interp = {
+            "llm_interpretation": {
+                "engine_version": "ai-interpretation-v4.0",
+                "executive_summary": self._v7_executive_summary(),
+                "why_this_period": {"dasha_plain": "Mars-Jupiter period."},
+            }
+        }
+        with patch.object(
+            chat_module, "get_conn",
+            return_value=_mock_conn_for_payload_with_predictions(payload, monthly_interp),
+        ):
+            context = chat_module._build_chat_context("fake-chart-id")
+
+        self.assertNotEqual(context["monthly_summary"], "not available")
+
+    def test_missing_main_theme_falls_back_gracefully(self):
+        payload = _base_payload(with_upagrahas=False)
+        monthly_interp = {
+            "llm_interpretation": {
+                "engine_version": "ai-interpretation-v7.0",
+                "executive_summary": {},
+                "window_summary": {"overview": "fallback overview text"},
+            }
+        }
+        with patch.object(
+            chat_module, "get_conn",
+            return_value=_mock_conn_for_payload_with_predictions(payload, monthly_interp),
+        ):
+            context = chat_module._build_chat_context("fake-chart-id")
+
+        self.assertEqual(context["monthly_summary"], "fallback overview text")
+
+
 class TestSystemPromptExtractionIsNoOp(unittest.TestCase):
     """
     The chat.py fix extracted the ENTIRE system-prompt assembly (template
