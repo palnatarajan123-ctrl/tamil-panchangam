@@ -692,8 +692,7 @@ def _build_natal_v2_interpretation(
     """Natal v2 — plain English first, classical second."""
     elements = []
 
-    elements.append(Paragraph(
-        "Natal Chart Reading", styles['SectionTitle']))
+    elements.extend(_section_header("Natal Chart Reading", styles))
     elements.append(Paragraph(
         "Your lifelong astrological blueprint — "
         "plain-English guidance followed by classical "
@@ -774,7 +773,7 @@ def _build_natal_v2_interpretation(
             for g in wya.growth_edges:
                 row = Table(
                     [[
-                        Paragraph("->", ParagraphStyle(
+                        Paragraph("→", ParagraphStyle(
                             'GIcon',
                             parent=styles['Normal'],
                             fontSize=11,
@@ -1160,7 +1159,7 @@ def _build_natal_interpretation_section(data: CanonicalReportData, styles) -> Li
     """Build natal LLM interpretation section for birth chart PDF."""
     elements = []
 
-    elements.append(Paragraph("Natal Chart Reading", styles['SectionTitle']))
+    elements.extend(_section_header("Natal Chart Reading", styles))
     elements.append(Paragraph(
         "Your lifelong astrological blueprint, interpreted through the Siddhar tradition.",
         styles['BodyText']
