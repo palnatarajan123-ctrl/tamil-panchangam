@@ -107,6 +107,7 @@ export default function Predictions() {
     month?: number;
   } | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [includeTechnicalAppendix, setIncludeTechnicalAppendix] = useState(true);
   const [envelopeData, setEnvelopeData] = useState<any>(null);
   const [calculationConfidence, setCalculationConfidence] = useState<{
     level: string;
@@ -277,6 +278,7 @@ export default function Predictions() {
         base_chart_id: baseChartId,
         report_type: predictionType,
         year: lastPredictionParams.year.toString(),
+        include_technical_appendix: includeTechnicalAppendix.toString(),
       });
       
       if (predictionType === "monthly" && lastPredictionParams.month) {
@@ -526,7 +528,7 @@ export default function Predictions() {
           </div>
 
           {prediction && (
-            <div className="mt-6 flex justify-center gap-3 flex-wrap">
+            <div className="mt-6 flex justify-center items-center gap-3 flex-wrap">
               <button
                 onClick={() => setChatOpen((v) => !v)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-sm font-medium"
@@ -534,6 +536,15 @@ export default function Predictions() {
                 <MessageCircle className="w-4 h-4" />
                 {chatOpen ? "Close Chat" : "Ask Jyotishi"}
               </button>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+                <input
+                  type="checkbox"
+                  checked={includeTechnicalAppendix}
+                  onChange={(e) => setIncludeTechnicalAppendix(e.target.checked)}
+                  data-testid="checkbox-technical-appendix"
+                />
+                Include technical appendix
+              </label>
               <Button
                 onClick={handleDownloadPdf}
                 disabled={isDownloadingPdf}

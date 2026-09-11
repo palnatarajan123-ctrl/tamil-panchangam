@@ -28,21 +28,27 @@ def build_canonical_report(
     report_type: str,
     year: int,
     month: Optional[int] = None,
+    include_technical_appendix: bool = True,
 ) -> bytes:
     """
     Build a canonical PDF report.
-    
+
     This is the SINGLE ENTRY POINT for all PDF generation.
-    
+
     Args:
         base_chart_id: The base chart UUID
         report_type: 'monthly' or 'yearly'
         year: The prediction year
         month: The prediction month (required for monthly)
-    
+        include_technical_appendix: when False, strips KP/divisional/
+            Shadbala/Ashtakavarga/Upagrahas/prospects/methodology content,
+            keeping only the D1 chart, Birth Reference table, and
+            narrative prediction content. See render_pdf() for the exact
+            boundary.
+
     Returns:
         PDF bytes
-    
+
     Raises:
         ReportBuildError: If report data is missing or rendering fails
     """
@@ -70,7 +76,7 @@ def build_canonical_report(
         raise ReportBuildError(f"Failed to load report data: {e}")
     
     try:
-        pdf_bytes = render_pdf(report_data)
+        pdf_bytes = render_pdf(report_data, include_technical_appendix=include_technical_appendix)
     except Exception as e:
         logger.error(f"Failed to render PDF: {e}")
         raise ReportBuildError(f"Failed to render PDF: {e}")

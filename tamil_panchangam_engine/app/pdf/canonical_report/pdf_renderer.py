@@ -309,21 +309,37 @@ def _render_chart_from_svg(svg_data_uri: str, chart_type: str):
     return placeholder_table
 
 
-def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
-    """Build natal snapshot section with charts and birth reference."""
+def _build_natal_snapshot(
+        data: CanonicalReportData, styles,
+        include_technical_appendix: bool = True) -> List:
+    """Build natal snapshot section with charts and birth reference.
+
+    The D1 (Rasi) chart and Birth Reference table are the visual anchor
+    and identity information for the report and always render. The
+    Navamsa (D9) chart is a divisional chart beyond D1, so it's
+    appendix-only content — omitted when include_technical_appendix is
+    False, along with the sentence introducing it.
+    """
     elements = []
-    
+
     elements.append(Paragraph("Natal Snapshot", styles['SectionTitle']))
-    
-    elements.append(Paragraph(
-        "Your birth chart captures the celestial arrangement at your moment of birth. "
-        "The Rasi (D1) chart shows planetary positions in zodiac signs, while the "
-        "Navamsa (D9) chart reveals deeper soul-level patterns.",
-        styles['BodyText']
-    ))
-    
+
+    if include_technical_appendix:
+        elements.append(Paragraph(
+            "Your birth chart captures the celestial arrangement at your moment of birth. "
+            "The Rasi (D1) chart shows planetary positions in zodiac signs, while the "
+            "Navamsa (D9) chart reveals deeper soul-level patterns.",
+            styles['BodyText']
+        ))
+    else:
+        elements.append(Paragraph(
+            "Your birth chart captures the celestial arrangement at your moment of birth. "
+            "The Rasi (D1) chart below shows planetary positions in zodiac signs.",
+            styles['BodyText']
+        ))
+
     elements.append(Spacer(1, 0.3*inch))
-    
+
     # Birth Chart (D1) with heading — keep heading and chart on same page
     d1_elements = []
     d1_elements.append(Paragraph("<b>Birth Chart (D1)</b>", styles['SubsectionTitle']))
@@ -331,13 +347,14 @@ def _build_natal_snapshot(data: CanonicalReportData, styles) -> List:
     d1_elements.append(Spacer(1, 0.2*inch))
     elements.append(KeepTogether(d1_elements))
 
-    # Navamsa (D9) with heading — keep heading and chart on same page
-    d9_elements = []
-    d9_elements.append(Paragraph("<b>Navamsa (D9)</b>", styles['SubsectionTitle']))
-    d9_elements.append(_render_chart_from_svg(data.chart_images.d9_navamsa, "D9"))
-    d9_elements.append(Spacer(1, 0.3*inch))
-    elements.append(KeepTogether(d9_elements))
-    
+    if include_technical_appendix:
+        # Navamsa (D9) with heading — keep heading and chart on same page
+        d9_elements = []
+        d9_elements.append(Paragraph("<b>Navamsa (D9)</b>", styles['SubsectionTitle']))
+        d9_elements.append(_render_chart_from_svg(data.chart_images.d9_navamsa, "D9"))
+        d9_elements.append(Spacer(1, 0.3*inch))
+        elements.append(KeepTogether(d9_elements))
+
     elements.append(Paragraph("Birth Reference", styles['SubsectionTitle']))
     
     ref = data.birth_reference
@@ -2745,14 +2762,25 @@ def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
     return buffer.read()
 
 
-def render_pdf(data: CanonicalReportData) -> bytes:
+def render_pdf(data: CanonicalReportData, include_technical_appendix: bool = True) -> bytes:
     """
     Render complete PDF from report data.
-    
+
+    Args:
+        include_technical_appendix: when False, omits the KP tables, cusp
+            tables, cuspal significators, prospects/Porutham section,
+            divisional charts beyond D1, yogas, sade sati, Shadbala,
+            Ashtakavarga, Upagrahas, astrological-context tables, and the
+            methodology appendix — everything the report's own "Technical
+            Appendix" divider describes. The D1 birth chart, the Birth
+            Reference table, and the narrative prediction content
+            (life areas, remedies, predictions, practices, closing)
+            always remain, in both modes.
+
     Returns PDF as bytes.
     """
     buffer = io.BytesIO()
-    
+
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
@@ -2761,9 +2789,9 @@ def render_pdf(data: CanonicalReportData) -> bytes:
         topMargin=MARGIN,
         bottomMargin=MARGIN,
     )
-    
+
     styles = _create_styles()
-    
+
     story = []
 
     story.extend(_build_cover_page(data, styles))
@@ -2781,37 +2809,43 @@ def render_pdf(data: CanonicalReportData) -> bytes:
         story.extend(_build_v4_key_takeaways(data, styles))
         story.extend(_build_v7_predicted_windows(data, styles))
 
-        # Technical appendix divider (v4 only)
-        story.extend(_build_appendix_divider(styles))
+        if include_technical_appendix:
+            # Technical appendix divider (v4 only)
+            story.extend(_build_appendix_divider(styles))
 
-        # Technical appendix — always rendered
-        story.extend(_build_natal_snapshot(data, styles))
-        story.extend(_build_kp_full_section(data, styles))
-        story.extend(_build_prospects_section(data, styles))
-        story.extend(_build_divisional_charts(data, styles))
-        story.extend(_build_yogas_section(data, styles))
-        story.extend(_build_sade_sati_section(data, styles))
-        story.extend(_build_shadbala_section(data, styles))
-        story.extend(_build_upagrahas_section(data, styles))
-        story.extend(_build_astrological_context(data, styles))
+        story.extend(_build_natal_snapshot(data, styles, include_technical_appendix))
+        if include_technical_appendix:
+            story.extend(_build_kp_full_section(data, styles))
+            story.extend(_build_prospects_section(data, styles))
+            story.extend(_build_divisional_charts(data, styles))
+            story.extend(_build_yogas_section(data, styles))
+            story.extend(_build_sade_sati_section(data, styles))
+            story.extend(_build_shadbala_section(data, styles))
+            story.extend(_build_upagrahas_section(data, styles))
+            story.extend(_build_astrological_context(data, styles))
+        # _build_predictions is narrative prediction content, not part of
+        # the technical appendix (Phase 2 will address its duplication
+        # with the front life-areas narrative separately) — always render.
         story.extend(_build_predictions(data, styles))
     else:
-        story.extend(_build_natal_snapshot(data, styles))
-        story.extend(_build_kp_full_section(data, styles))
-        story.extend(_build_prospects_section(data, styles))
-        story.extend(_build_divisional_charts(data, styles))
-        story.extend(_build_yogas_section(data, styles))
-        story.extend(_build_sade_sati_section(data, styles))
-        story.extend(_build_shadbala_section(data, styles))
-        story.extend(_build_upagrahas_section(data, styles))
-        story.extend(_build_astrological_context(data, styles))
+        story.extend(_build_natal_snapshot(data, styles, include_technical_appendix))
+        if include_technical_appendix:
+            story.extend(_build_kp_full_section(data, styles))
+            story.extend(_build_prospects_section(data, styles))
+            story.extend(_build_divisional_charts(data, styles))
+            story.extend(_build_yogas_section(data, styles))
+            story.extend(_build_sade_sati_section(data, styles))
+            story.extend(_build_shadbala_section(data, styles))
+            story.extend(_build_upagrahas_section(data, styles))
+            story.extend(_build_astrological_context(data, styles))
         story.extend(_build_predictions(data, styles))
         story.extend(_build_practices_reflection(data, styles))
         story.extend(_build_closing(data, styles))
 
-    story.extend(_build_methodology_appendix(data, styles))
+    if include_technical_appendix:
+        story.extend(_build_methodology_appendix(data, styles))
 
     doc.build(story)
-    
+
     buffer.seek(0)
     return buffer.read()

@@ -94,6 +94,7 @@ export default function PredictionScreen() {
   const isAdmin = user?.role === "admin";
   const [chatOpen, setChatOpen] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
+  const [includeTechnicalAppendix, setIncludeTechnicalAppendix] = useState(true);
 
   const now = new Date();
   const baseYear = now.getFullYear();
@@ -384,7 +385,7 @@ export default function PredictionScreen() {
               Download (only for monthly/yearly)
           -------------------------------------------------- */}
           {(period === "monthly" || period === "yearly") && !isDailyPeriod && (
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap items-center">
               <button
                 onClick={() => setChatOpen((v) => !v)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-sm font-medium"
@@ -392,6 +393,15 @@ export default function PredictionScreen() {
                 <MessageCircle className="w-4 h-4" />
                 {chatOpen ? "Close Chat" : "Ask Jyotishi"}
               </button>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+                <input
+                  type="checkbox"
+                  checked={includeTechnicalAppendix}
+                  onChange={(e) => setIncludeTechnicalAppendix(e.target.checked)}
+                  data-testid="checkbox-technical-appendix"
+                />
+                Include technical appendix
+              </label>
               <Button
                 variant="outline"
                 className="gap-2"
@@ -411,6 +421,7 @@ export default function PredictionScreen() {
                       base_chart_id: id,
                       report_type: period,
                       year: year.toString(),
+                      include_technical_appendix: includeTechnicalAppendix.toString(),
                     });
                     if (period === "monthly") {
                       params.append("month", index.toString());

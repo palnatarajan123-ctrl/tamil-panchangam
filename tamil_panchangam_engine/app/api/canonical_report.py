@@ -35,38 +35,49 @@ def generate_pdf_report(
     report_type: str = Query(..., description="Report type: 'monthly' or 'yearly'"),
     year: int = Query(..., description="Prediction year"),
     month: Optional[int] = Query(None, description="Prediction month (required for monthly)"),
+    include_technical_appendix: bool = Query(
+        True,
+        description=(
+            "When false, omits KP tables, divisional charts beyond D1, "
+            "yogas, sade sati, Shadbala, Ashtakavarga, Upagrahas, "
+            "prospects/Porutham, and the methodology appendix. The D1 "
+            "chart, Birth Reference table, and narrative predictions "
+            "always remain."
+        ),
+    ),
     user: dict = Depends(get_current_user),
 ):
     """
     Generate a canonical PDF report.
-    
+
     This is the ONLY endpoint for PDF generation.
-    
+
     The report reads ALL data from database/cache.
     It NEVER recalculates any astrological data.
-    
+
     Args:
         base_chart_id: Base chart UUID
         report_type: 'monthly' or 'yearly'
         year: Prediction year
         month: Prediction month (required for monthly reports)
-    
+        include_technical_appendix: whether to include the technical appendix
+
     Returns:
         PDF file as attachment
     """
-    
+
     if report_type == "monthly" and month is None:
         raise HTTPException(
             status_code=400,
             detail="Month is required for monthly reports"
         )
-    
+
     if report_type not in ("monthly", "yearly"):
         raise HTTPException(
             status_code=400,
             detail="report_type must be 'monthly' or 'yearly'"
         )
-    
+
     if month is not None and (month < 1 or month > 12):
         raise HTTPException(
             status_code=400,
@@ -85,6 +96,7 @@ def generate_pdf_report(
             report_type=report_type,
             year=year,
             month=month,
+            include_technical_appendix=include_technical_appendix,
         )
     except ReportBuildError as e:
         logger.error(f"Report build failed: {e}")
@@ -158,18 +170,19 @@ def preview_pdf_report(
     report_type: str = Query(..., description="Report type: 'monthly' or 'yearly'"),
     year: int = Query(..., description="Prediction year"),
     month: Optional[int] = Query(None, description="Prediction month (required for monthly)"),
+    include_technical_appendix: bool = Query(True, description="Whether to include the technical appendix"),
     user: dict = Depends(get_current_user),
 ):
     """
     Preview a PDF report inline (same as generate but displayed in browser).
     """
-    
+
     if report_type == "monthly" and month is None:
         raise HTTPException(
             status_code=400,
             detail="Month is required for monthly reports"
         )
-    
+
     if report_type not in ("monthly", "yearly"):
         raise HTTPException(
             status_code=400,
@@ -188,6 +201,7 @@ def preview_pdf_report(
             report_type=report_type,
             year=year,
             month=month,
+            include_technical_appendix=include_technical_appendix,
         )
     except ReportBuildError as e:
         raise HTTPException(status_code=404, detail=str(e))
