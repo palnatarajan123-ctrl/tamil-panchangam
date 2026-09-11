@@ -160,6 +160,27 @@ def _create_styles():
     return styles
 
 
+def _section_header(text: str, styles) -> List:
+    """Consistent top-level section header: the title plus a colored
+    accent rule beneath it. This is what makes a top-level section
+    (What This Period Means, Life Area Guidance, Technical Appendix
+    sections, etc.) visually unmistakable from a SubsectionTitle nested
+    within one (which has no rule) -- a reader flipping through the
+    document shouldn't have to read font size to tell them apart.
+    Every SectionTitle heading in the document should go through this
+    helper rather than a bare Paragraph call, so the treatment can't
+    drift per call site.
+    """
+    return [
+        Paragraph(text, styles['SectionTitle']),
+        HRFlowable(
+            width="100%", thickness=1.2,
+            color=colors.Color(*COLORS["accent"]),
+            spaceBefore=0, spaceAfter=14,
+        ),
+    ]
+
+
 def _split_sentences(text: str, per_group: int = 2) -> list:
     """Split text into groups of N sentences for paragraph-level readability."""
     sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z"\u2018\u201c])', text.strip())
@@ -231,7 +252,7 @@ def _build_how_to_read(styles) -> List:
     """Build 'How to Read This Report' section."""
     elements = []
     
-    elements.append(Paragraph("How to Read This Report", styles['SectionTitle']))
+    elements.extend(_section_header("How to Read This Report", styles))
     
     elements.append(Paragraph(
         "This report combines two types of information:",
@@ -322,7 +343,7 @@ def _build_natal_snapshot(
     """
     elements = []
 
-    elements.append(Paragraph("Natal Snapshot", styles['SectionTitle']))
+    elements.extend(_section_header("Natal Snapshot", styles))
 
     if include_technical_appendix:
         elements.append(Paragraph(
@@ -578,7 +599,7 @@ def _build_prospects_section(data: CanonicalReportData, styles) -> List:
         return []
 
     elements = []
-    elements.append(Paragraph("Compatibility Checks (Porutham)", styles['SectionTitle']))
+    elements.extend(_section_header("Compatibility Checks (Porutham)", styles))
     elements.append(Paragraph(
         "Tamil Jathagam Porutham (10-point Kuta compatibility matching) results "
         "for every candidate this chart has been checked against. Rajju, Vedha, "
@@ -599,7 +620,7 @@ def _build_kp_full_section(data: CanonicalReportData, styles) -> List:
         return []
 
     elements = []
-    elements.append(Paragraph("KP Sub-lord Analysis", styles['SectionTitle']))
+    elements.extend(_section_header("KP Sub-lord Analysis", styles))
     elements.append(Paragraph(
         "Krishnamurti Paddhati (KP) divides each nakshatra (13\u00b020') into nine "
         "sub-portions proportional to Vimshottari dasha periods. The sub-lord "
@@ -1137,7 +1158,7 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
     """Build astrological context section with dasha, transit, and timing tables."""
     elements = []
     
-    elements.append(Paragraph("Astrological Context", styles['SectionTitle']))
+    elements.extend(_section_header("Astrological Context", styles))
     
     elements.append(Paragraph(
         f"Current planetary influences for {data.period_label}:",
@@ -1357,7 +1378,7 @@ def _build_yogas_section(data: CanonicalReportData, styles) -> List:
     elements = []
 
     yoga_elements = []
-    yoga_elements.append(Paragraph("Detected Yogas", styles['SectionTitle']))
+    yoga_elements.extend(_section_header("Detected Yogas", styles))
 
     if not present_yogas:
         yoga_elements.append(Paragraph(
@@ -1460,7 +1481,7 @@ def _build_sade_sati_section(data: CanonicalReportData, styles) -> List:
     alert_level = ss_root.get("alert_level", "low")
 
     section_elements = []
-    section_elements.append(Paragraph("Sade Sati & Saturn Analysis", styles['SectionTitle']))
+    section_elements.extend(_section_header("Sade Sati & Saturn Analysis", styles))
 
     moon_sign_name = ss_root.get("moon_sign_name", "")
     saturn_sign_name = ss_root.get("current_saturn_sign_name", "")
@@ -1593,7 +1614,7 @@ def _build_shadbala_section(data: CanonicalReportData, styles) -> List:
     }
 
     section_elements = []
-    section_elements.append(Paragraph("Planetary Strength (Shadbala)", styles['SectionTitle']))
+    section_elements.extend(_section_header("Planetary Strength (Shadbala)", styles))
 
     # Summary line
     strongest = summary.get("strongest", "")
@@ -1722,7 +1743,7 @@ def _build_predictions(data: CanonicalReportData, styles, include_area_detail: b
     """
     elements = []
     
-    elements.append(Paragraph("Predictions", styles['SectionTitle']))
+    elements.extend(_section_header("Predictions", styles))
     
     if data.is_v3 and data.yearly_mantra:
         elements.append(Paragraph("Guiding Theme", styles['SubsectionTitle']))
@@ -1923,7 +1944,7 @@ def _build_practices_reflection(data: CanonicalReportData, styles) -> List:
     elements = []
     
     if data.is_v3 and data.veda_remedy:
-        elements.append(Paragraph("Veda Pariharam (Remedies)", styles['SectionTitle']))
+        elements.extend(_section_header("Veda Pariharam (Remedies)", styles))
         
         if data.veda_remedy.primary_remedy:
             elements.append(Paragraph(
@@ -1952,7 +1973,7 @@ def _build_practices_reflection(data: CanonicalReportData, styles) -> List:
         
         elements.append(Spacer(1, 0.3*inch))
     elif data.is_v2 and data.practices_v2:
-        elements.append(Paragraph("Practices & Reflection", styles['SectionTitle']))
+        elements.extend(_section_header("Practices & Reflection", styles))
         
         if data.practices_v2.daily_practice:
             elements.append(Paragraph(
@@ -1974,7 +1995,7 @@ def _build_practices_reflection(data: CanonicalReportData, styles) -> List:
         
         elements.append(Spacer(1, 0.3*inch))
     elif data.practices:
-        elements.append(Paragraph("Suggested Practices", styles['SectionTitle']))
+        elements.extend(_section_header("Suggested Practices", styles))
         for practice in data.practices:
             elements.append(Paragraph(f"• {practice}", styles['BodyText']))
         elements.append(Spacer(1, 0.3*inch))
@@ -1989,7 +2010,7 @@ def _build_closing(data: CanonicalReportData, styles) -> List:
     elements.append(PageBreak())
 
     if data.is_v3 and data.closing_v3:
-        elements.append(Paragraph("Key Takeaways", styles['SectionTitle']))
+        elements.extend(_section_header("Key Takeaways", styles))
         
         if data.closing_v3.key_takeaways:
             for takeaway in data.closing_v3.key_takeaways:
@@ -2000,7 +2021,7 @@ def _build_closing(data: CanonicalReportData, styles) -> List:
             for j, grp in enumerate(_split_sentences(data.closing_v3.encouragement)):
                 elements.append(Paragraph(f"<i>{grp}</i>", styles['BodyText']))
     elif data.is_v2 and data.closing_v2:
-        elements.append(Paragraph("Key Takeaways", styles['SectionTitle']))
+        elements.extend(_section_header("Key Takeaways", styles))
 
         if data.closing_v2.key_takeaways:
             for takeaway in data.closing_v2.key_takeaways:
@@ -2011,7 +2032,7 @@ def _build_closing(data: CanonicalReportData, styles) -> List:
             for j, grp in enumerate(_split_sentences(data.closing_v2.encouragement)):
                 elements.append(Paragraph(f"<i>{grp}</i>", styles['BodyText']))
     else:
-        elements.append(Paragraph("Closing Note", styles['SectionTitle']))
+        elements.extend(_section_header("Closing Note", styles))
 
         for j, grp in enumerate(_split_sentences(data.closing_note)):
             elements.append(Paragraph(f"<b>{grp}</b>" if j == 0 else grp, styles['BodyText']))
@@ -2050,7 +2071,7 @@ def _build_divisional_charts(data: CanonicalReportData, styles) -> List:
     if not (has_d2 or has_d7 or has_d10):
         return elements
     
-    elements.append(Paragraph("Tier-1 Divisional Charts", styles['SectionTitle']))
+    elements.extend(_section_header("Tier-1 Divisional Charts", styles))
     
     elements.append(Paragraph(
         "Divisional charts (Vargas) refine the birth chart analysis by examining "
@@ -2118,7 +2139,7 @@ def _build_methodology_appendix(data: CanonicalReportData, styles) -> List:
     if not data.methodology:
         return elements
     
-    elements.append(Paragraph("Appendix: Methodology", styles['SectionTitle']))
+    elements.extend(_section_header("Appendix: Methodology", styles))
     
     elements.append(Paragraph(
         "This section documents the calculation standards and methodology used in this report.",
@@ -2201,7 +2222,7 @@ def _build_v4_executive_summary(data: CanonicalReportData, styles) -> List:
     if not es:
         return elements
 
-    elements.append(Paragraph("What This Period Means For You", styles['SectionTitle']))
+    elements.extend(_section_header("What This Period Means For You", styles))
 
     if es.main_theme:
         elements.append(Paragraph(f"<b>{es.main_theme}</b>", styles['BodyText']))
@@ -2335,7 +2356,7 @@ def _build_v4_why_this_period(data: CanonicalReportData, styles) -> List:
     if not w:
         return elements
 
-    elements.append(Paragraph("Why This Period Feels This Way", styles['SubsectionTitle']))
+    elements.extend(_section_header("Why This Period Feels This Way", styles))
 
     if w.dasha_plain:
         elements.append(Paragraph("<b>Your Dasha (Life Chapter):</b>", styles['BodyText']))
@@ -2531,7 +2552,7 @@ def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
     if not data.v4_life_areas:
         return elements
 
-    elements.append(Paragraph("Life Area Guidance", styles['SectionTitle']))
+    elements.extend(_section_header("Life Area Guidance", styles))
     elements.append(Paragraph(
         "Plain-English guidance for each area of life this period. Each "
         "area shows a score, what to do, what to avoid, what you may "
@@ -2616,7 +2637,7 @@ def _build_v4_remedies(data: CanonicalReportData, styles) -> List:
     if not rem:
         return elements
 
-    elements.append(Paragraph("Remedies & Practices", styles['SubsectionTitle']))
+    elements.extend(_section_header("Remedies & Practices", styles))
 
     if rem.primary:
         elements.append(Paragraph(f"<b>Primary:</b> {rem.primary.name}", styles['BodyText']))
@@ -2661,7 +2682,7 @@ def _build_v4_key_takeaways(data: CanonicalReportData, styles) -> List:
     if not data.v4_key_takeaways:
         return elements
 
-    elements.append(Paragraph("Key Takeaways", styles['SectionTitle']))
+    elements.extend(_section_header("Key Takeaways", styles))
     for takeaway in data.v4_key_takeaways:
         elements.append(Paragraph(f"✓  {takeaway}", styles['BodyText']))
     elements.append(Spacer(1, 0.3*inch))
@@ -2685,7 +2706,7 @@ def _build_v7_predicted_windows(data: CanonicalReportData, styles) -> List:
     if not data.is_v7 or not data.v7_event_predictions:
         return elements
 
-    elements.append(Paragraph("Predicted Windows", styles['SectionTitle']))
+    elements.extend(_section_header("Predicted Windows", styles))
     elements.append(Paragraph(
         "Periods where multiple astrological signals converge — windows of heightened momentum or caution.",
         styles['BodyText']
@@ -2735,7 +2756,7 @@ def _build_upagrahas_section(data: CanonicalReportData, styles) -> List:
     if not gulika or not gulika.get("rasi"):
         return elements
 
-    elements.append(Paragraph("Shadow Points (Upagrahas)", styles['SubsectionTitle']))
+    elements.extend(_section_header("Shadow Points (Upagrahas)", styles))
     elements.append(Paragraph(
         "Gulika and Mandi are sensitive points in Tamil Jyotisha derived from Saturn's cycle. "
         "They indicate areas of persistent karmic weight — not obstacles to fear, but karma to work through.",
