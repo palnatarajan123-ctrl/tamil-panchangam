@@ -394,19 +394,7 @@ def _build_natal_snapshot(
             birth_table_data.append([role.title(), planet])
     
     table = Table(birth_table_data, colWidths=[2.5*inch, 3*inch])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.Color(0.95, 0.95, 0.95)),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-        ('FONTSIZE', (0, 1), (-1, -1), 10),
-        ('TOPPADDING', (0, 1), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-    ]))
+    table.setStyle(TableStyle(_data_table_style()))
     
     elements.append(table)
     elements.append(PageBreak())
@@ -414,22 +402,35 @@ def _build_natal_snapshot(
     return elements
 
 
-def _kp_table_style() -> list:
-    """Shared table style for all three KP tables."""
+def _data_table_style(align: str = 'LEFT', font_size: int = 10) -> list:
+    """Shared header/grid treatment for every plain data table in the
+    report: dark purple header row with bold white text, light gray
+    body background, muted grid lines. This is Birth Reference's
+    original table style (the report's first and best-established
+    table), extracted here so every other plain data table reuses it
+    instead of re-typing slightly different values per table -- which
+    is exactly how the Astrological Context tables and the Methodology
+    table quietly lost the header's bold weight, and how the Upagrahas
+    table ended up as a completely different dark theme.
+    """
     return [
         ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.Color(0.95, 0.95, 0.95)),
+        ('ALIGN', (0, 0), (-1, -1), align),
+        ('FONTSIZE', (0, 0), (-1, -1), font_size),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('TOPPADDING', (0, 1), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.Color(0.95, 0.95, 0.95)),
     ]
+
+
+def _kp_table_style() -> list:
+    """Shared table style for all three KP tables -- built on the same
+    base every plain data table in the report uses, just centered and
+    slightly smaller to fit these denser reference tables."""
+    return _data_table_style(align='CENTER', font_size=9)
 
 
 def _build_kp_sublords_section(data: CanonicalReportData, styles) -> List:
@@ -1183,15 +1184,7 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
         dasha_table.append(["Functional Malefics", ", ".join(dasha.functional_malefics)])
     
     table = Table(dasha_table, colWidths=[2*inch, 3.5*inch])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
+    table.setStyle(TableStyle(_data_table_style()))
     dasha_elements.append(table)
     elements.append(KeepTogether(dasha_elements))
     
@@ -1210,14 +1203,7 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
     ]
     
     table = Table(transit_table, colWidths=[2*inch, 3.5*inch])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
+    table.setStyle(TableStyle(_data_table_style()))
     transit_elements.append(table)
     elements.append(KeepTogether(transit_elements))
     
@@ -1237,14 +1223,7 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
     ]
     
     table = Table(timing_table, colWidths=[2*inch, 3.5*inch])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
+    table.setStyle(TableStyle(_data_table_style()))
     timing_elements.append(table)
     elements.append(KeepTogether(timing_elements))
 
@@ -1265,14 +1244,7 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
     ]
     
     table = Table(pakshi_table, colWidths=[2*inch, 3.5*inch])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
+    table.setStyle(TableStyle(_data_table_style()))
     pakshi_elements.append(table)
     elements.append(KeepTogether(pakshi_elements))
     
@@ -2160,15 +2132,7 @@ def _build_methodology_appendix(data: CanonicalReportData, styles) -> List:
     ]
     
     table = Table(method_table, colWidths=[2.5*inch, 3*inch])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
+    table.setStyle(TableStyle(_data_table_style()))
     elements.append(table)
     
     elements.append(Spacer(1, 0.3*inch))
@@ -2773,18 +2737,7 @@ def _build_upagrahas_section(data: CanonicalReportData, styles) -> List:
     ])
 
     t = Table(rows, colWidths=[130, 80, 80, 180])
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.1, 0.06, 0.2)),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.Color(0.07, 0.05, 0.12), colors.Color(0.1, 0.07, 0.16)]),
-        ("TEXTCOLOR", (0, 1), (-1, -1), colors.lightgrey),
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.Color(0.3, 0.2, 0.5)),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("LEFTPADDING", (0, 0), (-1, -1), 8),
-    ]))
+    t.setStyle(TableStyle(_data_table_style(align='LEFT', font_size=9)))
     elements.append(t)
     elements.append(Spacer(1, 0.2*inch))
     return elements
