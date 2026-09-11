@@ -2313,6 +2313,49 @@ def _build_v4_executive_summary(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+_ICON_ROW_GREEN = dict(
+    icon_color=colors.Color(0.15, 0.55, 0.25),
+    bg_color=colors.Color(0.93, 0.98, 0.93),
+    line_color=colors.Color(0.80, 0.92, 0.80),
+)
+_ICON_ROW_AMBER = dict(
+    icon_color=colors.Color(0.65, 0.40, 0.05),
+    bg_color=colors.Color(0.99, 0.96, 0.88),
+    line_color=colors.Color(0.92, 0.82, 0.70),
+)
+
+
+def _build_icon_row(icon: str, text: str, styles, palette: dict) -> Table:
+    """One icon + colored-background row -- the shared visual treatment
+    for action-oriented, scannable content. Originally WORKING FOR YOU/
+    WATCH OUT FOR's own ad hoc pattern; extracted here so Remedies &
+    Practices, Caution Windows, and Key Takeaways can share the exact
+    same treatment instead of each inventing its own format (Phase 3
+    item 4). `palette` is _ICON_ROW_GREEN or _ICON_ROW_AMBER.
+    """
+    row = Table(
+        [[
+            Paragraph(icon, ParagraphStyle(
+                'IconGlyph', parent=styles['Normal'],
+                fontSize=12, fontName='Helvetica-Bold',
+                textColor=palette['icon_color'],
+            )),
+            Paragraph(text, styles['BodyText']),
+        ]],
+        colWidths=[0.3*inch, 5.2*inch]
+    )
+    row.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), palette['bg_color']),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LINEBELOW', (0, 0), (-1, 0), 0.3, palette['line_color']),
+    ]))
+    return row
+
+
 def _build_v4_why_this_period(data: CanonicalReportData, styles) -> List:
     """Build v4 'why this period' plain-English explanation."""
     elements = []
@@ -2353,63 +2396,13 @@ def _build_v4_why_this_period(data: CanonicalReportData, styles) -> List:
         elements.append(Spacer(1, 0.1*inch))
         elements.append(Paragraph("WORKING FOR YOU", styles['V4SectionLabel']))
         for item in w.supportive:
-            item_table = Table(
-                [[
-                    Paragraph(
-                        "+",
-                        ParagraphStyle(
-                            'SupportIcon',
-                            parent=styles['Normal'],
-                            fontSize=12,
-                            fontName='Helvetica-Bold',
-                            textColor=colors.Color(0.15, 0.55, 0.25),
-                        )
-                    ),
-                    Paragraph(item, styles['BodyText']),
-                ]],
-                colWidths=[0.3*inch, 5.2*inch]
-            )
-            item_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.93, 0.98, 0.93)),
-                ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-                ('TOPPADDING', (0, 0), (-1, -1), 5),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LINEBELOW', (0, 0), (-1, 0), 0.3, colors.Color(0.80, 0.92, 0.80)),
-            ]))
-            elements.append(item_table)
+            elements.append(_build_icon_row("+", item, styles, _ICON_ROW_GREEN))
 
     if w.watchouts:
         elements.append(Spacer(1, 0.1*inch))
         elements.append(Paragraph("WATCH OUT FOR", styles['V4SectionLabel']))
         for item in w.watchouts:
-            item_table = Table(
-                [[
-                    Paragraph(
-                        "!",
-                        ParagraphStyle(
-                            'WatchIcon',
-                            parent=styles['Normal'],
-                            fontSize=12,
-                            fontName='Helvetica-Bold',
-                            textColor=colors.Color(0.65, 0.40, 0.05),
-                        )
-                    ),
-                    Paragraph(item, styles['BodyText']),
-                ]],
-                colWidths=[0.3*inch, 5.2*inch]
-            )
-            item_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.99, 0.96, 0.88)),
-                ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-                ('TOPPADDING', (0, 0), (-1, -1), 5),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LINEBELOW', (0, 0), (-1, 0), 0.3, colors.Color(0.92, 0.82, 0.70)),
-            ]))
-            elements.append(item_table)
+            elements.append(_build_icon_row("!", item, styles, _ICON_ROW_AMBER))
 
     elements.append(Spacer(1, 0.3*inch))
     return elements
@@ -2604,37 +2597,32 @@ def _build_v4_remedies(data: CanonicalReportData, styles) -> List:
     elements.extend(_section_header("Remedies & Practices", styles))
 
     if rem.primary:
-        elements.append(Paragraph(f"<b>Primary:</b> {rem.primary.name}", styles['BodyText']))
+        primary_lines = [f"<b>{rem.primary.name}</b>"]
         if rem.primary.simple_practice:
-            elements.append(Paragraph(
-                f"<i>Practice: {rem.primary.simple_practice}</i>",
-                styles['BodyText']
-            ))
+            primary_lines.append(f"<i>{rem.primary.simple_practice}</i>")
         if rem.primary.why:
-            elements.append(Paragraph(
-                f"<font color='gray' size='9'>{rem.primary.why}</font>",
-                styles['BodyText']
-            ))
-        elements.append(Spacer(1, 0.1*inch))
+            primary_lines.append(f"<font color='gray' size='9'>{rem.primary.why}</font>")
+        elements.append(_build_icon_row("✓", "<br/>".join(primary_lines), styles, _ICON_ROW_GREEN))
+        elements.append(Spacer(1, 0.08*inch))
 
     for sup in rem.supporting:
-        elements.append(Paragraph(f"• <b>{sup.name}</b>", styles['BodyText']))
+        sup_lines = [f"<b>{sup.name}</b>"]
         if sup.simple_practice:
-            elements.append(Paragraph(
-                f"  <i>{sup.simple_practice}</i>",
-                styles['BodyText']
-            ))
+            sup_lines.append(f"<i>{sup.simple_practice}</i>")
+        elements.append(_build_icon_row("✓", "<br/>".join(sup_lines), styles, _ICON_ROW_GREEN))
+        elements.append(Spacer(1, 0.04*inch))
 
     if data.v4_caution_windows:
-        elements.append(Spacer(1, 0.2*inch))
+        elements.append(Spacer(1, 0.15*inch))
         elements.append(Paragraph("Caution Windows", styles['SubsectionTitle']))
         for cw in data.v4_caution_windows:
-            cw_parts = [f"<b>{cw.period}</b>"]
+            cw_lines = [f"<b>{cw.period}</b>"]
             if cw.concern:
-                cw_parts.append(cw.concern)
+                cw_lines.append(cw.concern)
             if cw.action:
-                cw_parts.append(f"<i>{cw.action}</i>")
-            elements.append(Paragraph(" — ".join(cw_parts), styles['BodyText']))
+                cw_lines.append(f"<i>{cw.action}</i>")
+            elements.append(_build_icon_row("!", "<br/>".join(cw_lines), styles, _ICON_ROW_AMBER))
+            elements.append(Spacer(1, 0.04*inch))
 
     elements.append(Spacer(1, 0.2*inch))
     return elements
@@ -2648,8 +2636,9 @@ def _build_v4_key_takeaways(data: CanonicalReportData, styles) -> List:
 
     elements.extend(_section_header("Key Takeaways", styles))
     for takeaway in data.v4_key_takeaways:
-        elements.append(Paragraph(f"✓  {takeaway}", styles['BodyText']))
-    elements.append(Spacer(1, 0.3*inch))
+        elements.append(_build_icon_row("✓", takeaway, styles, _ICON_ROW_GREEN))
+        elements.append(Spacer(1, 0.04*inch))
+    elements.append(Spacer(1, 0.25*inch))
 
     if data.llm_enhanced:
         elements.append(Paragraph(
