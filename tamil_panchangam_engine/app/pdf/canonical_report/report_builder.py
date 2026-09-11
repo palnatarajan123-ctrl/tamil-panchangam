@@ -86,9 +86,17 @@ def build_canonical_report(
     return pdf_bytes
 
 
-def build_birth_chart_report(base_chart_id: str) -> bytes:
+def build_birth_chart_report(base_chart_id: str, include_technical_appendix: bool = True) -> bytes:
     """
     Build a birth-chart-only PDF (no prediction required).
+
+    Args:
+        base_chart_id: The base chart UUID
+        include_technical_appendix: when False, strips KP/prospects/
+            astrological-context/divisional/yogas/sade-sati/Shadbala/
+            methodology content, keeping only the D1 chart, Birth
+            Reference table, and the narrative interpretation section.
+            See render_birth_chart_pdf() for the exact boundary.
 
     Returns:
         PDF bytes
@@ -107,7 +115,7 @@ def build_birth_chart_report(base_chart_id: str) -> bytes:
         raise ReportBuildError(f"Failed to load birth chart data: {e}")
 
     try:
-        pdf_bytes = render_birth_chart_pdf(report_data)
+        pdf_bytes = render_birth_chart_pdf(report_data, include_technical_appendix=include_technical_appendix)
     except Exception as e:
         logger.error(f"Failed to render birth chart PDF: {e}")
         raise ReportBuildError(f"Failed to render birth chart PDF: {e}")

@@ -172,6 +172,7 @@ function NatalSkeleton() {
 
 export function NatalInterpretationPanel({ chartId }: { chartId: string }) {
   const [downloading, setDownloading] = useState(false);
+  const [includeTechnicalAppendix, setIncludeTechnicalAppendix] = useState(true);
 
   async function downloadPdf() {
     setDownloading(true);
@@ -180,7 +181,11 @@ export function NatalInterpretationPanel({ chartId }: { chartId: string }) {
       // manual-token fetch) -- this endpoint also requires ownership now
       // (security fix, 2026-09-08), matching the natal-interpretation call
       // below which already used apiRequest correctly.
-      const res = await apiRequest("GET", `/api/reports/birth-chart-pdf?base_chart_id=${chartId}`);
+      const params = new URLSearchParams({
+        base_chart_id: chartId,
+        include_technical_appendix: includeTechnicalAppendix.toString(),
+      });
+      const res = await apiRequest("GET", `/api/reports/birth-chart-pdf?${params.toString()}`);
       if (!res.ok) throw new Error("Download failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -219,20 +224,31 @@ export function NatalInterpretationPanel({ chartId }: { chartId: string }) {
             </CardTitle>
             <CardDescription>Your lifelong astrological blueprint</CardDescription>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2 shrink-0"
-            onClick={downloadPdf}
-            disabled={downloading}
-            title="Download natal chart as PDF"
-          >
-            {downloading
-              ? <Loader2 className="h-4 w-4 animate-spin" />
-              : <Download className="h-4 w-4" />
-            }
-            <span className="hidden sm:inline">PDF</span>
-          </Button>
+          <div className="flex items-center gap-3 shrink-0">
+            <label className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={includeTechnicalAppendix}
+                onChange={(e) => setIncludeTechnicalAppendix(e.target.checked)}
+                data-testid="checkbox-technical-appendix"
+              />
+              Technical appendix
+            </label>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 shrink-0"
+              onClick={downloadPdf}
+              disabled={downloading}
+              title="Download natal chart as PDF"
+            >
+              {downloading
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Download className="h-4 w-4" />
+              }
+              <span className="hidden sm:inline">PDF</span>
+            </Button>
+          </div>
         </div>
       </CardHeader>
 

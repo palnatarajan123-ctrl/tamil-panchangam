@@ -39,6 +39,7 @@ export default function ProspectDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [convertError, setConvertError] = useState("");
   const [pdfDownloading, setPdfDownloading] = useState(false);
+  const [includeTechnicalAppendix, setIncludeTechnicalAppendix] = useState(true);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["/api/prospects", prospectId, "porutham"],
@@ -129,7 +130,7 @@ export default function ProspectDetail() {
           <p className="text-sm text-destructive mt-3">{convertError}</p>
         )}
 
-        <div className="flex flex-wrap gap-2 mt-4">
+        <div className="flex flex-wrap items-center gap-2 mt-4">
           <Button
             variant="outline"
             className="gap-2"
@@ -139,6 +140,15 @@ export default function ProspectDetail() {
             <MessageCircle className="h-4 w-4" />
             {chatOpen ? "Close Chat" : "Ask Jyotishi about this match"}
           </Button>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+            <input
+              type="checkbox"
+              checked={includeTechnicalAppendix}
+              onChange={(e) => setIncludeTechnicalAppendix(e.target.checked)}
+              data-testid="checkbox-technical-appendix"
+            />
+            Technical appendix
+          </label>
           <Button
             variant="outline"
             className="gap-2"
@@ -152,7 +162,11 @@ export default function ProspectDetail() {
               // PDF download already uses (Issue 1, 2026-09-11).
               setPdfDownloading(true);
               try {
-                const res = await apiRequest("GET", `/api/reports/birth-chart-pdf?base_chart_id=${chartId}`);
+                const params = new URLSearchParams({
+                  base_chart_id: chartId,
+                  include_technical_appendix: includeTechnicalAppendix.toString(),
+                });
+                const res = await apiRequest("GET", `/api/reports/birth-chart-pdf?${params.toString()}`);
                 const blob = await res.blob();
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");

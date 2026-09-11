@@ -125,6 +125,16 @@ def generate_pdf_report(
 def generate_birth_chart_pdf(
     request: Request,
     base_chart_id: str = Query(..., description="Base chart UUID"),
+    include_technical_appendix: bool = Query(
+        True,
+        description=(
+            "When false, omits KP tables, prospects/Porutham, "
+            "astrological-context tables, divisional charts beyond D1, "
+            "yogas, sade sati, Shadbala, and the methodology appendix. "
+            "The D1 chart, Birth Reference table, and narrative "
+            "interpretation always remain."
+        ),
+    ),
     user: dict = Depends(get_current_user),
 ):
     """
@@ -140,7 +150,10 @@ def generate_birth_chart_pdf(
             raise HTTPException(status_code=404, detail="Base chart not found")
 
     try:
-        pdf_bytes = build_birth_chart_report(base_chart_id=base_chart_id)
+        pdf_bytes = build_birth_chart_report(
+            base_chart_id=base_chart_id,
+            include_technical_appendix=include_technical_appendix,
+        )
     except ReportBuildError as e:
         logger.error(f"Birth chart PDF build failed: {e}")
         raise HTTPException(status_code=404, detail=str(e))

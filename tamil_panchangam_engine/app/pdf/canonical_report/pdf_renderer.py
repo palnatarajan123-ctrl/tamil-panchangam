@@ -2890,12 +2890,23 @@ def _build_appendix_divider(styles) -> List:
     return elements
 
 
-def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
+def render_birth_chart_pdf(data: CanonicalReportData, include_technical_appendix: bool = True) -> bytes:
     """
     Render a birth-chart-only PDF (no prediction sections).
 
     Sections: cover → natal snapshot → divisional charts →
               yogas → sade sati → shadbala → methodology.
+
+    Args:
+        include_technical_appendix: when False, omits the KP tables,
+            prospects/Porutham section, astrological-context tables,
+            divisional charts beyond D1, yogas, sade sati, Shadbala,
+            and the methodology appendix -- the same boundary
+            render_pdf() uses (see its docstring). The D1 birth chart,
+            the Birth Reference table, and the narrative interpretation
+            section (natal-v2 or legacy) always remain -- confirmed
+            self-contained (no reference into appendix content by name)
+            during the #2 inventory before this toggle was added.
     """
     buffer = io.BytesIO()
 
@@ -2925,15 +2936,16 @@ def render_birth_chart_pdf(data: CanonicalReportData) -> bytes:
                 _build_natal_interpretation_section(
                     data, styles))
     # Technical appendix
-    story.extend(_build_natal_snapshot(data, styles))
-    story.extend(_build_kp_full_section(data, styles))
-    story.extend(_build_prospects_section(data, styles))
-    story.extend(_build_astrological_context(data, styles))
-    story.extend(_build_divisional_charts(data, styles))
-    story.extend(_build_yogas_section(data, styles))
-    story.extend(_build_sade_sati_section(data, styles))
-    story.extend(_build_shadbala_section(data, styles))
-    story.extend(_build_methodology_appendix(data, styles))
+    story.extend(_build_natal_snapshot(data, styles, include_technical_appendix))
+    if include_technical_appendix:
+        story.extend(_build_kp_full_section(data, styles))
+        story.extend(_build_prospects_section(data, styles))
+        story.extend(_build_astrological_context(data, styles))
+        story.extend(_build_divisional_charts(data, styles))
+        story.extend(_build_yogas_section(data, styles))
+        story.extend(_build_sade_sati_section(data, styles))
+        story.extend(_build_shadbala_section(data, styles))
+        story.extend(_build_methodology_appendix(data, styles))
 
     doc.build(story)
 
