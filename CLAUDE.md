@@ -36,6 +36,20 @@ stale" and "confirmed real" looked like in practice):
   with an explicit night-specific table to break the tie. Affects 10 of
   24 charts (41.7%) — real blast radius, not a rare edge case. Needs an
   authoritative source (or a domain expert) before wiring anything in.
+- **`app/api/predictions_ui.py` is dead code** — its `router` (prefix
+  `/ui`) is never imported into `main.py`, so `POST /api/ui/predictions`
+  doesn't exist in the running app. Found during the 2026-09-10 auth
+  sweep test (backlog #2) while enumerating every mounted route. Not a
+  live gap (unreachable), just noting it here so it isn't mistaken for a
+  missing-auth finding by someone skimming `app/api/` later — either wire
+  it in or delete it, don't "fix" its auth in place believing it's live.
+- **`POST /api/auth/refresh` has no rate limit at all** — unlike
+  `/api/auth/google`'s `10/hour` (both are legitimately unauthenticated
+  by design; the body token is the credential — see backlog #2's sweep
+  test). Same bot-verification/budget-exposure bucket as Task 3's
+  register-Turnstile work; not a Turnstile candidate itself since refresh
+  is machine-driven, not human-driven, but worth a rate limit given a
+  stolen/guessed refresh token could otherwise be hammered without limit.
 
 **Considered and closed, not pending** (investigated with real data
 2026-08-14 — don't re-open without new evidence):
@@ -47,6 +61,18 @@ stale" and "confirmed real" looked like in practice):
   declined for cost (multiplies per-member, unbounded with family size,
   for the lowest-value case). Reaffirmed given the history-cap finding
   above showed no token headroom elsewhere to justify adding cost here.
+- "Login requires two submits" (was: Turnstile token not ready before
+  submit enabled) — investigated 2026-09-10, closed stale, not fixed.
+  The premise was wrong on both counts: the login screen isn't under
+  `client/src/screens/` (it's `client/src/pages/login.tsx`), and
+  Turnstile is wired into nothing in the login flow, client or server —
+  it only gates `base_chart.py`'s `/create` route. Full static trace
+  ruled out all three hypothesized mechanisms (Turnstile gate, silent
+  error-handling, stale closure); automated repro via curl, both locally
+  and against the live prod Vercel+Render stack, got a clean 200 on
+  attempt #1 every time, no delay, no lockout. Don't re-open on the
+  Turnstile hypothesis; if it resurfaces, check Render's cold-start
+  behavior (free-tier services spin down after ~15min idle) instead.
 
 ## Architecture notes (learned the hard way — read before assuming)
 
