@@ -31,20 +31,22 @@ logger = logging.getLogger(__name__)
 
 MAX_PROMPT_TOKENS = {
     "weekly": 1400,
-    # Issue 2 fix (2026-09-11): 2000 was stale -- MAX_TOTAL_TOKENS(8000) -
-    # MAX_COMPLETION_TOKENS(5000) already budgets 3000 real prompt tokens,
-    # but this explicit sub-cap hadn't been raised to match since the v7
-    # payload additions (yogas/KP/upagraha/shadbala context) grew the
-    # typical monthly payload. A real chart measured at 2001 estimated
-    # tokens (estimate_tokens() is a crude len//4 heuristic, not an exact
-    # tokenizer -- 2000 left ZERO margin for that imprecision) tripped
-    # validate_payload_size()'s "prompt_too_large" branch and silently
-    # fell back to the deterministic ai-interpretation-v1.0 result instead
-    # of ever calling the LLM -- no error, no visible failure, just a
-    # response that looked like a cache/version bug but wasn't. 2600
-    # leaves real margin under the 3000 ceiling the total-budget math
-    # already allows, instead of matching whatever the last chart that
-    # prompted a bump happened to need.
+    # Raised from 2000 -> 2600 (Issue 2 fix, 2026-09-11) after v7's context
+    # additions (yogas/KP/upagraha/shadbala/divisional signals) pushed a
+    # real chart's Monthly payload to 2001 estimated tokens, silently
+    # triggering validate_payload_size()'s "prompt_too_large" fallback --
+    # the LLM was never called, and a terse deterministic
+    # (ai-interpretation-v1.0) response came back with no visible error,
+    # no exception, nothing to signal it wasn't the real generated
+    # content. estimate_tokens() is a crude len//4 heuristic, not an exact
+    # tokenizer, so 2000 left zero margin for that imprecision. 2600
+    # leaves real margin under the 3000-token ceiling
+    # MAX_TOTAL_TOKENS(8000) - MAX_COMPLETION_TOKENS(5000) already allows.
+    # If a future prompt version adds more context, RE-MEASURE A REAL
+    # CHART'S payload size (see tests/llm/test_payload_size_validation.py)
+    # before assuming this margin still holds -- this went stale silently
+    # once already, via incremental bumps (900->1000->1200->1800->2000)
+    # that each chased the last failure instead of budgeting real margin.
     "monthly": 2600,
     "yearly": 2500
 }
