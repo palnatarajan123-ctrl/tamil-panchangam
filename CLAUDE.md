@@ -43,6 +43,16 @@ stale" and "confirmed real" looked like in practice):
   live gap (unreachable), just noting it here so it isn't mistaken for a
   missing-auth finding by someone skimming `app/api/` later — either wire
   it in or delete it, don't "fix" its auth in place believing it's live.
+- **`AuthContext.tsx`'s `googleLogin()` has zero callers anywhere in the
+  frontend** — dead code, found during the 2026-09-11 login-race
+  investigation (Task 1 reopened). Previously only noted in that fix's
+  commit message (`03aecfc`), not actually recorded here — fixed
+  2026-09-11. Would have the identical `navigate()`/`setUser()` race that
+  bug was about if it were ever wired up (it calls `setUser()` the same
+  way `login()`/`register()` do), so if someone adds a Google sign-in
+  button later, route it through the same effect-driven `GuestRoute`
+  pattern those two already use — don't add an imperative `navigate()`
+  next to it.
 - **`POST /api/auth/refresh` has no rate limit at all** — unlike
   `/api/auth/google`'s `10/hour` (both are legitimately unauthenticated
   by design; the body token is the credential — see backlog #2's sweep
