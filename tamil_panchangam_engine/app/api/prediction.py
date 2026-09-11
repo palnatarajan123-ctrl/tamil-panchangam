@@ -33,7 +33,11 @@ from app.engines.paraphrasing_engine import paraphrase_interpretation
 from app.engines.explainability_engine import build_explainability
 from app.engines.ai_interpretation_engine import generate_interpretation as generate_ai_interpretation
 from app.engines.explainability_filter import apply_explainability
-from app.engines.llm_interpretation_orchestrator import generate_llm_interpretation, is_llm_enabled
+from app.engines.llm_interpretation_orchestrator import (
+    generate_llm_interpretation,
+    is_llm_enabled,
+    PROMPT_VERSION_BY_WINDOW,
+)
 from app.engines.corner_case_detector import assess_calculation_confidence
 
 from app.core.auth import require_admin, get_current_user
@@ -492,6 +496,33 @@ def generate_monthly_prediction(
         
         interpretation["ai_interpretation"] = ai_interpretation
 
+        # Part A closing-pass fix (2026-09-11): when LLM is disabled,
+        # this branch previously left interpretation["llm_metadata"]
+        # (and "llm_interpretation") entirely UNSET on a fresh generation
+        # -- unlike a chart that had already gone through
+        # generate_llm_interpretation() at least once (which always tags
+        # fallback_reason="llm_disabled" explicitly). A brand-new
+        # chart+period generated for the first time while LLM was off
+        # returned 200 with real computed data but ZERO signal that AI
+        # commentary was ever attempted -- no banner could show, silently
+        # ambiguous, exactly the class of gap this whole follow-up was
+        # about. Found live during closing verification with billing
+        # restored, not caught earlier because every prior test of the
+        # disabled path reused an ALREADY-cache-hit row (which always had
+        # this key). Tagging it explicitly here, before persisting, so
+        # both a fresh generation AND any later re-fetch of this exact
+        # row see the same clear signal -- and so the cache-hit retry
+        # trigger above can find it and retry once an admin re-enables.
+        currently_enabled = is_llm_enabled()
+        if not currently_enabled:
+            interpretation["llm_metadata"] = {
+                "provider": "none",
+                "model": None,
+                "prompt_version": PROMPT_VERSION_BY_WINDOW.get("monthly", "v7"),
+                "fallback_reason": "llm_disabled",
+                "tokens_used": 0,
+            }
+
         # -------------------------------------------------
         # 8. Persist immediately (without LLM — will update in background)
         # -------------------------------------------------
@@ -511,7 +542,7 @@ def generate_monthly_prediction(
         # -------------------------------------------------
         # 7b. LLM Interpretation — run in background after response
         # -------------------------------------------------
-        if is_llm_enabled():
+        if currently_enabled:
             background_tasks.add_task(
                 _run_llm_background,
                 base_chart_id=payload.base_chart_id,

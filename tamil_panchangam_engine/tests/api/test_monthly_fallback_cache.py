@@ -269,5 +269,82 @@ class TestNoLlmCallWhileGloballyDisabled(unittest.TestCase):
             mock_call_llm.assert_not_called()
 
 
+class TestFreshGenerationWhileDisabledIsTaggedNotSilent(unittest.TestCase):
+    """Found live during the 2026-09-11 closing-pass verification (with
+    real Anthropic billing restored, testing the disabled-admin-toggle
+    path end to end for the first time against a genuinely NEW chart+
+    period): a brand-new chart+period generated for the FIRST time while
+    LLM was administratively off returned 200 with real computed data but
+    interpretation.llm_metadata entirely UNSET -- not even
+    fallback_reason="llm_disabled". Every earlier test of the disabled
+    path (this file, test_is_llm_enabled_consolidation.py) reused an
+    ALREADY-cache-hit row, which always has this key once
+    generate_llm_interpretation() has run on it at least once -- this
+    fresh-generation branch skips calling that function entirely when
+    disabled, so it never got tagged. No signal meant no banner could
+    show on the frontend -- silently ambiguous, exactly the class of gap
+    Part A was about, just in a code path not exercised by the fallback-
+    retry tests above. Also matters for the retry trigger itself: without
+    this tag, a later re-fetch of this same row wouldn't recognize it as
+    disabled-not-real either.
+    """
+
+    def setUp(self):
+        self.client = TestClient(app)
+        app.dependency_overrides[get_current_user] = lambda: TEST_USER
+
+    def tearDown(self):
+        app.dependency_overrides.pop(get_current_user, None)
+
+    def test_fresh_generation_while_disabled_tags_llm_disabled(self):
+        envelope = {
+            "dasha_context": {"maha_lord": "Mercury", "antar_lord": "Rahu"},
+            "calculation_confidence": {"level": "high", "cusp_cases": []},
+        }
+        synthesis = {"confidence": {"overall": 0.6, "variance": 0.0}, "life_areas": {}}
+        ai_interp = {"engine_version": "ai-interpretation-v1.0", "window_summary": {"momentum": "steady"}}
+        explainability_mock = MagicMock()
+        explainability_mock.model_dump.return_value = {}
+
+        with patch("app.api.prediction.get_base_chart_by_id", return_value=MINIMAL_CHART), \
+             patch("app.api.prediction.user_owns_chart", return_value=True), \
+             patch("app.api.prediction.get_monthly_prediction", return_value=None), \
+             patch("app.api.prediction.is_llm_enabled", return_value=False), \
+             patch("app.api.prediction.build_monthly_prediction_envelope", return_value=envelope), \
+             patch("app.api.prediction.synthesize_from_envelope", return_value=synthesis), \
+             patch("app.api.prediction.build_interpretation_from_synthesis",
+                   return_value={"interpretation": {}}), \
+             patch("app.api.prediction.generate_ai_interpretation", return_value=ai_interp), \
+             patch("app.api.prediction.paraphrase_interpretation", side_effect=lambda x: x), \
+             patch("app.api.prediction.apply_explainability", side_effect=lambda x, _: x), \
+             patch("app.api.prediction.assess_calculation_confidence",
+                   return_value={"level": "high", "cusp_cases": []}), \
+             patch("app.api.prediction.build_explainability", return_value=explainability_mock), \
+             patch("app.api.prediction.save_monthly_prediction") as mock_save, \
+             patch("app.api.prediction._run_llm_background") as mock_bg:
+            resp = self.client.post(
+                "/api/prediction/monthly",
+                json={"base_chart_id": "chart-1", "year": 2026, "month": 9},
+            )
+
+        self.assertEqual(resp.status_code, 200, resp.text)
+        body = resp.json()
+        self.assertIsNone(body["llm_status"])
+        interp = body["details"]["interpretation"]
+        self.assertEqual(interp["llm_metadata"]["fallback_reason"], "llm_disabled")
+        mock_bg.assert_not_called()
+
+        # The persisted row must ALSO carry this tag, not just the
+        # in-memory response -- otherwise a later re-fetch of this exact
+        # row (the cache-hit branch) would see no fallback_reason at all
+        # and neither show the paused banner nor recognize it as
+        # retry-eligible once re-enabled.
+        _, save_kwargs = mock_save.call_args
+        saved_interpretation = save_kwargs.get("interpretation")
+        self.assertEqual(
+            saved_interpretation["llm_metadata"]["fallback_reason"], "llm_disabled"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
