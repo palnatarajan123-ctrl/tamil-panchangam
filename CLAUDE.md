@@ -172,6 +172,40 @@ stale" and "confirmed real" looked like in practice):
   200" test, not just the rejection-path coverage from the original auth
   sweep. Don't build this — it's a breadth-check across the whole API,
   not a quick add.
+- **`life_area_scorer.py`'s `top_signals` silently excludes every
+  yoga/dasha-activation/Ashtakavarga signal from a life area's scoring
+  breakdown** — found 2026-09-11 while investigating (and fixing, see
+  `_momentum_from_score` in `ai_interpretation_engine.py`) the front/back
+  Overview-contradiction bug. `LifeAreaScorer.score_one()` computes each
+  signal's contribution as `(house_w + planet_w) * strength * src_bias *
+  val_mult`, then only appends it to `contributions`/`top_signals` `if
+  abs(raw) > 0`. Yoga (`YOGA_DHANA`, `YOGA_RAJA`), Ashtakavarga
+  (`ASHTAKAVARGA_STRONG_SUPPORT`), and Yogakaraka-activation signals
+  carry no `house`/`planet` field in their raw dict, so `house_w` and
+  `planet_w` are both `0.0` regardless of the signal's real `strength` —
+  `raw` is always exactly `0`, so these signals can never enter
+  `top_signals` for ANY life area, no matter how strong. Confirmed via a
+  real trace (4 charts, avg scores 57-77): `top_signals` for every area
+  on every chart tested contained only Drishti/Gochara/house-affliction
+  signals — never a yoga or dasha-activation signal, even when those
+  were the dominant contributors to a high `base_score_0_100`. This
+  fix only changed how the deterministic Overview text READS
+  `top_signals` (switched to reading the final weighted `score`
+  instead) — it did NOT touch `top_signals`' own population logic, so
+  anything else that consumes `top_signals` (e.g. the "Signals" list
+  shown in the legacy per-area PDF breakdown, `_get_relevant_signals_for_area`)
+  still only ever shows house/planet-tagged signals, silently omitting
+  yoga/dasha ones from that display too — same root cause, different
+  visible symptom, not investigated further here. Also noticed but not
+  chased: for the one chart traced in detail, `top_signals` came out
+  IDENTICAL across all 5 life areas (same 6 signals, same order) despite
+  each area having a different house/benefic weighting config in
+  `LIFE_AREA_WEIGHTS` — expected if those specific signals happen to
+  outrank everything else for every area's weighting, but not verified
+  either way. Needs its own investigation — bigger blast radius than the
+  Overview fix (affects score deltas, not just narrative text, and
+  potentially the "Signals" display across all three prediction periods)
+  — deliberately scoped out of the Overview fix.
 
 ## 2026-09-11 regression investigation retrospective (Issue 4)
 

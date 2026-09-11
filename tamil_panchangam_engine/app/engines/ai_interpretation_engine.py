@@ -156,21 +156,30 @@ HOUSE_THEMES = {
 }
 
 
-def _determine_momentum(signals: List[Dict], life_area_scores: Dict) -> str:
-    """Determine overall momentum from signals."""
-    pos_count = sum(1 for s in signals if s.get("valence") == "pos")
-    neg_count = sum(1 for s in signals if s.get("valence") == "neg")
-    
-    avg_score = sum(la["score"] for la in life_area_scores.values()) / len(life_area_scores) if life_area_scores else 50
-    
-    if pos_count > neg_count + 2 and avg_score > 60:
+def _momentum_from_score(avg_score: float) -> str:
+    """Classify overall period momentum from the average per-area
+    weighted score -- the same score values shown in the life-area
+    labels and fed to the v4-v7 LLM prompt (payload_builder.py's
+    extract_payload_inputs).
+
+    This replaced a pos/neg signal-COUNT classifier (_determine_momentum,
+    removed) that was found to contradict this score on every real
+    chart tested (avg scores 57-77, all "pressure"): it counted valence
+    tags from top_signals, which structurally excludes yoga/dasha-
+    activation signals -- they carry no house/planet field, so
+    life_area_scorer.py gives them zero weight and they never enter the
+    pool -- leaving only the numerous Drishti/house-affliction checks to
+    decide the count. Deriving momentum from the same score the life
+    areas and front narrative already use means the two can't
+    contradict each other by construction. See the 2026-09-11
+    front/back Overview-contradiction investigation for the full trace.
+    """
+    if avg_score >= 65:
         return "growth"
-    elif neg_count > pos_count + 2 or avg_score < 45:
-        return "pressure"
-    elif abs(pos_count - neg_count) <= 1:
+    elif avg_score >= 45:
         return "consolidation"
     else:
-        return "transition"
+        return "pressure"
 
 
 def _normalize_signals(raw_signals: List[Dict]) -> List[Dict]:
@@ -268,17 +277,15 @@ def _get_dominant_forces(envelope: Dict, signals: List[Dict]) -> List[Dict]:
     return forces[:3]
 
 
-def _determine_outcome_mode(signals: List[Dict], momentum: str) -> str:
-    """Determine how outcomes manifest: ease, effort, or delay."""
-    saturn_signals = [s for s in signals if "Saturn" in s.get("key", "") or s.get("planet") == "Saturn"]
-    jupiter_signals = [s for s in signals if "Jupiter" in s.get("key", "") or s.get("planet") == "Jupiter"]
-    
-    if momentum == "growth" and len(jupiter_signals) > len(saturn_signals):
-        return "ease"
-    elif momentum == "pressure" or len(saturn_signals) > 2:
-        return "delay"
-    else:
-        return "effort"
+def _determine_outcome_mode(momentum: str) -> str:
+    """Map the score-derived momentum band to how outcomes manifest.
+
+    Previously counted Saturn vs. Jupiter signals from the same
+    top_signals pool _determine_momentum used -- same defective input
+    (see _momentum_from_score's docstring), so it's fixed the same way:
+    derived from momentum instead of re-deriving from raw signal counts.
+    """
+    return {"growth": "ease", "pressure": "delay"}.get(momentum, "effort")
 
 
 def _generate_window_summary(
@@ -290,13 +297,18 @@ def _generate_window_summary(
 ) -> Dict[str, Any]:
     """Generate Level 1: Window Summary."""
     life_areas = synthesis.get("life_areas", {})
-    
-    momentum = _determine_momentum(signals, life_areas)
+    avg_score = (
+        sum(la.get("score", 50) for la in life_areas.values()) / len(life_areas)
+        if life_areas else 50
+    )
+
+    momentum = _momentum_from_score(avg_score)
     dominant_forces = _get_dominant_forces(envelope, signals)
-    outcome_mode = _determine_outcome_mode(signals, momentum)
+    outcome_mode = _determine_outcome_mode(momentum)
     
     momentum_phrase = random.choice(MOMENTUM_TYPES.get(momentum, ["transitional period"]))
-    
+    momentum_article = "an" if momentum_phrase[:1].lower() in "aeiou" else "a"
+
     force_descriptions = [f.get("description", "") for f in dominant_forces if f.get("description")]
     forces_text = " and ".join(force_descriptions[:2]) if force_descriptions else "mixed planetary influences"
     
@@ -314,7 +326,7 @@ def _generate_window_summary(
     elif timing_summary.get("challenging_periods", 0) > timing_summary.get("supportive_periods", 0):
         timing_note = "Timing windows suggest caution in the middle portion of this period."
     
-    overview = f"This period marks a {momentum_phrase}, shaped primarily by {forces_text}. {outcome_phrases.get(outcome_mode, '')} {timing_note}".strip()
+    overview = f"This period marks {momentum_article} {momentum_phrase}, shaped primarily by {forces_text}. {outcome_phrases.get(outcome_mode, '')} {timing_note}".strip()
     
     return {
         "momentum": momentum,
