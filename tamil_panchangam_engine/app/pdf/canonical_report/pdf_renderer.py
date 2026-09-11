@@ -1225,6 +1225,20 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
     table = Table(timing_table, colWidths=[2*inch, 3.5*inch])
     table.setStyle(TableStyle(_data_table_style()))
     timing_elements.append(table)
+
+    # Soften classically alarming-sounding Tara names (Vipat/Pratyak/
+    # Naidhana -- nakshatra_engine.py's own three "challenging" Taras)
+    # the same way Upagrahas gives Gulika/Mandi a plain-language gloss
+    # instead of leaving e.g. "Naidhana Tara - Death-like" bare in a table.
+    if any(name in timing.tara_bala for name in ("Vipat Tara", "Pratyak Tara", "Naidhana Tara")):
+        timing_elements.append(Spacer(1, 0.05*inch))
+        timing_elements.append(Paragraph(
+            "<font color='gray' size='9'><i>Tara Bala names describe timing rhythm, not fate — "
+            "a classically “challenging” Tara like this calls for a bit more care in "
+            "scheduling, not an omen to fear.</i></font>",
+            styles['BodyText']
+        ))
+
     elements.append(KeepTogether(timing_elements))
 
     elements.append(Spacer(1, 0.3*inch))
@@ -1433,6 +1447,16 @@ def _build_yogas_section(data: CanonicalReportData, styles) -> List:
 
         table.setStyle(TableStyle(style_cmds))
         grp_elements.append(table)
+
+        if is_challenging:
+            grp_elements.append(Spacer(1, 0.05 * inch))
+            grp_elements.append(Paragraph(
+                "<font color='gray' size='9'><i>Classical texts group these together as "
+                "requiring extra awareness, not as a verdict — every chart carries a mix of "
+                "supportive and challenging yogas.</i></font>",
+                styles['BodyText']
+            ))
+
         grp_elements.append(Spacer(1, 0.2 * inch))
         elements.append(KeepTogether(grp_elements))
 
@@ -1465,6 +1489,19 @@ def _build_sade_sati_section(data: CanonicalReportData, styles) -> List:
         context_line += f" (H{house_from_moon} from Moon)"
     section_elements.append(Paragraph(context_line, styles['BodyText']))
     section_elements.append(Spacer(1, 0.15 * inch))
+
+    # Sade Sati / Ashtama Shani / Kantaka Shani are classically heavy-
+    # sounding Saturn transit names -- give them the same gentle framing
+    # Upagrahas gives Gulika/Mandi, instead of leaving "Ashtama Shani
+    # Active" etc. as a bare, unglossed heading.
+    if ss.get("active") or ashtama.get("active") or kantaka.get("active"):
+        section_elements.append(Paragraph(
+            "<font color='gray' size='9'><i>These are classical Saturn timing patterns, not "
+            "predictions of misfortune — they call for mindful attention during the noted "
+            "windows, not fear.</i></font>",
+            styles['BodyText']
+        ))
+        section_elements.append(Spacer(1, 0.15 * inch))
 
     # Status
     if alert_level == "low" and not ss.get("active") and not ashtama.get("active"):
