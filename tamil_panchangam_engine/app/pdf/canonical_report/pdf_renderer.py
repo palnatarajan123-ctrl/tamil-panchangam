@@ -1685,13 +1685,26 @@ def _score_to_label(score: int) -> str:
 
 
 def _score_to_color(score: int):
-    """Convert score to color for visual indicator."""
-    if score >= 65:
-        return colors.Color(0.2, 0.6, 0.3)
+    """Convert score to a color for visual indicators (gauges, badges).
+
+    Six bands matching _score_to_label's thresholds exactly (75/65/55/
+    45/35), so a given score's color and text label always agree on
+    where the boundary falls -- not a coarser 2-3 color split that
+    would put e.g. "Mildly Supportive" and "Neutral" in the same color
+    despite being different labels.
+    """
+    if score >= 75:
+        return colors.Color(0.13, 0.50, 0.24)   # Strong Support -- deep green
+    elif score >= 65:
+        return colors.Color(0.35, 0.60, 0.30)   # Favorable -- green
+    elif score >= 55:
+        return colors.Color(0.58, 0.58, 0.18)   # Mildly Supportive -- olive
     elif score >= 45:
-        return colors.Color(0.6, 0.5, 0.2)
+        return colors.Color(0.75, 0.55, 0.15)   # Neutral -- amber
+    elif score >= 35:
+        return colors.Color(0.80, 0.42, 0.15)   # Watchful -- orange
     else:
-        return colors.Color(0.7, 0.3, 0.3)
+        return colors.Color(0.72, 0.25, 0.25)   # Challenging -- red
 
 
 def _build_predictions(data: CanonicalReportData, styles, include_area_detail: bool = True) -> List:
@@ -2476,32 +2489,38 @@ def _build_v4_area_why_note(area, pred_area) -> str:
     return text if text.endswith('.') else text + '.'
 
 
-def _build_v4_area_score_badge(pred_area, styles) -> Table:
-    """Simple colored score badge -- a visual indicator in place of the
-    old plain-text "79/100 | Strong Support" line. Deliberately basic;
-    Phase 3's full visual pass will turn this into a proper gauge/bar
-    consistent with the executive-summary cards' palette."""
-    badge = Table(
-        [[Paragraph(
-            f"{pred_area.score}/100  |  {_score_to_label(pred_area.score)}",
-            ParagraphStyle(
-                'AreaScoreBadge',
-                parent=styles['Normal'],
-                fontName='Helvetica-Bold',
-                fontSize=10,
-                textColor=colors.white,
-                alignment=TA_CENTER,
-            )
-        )]],
-        colWidths=[2.6*inch]
-    )
-    badge.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), _score_to_color(pred_area.score)),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+def _build_v4_area_score_gauge(pred_area, styles) -> List:
+    """Horizontal score gauge: a colored bar filled proportionally to
+    the score (0-100), banded to match _score_to_label's six strength
+    labels exactly, with a caption underneath. Replaces Phase 2's flat
+    colored badge -- that was a deliberate stopgap, this is the real
+    visual treatment."""
+    score = max(0, min(100, pred_area.score))
+    color = _score_to_color(score)
+    track_color = colors.Color(0.90, 0.90, 0.90)
+
+    gauge_width = 4.3 * inch
+    fill_w = max(6, gauge_width * (score / 100.0))
+    empty_w = max(0.01, gauge_width - fill_w)
+
+    bar = Table([["", ""]], colWidths=[fill_w, empty_w], rowHeights=[9])
+    bar.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), color),
+        ('BACKGROUND', (1, 0), (1, 0), track_color),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
     ]))
-    return badge
+
+    caption = Paragraph(
+        f"<b>{score}/100</b> &nbsp;&middot;&nbsp; {_score_to_label(score)}",
+        ParagraphStyle(
+            'GaugeCaption', parent=styles['Normal'],
+            fontSize=10, fontName='Helvetica-Bold', textColor=color,
+        )
+    )
+    return [bar, Spacer(1, 0.05*inch), caption]
 
 
 def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
@@ -2545,7 +2564,7 @@ def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
         )]
         if pred_area:
             header_elements.append(Spacer(1, 0.05*inch))
-            header_elements.append(_build_v4_area_score_badge(pred_area, styles))
+            header_elements.extend(_build_v4_area_score_gauge(pred_area, styles))
         header_elements.append(Spacer(1, 0.1*inch))
         if area.plain_english:
             header_elements.append(Paragraph(area.plain_english, styles['BodyText']))
