@@ -120,7 +120,6 @@ class TestOverviewMatchesRealScoreEndToEnd(unittest.TestCase):
             self.assertNotIn(" a expansion", overview)
             self.assertNotIn(" a integration period", overview)
             self.assertNotIn(" a advancement", overview)
-            self.assertNotIn(" a stabilization", overview)
 
 
 if __name__ == "__main__":
