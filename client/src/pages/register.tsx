@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
+import { Turnstile } from "@marsidev/react-turnstile";
+import { TURNSTILE_SITE_KEY } from "@/lib/turnstile";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +17,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,7 +28,7 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await register(email, password, name);
+      await register(email, password, name, turnstileToken);
       navigate("/");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -88,7 +91,16 @@ export default function Register() {
               <p className="text-sm text-destructive">{error}</p>
             )}
 
-            <Button type="submit" className="w-full gap-2" disabled={loading}>
+            <div className="flex justify-center">
+              <Turnstile
+                siteKey={TURNSTILE_SITE_KEY}
+                onSuccess={(token) => setTurnstileToken(token)}
+                onExpire={() => setTurnstileToken(null)}
+                onError={() => setTurnstileToken(null)}
+              />
+            </div>
+
+            <Button type="submit" className="w-full gap-2" disabled={loading || !turnstileToken}>
               <UserPlus className="h-4 w-4" />
               {loading ? "Creating account…" : "Create account"}
             </Button>

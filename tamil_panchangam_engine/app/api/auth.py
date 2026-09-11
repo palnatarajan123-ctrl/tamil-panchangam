@@ -24,6 +24,7 @@ from app.core.auth import (
     verify_password,
 )
 from app.core.limiter import limiter
+from app.core.turnstile import verify_turnstile
 from app.db.postgres import get_conn
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     name: str
+    turnstile_token: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -105,6 +107,20 @@ def _make_token_response(user_id: str, role: str, name: str, email: str,
 @limiter.limit("5/hour")
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(request: Request, body: RegisterRequest):
+    # Turnstile verification (security fix, 2026-09-10, backlog #1): the
+    # same check already required on base_chart.py's /create -- same
+    # DISABLE_TURNSTILE-gated bypass, same "missing token = reject"
+    # behavior, via the single shared verify_turnstile() implementation
+    # (no second copy of this logic). /register previously had only IP
+    # rate limiting, which doesn't stop a scripted client from minting
+    # accounts (each with its own fresh IP-limit budget), and a new
+    # account can immediately trigger paid LLM calls -- a budget-exposure
+    # risk, not just spam. Checked before the email-uniqueness lookup so
+    # a non-human caller can't even learn whether an email is taken.
+    if os.environ.get("DISABLE_TURNSTILE", "false").lower() != "true":
+        if not body.turnstile_token or not verify_turnstile(body.turnstile_token):
+            raise HTTPException(status_code=403, detail="CAPTCHA verification failed. Please try again.")
+
     with get_conn() as conn:
         existing = conn.execute(
             "SELECT id FROM users WHERE email = ?", [body.email.lower()]

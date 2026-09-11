@@ -4,12 +4,12 @@ import logging
 import hashlib
 import os
 import uuid
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime
 from typing import List, Optional
 from app.core.limiter import limiter
 from app.core.auth import get_current_user
+from app.core.turnstile import verify_turnstile
 
 logger = logging.getLogger(__name__)
 
@@ -85,35 +85,6 @@ from app.repositories.base_chart_repo import user_owns_chart
 
 
 router = APIRouter(prefix="/base-chart", tags=["Base Chart"])
-
-
-def _verify_turnstile(token: str) -> bool:
-    """Verify Cloudflare Turnstile token. Returns True if valid.
-
-    Security fix (2026-09-08): the previous bypass condition was
-    `os.getenv("RENDER") is None and os.getenv("VERCEL") is None`, which
-    silently skipped verification (returning True) for ANY deployment that
-    wasn't specifically flagged RENDER or VERCEL -- not just localhost. An
-    infra-detection heuristic is the wrong tool for a security gate; a
-    misconfigured or differently-hosted deployment could inherit an open
-    bypass with no one noticing. Replaced with an explicit opt-in flag
-    that must be deliberately set, and defaults to enforcing verification
-    everywhere else, including local dev unless a developer sets it.
-    """
-    import os
-    if os.getenv("DISABLE_TURNSTILE", "false").lower() == "true":
-        return True
-
-    secret = os.getenv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA")
-    try:
-        with httpx.Client(timeout=5.0) as client:
-            resp = client.post(
-                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-                data={"secret": secret, "response": token},
-            )
-            return resp.json().get("success", False)
-    except Exception:
-        return False
 
 
 def load_charts_from_db():
@@ -233,7 +204,7 @@ def create_base_chart(
     import os as _os
     if _os.getenv("DISABLE_TURNSTILE", "false").lower() != "true":
         token = payload.turnstile_token
-        if not token or not _verify_turnstile(token):
+        if not token or not verify_turnstile(token):
             raise HTTPException(status_code=403, detail="CAPTCHA verification failed. Please try again.")
 
     # -------------------------------------------------

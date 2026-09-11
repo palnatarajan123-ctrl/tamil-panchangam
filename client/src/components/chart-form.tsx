@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useState, useMemo } from "react";
 import { Turnstile } from "@marsidev/react-turnstile";
+import { TURNSTILE_SITE_KEY } from "@/lib/turnstile";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -254,8 +255,6 @@ interface ChartFormProps {
 /* -----------------------------------------------------
    Component
 ----------------------------------------------------- */
-
-const TURNSTILE_SITE_KEY = "0x4AAAAAACuBMk9QffkMSOPv"; // Cloudflare test key (always passes)
 
 export function ChartForm({ onSuccess }: ChartFormProps) {
   const { toast } = useToast();

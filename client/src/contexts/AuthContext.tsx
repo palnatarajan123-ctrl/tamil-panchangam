@@ -14,7 +14,7 @@ interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, name: string, turnstileToken: string | null) => Promise<void>;
   googleLogin: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -48,8 +48,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }
 
-  async function register(email: string, password: string, name: string) {
-    const res = await apiRequest("POST", "/api/auth/register", { email, password, name });
+  async function register(email: string, password: string, name: string, turnstileToken: string | null) {
+    const res = await apiRequest("POST", "/api/auth/register", {
+      email,
+      password,
+      name,
+      turnstile_token: turnstileToken,
+    });
     const data = await res.json();
     setTokens(data.access_token, data.refresh_token);
     setUser(data.user);
