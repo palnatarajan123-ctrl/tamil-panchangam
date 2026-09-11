@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { TURNSTILE_SITE_KEY } from "@/lib/turnstile";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,7 +11,6 @@ import { Sparkles, UserPlus } from "lucide-react";
 
 export default function Register() {
   const { register } = useAuth();
-  const [, navigate] = useLocation();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,7 +28,9 @@ export default function Register() {
     setLoading(true);
     try {
       await register(email, password, name, turnstileToken);
-      navigate("/");
+      // No navigate() here (Task 1 fix, 2026-09-11) -- same
+      // navigate/setUser race as login.tsx. GuestRoute (App.tsx) leaves
+      // this page once `user` is actually committed.
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {

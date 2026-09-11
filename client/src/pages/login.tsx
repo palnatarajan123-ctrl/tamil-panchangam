@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,6 @@ import { Sparkles, LogIn } from "lucide-react";
 
 export default function Login() {
   const { login } = useAuth();
-  const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,7 +20,12 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/");
+      // No navigate() here (Task 1 fix, 2026-09-11) -- imperatively
+      // navigating right after setUser() raced wouter's unbatched
+      // dispatchEvent against React's pending state flush, silently
+      // bouncing back to /login. GuestRoute (App.tsx) now leaves this
+      // page once `user` is actually committed, via the same
+      // effect-driven pattern AuthRoute already used correctly.
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

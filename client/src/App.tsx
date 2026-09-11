@@ -63,7 +63,7 @@ function AdminRoute({ children }: { children: ReactNode }) {
    dead end.
 -------------------------------------------------- */
 
-function AuthRoute({ children }: { children: ReactNode }) {
+export function AuthRoute({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
   const [, navigate] = useLocation();
 
@@ -75,6 +75,47 @@ function AuthRoute({ children }: { children: ReactNode }) {
 
   if (isLoading) return null;
   if (!user) return null;
+  return <>{children}</>;
+}
+
+/* -------------------------------------------------
+   GUEST ROUTE GUARD (Task 1 fix, 2026-09-11)
+
+   Login/register previously navigated to "/" imperatively, right after
+   setUser() in the same synchronous block (handleSubmit: await login();
+   navigate("/")). Wouter's navigate() triggers an unbatched
+   dispatchEvent() (confirmed in wouter's own source -- its maintainers'
+   own TODO acknowledges this isn't wrapped in unstable_batchedUpdates),
+   which could force AuthRoute to re-render and read a still-stale
+   `user = null` before React flushed the pending setUser() update --
+   AuthRoute's effect would then fire navigate("/login"), silently
+   bouncing the just-logged-in user back with no error. Reproduced
+   deterministically (see client/src/__tests__/auth-navigation-race.test.tsx).
+
+   Fix: navigation off of login/register is no longer imperative anywhere.
+   GuestRoute mirrors AuthRoute's own (already-correct) effect-driven
+   pattern in the opposite direction -- it reacts to the COMMITTED `user`
+   value via useEffect, the same mechanism that already correctly
+   protects AuthRoute's routes, rather than an event-handler racing that
+   commit. login.tsx/register.tsx now just call login()/register() and
+   stop; once `user` actually becomes truthy, GuestRoute is what leaves
+   the page. Also handles landing on /login or /register while already
+   authenticated (e.g. a stale bookmark) -- redirects away once, no loop,
+   same guard-on-mount behavior AuthRoute already has for the reverse case.
+-------------------------------------------------- */
+
+export function GuestRoute({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && user) {
+      navigate("/");
+    }
+  }, [user, isLoading, navigate]);
+
+  if (isLoading) return null;
+  if (user) return null;
   return <>{children}</>;
 }
 
@@ -116,9 +157,14 @@ function Router() {
         <AdminRoute><AdminLLM /></AdminRoute>
       </Route>
 
-      {/* Auth pages (correctly public) */}
-      <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
+      {/* Auth pages (correctly public, but leave immediately once
+         authenticated -- Task 1 fix, 2026-09-11, see GuestRoute above) */}
+      <Route path="/login">
+        <GuestRoute><Login /></GuestRoute>
+      </Route>
+      <Route path="/register">
+        <GuestRoute><Register /></GuestRoute>
+      </Route>
 
       {/* Auth required (security fix, 2026-09-08) */}
       <Route path="/my-charts">
