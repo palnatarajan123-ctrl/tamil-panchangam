@@ -17,6 +17,7 @@ import {
   Clock,
   Sunrise,
   Sunset,
+  Info,
 } from "lucide-react";
 
 interface DailyData {
@@ -30,6 +31,13 @@ interface DailyData {
   tara_bala: { key: string; name: string; quality: string; distance: number };
   tithi: { name: string; paksha: string; number: number };
   llm_guidance?: string | null;
+  // Part A, 2026-09-11 follow-up: previously the backend already
+  // distinguished "capped" (Task 3) but this component never consumed
+  // either -- a null llm_guidance silently rendered nothing, for ANY
+  // reason (disabled, capped, no API key, or a real failure), all
+  // indistinguishable to the user.
+  llm_capped?: boolean;
+  llm_paused?: boolean;
 }
 
 const TARA_QUALITY_COLOR: Record<string, string> = {
@@ -153,6 +161,20 @@ export function DailyView({ baseChartId, date }: DailyViewProps) {
           <p className="text-sm text-foreground leading-relaxed">
             {data.llm_guidance}
           </p>
+        </div>
+      )}
+      {!data.llm_guidance && (data.llm_paused || data.llm_capped) && (
+        <div
+          className="flex items-start gap-2 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-muted-foreground"
+          data-testid="daily-guidance-paused-banner"
+        >
+          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            {data.llm_paused
+              ? "AI-generated commentary is currently paused by the administrator."
+              : "You've reached today's AI usage limit for this account."}{" "}
+            The Panchangam data above is unaffected.
+          </span>
         </div>
       )}
 

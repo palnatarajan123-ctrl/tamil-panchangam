@@ -168,12 +168,21 @@ class TestDailyRouteGracefulDegradation(unittest.TestCase):
             self.assertIn(key, body)
 
     def test_uncapped_user_gets_llm_capped_false(self):
+        # Patched at app.api.daily's own namespace, not the source module
+        # (app.engines.llm_interpretation_orchestrator) -- Part A's
+        # 2026-09-11 consolidation moved daily.py's is_llm_enabled import
+        # to module level (previously a per-call local import, which
+        # happened to also be patchable at the source module; module-level
+        # imports bind the name once, so the consuming module's own
+        # namespace is what must be patched -- consistent with how every
+        # other test in this session already patches is_llm_enabled).
         with patch("app.api.daily._get_base_chart_payload", return_value=self._sample_payload()), \
              patch("app.api.daily.get_conn", return_value=MagicMock()), \
-             patch("app.engines.llm_interpretation_orchestrator.is_llm_enabled", return_value=False):
+             patch("app.api.daily.is_llm_enabled", return_value=False):
             # is_llm_enabled=False takes the pre-existing global-disable
             # path (checked first) -- llm_capped must stay False there,
-            # not get confused with the new capped path.
+            # not get confused with the new capped path. It's now
+            # llm_paused=True instead (Part A follow-up).
             resp = self.client.get(
                 "/api/prediction/daily",
                 params={"base_chart_id": "chart-1", "date": "2026-09-10"},
@@ -182,6 +191,7 @@ class TestDailyRouteGracefulDegradation(unittest.TestCase):
         body = resp.json()
         self.assertIsNone(body["llm_guidance"])
         self.assertFalse(body["llm_capped"])
+        self.assertTrue(body["llm_paused"])
 
 
 if __name__ == "__main__":

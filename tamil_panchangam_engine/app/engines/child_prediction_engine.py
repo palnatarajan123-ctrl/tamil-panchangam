@@ -18,6 +18,7 @@ from app.engines.budget_guard import log_llm_call
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.children_timing_engine import RASI_LORDS
 from app.engines.porutham_engine import _rasi_index
+from app.engines.llm_interpretation_orchestrator import is_llm_enabled, get_llm_pause_reason
 
 logger = logging.getLogger(__name__)
 
@@ -121,14 +122,10 @@ def run_child_prediction(
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         return {"error": "LLM not configured — ANTHROPIC_API_KEY missing", "cached": False}
-    try:
-        budget_row = db.execute(
-            "SELECT llm_enabled, paused_reason FROM llm_budget WHERE id = 1"
-        ).fetchone()
-        if budget_row and not budget_row[0]:
-            return {"error": f"LLM paused: {budget_row[1] or 'budget'}", "cached": False}
-    except Exception as e:
-        logger.warning(f"Budget check failed: {e}")
+    # 2026-09-11 Part A consolidation: was a raw SQL check directly
+    # against llm_budget -- see is_llm_enabled()'s docstring.
+    if not is_llm_enabled():
+        return {"error": f"LLM paused: {get_llm_pause_reason() or 'budget'}", "cached": False}
 
     context = _build_child_context(chart_payload, year)
     user_message = (

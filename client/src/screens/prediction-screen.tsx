@@ -19,7 +19,7 @@ import {
 } from "@/adapters/aiInterpretationAdapter";
 
 import { Button } from "@/components/ui/button";
-import { Loader2, Download, Sparkles, MessageCircle, AlertTriangle } from "lucide-react";
+import { Loader2, Download, Sparkles, MessageCircle, AlertTriangle, Info } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -219,31 +219,47 @@ export default function PredictionScreen() {
   // investigation, Issue 2 follow-up): fallback_reason was already read
   // above, but only ever used to decide whether to show the "Enhance
   // with AI" button for two specific reasons -- every OTHER
-  // fallback_reason (prompt_too_large, token_budget_exceeded,
-  // validation_failed, dasha_payload_leak, missing_interpretive_hint,
-  // invalid_payload_none_leak, or a raw provider error string) rendered
-  // the terse deterministic content with no visible indicator that it
-  // wasn't the real generated interpretation -- exactly how Issue 2 went
-  // undetected until someone happened to inspect the raw API response.
-  // Keyed purely on fallback_reason, not on `period`, so it applies to
-  // any period type sharing this same details.interpretation.llm_metadata
-  // shape (currently monthly and yearly; weekly inherits it too via its
-  // cached monthly interpretation, though weekly isn't a selectable
-  // period in this screen today).
-  const FALLBACK_REASON_LABELS: Record<string, string> = {
+  // fallback_reason rendered the terse deterministic content with no
+  // visible indicator that it wasn't the real generated interpretation --
+  // exactly how Issue 2 went undetected until someone happened to
+  // inspect the raw API response. Keyed purely on fallback_reason, not
+  // on `period`, so it applies to any period type sharing this same
+  // details.interpretation.llm_metadata shape (currently monthly and
+  // yearly; weekly inherits it too via its cached monthly
+  // interpretation, though weekly isn't a selectable period in this
+  // screen today).
+  //
+  // Two DELIBERATELY different banners, not one generic one (Part A,
+  // 2026-09-11 follow-up): "AI is paused/unavailable" (llm_disabled,
+  // budget_exceeded, anthropic_key_missing) is an expected, intentional
+  // state -- an admin choice or a hit quota, calm tone, phrased as
+  // current status. "This response was simplified" (prompt_too_large,
+  // token_budget_exceeded, validation_failed, dasha_payload_leak,
+  // missing_interpretive_hint, invalid_payload_none_leak, or an
+  // unrecognized/raw provider error) is a per-request technical limit or
+  // failure, warning tone. Conflating these into one banner risks making
+  // a deliberate admin decision look like a bug, or masking a real
+  // failure as if it were an intentional pause.
+  const PAUSED_REASONS = new Set(["llm_disabled", "budget_exceeded", "anthropic_key_missing"]);
+  const PAUSED_REASON_LABELS: Record<string, string> = {
+    llm_disabled: "AI-generated commentary is currently paused by the administrator",
+    budget_exceeded: "the monthly AI budget has been reached",
+    anthropic_key_missing: "the AI provider isn't configured right now",
+  };
+  const SIMPLIFIED_REASON_LABELS: Record<string, string> = {
     prompt_too_large: "the chart data for this period was too large to send to the AI",
     token_budget_exceeded: "this would have exceeded the AI token budget",
     validation_failed: "the AI's response didn't match the expected format",
     dasha_payload_leak: "an internal data-safety check blocked the AI request",
     missing_interpretive_hint: "some required chart data wasn't ready yet",
     invalid_payload_none_leak: "an internal data-safety check blocked the AI request",
-    llm_disabled: "AI enhancement is currently disabled",
-    anthropic_key_missing: "the AI provider isn't configured",
-    budget_exceeded: "the monthly AI budget has been reached",
   };
-  const fallbackMessage = fallbackReason
-    ? FALLBACK_REASON_LABELS[fallbackReason] ?? "the AI-generated version couldn't be produced"
-    : null;
+  const isPausedReason = !!fallbackReason && PAUSED_REASONS.has(fallbackReason);
+  const pausedMessage = isPausedReason ? PAUSED_REASON_LABELS[fallbackReason!] : null;
+  const simplifiedMessage =
+    fallbackReason && !isPausedReason
+      ? SIMPLIFIED_REASON_LABELS[fallbackReason] ?? "the AI-generated version couldn't be produced"
+      : null;
 
   async function handleEnhanceWithAI() {
     setEnhancing(true);
@@ -340,14 +356,26 @@ export default function PredictionScreen() {
       {!isDailyPeriod && data && !llmPending && (
         <>
         <div className={chatOpen ? "mr-80 transition-all duration-300" : "transition-all duration-300"}>
-          {fallbackMessage && (
+          {pausedMessage && (
+            <div
+              className="flex items-start gap-2 rounded-lg border border-border bg-muted px-4 py-3 mb-4 text-sm text-muted-foreground"
+              data-testid="ai-paused-banner"
+            >
+              <Info className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                {pausedMessage}. You're seeing the computed astrological data below;
+                AI-generated commentary will resume automatically once available.
+              </span>
+            </div>
+          )}
+          {simplifiedMessage && (
             <div
               className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 mb-4 text-sm text-amber-800 dark:text-amber-300"
               data-testid="fallback-response-banner"
             >
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>
-                <strong>Simplified response:</strong> {fallbackMessage}. This is not the
+                <strong>Simplified response:</strong> {simplifiedMessage}. This is not the
                 full AI-generated interpretation.
               </span>
             </div>

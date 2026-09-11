@@ -63,17 +63,71 @@ def _load_prompt_template(version: str = "v2") -> str:
 
 
 def is_llm_enabled() -> bool:
-    """Check if LLM is enabled in config."""
+    """
+    THE single source of truth for "may any LLM call be made right now,
+    anywhere in the app." Every LLM-calling code path -- a route handler,
+    the orchestrator itself, a background regeneration task -- must check
+    this, and only this, before doing any LLM-related work. No per-module
+    reimplementation, no raw SQL against either table below, no locally
+    cached copy of either flag.
+
+    Consolidated 2026-09-11 (Part A of the stale-fallback-cache follow-up):
+    two independent flags previously existed with no single function
+    combining them --
+      - llm_config.llm_enabled: the admin's manual on/off toggle
+        (admin_llm.py's /toggle route, via set_llm_enabled() below).
+      - llm_budget.llm_enabled: the automatic spend-based auto-pause,
+        set by budget_guard._check_budget() when monthly $ spend crosses
+        the configured threshold.
+    /toggle already best-effort syncs both on a manual flip (see its own
+    comment), but that sync is wrapped in a swallowed exception -- a
+    fresh source of ambiguity if it ever silently failed. Three call
+    sites (chat.py once, family.py twice) were independently re-querying
+    llm_budget.llm_enabled directly via raw SQL as their OWN gate,
+    bypassing this function and its (previously nonexistent) awareness of
+    the budget-auto-pause condition entirely -- meaning natal-
+    interpretation/kp-interpretation/daily/monthly/yearly, which DID
+    already call this function, were never actually honoring the
+    budget-auto-pause either, only the manual toggle. Returns False if
+    EITHER source says off -- true only if both agree the LLM may run.
+    """
     try:
         with get_conn() as conn:
-            result = conn.execute(
+            config_row = conn.execute(
                 "SELECT value FROM llm_config WHERE key = 'llm_enabled'"
             ).fetchone()
-            if result:
-                return result[0].lower() == "true"
+            manually_enabled = config_row[0].lower() == "true" if config_row else True
+
+            budget_row = conn.execute(
+                "SELECT llm_enabled FROM llm_budget WHERE id = 1"
+            ).fetchone()
+            budget_enabled = bool(budget_row[0]) if budget_row else True
+
+            return manually_enabled and budget_enabled
     except Exception as e:
         logger.warning(f"Failed to check LLM config: {e}")
     return True
+
+
+def get_llm_pause_reason() -> Optional[str]:
+    """The human-facing reason the LLM is currently paused, if it is --
+    'manual' (admin toggle) or 'budget_exceeded' (auto-pause), mirroring
+    llm_budget.paused_reason. A details lookup for user-facing messaging
+    ONLY -- never use this for a gating decision, that's is_llm_enabled()'s
+    job exclusively. Returns None if the LLM is currently enabled or the
+    reason can't be determined."""
+    if is_llm_enabled():
+        return None
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT paused_reason FROM llm_budget WHERE id = 1"
+            ).fetchone()
+            if row and row[0]:
+                return row[0]
+    except Exception as e:
+        logger.warning(f"Failed to read LLM pause reason: {e}")
+    return "manual"
 
 
 def set_llm_enabled(enabled: bool) -> bool:

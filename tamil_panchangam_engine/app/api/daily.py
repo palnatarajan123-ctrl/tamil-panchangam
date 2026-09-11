@@ -17,6 +17,7 @@ from app.db.postgres import get_conn
 from app.core.auth import get_current_user
 from app.core.limiter import limiter
 from app.engines.dinaphalam_engine import compute_dinaphalam
+from app.engines.llm_interpretation_orchestrator import is_llm_enabled
 from app.utils.time_utils import get_timezone_from_coordinates
 
 logger = logging.getLogger(__name__)
@@ -48,26 +49,33 @@ def _get_base_chart_payload(base_chart_id: str) -> dict:
 
 def _generate_daily_llm_guidance(
     result: dict, chart_name: str, base_chart_id: str, user_id: Optional[str] = None,
-) -> tuple[Optional[str], bool]:
+) -> tuple[Optional[str], bool, bool]:
     """2-3 sentence personalized daily guidance. Low token usage.
 
-    Returns (guidance, capped). Unlike natal_interpretation.py's two
-    routes (whose entire value IS the LLM output, hard-429'd on cap --
+    Returns (guidance, capped, paused). Unlike natal_interpretation.py's
+    two routes (whose entire value IS the LLM output, hard-429'd on cap --
     see that file), this route already computes and returns real,
     non-LLM Panchangam data (tithi/nakshatra/yoga/rahu-kaalam/etc.)
     regardless of LLM outcome. Discarding that with a 429 just because
-    the LLM commentary specifically is capped would be a strictly worse
-    response than the existing is_llm_enabled()-disabled case already
-    degrades to (silently returning llm_guidance=None, 200 OK) -- a
-    per-account budget cap is the same *kind* of condition as that
-    global switch (temporary LLM unavailability, not an identity/security
-    failure like Turnstile/auth), so it gets the same graceful-degradation
-    treatment, not Turnstile's hard-stop treatment. The caller surfaces
-    `capped` as a distinct `llm_capped` response key.
+    the LLM commentary specifically is capped/paused would be a strictly
+    worse response than graceful degradation -- a per-account budget cap
+    and the global admin pause are both the same *kind* of condition
+    (temporary LLM unavailability, not an identity/security failure like
+    Turnstile/auth), so both get graceful-degradation treatment, not
+    Turnstile's hard-stop treatment. The caller surfaces `capped` and
+    `paused` as distinct `llm_capped`/`llm_paused` response keys.
+
+    `paused` (Part A, 2026-09-11 follow-up) is distinct from `capped`:
+    capped is per-account (this user specifically hit their own daily
+    cap); paused is global (an admin disabled AI for everyone, or the
+    monthly $ budget auto-paused it). Previously both the disabled case
+    and the missing-API-key case collapsed into the same silent
+    (None, False) return as "no guidance, unspecified reason" -- no way
+    for the frontend to show a real "AI is paused" message distinct from
+    any other silent-null case.
     """
-    from app.engines.llm_interpretation_orchestrator import is_llm_enabled
     if not is_llm_enabled():
-        return None, False
+        return None, False, True
 
     # Per-account daily cap (Task 3/backlog #1, 2026-09-10): checked at the
     # same point as the global is_llm_enabled() gate above, before making
@@ -79,12 +87,12 @@ def _generate_daily_llm_guidance(
                 check_user_llm_cap(conn, user_id)
         except HTTPException as e:
             if e.status_code == 429:
-                return None, True
+                return None, True, False
             raise
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        return None, False
+        return None, False, False
 
     try:
         nak = result.get("nakshatra", {})
@@ -141,11 +149,11 @@ def _generate_daily_llm_guidance(
         except Exception as log_err:
             logger.warning(f"daily_guidance log_llm_call failed: {log_err}")
 
-        return guidance, False
+        return guidance, False, False
 
     except Exception as e:
         logger.warning(f"Daily LLM guidance failed: {e}")
-        return None, False
+        return None, False, False
 
 
 @limiter.limit("10/hour")
@@ -222,7 +230,7 @@ def get_daily_prediction(
         ayanamsa=ayanamsa,
     )
 
-    llm_guidance, llm_capped = _generate_daily_llm_guidance(
+    llm_guidance, llm_capped, llm_paused = _generate_daily_llm_guidance(
         result=result,
         chart_name=birth_details.get("name", ""),
         base_chart_id=base_chart_id,
@@ -234,4 +242,5 @@ def get_daily_prediction(
         **result,
         "llm_guidance": llm_guidance,
         "llm_capped": llm_capped,
+        "llm_paused": llm_paused,
     }

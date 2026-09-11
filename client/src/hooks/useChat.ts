@@ -132,6 +132,17 @@ export function useChat(
                   .then((data) => setUsage(data))
                   .catch(() => {});
               }
+              // Distinct, calm wording for a deliberate admin pause (Part
+              // A, 2026-09-11 follow-up) -- was showing the raw "llm_paused"
+              // string verbatim as a destructive-styled error, indistinguishable
+              // from a genuine failure. This is an intentional, expected
+              // state (admin toggle or budget auto-pause), not a bug.
+              if (json.error === "llm_paused") {
+                const reason = json.reason === "budget_exceeded"
+                  ? "the monthly AI budget has been reached"
+                  : "paused by the administrator";
+                throw new Error(`Ask Jyotishi is temporarily unavailable — AI chat is ${reason}.`);
+              }
               if (json.error) throw new Error(json.error);
             } catch {}
           }

@@ -35,6 +35,7 @@ from app.llm.payload_builder import (
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.budget_guard import log_llm_call
+from app.engines.llm_interpretation_orchestrator import is_llm_enabled, get_llm_pause_reason
 from app.engines.family_prediction_engine import run_family_prediction
 from app.engines.children_timing_engine import run_children_timing
 from app.engines.timeline_aggregator import build_timeline
@@ -818,14 +819,10 @@ def generate_timeline_summary(
     if not api_key:
         return None
 
-    try:
-        budget_row = db.execute(
-            "SELECT llm_enabled, paused_reason FROM llm_budget WHERE id = 1"
-        ).fetchone()
-        if budget_row and not budget_row[0]:
-            return None
-    except Exception as e:
-        logger.warning(f"Budget check failed: {e}")
+    # 2026-09-11 Part A consolidation: was a raw SQL check directly
+    # against llm_budget -- see is_llm_enabled()'s docstring.
+    if not is_llm_enabled():
+        return None
 
     # Cache check
     try:
@@ -1359,10 +1356,6 @@ async def family_group_chat_stream(
             ORDER BY fm.role, fm.birth_order
         """, (group_id,)).fetchall()
 
-        budget_row = conn.execute(
-            "SELECT llm_enabled, paused_reason FROM llm_budget WHERE id = 1"
-        ).fetchone()
-
     if not rows:
         raise HTTPException(status_code=400, detail="No members in this family group")
 
@@ -1396,9 +1389,14 @@ async def family_group_chat_stream(
     messages = [{"role": m.role, "content": m.content} for m in history_trimmed]
     messages.append({"role": "user", "content": req.question})
 
+    # 2026-09-11 Part A consolidation: was a raw SQL check directly
+    # against llm_budget -- see is_llm_enabled()'s docstring.
+    llm_paused = not is_llm_enabled()
+    pause_reason = get_llm_pause_reason() if llm_paused else None
+
     async def generate():
-        if budget_row and not budget_row[0]:
-            yield f"data: {json.dumps({'error': 'llm_paused', 'reason': budget_row[1]})}\n\n"
+        if llm_paused:
+            yield f"data: {json.dumps({'error': 'llm_paused', 'reason': pause_reason})}\n\n"
             return
 
         import anthropic

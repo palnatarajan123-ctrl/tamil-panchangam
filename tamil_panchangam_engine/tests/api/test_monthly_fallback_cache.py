@@ -211,5 +211,63 @@ class TestMonthlyLlmStatusFallbackAware(unittest.TestCase):
         self.assertEqual(resp.json()["status"], "pending")
 
 
+class TestNoLlmCallWhileGloballyDisabled(unittest.TestCase):
+    """Part A (2026-09-11 follow-up): the definitive proof requested --
+    with the global flag OFF, hitting a fallback-tagged cached row
+    repeatedly must never result in any LLM call, spied on at the actual
+    LLM-calling function (not just the background-task wrapper one layer
+    up, for a more direct guarantee than trusting _run_llm_background's
+    own internal gate alone). Flipping the flag ON must then trigger
+    exactly one regeneration attempt on the next request -- proving the
+    fix is specifically "don't retry while disabled", not "never retry
+    a fallback at all" (that part of the original fix must be preserved).
+    """
+
+    def setUp(self):
+        self.client = TestClient(app)
+        app.dependency_overrides[get_current_user] = lambda: TEST_USER
+
+    def tearDown(self):
+        app.dependency_overrides.pop(get_current_user, None)
+
+    def _post_monthly(self):
+        return self.client.post(
+            "/api/prediction/monthly",
+            json={"base_chart_id": "chart-1", "year": 2026, "month": 9},
+        )
+
+    def test_disabled_then_enabled_across_repeated_requests(self):
+        with patch("app.api.prediction.get_base_chart_by_id", return_value=MINIMAL_CHART), \
+             patch("app.api.prediction.user_owns_chart", return_value=True), \
+             patch("app.api.prediction.get_monthly_prediction",
+                   return_value=_existing_row(fallback_reason="prompt_too_large")), \
+             patch("app.engines.llm_interpretation_orchestrator.openai_provider.call_openai") as mock_call_llm, \
+             patch("app.api.prediction.is_llm_enabled", return_value=False):
+            # Repeated requests, flag OFF -- the actual LLM-calling
+            # function must never be invoked, not once, across any of them.
+            for _ in range(3):
+                resp = self._post_monthly()
+                self.assertEqual(resp.status_code, 200, resp.text)
+                self.assertIsNone(resp.json()["llm_status"])
+            mock_call_llm.assert_not_called()
+
+            # Flip the flag ON (same test, same mocked cache row still
+            # tagged as a stale fallback) -- the very next request must
+            # now trigger exactly one regeneration attempt.
+            with patch("app.api.prediction.is_llm_enabled", return_value=True), \
+                 patch("app.api.prediction._run_llm_background") as mock_bg:
+                resp = self._post_monthly()
+                self.assertEqual(resp.status_code, 200, resp.text)
+                self.assertEqual(resp.json()["llm_status"], "pending")
+                mock_bg.assert_called_once()
+
+            # Still zero real LLM calls in this test -- _run_llm_background
+            # itself was mocked for the enabled case above (isolating the
+            # gate/scheduling decision from the full generation pipeline,
+            # which is exercised for real elsewhere, live, in this
+            # investigation -- see this file's module docstring).
+            mock_call_llm.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

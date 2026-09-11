@@ -22,6 +22,7 @@ from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.shadbala_engine import compute_shadbala
 from app.engines.budget_guard import log_llm_call
 from app.engines.dasha_resolver import resolve_antar_dasha
+from app.engines.llm_interpretation_orchestrator import is_llm_enabled, get_llm_pause_reason
 
 logger = logging.getLogger(__name__)
 
@@ -835,15 +836,18 @@ Frame all responses in parent-friendly language.
     if not api_key:
         raise HTTPException(status_code=500, detail="LLM not configured")
 
-    # Budget gate — check llm_budget before calling Anthropic
-    with get_conn() as conn:
-        budget_row = conn.execute(
-            "SELECT llm_enabled, paused_reason FROM llm_budget WHERE id = 1"
-        ).fetchone()
+    # Global LLM gate (2026-09-11 Part A consolidation): was a raw SQL
+    # check directly against llm_budget, bypassing is_llm_enabled() (the
+    # single canonical source of truth) entirely -- see that function's
+    # docstring for why this mattered beyond consistency: it also means
+    # this check now correctly reflects the manual admin toggle, not just
+    # the budget auto-pause it was already catching.
+    llm_paused = not is_llm_enabled()
+    pause_reason = get_llm_pause_reason() if llm_paused else None
 
     async def generate():
-        if budget_row and not budget_row[0]:
-            yield f"data: {json.dumps({'error': 'llm_paused', 'reason': budget_row[1]})}\n\n"
+        if llm_paused:
+            yield f"data: {json.dumps({'error': 'llm_paused', 'reason': pause_reason})}\n\n"
             return
 
         import anthropic
