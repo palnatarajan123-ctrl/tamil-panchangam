@@ -50,6 +50,24 @@ stale" and "confirmed real" looked like in practice):
   register-Turnstile work; not a Turnstile candidate itself since refresh
   is machine-driven, not human-driven, but worth a rate limit given a
   stolen/guessed refresh token could otherwise be hammered without limit.
+- **Per-account daily LLM cap (`budget_guard.check_user_llm_cap()`,
+  landed 2026-09-10) is only wired into 3 routes** —
+  `daily.py`'s `/prediction/daily`, `natal_interpretation.py`'s
+  `/natal-interpretation` and `/{chart_id}/kp-interpretation`. NOT wired
+  into `chat.py`, `family.py`'s family-group chat/predictions, or the
+  engine-layer `log_llm_call()` sites (`children_timing_engine.py`,
+  `child_prediction_engine.py`, `family_prediction_engine.py`,
+  `payload_builder.py`) — threading `user_id` through those means
+  changing signatures several call-frames deep, deliberately scoped out
+  rather than done half-carefully in the same pass. A capped account can
+  still exhaust budget through any of those paths today.
+- **`admin_llm.py`'s `/budget` endpoint doesn't expose
+  `llm_budget.per_account_daily_cap_usd`** (added alongside the
+  per-account cap above) — an admin can currently only edit
+  `monthly_budget_usd` via the API; changing the per-account cap requires
+  a direct DB update. Same singleton-row pattern as the existing field,
+  straightforward to add to that endpoint's request/response models when
+  someone needs it.
 
 **Considered and closed, not pending** (investigated with real data
 2026-08-14 — don't re-open without new evidence):
