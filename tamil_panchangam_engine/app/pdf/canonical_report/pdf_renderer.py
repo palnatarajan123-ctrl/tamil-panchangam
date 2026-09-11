@@ -299,7 +299,7 @@ def _build_how_to_read(styles) -> List:
     return elements
 
 
-def _render_chart_from_svg(svg_data_uri: str, chart_type: str):
+def _render_chart_from_svg(svg_data_uri: str, chart_type: str, target_size: int = 300):
     """Convert existing SVG data URI to ReportLab Drawing."""
     if HAS_SVGLIB and svg_data_uri and svg_data_uri.startswith("data:image/svg+xml;base64,"):
         try:
@@ -307,7 +307,6 @@ def _render_chart_from_svg(svg_data_uri: str, chart_type: str):
             svg_bytes = base64.b64decode(svg_b64)
             drawing = svg2rlg(BytesIO(svg_bytes))
             if drawing:
-                target_size = 300
                 scale = target_size / max(drawing.width, drawing.height)
                 drawing.width = drawing.width * scale
                 drawing.height = drawing.height * scale
@@ -2117,75 +2116,89 @@ def _build_closing(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def _build_divisional_chart_cell(heading: str, description: str, svg_data_uri: str, chart_type: str, styles) -> List:
+    """One divisional chart's heading + description + chart, sized to
+    share a page two-up (Phase 4) instead of each getting its own
+    ~70%-empty page. Smaller render (220pt vs. D1's dedicated 320pt
+    card / the old 300pt used here) since these are appendix reference
+    charts, not the report's visual anchor -- see _render_d1_chart_card
+    for why D1 stays full-size and framed instead."""
+    return [
+        Paragraph(heading, styles['SubsectionTitle']),
+        Paragraph(description, styles['BodyText']),
+        Spacer(1, 0.1*inch),
+        _render_chart_from_svg(svg_data_uri, chart_type, target_size=220),
+    ]
+
+
 def _build_divisional_charts(data: CanonicalReportData, styles) -> List:
-    """Build Tier-1 divisional charts section."""
+    """Build Tier-1 divisional charts section, two charts per row
+    instead of one per page (Phase 4: these pages were ~70% empty
+    space below a small chart + one paragraph)."""
     elements = []
-    
-    has_d2 = bool(data.chart_images.d2_hora)
-    has_d7 = bool(data.chart_images.d7_saptamsa)
-    has_d10 = bool(data.chart_images.d10_dasamsa)
-    
-    if not (has_d2 or has_d7 or has_d10):
+
+    charts = []
+    if data.chart_images.d10_dasamsa:
+        charts.append(_build_divisional_chart_cell(
+            "<b>Dasamsa (D10)</b> - Career & Authority",
+            "The Dasamsa divides each sign into 10 parts, revealing career potential, "
+            "professional achievements, and societal status. Strong placements here "
+            "indicate success in one's profession and public recognition.",
+            data.chart_images.d10_dasamsa, "D10", styles,
+        ))
+    if data.chart_images.d2_hora:
+        charts.append(_build_divisional_chart_cell(
+            "<b>Hora (D2)</b> - Wealth & Sustenance",
+            "The Hora chart divides each sign into 2 parts (Sun and Moon horas), "
+            "indicating wealth accumulation capacity and financial sustenance. "
+            "Planets in Sun hora suggest self-earned wealth; Moon hora suggests inherited or accumulated wealth.",
+            data.chart_images.d2_hora, "D2", styles,
+        ))
+    if data.chart_images.d7_saptamsa:
+        charts.append(_build_divisional_chart_cell(
+            "<b>Saptamsa (D7)</b> - Creativity & Children",
+            "The Saptamsa divides each sign into 7 parts, showing creative potential, "
+            "progeny matters, and artistic abilities. This chart is particularly "
+            "important for understanding one's relationship with children and creative pursuits.",
+            data.chart_images.d7_saptamsa, "D7", styles,
+        ))
+
+    if not charts:
         return elements
-    
+
     elements.extend(_section_header("Tier-1 Divisional Charts", styles))
-    
+
     elements.append(Paragraph(
         "Divisional charts (Vargas) refine the birth chart analysis by examining "
         "specific life areas. These follow the Classical Parashara method with "
         "arc-second precision for accurate planet placement.",
         styles['BodyText']
     ))
-    
-    elements.append(Spacer(1, 0.3*inch))
-    
-    # Dasamsa (D10) - Career
-    if has_d10:
-        d10_elements = []
-        d10_elements.append(Paragraph("<b>Dasamsa (D10)</b> - Career & Authority", styles['SubsectionTitle']))
-        d10_elements.append(Paragraph(
-            "The Dasamsa divides each sign into 10 parts, revealing career potential, "
-            "professional achievements, and societal status. Strong placements here "
-            "indicate success in one's profession and public recognition.",
-            styles['BodyText']
-        ))
-        d10_elements.append(Spacer(1, 0.1*inch))
-        d10_elements.append(_render_chart_from_svg(data.chart_images.d10_dasamsa, "D10"))
-        d10_elements.append(Spacer(1, 0.3*inch))
-        elements.append(KeepTogether(d10_elements))
-    
-    # Hora (D2) - Wealth
-    if has_d2:
-        d2_elements = []
-        d2_elements.append(Paragraph("<b>Hora (D2)</b> - Wealth & Sustenance", styles['SubsectionTitle']))
-        d2_elements.append(Paragraph(
-            "The Hora chart divides each sign into 2 parts (Sun and Moon horas), "
-            "indicating wealth accumulation capacity and financial sustenance. "
-            "Planets in Sun hora suggest self-earned wealth; Moon hora suggests inherited or accumulated wealth.",
-            styles['BodyText']
-        ))
-        d2_elements.append(Spacer(1, 0.1*inch))
-        d2_elements.append(_render_chart_from_svg(data.chart_images.d2_hora, "D2"))
-        d2_elements.append(Spacer(1, 0.3*inch))
-        elements.append(KeepTogether(d2_elements))
-    
-    # Saptamsa (D7) - Creativity & Children
-    if has_d7:
-        d7_elements = []
-        d7_elements.append(Paragraph("<b>Saptamsa (D7)</b> - Creativity & Children", styles['SubsectionTitle']))
-        d7_elements.append(Paragraph(
-            "The Saptamsa divides each sign into 7 parts, showing creative potential, "
-            "progeny matters, and artistic abilities. This chart is particularly "
-            "important for understanding one's relationship with children and creative pursuits.",
-            styles['BodyText']
-        ))
-        d7_elements.append(Spacer(1, 0.1*inch))
-        d7_elements.append(_render_chart_from_svg(data.chart_images.d7_saptamsa, "D7"))
-        d7_elements.append(Spacer(1, 0.3*inch))
-        elements.append(KeepTogether(d7_elements))
-    
+
+    elements.append(Spacer(1, 0.25*inch))
+
+    col_width = 3.35 * inch
+    for i in range(0, len(charts), 2):
+        row = charts[i:i + 2]
+        if len(row) == 1:
+            row_data = [row[0], ""]
+        else:
+            row_data = row
+        row_table = Table([row_data], colWidths=[col_width, col_width])
+        row_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (0, 0), 0),
+            ('RIGHTPADDING', (0, 0), (0, 0), 12),
+            ('LEFTPADDING', (1, 0), (1, 0), 12),
+            ('RIGHTPADDING', (1, 0), (1, 0), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        elements.append(row_table)
+        elements.append(Spacer(1, 0.3*inch))
+
     elements.append(PageBreak())
-    
+
     return elements
 
 
