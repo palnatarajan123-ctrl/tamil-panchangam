@@ -27,6 +27,7 @@ from reportlab.platypus import (
 )
 from reportlab.graphics.shapes import Drawing, Rect, Group
 from reportlab.pdfgen import canvas as pdfcanvas
+from reportlab.platypus.tableofcontents import TableOfContents
 import base64
 
 from .models import CanonicalReportData
@@ -2986,6 +2987,43 @@ class _NumberedCanvas(pdfcanvas.Canvas):
         self.drawCentredString(page_width / 2, 28, f"Page {self._pageNumber} of {page_count}")
 
 
+class _TOCDocTemplate(SimpleDocTemplate):
+    """SimpleDocTemplate with a hook that feeds every top-level section
+    heading (any Paragraph in 'SectionTitle' style, except the Contents
+    heading itself) to the TableOfContents flowable placed in the story.
+    Used with doc.multiBuild() instead of doc.build() -- the ToC needs
+    the real page each section lands on, which isn't known until a full
+    layout pass has already happened.
+    """
+
+    def afterFlowable(self, flowable):
+        if isinstance(flowable, Paragraph) and getattr(flowable.style, 'name', '') == 'SectionTitle':
+            text = flowable.getPlainText()
+            if text != "Contents":
+                self.notify('TOCEntry', (0, text, self.page))
+
+
+def _build_table_of_contents(styles) -> List:
+    """Short, flat (single-level) table of contents -- only meaningful
+    when the technical appendix is included and the document runs long
+    enough to actually need one (Phase 4 item 3). Requires
+    _TOCDocTemplate + doc.multiBuild(), not plain doc.build().
+    """
+    toc = TableOfContents()
+    toc.levelStyles = [
+        ParagraphStyle(
+            name='TOCLevel0', parent=styles['Normal'],
+            fontSize=11, leading=18,
+            textColor=colors.Color(*COLORS["text"]),
+        ),
+    ]
+    elements = []
+    elements.extend(_section_header("Contents", styles))
+    elements.append(toc)
+    elements.append(PageBreak())
+    return elements
+
+
 def render_pdf(data: CanonicalReportData, include_technical_appendix: bool = True) -> bytes:
     """
     Render complete PDF from report data.
@@ -3005,7 +3043,7 @@ def render_pdf(data: CanonicalReportData, include_technical_appendix: bool = Tru
     """
     buffer = io.BytesIO()
 
-    doc = SimpleDocTemplate(
+    doc = _TOCDocTemplate(
         buffer,
         pagesize=A4,
         rightMargin=MARGIN,
@@ -3020,6 +3058,12 @@ def render_pdf(data: CanonicalReportData, include_technical_appendix: bool = Tru
 
     story.extend(_build_cover_page(data, styles))
     story.extend(_build_how_to_read(styles))
+
+    # Short flat ToC, page 2-ish -- only worth having when the technical
+    # appendix makes the document long enough to need one; the
+    # simplified mode is short enough to just read top to bottom.
+    if include_technical_appendix:
+        story.extend(_build_table_of_contents(styles))
 
     if data.is_v4:
         # v4: human meaning first, technical appendix at end
@@ -3077,7 +3121,11 @@ def render_pdf(data: CanonicalReportData, include_technical_appendix: bool = Tru
     def _canvas_factory(*args, **kwargs):
         return _NumberedCanvas(*args, header_text=header_text, **kwargs)
 
-    doc.build(story, canvasmaker=_canvas_factory)
+    # multiBuild (not build): when a ToC is present, section page
+    # numbers aren't known until a full layout pass has already
+    # happened, so it reruns until they stabilize. Degrades to exactly
+    # one pass when the story has no ToC (technical appendix off).
+    doc.multiBuild(story, canvasmaker=_canvas_factory)
 
     buffer.seek(0)
     return buffer.read()
