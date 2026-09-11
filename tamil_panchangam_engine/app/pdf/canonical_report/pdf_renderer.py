@@ -25,7 +25,7 @@ from reportlab.platypus import (
     KeepTogether,
     HRFlowable,
 )
-from reportlab.graphics.shapes import Drawing, Rect
+from reportlab.graphics.shapes import Drawing, Rect, Group
 import base64
 
 from .models import CanonicalReportData
@@ -330,6 +330,54 @@ def _render_chart_from_svg(svg_data_uri: str, chart_type: str):
     return placeholder_table
 
 
+def _render_d1_chart_card(svg_data_uri: str):
+    """The D1 (Rasi) chart is the report's one visual anchor in both
+    technical-appendix toggle states -- it gets the most polished
+    treatment of any chart in the document: larger than the generic
+    divisional-chart rendering (_render_chart_from_svg, still used for
+    D9/D2/D7/D10 unchanged) and framed in a bordered card using the
+    report's accent color, instead of floating bare on the page like
+    every other chart (Phase 3 item 6).
+
+    The border+background is drawn as a Rect inside the SAME Drawing
+    as the chart (via a translated Group), not by nesting the chart in
+    a Platypus Table cell -- a manually-.scale()'d Drawing renders with
+    its content offset from where a Table cell thinks its bounding box
+    is, clipping/misplacing the border. Keeping everything in one
+    Drawing's own coordinate space avoids that entirely.
+    """
+    drawing = None
+    if HAS_SVGLIB and svg_data_uri and svg_data_uri.startswith("data:image/svg+xml;base64,"):
+        try:
+            svg_b64 = svg_data_uri.split(",", 1)[1]
+            svg_bytes = base64.b64decode(svg_b64)
+            drawing = svg2rlg(BytesIO(svg_bytes))
+            if drawing:
+                target_size = 320
+                scale = target_size / max(drawing.width, drawing.height)
+                drawing.width = drawing.width * scale
+                drawing.height = drawing.height * scale
+                drawing.scale(scale, scale)
+        except Exception:
+            drawing = None
+
+    if drawing is None:
+        return _render_chart_from_svg(svg_data_uri, "D1")
+
+    pad = 16
+    framed = Drawing(drawing.width + 2 * pad, drawing.height + 2 * pad)
+    framed.add(Rect(
+        0, 0, drawing.width + 2 * pad, drawing.height + 2 * pad,
+        fillColor=colors.Color(*COLORS["background"]),
+        strokeColor=colors.Color(*COLORS["accent"]),
+        strokeWidth=1.5,
+    ))
+    chart_group = Group(drawing)
+    chart_group.translate(pad, pad)
+    framed.add(chart_group)
+    return framed
+
+
 def _build_natal_snapshot(
         data: CanonicalReportData, styles,
         include_technical_appendix: bool = True) -> List:
@@ -364,7 +412,7 @@ def _build_natal_snapshot(
     # Birth Chart (D1) with heading — keep heading and chart on same page
     d1_elements = []
     d1_elements.append(Paragraph("<b>Birth Chart (D1)</b>", styles['SubsectionTitle']))
-    d1_elements.append(_render_chart_from_svg(data.chart_images.d1_rasi, "D1"))
+    d1_elements.append(_render_d1_chart_card(data.chart_images.d1_rasi))
     d1_elements.append(Spacer(1, 0.2*inch))
     elements.append(KeepTogether(d1_elements))
 
