@@ -1694,8 +1694,19 @@ def _score_to_color(score: int):
         return colors.Color(0.7, 0.3, 0.3)
 
 
-def _build_predictions(data: CanonicalReportData, styles) -> List:
-    """Build predictions section with full details and scores."""
+def _build_predictions(data: CanonicalReportData, styles, include_area_detail: bool = True) -> List:
+    """Build predictions section with full details and scores.
+
+    include_area_detail=True (legacy v1-3 branch, unchanged): full
+    per-area score table + "Detailed Insights" breakdown, same as always.
+
+    include_area_detail=False (v4+ branch, Phase 2): that per-area
+    breakdown is dropped here because it's now merged into
+    _build_v4_life_areas's front narrative (score badge + Why note) —
+    only the section-level content that ISN'T per-area (Overview,
+    Prediction Confidence, the aggregated Astrological Influences line)
+    still renders here, in its original position.
+    """
     elements = []
     
     elements.append(Paragraph("Predictions", styles['SectionTitle']))
@@ -1794,102 +1805,103 @@ def _build_predictions(data: CanonicalReportData, styles) -> List:
         ))
         elements.append(Spacer(1, 0.2*inch))
     
-    scores_data = [["Life Area", "Score", "Outlook"]]
-    for area in data.prediction_areas:
-        scores_data.append([
-            area.area,
-            f"{area.score}/100 ({_score_to_label(area.score)})",
-            area.outlook.title()
-        ])
-    
-    scores_table = Table(scores_data, colWidths=[2*inch, 2.2*inch, 1.5*inch])
-    scores_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
-    elements.append(scores_table)
-    elements.append(Spacer(1, 0.3*inch))
-    
-    elements.append(Paragraph("Detailed Insights", styles['SubsectionTitle']))
-    elements.append(Spacer(1, 0.15*inch))
+    if include_area_detail:
+        scores_data = [["Life Area", "Score", "Outlook"]]
+        for area in data.prediction_areas:
+            scores_data.append([
+                area.area,
+                f"{area.score}/100 ({_score_to_label(area.score)})",
+                area.outlook.title()
+            ])
 
-    for i, area in enumerate(data.prediction_areas):
-        # Divider between sections (skip before the first)
-        if i > 0:
-            elements.append(HRFlowable(
-                width="100%", thickness=0.5,
-                color=colors.Color(0.82, 0.82, 0.82),
-                spaceBefore=6, spaceAfter=10,
-            ))
+        scores_table = Table(scores_data, colWidths=[2*inch, 2.2*inch, 1.5*inch])
+        scores_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(scores_table)
+        elements.append(Spacer(1, 0.3*inch))
 
-        area_elements = []
+        elements.append(Paragraph("Detailed Insights", styles['SubsectionTitle']))
+        elements.append(Spacer(1, 0.15*inch))
 
-        # Heading: "Career - 65/100 | Favorable"
-        heading = f"{area.area} - {area.score}/100  |  {_score_to_label(area.score)}"
-        area_elements.append(Paragraph(heading, styles['LifeAreaTitle']))
+        for i, area in enumerate(data.prediction_areas):
+            # Divider between sections (skip before the first)
+            if i > 0:
+                elements.append(HRFlowable(
+                    width="100%", thickness=0.5,
+                    color=colors.Color(0.82, 0.82, 0.82),
+                    spaceBefore=6, spaceAfter=10,
+                ))
 
-        # Interpretation split into 2-sentence paragraph groups
-        if area.interpretation:
-            groups = _split_sentences(area.interpretation, per_group=2)
-            for j, group in enumerate(groups):
-                if j == 0:
-                    # Bold the first sentence group as a visual lead-in
-                    area_elements.append(Paragraph(f"<b>{group}</b>", styles['BodyText']))
-                else:
-                    area_elements.append(Paragraph(group, styles['BodyText']))
+            area_elements = []
 
-        if area.deeper_explanation and not data.is_v2 and not data.is_v3:
-            area_elements.append(Paragraph(
-                f"<i>{area.deeper_explanation}</i>",
-                styles['BodyText']
-            ))
+            # Heading: "Career - 65/100 | Favorable"
+            heading = f"{area.area} - {area.score}/100  |  {_score_to_label(area.score)}"
+            area_elements.append(Paragraph(heading, styles['LifeAreaTitle']))
 
-        if area.guidance:
-            area_elements.append(Paragraph(
-                f"<b>Guidance:</b> {area.guidance}",
-                styles['BodyText']
-            ))
-
-        if area.attribution and area.attribution.signals:
-            area_elements.append(Spacer(1, 0.1*inch))
-            area_elements.append(Paragraph("<b>Signals</b>", styles['BodyText']))
-            for sig in area.attribution.signals:
-                sign = "+" if sig.direction == "pos" else "-"
-                sig_line = f"{sig.engine}  {sign}{abs(sig.weight):.2f}"
-                area_elements.append(Paragraph(sig_line, styles['BodyText']))
-                if sig.interpretive_hint:
-                    area_elements.append(Paragraph(
-                        f"<i>{sig.interpretive_hint}</i>",
-                        styles['BodyText']
-                    ))
-                # ENHANCEMENT B: drishti adjustment note for Gochara signals
-                drishti_bonus = None
-                if "GOCHARA_JUPITER" in sig.engine:
-                    drishti_bonus = data.transit_context.jupiter_drishti_bonus
-                elif "GOCHARA_SATURN" in sig.engine:
-                    drishti_bonus = data.transit_context.saturn_drishti_bonus
-                if drishti_bonus is not None and abs(drishti_bonus) >= 0.15:
-                    pct = int(abs(drishti_bonus) * 100)
-                    if drishti_bonus < 0:
-                        note = f"Weakened by natal aspects (-{pct}%)"
+            # Interpretation split into 2-sentence paragraph groups
+            if area.interpretation:
+                groups = _split_sentences(area.interpretation, per_group=2)
+                for j, group in enumerate(groups):
+                    if j == 0:
+                        # Bold the first sentence group as a visual lead-in
+                        area_elements.append(Paragraph(f"<b>{group}</b>", styles['BodyText']))
                     else:
-                        note = f"Strengthened by natal aspects (+{pct}%)"
-                    area_elements.append(Paragraph(
-                        f"<font color='gray'><i>{note}</i></font>",
-                        styles['BodyText']
-                    ))
+                        area_elements.append(Paragraph(group, styles['BodyText']))
 
-        area_elements.append(Spacer(1, 0.25*inch))
-        elements.append(KeepTogether(area_elements))
-    
+            if area.deeper_explanation and not data.is_v2 and not data.is_v3:
+                area_elements.append(Paragraph(
+                    f"<i>{area.deeper_explanation}</i>",
+                    styles['BodyText']
+                ))
+
+            if area.guidance:
+                area_elements.append(Paragraph(
+                    f"<b>Guidance:</b> {area.guidance}",
+                    styles['BodyText']
+                ))
+
+            if area.attribution and area.attribution.signals:
+                area_elements.append(Spacer(1, 0.1*inch))
+                area_elements.append(Paragraph("<b>Signals</b>", styles['BodyText']))
+                for sig in area.attribution.signals:
+                    sign = "+" if sig.direction == "pos" else "-"
+                    sig_line = f"{sig.engine}  {sign}{abs(sig.weight):.2f}"
+                    area_elements.append(Paragraph(sig_line, styles['BodyText']))
+                    if sig.interpretive_hint:
+                        area_elements.append(Paragraph(
+                            f"<i>{sig.interpretive_hint}</i>",
+                            styles['BodyText']
+                        ))
+                    # ENHANCEMENT B: drishti adjustment note for Gochara signals
+                    drishti_bonus = None
+                    if "GOCHARA_JUPITER" in sig.engine:
+                        drishti_bonus = data.transit_context.jupiter_drishti_bonus
+                    elif "GOCHARA_SATURN" in sig.engine:
+                        drishti_bonus = data.transit_context.saturn_drishti_bonus
+                    if drishti_bonus is not None and abs(drishti_bonus) >= 0.15:
+                        pct = int(abs(drishti_bonus) * 100)
+                        if drishti_bonus < 0:
+                            note = f"Weakened by natal aspects (-{pct}%)"
+                        else:
+                            note = f"Strengthened by natal aspects (+{pct}%)"
+                        area_elements.append(Paragraph(
+                            f"<font color='gray'><i>{note}</i></font>",
+                            styles['BodyText']
+                        ))
+
+            area_elements.append(Spacer(1, 0.25*inch))
+            elements.append(KeepTogether(area_elements))
+
     elements.append(PageBreak())
-    
+
     return elements
 
 
@@ -2405,17 +2417,106 @@ def _build_v4_why_this_period(data: CanonicalReportData, styles) -> List:
     return elements
 
 
+def _find_prediction_area(data: CanonicalReportData, area_key: str):
+    """Match a v4 life-area key (snake_case, e.g. "personal_growth") to
+    its PredictionArea entry (title-case .area string, e.g. "Personal
+    Growth") -- both are sourced from the same LLM "life_areas" response
+    object, just shaped differently by data_loader.py's two extraction
+    paths. Returns None if no match (defensive; shouldn't happen for a
+    v4+ chart with both fields populated)."""
+    target = area_key.replace("_", " ").lower()
+    for pa in data.prediction_areas:
+        if pa.area.lower() == target:
+            return pa
+    return None
+
+
+_HINT_QUALIFIER_RE = re.compile(r'\s*\([^)]*\)\s*$')
+
+
+def _build_v4_area_why_note(area, pred_area) -> str:
+    """Fold astrological basis, chart insight, and raw signal strength
+    into ONE coherent plain-language note -- replaces what used to be
+    three separately-labeled technical blocks (Astrological basis /
+    Chart insight / raw Signals list with numeric deltas).
+
+    The strongest positive and negative signal (by magnitude) are woven
+    in by name, with their parenthetical qualifier stripped and their
+    raw weight never shown -- the magnitude only decides which signal
+    earns a mention, not what appears on the page.
+    """
+    sentences = []
+    if area.astrological_basis:
+        sentences.append(area.astrological_basis.strip().rstrip('.'))
+    if area.divisional_insight:
+        sentences.append(area.divisional_insight.strip().rstrip('.'))
+
+    if pred_area and pred_area.attribution and pred_area.attribution.signals:
+        signals = pred_area.attribution.signals
+        pos = sorted(
+            (s for s in signals if s.direction == "pos" and s.interpretive_hint),
+            key=lambda s: abs(s.weight), reverse=True
+        )
+        neg = sorted(
+            (s for s in signals if s.direction == "neg" and s.interpretive_hint),
+            key=lambda s: abs(s.weight), reverse=True
+        )
+        pos_hint = _HINT_QUALIFIER_RE.sub('', pos[0].interpretive_hint).strip() if pos else None
+        neg_hint = _HINT_QUALIFIER_RE.sub('', neg[0].interpretive_hint).strip() if neg else None
+        if pos_hint and neg_hint:
+            sentences.append(f"This is further shaped by {pos_hint}, balanced against {neg_hint}")
+        elif pos_hint:
+            sentences.append(f"This is further shaped by {pos_hint}")
+        elif neg_hint:
+            sentences.append(f"This is tempered somewhat by {neg_hint}")
+
+    if not sentences:
+        return ""
+    text = ". ".join(sentences)
+    return text if text.endswith('.') else text + '.'
+
+
+def _build_v4_area_score_badge(pred_area, styles) -> Table:
+    """Simple colored score badge -- a visual indicator in place of the
+    old plain-text "79/100 | Strong Support" line. Deliberately basic;
+    Phase 3's full visual pass will turn this into a proper gauge/bar
+    consistent with the executive-summary cards' palette."""
+    badge = Table(
+        [[Paragraph(
+            f"{pred_area.score}/100  |  {_score_to_label(pred_area.score)}",
+            ParagraphStyle(
+                'AreaScoreBadge',
+                parent=styles['Normal'],
+                fontName='Helvetica-Bold',
+                fontSize=10,
+                textColor=colors.white,
+                alignment=TA_CENTER,
+            )
+        )]],
+        colWidths=[2.6*inch]
+    )
+    badge.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), _score_to_color(pred_area.score)),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    return badge
+
+
 def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
-    """Build v4 life areas with plain-English do/avoid content."""
+    """Build v4 life areas: plain-English do/avoid content merged with
+    the score and astrological grounding that used to render a second
+    time, separately, in _build_predictions (Phase 2 redesign)."""
     elements = []
     if not data.v4_life_areas:
         return elements
 
     elements.append(Paragraph("Life Area Guidance", styles['SectionTitle']))
     elements.append(Paragraph(
-        "Plain-English guidance for each area of life "
-        "this period. Each area shows what to do, what to "
-        "avoid, and what you may notice.",
+        "Plain-English guidance for each area of life this period. Each "
+        "area shows a score, what to do, what to avoid, what you may "
+        "notice, and why.",
         styles['BodyText']
     ))
     elements.append(Spacer(1, 0.2*inch))
@@ -2426,67 +2527,64 @@ def _build_v4_life_areas(data: CanonicalReportData, styles) -> List:
 
     for i, area_key in enumerate(areas_to_render):
         area = data.v4_life_areas[area_key]
-        area_elements = []
+        pred_area = _find_prediction_area(data, area_key)
 
         if i > 0:
-            area_elements.append(Spacer(1, 0.3*inch))
-            area_elements.append(HRFlowable(
+            elements.append(Spacer(1, 0.3*inch))
+            elements.append(HRFlowable(
                 width="100%", thickness=1.0,
                 color=colors.Color(*COLORS["primary"]),
                 spaceBefore=4, spaceAfter=12,
             ))
 
-        area_elements.append(Paragraph(
+        # Keep heading + score badge + intro paragraph together to avoid
+        # an orphaned heading; the rest of the area may span pages.
+        header_elements = [Paragraph(
             area_key.replace("_", " ").title(),
             styles['LifeAreaTitle']
-        ))
-
+        )]
+        if pred_area:
+            header_elements.append(Spacer(1, 0.05*inch))
+            header_elements.append(_build_v4_area_score_badge(pred_area, styles))
+        header_elements.append(Spacer(1, 0.1*inch))
         if area.plain_english:
-            area_elements.append(Paragraph(area.plain_english, styles['BodyText']))
-            area_elements.append(Spacer(1, 0.1*inch))
+            header_elements.append(Paragraph(area.plain_english, styles['BodyText']))
+        elements.append(KeepTogether(header_elements))
+        elements.append(Spacer(1, 0.1*inch))
 
         if area.do:
-            area_elements.append(Paragraph("DO", styles['V4SectionLabel']))
+            elements.append(Paragraph("DO", styles['V4SectionLabel']))
             for item in area.do:
-                area_elements.append(Paragraph(f"✓  {item}", styles['V4DoItem']))
-            area_elements.append(Spacer(1, 0.08*inch))
+                elements.append(Paragraph(f"✓  {item}", styles['V4DoItem']))
+            elements.append(Spacer(1, 0.08*inch))
 
         if area.avoid:
-            area_elements.append(Paragraph("AVOID", styles['V4SectionLabel']))
+            elements.append(Paragraph("AVOID", styles['V4SectionLabel']))
             for item in area.avoid:
-                area_elements.append(Paragraph(f"✗  {item}", styles['V4AvoidItem']))
-            area_elements.append(Spacer(1, 0.08*inch))
+                elements.append(Paragraph(f"✗  {item}", styles['V4AvoidItem']))
+            elements.append(Spacer(1, 0.08*inch))
 
         if area.real_life_patterns:
-            area_elements.append(Paragraph("WHAT THIS MAY LOOK LIKE", styles['V4SectionLabel']))
-            area_elements.append(Paragraph(area.real_life_patterns, styles['BodyText']))
-            area_elements.append(Spacer(1, 0.08*inch))
+            elements.append(Paragraph("WHAT THIS MAY LOOK LIKE", styles['V4SectionLabel']))
+            elements.append(Paragraph(area.real_life_patterns, styles['BodyText']))
+            elements.append(Spacer(1, 0.08*inch))
 
-        if area.astrological_basis:
-            area_elements.append(Paragraph(
-                f"<font color='gray' size='9'><i>Astrological basis: {area.astrological_basis}</i></font>",
+        why_note = _build_v4_area_why_note(area, pred_area)
+        if why_note:
+            elements.append(Paragraph("WHY", styles['V4SectionLabel']))
+            elements.append(Paragraph(
+                f"<font color='gray' size='9'><i>{why_note}</i></font>",
                 styles['BodyText']
             ))
-
-        if area.divisional_insight:
-            area_elements.append(Paragraph(
-                f"<font color='gray' size='9'><i>Chart insight: {area.divisional_insight}</i></font>",
-                styles['BodyText']
-            ))
+            elements.append(Spacer(1, 0.08*inch))
 
         if area.karmic_note:
-            area_elements.append(Paragraph(
+            elements.append(Paragraph(
                 f"<font color='#8b5cf6' size='9'><i>☽ {area.karmic_note}</i></font>",
                 styles['BodyText']
             ))
 
-        area_elements.append(Spacer(1, 0.15*inch))
-        # Use KeepTogether only for the header+summary block
-        # to prevent orphaned headings. Full area may span pages.
-        header_block = area_elements[:3]  # heading + spacer + plain_english
-        elements.append(KeepTogether(header_block))
-        for el in area_elements[3:]:
-            elements.append(el)
+        elements.append(Spacer(1, 0.15*inch))
 
     elements.append(Spacer(1, 0.3*inch))
     return elements
@@ -2824,9 +2922,12 @@ def render_pdf(data: CanonicalReportData, include_technical_appendix: bool = Tru
             story.extend(_build_upagrahas_section(data, styles))
             story.extend(_build_astrological_context(data, styles))
         # _build_predictions is narrative prediction content, not part of
-        # the technical appendix (Phase 2 will address its duplication
-        # with the front life-areas narrative separately) — always render.
-        story.extend(_build_predictions(data, styles))
+        # the technical appendix, so it still renders unconditionally
+        # (Phase 1). Its per-area breakdown is now merged into
+        # _build_v4_life_areas above (Phase 2) -- only the section-level
+        # content (Overview, Prediction Confidence, Astrological
+        # Influences) still comes from here for v4+ charts.
+        story.extend(_build_predictions(data, styles, include_area_detail=False))
     else:
         story.extend(_build_natal_snapshot(data, styles, include_technical_appendix))
         if include_technical_appendix:
