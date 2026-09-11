@@ -109,7 +109,36 @@ stale" and "confirmed real" looked like in practice):
   `_check_cache()`) directly and unconditionally on every request, so
   this exact latent inconsistency may still be live there. Not verified
   either way — flagging, not fixed, since it's one layer deeper than
-  tonight's fix and wasn't the reported symptom.
+  tonight's fix and wasn't the reported symptom. Still true after Part A's
+  consolidation below -- `_check_cache()` itself wasn't touched, only the
+  single-source-of-truth gate one layer above it.
+- **Dead duplicate token-limit implementation**: `token_estimator.py`'s
+  `check_token_limits()`/`get_max_completion_tokens()`/`MAX_TOTAL_TOKENS=10000`
+  are imported into `llm_interpretation_orchestrator.py` but never called
+  anywhere -- the actually-enforced path is `payload_builder.py`'s own
+  separate `validate_payload_size()`/`MAX_PROMPT_TOKENS` dict, with
+  different numbers (`token_estimator.py` uses flat 6000/10000, not
+  period-specific). Found while investigating whether the "3000-token
+  ceiling" referenced in the Issue 2 fix was a real constraint (it isn't
+  -- see below). Not fixed -- confusing but inert, someone reading
+  `token_estimator.py` in isolation could mistake it for live enforcement.
+- **`MAX_TOTAL_TOKENS`/`MAX_COMPLETION_TOKENS` (`payload_builder.py`) are
+  self-referential, not hard constraints** (2026-09-11, Part B of the
+  same follow-up): confirmed by tracing where they're actually used --
+  `MAX_TOTAL_TOKENS` is read ONLY inside `validate_payload_size()`'s own
+  check, nowhere else. It's not Claude's model context window (~200K
+  tokens, far larger), not `budget_guard.py`'s dollar cap, and not
+  `llm_interpretation_orchestrator.LLM_MONTHLY_TOKEN_BUDGET` (a separate
+  1M-token/month quota) -- it's exactly as arbitrary as the original 2000
+  figure was, just one level removed, with the same incremental-bump
+  history (its own comments: "raised to accommodate v7 completion
+  headroom"). 2600 (Monthly's new `MAX_PROMPT_TOKENS`) is confirmed to
+  have real margin against two genuinely fresh, real charts measured
+  after the fix (1841 and 2001 estimated tokens -- 599-759 tokens of
+  headroom, ~23-29%) -- comfortable, not huge. If future prompt growth
+  pushes real charts noticeably above ~2200-2300, re-measure rather than
+  assume the margin still holds (same instruction already in
+  `payload_builder.py`'s comment on the constant itself).
 - **PDF download call-site consolidation**: `window.open()` was the root
   cause of Issue 1 (can't attach Authorization header) — this is the
   third instance of the "multiple independent copies drift" bug class in
@@ -243,6 +272,23 @@ this, not the automated suite alone).
   both implementations above. Their *base* fields (nakshatra/rasi vs
   lagna/moon, sade-sati-always-shown vs conditional) are NOT unified —
   they'd already diverged before anyone looked; don't assume they match.
+- **`is_llm_enabled()` (`llm_interpretation_orchestrator.py`) is THE
+  single source of truth for "may the LLM be called right now, anywhere"
+  — as of 2026-09-11, not before.** It used to check only
+  `llm_config.llm_enabled` (the admin's manual toggle); a completely
+  separate flag, `llm_budget.llm_enabled` (auto-pause when $ spend
+  crosses the configured threshold, set by
+  `budget_guard._check_budget()`), was checked independently via raw SQL
+  in three places (`chat.py` once, `family.py` twice) — meaning those
+  three never reliably respected the manual toggle (only via a
+  best-effort, swallowed-exception sync in `admin_llm.py`'s `/toggle`),
+  and conversely every OTHER LLM call site (`natal_interpretation.py`,
+  `daily.py`, `prediction.py`, the orchestrator itself) never respected
+  the budget auto-pause at all. Now returns `False` if either source
+  says off. If you're adding a new LLM-calling code path, call
+  `is_llm_enabled()` — never re-query either table directly, never
+  reimplement this check. Need the human-facing reason it's off (not a
+  gating decision)? Use `get_llm_pause_reason()`, same file.
 - `family_predictions` caches per `(group_id, year)` only — no version
   history is kept. A regeneration overwrites the single row for that
   group/year; `prompt_version` gates whether a *read* is treated as
