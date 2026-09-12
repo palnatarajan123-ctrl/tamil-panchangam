@@ -132,9 +132,31 @@ def _make_styles():
     return styles
 
 
-def _header_table_style(header_bg: tuple) -> TableStyle:
+def _section_header(text: str, styles) -> List:
+    """Top-level heading + a colored accent rule beneath it -- same
+    visual device canonical_report/pdf_renderer.py's _section_header()
+    establishes for #1/#2, applied here so all three report types share
+    one visual identity. This report has no subsection level to
+    distinguish from (every heading here is top-level), so this isn't
+    fixing an internal hierarchy problem -- it's adopting the
+    cross-report convention (Phase 3, #3 pass).
+    """
+    return [
+        Paragraph(text, styles['FamilySectionTitle']),
+        HRFlowable(
+            width="100%", thickness=1.2,
+            color=colors.Color(*COLORS["accent"]),
+            spaceBefore=0, spaceAfter=10,
+        ),
+    ]
+
+
+def _header_table_style(header_bg) -> TableStyle:
+    """header_bg: a colors.Color (not a raw tuple -- lets call sites
+    pass an existing named Color constant like CAUTION_COLOR directly
+    instead of needing a second, manually-matched tuple copy of it)."""
     return TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(*header_bg)),
+        ('BACKGROUND', (0, 0), (-1, 0), header_bg),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 10),
@@ -182,9 +204,7 @@ def _build_cover(group_name: str, member_names: List[str], year: int, styles) ->
 def _build_executive_summary(summary: str, styles) -> List:
     if not summary:
         return []
-    elements = [
-        Paragraph("Executive Summary", styles['FamilySectionTitle']),
-    ]
+    elements = list(_section_header("Executive Summary", styles))
     # Card background via table
     cell_style = ParagraphStyle(
         'SummaryCell', parent=styles['FamilyBody'],
@@ -211,7 +231,7 @@ def _build_executive_summary(summary: str, styles) -> List:
 def _build_financial_peaks(peaks: list, styles) -> List:
     if not peaks:
         return []
-    elements = [Paragraph("Financial Peaks &amp; Troughs", styles['FamilySectionTitle'])]
+    elements = list(_section_header("Financial Peaks &amp; Troughs", styles))
 
     header = [
         Paragraph("Period", styles['FamilyTableHeader']),
@@ -242,7 +262,7 @@ def _build_financial_peaks(peaks: list, styles) -> List:
 
     col_widths = [110, 70, 65, 195]
     table = Table(rows, colWidths=col_widths, repeatRows=1)
-    table.setStyle(_header_table_style(COLORS["primary"]))
+    table.setStyle(_header_table_style(colors.Color(*COLORS["primary"])))
     elements.append(table)
     elements.append(Spacer(1, 0.2 * inch))
     return elements
@@ -251,7 +271,7 @@ def _build_financial_peaks(peaks: list, styles) -> List:
 def _build_caution_windows(windows: list, styles) -> List:
     if not windows:
         return []
-    elements = [Paragraph("Shared Caution Windows", styles['FamilySectionTitle'])]
+    elements = list(_section_header("Shared Caution Windows", styles))
 
     header = [
         Paragraph("Period", styles['FamilyTableHeader']),
@@ -279,7 +299,13 @@ def _build_caution_windows(windows: list, styles) -> List:
 
     col_widths = [110, 70, 65, 195]
     table = Table(rows, colWidths=col_widths, repeatRows=1)
-    table.setStyle(_header_table_style(COLORS["secondary"]))
+    # Caution Windows is the one table that's semantically about what to
+    # watch out for, so it gets the report's actual warning color
+    # (CAUTION_COLOR, already defined for exactly this but never wired
+    # in anywhere) instead of a third, unrelated neutral hue -- resolves
+    # the previous primary/secondary/accent three-way header-color
+    # spread into a meaningful two-color scheme: neutral data vs. caution.
+    table.setStyle(_header_table_style(CAUTION_COLOR))
     elements.append(table)
     elements.append(Spacer(1, 0.2 * inch))
     return elements
@@ -288,7 +314,7 @@ def _build_caution_windows(windows: list, styles) -> List:
 def _build_child_milestones(milestones: list, styles) -> List:
     if not milestones:
         return []
-    elements = [Paragraph("Child Milestones", styles['FamilySectionTitle'])]
+    elements = list(_section_header("Child Milestones", styles))
 
     header = [
         Paragraph("Child", styles['FamilyTableHeader']),
@@ -313,7 +339,12 @@ def _build_child_milestones(milestones: list, styles) -> List:
 
     col_widths = [90, 90, 90, 170]
     table = Table(rows, colWidths=col_widths, repeatRows=1)
-    table.setStyle(_header_table_style(COLORS["accent"]))
+    # Neutral header (matches Financial Peaks/Porutham) -- the accent
+    # gold this used to have was one more unrelated hue in the same
+    # three-way spread Caution Windows' header just resolved; per-row
+    # favorable/unfavorable meaning is carried by the ✓/⚠ indicator
+    # itself, not the table shell.
+    table.setStyle(_header_table_style(colors.Color(*COLORS["primary"])))
     elements.append(table)
     elements.append(Spacer(1, 0.2 * inch))
     return elements
@@ -357,7 +388,7 @@ def _build_porutham(
     if not points:
         return []
 
-    elements = [Paragraph("Compatibility (Porutham)", styles['FamilySectionTitle'])]
+    elements = list(_section_header("Compatibility (Porutham)", styles))
 
     summary_style = ParagraphStyle(
         'PoruthamSummary', parent=styles['FamilyBody'],
@@ -398,7 +429,7 @@ def _build_porutham(
         ])
 
     table = Table(rows, colWidths=[300, 140], repeatRows=1)
-    table.setStyle(_header_table_style(COLORS["primary"]))
+    table.setStyle(_header_table_style(colors.Color(*COLORS["primary"])))
     elements.append(KeepTogether([table]))
     elements.append(Spacer(1, 0.2 * inch))
     return elements
@@ -407,7 +438,7 @@ def _build_porutham(
 def _build_key_takeaways(takeaways: list, styles) -> List:
     if not takeaways:
         return []
-    elements = [Paragraph("Key Takeaways", styles['FamilySectionTitle'])]
+    elements = list(_section_header("Key Takeaways", styles))
     bullet_paragraphs = [
         Paragraph(f"• {t}", styles['FamilyBullet'])
         for t in takeaways
@@ -538,7 +569,7 @@ def render_children_timing_pdf(
                 Paragraph(guidance, styles['FamilyTableCell']),
             ])
         t = Table(rows, colWidths=[100, 65, 120, 155], repeatRows=1)
-        t.setStyle(_header_table_style(COLORS["primary"]))
+        t.setStyle(_header_table_style(colors.Color(*COLORS["primary"])))
         story.append(t)
         story.append(Spacer(1, 0.2 * inch))
 
@@ -632,7 +663,7 @@ def render_child_prediction_pdf(
                 Paragraph(str(e.get("plain_english", "")), styles['FamilyTableCell']),
             ])
         t = Table(rows, colWidths=[110, 65, 80, 185], repeatRows=1)
-        t.setStyle(_header_table_style(COLORS["primary"]))
+        t.setStyle(_header_table_style(colors.Color(*COLORS["primary"])))
         story.append(t)
         story.append(Spacer(1, 0.2 * inch))
 
