@@ -473,9 +473,7 @@ def _build_key_takeaways(takeaways: list, styles) -> List:
         Paragraph(f"• {t}", styles['FamilyBullet'])
         for t in takeaways
     ]
-    card_content = [[bp] for bp in bullet_paragraphs]
     # Wrap in a single-column table for the card background
-    flat_content = [[Paragraph("", styles['FamilyBody'])]]  # dummy
     table = Table(
         [[bp] for bp in bullet_paragraphs],
         colWidths=[440],
@@ -488,7 +486,10 @@ def _build_key_takeaways(takeaways: list, styles) -> List:
         ('TOPPADDING', (0, 0), (0, -1), 6),
         ('BOTTOMPADDING', (0, 0), (0, -1), 6),
     ]))
-    elements.append(table)
+    # KeepTogether: this box previously had none, so it could (and in a
+    # real render, did) split across a page boundary mid-box -- the gold
+    # border visibly cutting off on one page and resuming on the next.
+    elements.append(KeepTogether([table]))
     elements.append(Spacer(1, 0.2 * inch))
     return elements
 
@@ -810,6 +811,11 @@ def render_family_pdf(
     story += _build_key_takeaways(prediction.get("key_takeaways", []), styles)
     story += _build_footer(styles)
 
-    doc.build(story)
+    header_text = f"Tamil Panchangam — Family Prediction Report — {group_name}"
+
+    def _canvas_factory(*args, **kwargs):
+        return _NumberedCanvas(*args, header_text=header_text, **kwargs)
+
+    doc.build(story, canvasmaker=_canvas_factory)
     buffer.seek(0)
     return buffer.read()
