@@ -48,6 +48,16 @@ THEME_COLORS = {
 FAVORABLE_COLOR = colors.Color(0.13, 0.45, 0.20)
 CAUTION_COLOR = colors.Color(0.80, 0.55, 0.10)
 
+# Porutham grade -> color (porutham_engine.py's four grades: Excellent/
+# Good/Average/Poor). Reuses the colors already defined above rather
+# than inventing a new palette for this one badge.
+GRADE_COLORS = {
+    "excellent": FAVORABLE_COLOR,
+    "good": FAVORABLE_COLOR,
+    "average": CAUTION_COLOR,
+    "poor": TROUGH_COLOR,
+}
+
 
 def _make_styles():
     styles = getSampleStyleSheet()
@@ -328,7 +338,8 @@ def _build_child_milestones(milestones: list, styles) -> List:
         fav = m.get("favorable", True)
         outlook = m.get("plain_english", "")
         indicator = "✓" if fav else "⚠"
-        outlook_cell = f"{indicator} {outlook}"
+        indicator_color = FAVORABLE_COLOR if fav else CAUTION_COLOR
+        outlook_cell = f'<font color="#{_rgb_hex(indicator_color)}"><b>{indicator}</b></font> {outlook}'
 
         rows.append([
             Paragraph(str(m.get("child_name", "")), styles['FamilyTableCell']),
@@ -395,9 +406,18 @@ def _build_porutham(
         alignment=TA_CENTER, spaceAfter=10,
     )
     names_line = f"{husband_name or 'Husband'} &amp; {wife_name or 'Wife'}"
+    grade = str(porutham.get('grade', ''))
+    # Grade used to display as bare text ("— Poor") with no visual
+    # treatment at all -- same category of issue as #1's bare Tara Bala
+    # names, just milder since a full explanatory paragraph (commentary,
+    # below) already follows it here. GRADE_COLORS reuses colors already
+    # defined in this file for exactly this kind of favorable/caution
+    # framing (FAVORABLE_COLOR/CAUTION_COLOR/TROUGH_COLOR).
+    grade_color = GRADE_COLORS.get(grade.lower(), CAUTION_COLOR)
     score_line = (
         f"{porutham.get('total_score')}/{porutham.get('max_score')} "
-        f"({porutham.get('percent')}%) — {porutham.get('grade')}"
+        f"({porutham.get('percent')}%) — "
+        f'<font color="#{_rgb_hex(grade_color)}"><b>{grade}</b></font>'
     )
     elements.append(Paragraph(f"<b>{names_line}</b><br/>{score_line}", summary_style))
     elements.append(Spacer(1, 0.1 * inch))
