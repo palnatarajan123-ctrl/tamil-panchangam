@@ -1,7 +1,13 @@
 # app/pdf/family_report/family_pdf_renderer.py
 """
 Family Prediction PDF Renderer.
-Uses ReportLab Platypus — same card-style layout as canonical_report/pdf_renderer.py.
+Uses ReportLab Platypus -- shares COLORS/MARGIN/NumberedCanvas with
+canonical_report/pdf_renderer.py via app.pdf.shared_styles (extracted
+2026-09-11; this file used to carry its own hand-copied, independently-
+synced COLORS dict identical in value but not import, which is exactly
+the kind of drift this extraction fixes). Layout code itself (styles,
+table builders, section builders) is still independent -- only the
+color/canvas primitives are shared so far.
 """
 
 import io
@@ -25,18 +31,9 @@ from reportlab.platypus import (
     HRFlowable,
 )
 
-logger = logging.getLogger(__name__)
+from app.pdf.shared_styles import COLORS, MARGIN, NumberedCanvas as _NumberedCanvas
 
-# Match config.py COLORS exactly
-COLORS = {
-    "primary": (0.2, 0.15, 0.4),
-    "secondary": (0.4, 0.35, 0.5),
-    "accent": (0.8, 0.6, 0.2),
-    "text": (0.1, 0.1, 0.1),
-    "muted": (0.5, 0.5, 0.5),
-    "background": (0.98, 0.97, 0.95),
-}
-MARGIN = 50
+logger = logging.getLogger(__name__)
 
 # Type → color mapping for PDF badges
 PEAK_COLOR = colors.Color(0.13, 0.45, 0.20)

@@ -6,7 +6,16 @@ Centralized configuration for PDF generation:
 - Token limits
 - Section names
 - Styling defaults
+
+COLORS and MARGIN are re-exported from app.pdf.shared_styles (not
+defined here) so this module and family_report/family_pdf_renderer.py
+draw from one source instead of two independently-synced copies --
+see shared_styles.py's docstring for why. Kept as re-exports (not
+removed) so `from .config import COLORS, MARGIN` keeps working
+everywhere in this package without touching every call site.
 """
+
+from app.pdf.shared_styles import COLORS, MARGIN
 
 REPORT_VERSION = "1.0"
 PROMPT_VERSION = "report_v1"
@@ -24,15 +33,6 @@ SECTION_NAMES = [
     "summary_closing",
 ]
 
-COLORS = {
-    "primary": (0.2, 0.15, 0.4),
-    "secondary": (0.4, 0.35, 0.5),
-    "accent": (0.8, 0.6, 0.2),
-    "text": (0.1, 0.1, 0.1),
-    "muted": (0.5, 0.5, 0.5),
-    "background": (0.98, 0.97, 0.95),
-}
-
 FONTS = {
     "heading": "Helvetica-Bold",
     "body": "Helvetica",
@@ -40,4 +40,3 @@ FONTS = {
 }
 
 PAGE_SIZE = "A4"
-MARGIN = 50
