@@ -2910,7 +2910,7 @@ def render_birth_chart_pdf(data: CanonicalReportData, include_technical_appendix
     """
     buffer = io.BytesIO()
 
-    doc = SimpleDocTemplate(
+    doc = _TOCDocTemplate(
         buffer,
         pagesize=A4,
         rightMargin=MARGIN,
@@ -2924,6 +2924,12 @@ def render_birth_chart_pdf(data: CanonicalReportData, include_technical_appendix
 
     story.extend(_build_cover_page(data, styles))
     story.extend(_build_how_to_read(styles))
+
+    # Short flat ToC, same threshold #1 uses -- only worth having when
+    # the technical appendix makes the document long enough to need one.
+    if include_technical_appendix:
+        story.extend(_build_table_of_contents(styles))
+
     # Interpretation first — human meaning before technical charts
     if data.is_natal_v2 or data.prediction_overview \
             or data.prediction_areas:
@@ -2947,7 +2953,16 @@ def render_birth_chart_pdf(data: CanonicalReportData, include_technical_appendix
         story.extend(_build_shadbala_section(data, styles))
         story.extend(_build_methodology_appendix(data, styles))
 
-    doc.build(story)
+    header_text = f"Tamil Panchangam — Birth Chart Report — {data.birth_details.name}"
+
+    def _canvas_factory(*args, **kwargs):
+        return _NumberedCanvas(*args, header_text=header_text, **kwargs)
+
+    # multiBuild (not build): degrades to one pass when the story has
+    # no ToC flowable (technical appendix off) -- same mechanism as #1,
+    # verified there that multiBuild only calls canv.save() once so it
+    # can't corrupt the buffer across passes.
+    doc.multiBuild(story, canvasmaker=_canvas_factory)
 
     buffer.seek(0)
     return buffer.read()
