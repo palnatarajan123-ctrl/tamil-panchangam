@@ -206,6 +206,54 @@ stale" and "confirmed real" looked like in practice):
   Overview fix (affects score deltas, not just narrative text, and
   potentially the "Signals" display across all three prediction periods)
   — deliberately scoped out of the Overview fix.
+- **Every birth-chart-only PDF (`render_birth_chart_pdf()`) silently
+  omits Sade Sati & Saturn Analysis and Shadow Points (Upagrahas)**,
+  despite both sections' rendering code being present, wired in, and
+  confirmed working correctly when given data. Found 2026-09-11 while
+  inventorying `render_birth_chart_pdf()` for the PDF redesign (#2) and
+  confirmed concretely against a real chart (`f5da25da`): both
+  `data.sade_sati_data` and `data.upagrahas` come back `None` from
+  `build_birth_chart_report_data()` (`data_loader.py`), so
+  `_build_sade_sati_section()`/`_build_upagrahas_section()` both hit
+  their early `if not data.X: return []` guard and produce nothing —
+  no error, no log, just two entire sections missing from every natal
+  report a user has ever downloaded. This affects ALL users of this
+  report type, not one chart — it's a structural gap in the loader, not
+  a per-chart data quirk.
+  - **Root cause, Sade Sati**: `build_birth_chart_report_data()` reads
+    `sade_sati_raw = payload.get("sade_sati")` — the STATIC base_chart
+    payload, which never gets a `"sade_sati"` key written at chart
+    creation (confirmed: grepped the whole function, this is the only
+    place it's referenced). That's actually correct behavior for a
+    static field, because Sade Sati status is NOT static — it depends
+    on Saturn's CURRENT transit relative to the natal Moon, which
+    changes over years. The monthly report's loader (`build_report_data()`,
+    same file) gets this right: it reads `envelope.get("sade_sati")`,
+    where `envelope` is `build_monthly_prediction_envelope()`'s live,
+    "as-of-now" computation. The birth-chart loader needs the same kind
+    of live call — and already imports and calls two structurally
+    identical live engines a few lines away in the very same function
+    (`compute_gochara()`, `compute_nakshatra_context()`, both called
+    with a live `reference_date_utc` to build `live_transit_context`/
+    `live_nakshatra`) — it just never added the equivalent call to
+    `sade_sati_engine.py`'s `compute_sade_sati()`. This is a same-file,
+    same-pattern fix, not a design problem.
+  - **Root cause, Upagrahas**: simpler and more complete an omission —
+    `build_birth_chart_report_data()`'s `CanonicalReportData(...)`
+    constructor call never passes an `upagrahas=` argument at all (the
+    field just defaults to `None`). No read-from-wrong-place bug here,
+    just never wired in. `upagrahas_engine.py`'s `compute_gulika_mandi()`
+    is already imported and called elsewhere in this same file
+    (`app/api/prediction.py`'s lazy-backfill path, per this file's own
+    "Payload paths" notes above) — same shape of fix as Sade Sati:
+    reuse an existing engine call, not build one from scratch.
+  - Not fixed here — flagged during a visual-redesign pass (Phase 0-4
+    inventory for #2), deliberately scoped out since it's a content-
+    completeness bug, not a styling one, and the redesign work was
+    already committed to reusing the existing (working) render
+    functions for these two sections unchanged. Needs its own fix,
+    prioritized as a real content gap affecting every natal-only
+    report, not a minor mapping oversight.
 
 ## 2026-09-11 regression investigation retrospective (Issue 4)
 
