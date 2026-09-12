@@ -291,14 +291,24 @@ def _build_caution_windows(windows: list, styles) -> List:
     ]
     rows = [header]
 
+    muted_hex = _rgb_hex(colors.Color(*COLORS["muted"]))
+
     for w in windows:
         theme = str(w.get("theme", "general")).lower()
-        guidance = w.get("plain_english", "")
+        # Genuinely separated blocks via <br/> -- this used to
+        # concatenate with literal "\n" characters, which ReportLab's
+        # Paragraph parser does not render as line breaks (collapses to
+        # a space like HTML), so the main guidance, the affected-members
+        # list, and the remedy hint all ran together as one dense
+        # paragraph despite reading as if they were on separate lines
+        # in the source. Real rendering defect, not a style choice.
+        guidance_parts = [w.get("plain_english", "")]
         affected = ", ".join(w.get("members_affected", []))
         if affected:
-            guidance += f"\nAffects: {affected}"
+            guidance_parts.append(f'<font size="9" color="#{muted_hex}">Affects: {affected}</font>')
         if w.get("remedy_hint"):
-            guidance += f"\n<i>{w['remedy_hint']}</i>"
+            guidance_parts.append(f"<i>{w['remedy_hint']}</i>")
+        guidance = "<br/><br/>".join(guidance_parts)
 
         rows.append([
             Paragraph(str(w.get("period", "")), styles['FamilyTableCell']),
