@@ -75,21 +75,36 @@ stale" and "confirmed real" looked like in practice):
   SAV output — that pipeline (`bhinnashtakavarga_engine.py` →
   `refined_av_engine.py`) is the legitimate one.
 
-  **Not fixed — needs a decision**: `ashtakavarga_engine.py`'s
+  **Not fixed — decision made on the destination, deferred on
+  execution (2026-09-13)**: `ashtakavarga_engine.py`'s
   `compute_ashtakavarga_validation()` is live, used for real Saturn/
   Jupiter transit-strength validation feeding `remedy_engine.py` (via
-  `prediction_envelope.py`). Options, not chosen here: (a) replace its
-  usage with the already-more-correct `bhinnashtakavarga_engine.py` SAV
-  + `refined_av_engine.py` Shodhita reduction pipeline (the "do it
-  right" option, larger integration work); (b) keep the current
-  heuristic but rename/relabel honestly (e.g. drop all classical
-  terminology, document as "an estimated bindu-density heuristic, not
-  verified against classical Ashtakavarga tables") without changing its
-  output; (c) leave as-is with this finding recorded, if the live
-  impact is judged acceptable for now. Also worth a small separate fix
-  regardless of which option is chosen: `bhinnashtakavarga_engine.py`'s
-  Moon/Mars/Jupiter table discrepancies (a few cells in `BAV_TABLES`
-  likely need correcting against a verified reference).
+  `prediction_envelope.py:321`). Decided: switch this call site to the
+  already-more-correct `bhinnashtakavarga_engine.py` SAV +
+  `refined_av_engine.py` Shodhita-reduction pipeline (not a rename, not
+  "leave as-is" — the current heuristic is confirmed structurally wrong,
+  not just unlabeled). This switch is gated on two preconditions, both
+  still outstanding, before it ships:
+  1. Fix and source `bhinnashtakavarga_engine.py`'s 3 known
+     transcription discrepancies (Moon 48 vs. expected 49, Mars 41 vs.
+     expected 39, Jupiter 57 vs. expected 56) against a verified
+     reference table — switching to a "mostly correct" replacement
+     without first closing this gap would trade one uncited-accuracy
+     problem for a smaller but still real one.
+  2. Run a before/after comparative audit across real charts showing
+     EXACTLY which Saturn/Jupiter transit-strength labels
+     (`strength`/`overall_support` in `compute_ashtakavarga_validation()`'s
+     output) would change for real users under the new pipeline, before
+     switching — per this project's standing rule that a score/label
+     change is a product decision, not something to migrate silently.
+     The scale difference alone (57-total heuristic vs. 337-total real
+     SAV, then Shodhita-reduced) means `_classify_bindu_strength()`'s
+     thresholds (`>=6 high_support`, etc., calibrated for the 0-8
+     per-sign range the current heuristic happens to produce) will also
+     need re-deriving for the new pipeline's actual output range, not
+     reused as-is.
+  Both preconditions require their own dedicated work sessions — not
+  started here.
 - **`transit_hits_engine.py`'s `_house_of()` uses a different house
   SYSTEM than the rest of the app, not just a differently-styled
   formula** — found 2026-09-13 while consolidating the whole-sign
