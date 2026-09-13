@@ -10,6 +10,8 @@ Determines the functional role of each planet based on:
 import logging
 from typing import Dict, List, Any
 
+from app.utils.planet_lists import NATURAL_MALEFICS
+
 logger = logging.getLogger(__name__)
 
 RASI_LORDS = {
@@ -34,7 +36,6 @@ RASI_NAMES = [
 ]
 
 NATURAL_BENEFICS = ["Jupiter", "Venus", "Mercury", "Moon"]
-NATURAL_MALEFICS = ["Saturn", "Mars", "Sun", "Rahu", "Ketu"]
 
 TRIKONA_HOUSES = [1, 5, 9]
 KENDRA_HOUSES = [1, 4, 7, 10]

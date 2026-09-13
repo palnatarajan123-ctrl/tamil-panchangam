@@ -262,8 +262,9 @@ def compute_event_windows(
 from datetime import date as _date
 from typing import Any as _Any, Dict as _Dict, List as _List, Optional as _Optional
 
+from app.utils.planet_lists import NATURAL_MALEFICS as _MALEFIC_PLANETS
+
 _BENEFIC_PLANETS = {"Jupiter", "Venus", "Moon", "Mercury"}
-_MALEFIC_PLANETS = {"Saturn", "Rahu", "Ketu", "Mars", "Sun"}
 
 # Positive/negative aspects for confluence scoring
 _POSITIVE_ASPECTS = {"conjunction", "trine"}

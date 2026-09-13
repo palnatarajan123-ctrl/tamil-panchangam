@@ -8,10 +8,11 @@ Computes static natal chart house analysis:
 import logging
 from typing import Dict, List, Any
 
+from app.utils.planet_lists import NATURAL_MALEFICS
+
 logger = logging.getLogger(__name__)
 
 NATURAL_BENEFICS = ["Jupiter", "Venus", "Moon", "Mercury"]
-NATURAL_MALEFICS = ["Saturn", "Mars", "Rahu", "Ketu", "Sun"]
 
 HOUSE_KENDRA = [1, 4, 7, 10]
 HOUSE_TRIKONA = [1, 5, 9]

@@ -2,6 +2,7 @@
 
 from statistics import pstdev
 from app.engines.life_area_scorer import LifeAreaScorer
+from app.utils.planet_lists import NATURAL_MALEFICS as MALEFIC_LORDS
 
 # ============================================================
 # CONSTANTS
@@ -16,7 +17,9 @@ LIFE_AREAS = [
 ]
 
 BENEFIC_LORDS = {"Jupiter", "Venus", "Mercury"}
-MALEFIC_LORDS = {"Saturn", "Mars", "Rahu", "Ketu"}
+# MALEFIC_LORDS imported above -- this file's own copy used to exclude
+# Sun (a real, confirmed drift from the other 3 files that each
+# independently declared the same list). See app.utils.planet_lists.
 
 
 # ============================================================
