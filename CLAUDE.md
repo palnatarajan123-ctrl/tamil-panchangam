@@ -254,6 +254,45 @@ stale" and "confirmed real" looked like in practice):
     functions for these two sections unchanged. Needs its own fix,
     prioritized as a real content gap affecting every natal-only
     report, not a minor mapping oversight.
+- **Ask Jyotishi chat's ungrounded-fact pattern extends beyond Gochara
+  (2026-09-12, deferred half of the peyarchi/chat-fabrication fix)** —
+  the fix landed 2026-09-12 grounded `_build_chat_context()`'s Gochara/
+  transit data specifically (real `compute_gochara()` call + a
+  GROUNDING/anti-fabrication system-prompt rule that covers ANY
+  ungrounded claim generically). The rule is in place chart-wide, but
+  the underlying DATA gaps it's compensating for elsewhere were not
+  individually closed the way Gochara's was: `_build_chat_context()`
+  still gives the LLM only current dasha LORD names (no start/end
+  dates), one hardcoded D10 Sun/Saturn snippet (no other divisional
+  chart placements), and yoga NAMES only (no house/planet specifics).
+  A question asking for a dasha end date, a D9/D7/D10-beyond-Sun-Saturn
+  placement, or which house a named yoga's planets sit in still has
+  no precomputed answer to draw from — the new GROUNDING rule should
+  make the model decline rather than fabricate in these cases (same
+  mechanism that now catches ungrounded Gochara questions), but this
+  wasn't individually verified per question type the way Gochara was
+  (real chart, real prompt, real re-run). If a future report shows the
+  model confidently answering one of these with a specific wrong
+  number, checking whether the GROUNDING rule actually fired (vs. the
+  model ignoring it) is the first thing to check, before assuming a new
+  bug. Actually grounding these (precomputed dasha timeline dates,
+  fuller divisional-chart data, yoga house/planet detail) was
+  deliberately scoped out of the 2026-09-12 fix as its own, separate
+  piece of work.
+- **`ashtakavarga_engine.py`'s fallback estimation branch has the same
+  Tamil/English rasi-name mismatch as the two bugs fixed 2026-09-12 in
+  `gochara_engine.py`/`moon_transit_engine.py`, but is dead code in
+  practice** — `compute_ashtakavarga_validation()`'s fallback branch
+  (`RASI_TO_INDEX.get(birth_moon_rasi, 0)`, line ~121) has the identical
+  bug shape (Tamil `birth_moon_rasi` against an English-keyed lookup),
+  but its only real caller (`prediction_envelope.py:319`) always passes
+  `natal_positions`/`lagna_longitude` as non-None, so the "classical"
+  branch (which doesn't use `birth_moon_rasi` at all) is always taken
+  instead — confirmed by reading the caller, not assumed. Not fixed —
+  normalizing it would be a one-line no-op change to live behavior
+  today, so it wasn't worth bundling into that fix's commit, but if
+  `compute_ashtakavarga_validation()` ever gets a second caller that
+  omits `natal_positions`/`lagna_longitude`, this exact bug reactivates.
 
 ## 2026-09-11 regression investigation retrospective (Issue 4)
 
@@ -403,6 +442,31 @@ this, not the automated suite alone).
   group/year; `prompt_version` gates whether a *read* is treated as
   current, it doesn't preserve old rows the way `prediction_llm_interpretation`
   does for individual charts.
+- **`ephemeris.moon.rasi`/`ephemeris.lagna.rasi` on every chart payload
+  are stored in TAMIL** (`ephemeris.py`'s `get_rasi()`/`RASI_NAMES`), but
+  several engines (`gochara_engine.py`, `moon_transit_engine.py`) key
+  their house-counting lookups in ENGLISH. Passing a Tamil rasi string
+  into one of those silently defaulted to index 0 ("as if Moon is in
+  Aries") instead of raising — fixed 2026-09-12 via
+  `app.utils.rasi_utils.to_english_rasi()`, now the single conversion
+  point (normalizes inside the lookup functions themselves, so every
+  caller is covered, not just known ones). If you add a new engine that
+  compares a rasi name read from a chart payload against an
+  English-keyed table (`RASI_TO_INDEX`-shaped), run it through
+  `to_english_rasi()` first — don't assume the payload's rasi is already
+  in whatever naming scheme your lookup uses.
+- **Transit/Gochara computations must thread `node_type` from the
+  chart's own `chart_metadata.node_type`, not assume a default** — fixed
+  2026-09-12: `swisseph_utils.py` used to hardcode `swe.TRUE_NODE` for
+  Rahu regardless of the chart's setting, while the natal engine
+  (`ephemeris.py`) already defaulted to mean node (the documented
+  traditional-Tamil-astrology convention). `compute_planet_longitude()`/
+  `compute_planet_longitude_with_speed()` now take `node_type` (default
+  `"mean"`); every real Rahu/Ketu transit call site threads the chart's
+  actual value through. A future transit-computing engine that skips
+  this (hardcodes a node type, or doesn't accept the parameter at all)
+  reintroduces the exact bug that moved Rahu's real Dec 2026 Capricorn
+  ingress ~10 days early.
 
 Before writing any new engine that reads base_charts.payload,
 always run this first to see actual structure:
