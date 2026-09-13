@@ -13,25 +13,10 @@ from app.db.postgres import get_conn
 from app.core.auth import get_current_user
 from app.repositories.base_chart_repo import get_base_chart_by_id, user_owns_chart
 from app.engines.realtime_context_engine import compute_realtime_context
+from app.utils.rasi_utils import to_english_rasi
 
 
 router = APIRouter(prefix="/realtime", tags=["Realtime Context"])
-
-
-ENGLISH_TO_TAMIL_RASI = {
-    "Aries": "Mesham",
-    "Taurus": "Rishabam",
-    "Gemini": "Mithunam",
-    "Cancer": "Kadakam",
-    "Leo": "Simmam",
-    "Virgo": "Kanni",
-    "Libra": "Thulam",
-    "Scorpio": "Vrischikam",
-    "Sagittarius": "Dhanusu",
-    "Capricorn": "Makaram",
-    "Aquarius": "Kumbham",
-    "Pisces": "Meenam",
-}
 
 
 @router.get("/context/{base_chart_id}")
@@ -64,13 +49,7 @@ def get_realtime_context(base_chart_id: str, user: dict = Depends(get_current_us
     ephemeris = payload.get("ephemeris", {})
     moon_data = ephemeris.get("moon", {})
     birth_moon_longitude = moon_data.get("longitude_deg", 0.0)
-    birth_moon_rasi = moon_data.get("rasi", "Aries")
-    
-    if birth_moon_rasi in ENGLISH_TO_TAMIL_RASI.values():
-        for eng, tam in ENGLISH_TO_TAMIL_RASI.items():
-            if tam == birth_moon_rasi:
-                birth_moon_rasi = eng
-                break
+    birth_moon_rasi = to_english_rasi(moon_data.get("rasi", "Aries"))
     
     panchangam = payload.get("panchangam_birth", {})
     nakshatra_data = panchangam.get("nakshatra", {})
@@ -80,12 +59,7 @@ def get_realtime_context(base_chart_id: str, user: dict = Depends(get_current_us
         birth_nakshatra = moon_nak.get("name", "Ashwini") if isinstance(moon_nak, dict) else "Ashwini"
     
     lagna = ephemeris.get("lagna", {})
-    birth_lagna_rasi = lagna.get("rasi", None)
-    if birth_lagna_rasi in ENGLISH_TO_TAMIL_RASI.values():
-        for eng, tam in ENGLISH_TO_TAMIL_RASI.items():
-            if tam == birth_lagna_rasi:
-                birth_lagna_rasi = eng
-                break
+    birth_lagna_rasi = to_english_rasi(lagna.get("rasi", None))
     
     birth_details = payload.get("birth_details", {})
     latitude = birth_details.get("latitude", 13.0827)

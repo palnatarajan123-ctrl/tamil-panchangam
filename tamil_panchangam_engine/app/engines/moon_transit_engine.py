@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List
 from app.utils.swisseph_utils import compute_planet_longitude
+from app.utils.rasi_utils import to_english_rasi
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +47,8 @@ def _longitude_to_rasi(longitude: float) -> str:
 
 def _house_from_moon(transit_rasi: str, natal_moon_rasi: str) -> int:
     """Calculate house position from Moon sign."""
-    moon_idx = RASI_TO_INDEX.get(natal_moon_rasi, 0)
-    transit_idx = RASI_TO_INDEX.get(transit_rasi, 0)
+    moon_idx = RASI_TO_INDEX.get(to_english_rasi(natal_moon_rasi), 0)
+    transit_idx = RASI_TO_INDEX.get(to_english_rasi(transit_rasi), 0)
     return ((transit_idx - moon_idx) % 12) + 1
 
 

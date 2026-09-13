@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Optional
 from app.utils.swisseph_utils import compute_planet_longitude, compute_planet_longitude_with_speed
+from app.utils.rasi_utils import to_english_rasi
 
 logger = logging.getLogger(__name__)
 
@@ -87,15 +88,15 @@ def _days_in_sign(degree_in_sign: float, speed_deg_per_day: float) -> int:
 
 def _house_from_moon(transit_rasi: str, natal_moon_rasi: str) -> int:
     """Calculate house position from Moon sign."""
-    moon_idx = RASI_TO_INDEX.get(natal_moon_rasi, 0)
-    transit_idx = RASI_TO_INDEX.get(transit_rasi, 0)
+    moon_idx = RASI_TO_INDEX.get(to_english_rasi(natal_moon_rasi), 0)
+    transit_idx = RASI_TO_INDEX.get(to_english_rasi(transit_rasi), 0)
     return ((transit_idx - moon_idx) % 12) + 1
 
 
 def _transit_natal_house(transit_rasi: str, natal_lagna_rasi: str) -> int:
     """Calculate house position of transit planet from natal Lagna."""
-    lagna_idx = RASI_TO_INDEX.get(natal_lagna_rasi, 0)
-    transit_idx = RASI_TO_INDEX.get(transit_rasi, 0)
+    lagna_idx = RASI_TO_INDEX.get(to_english_rasi(natal_lagna_rasi), 0)
+    transit_idx = RASI_TO_INDEX.get(to_english_rasi(transit_rasi), 0)
     return ((transit_idx - lagna_idx) % 12) + 1
 
 
