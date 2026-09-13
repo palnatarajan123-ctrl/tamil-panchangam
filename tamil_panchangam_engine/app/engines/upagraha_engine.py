@@ -21,6 +21,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 from app.utils.swisseph_utils import AYANAMSA_MODES, compute_planet_longitude_at_jd
+from app.utils.panchangam_calc import GULIKA_DAYTIME_SEGMENT_1INDEXED
 
 logger = logging.getLogger(__name__)
 
@@ -36,18 +37,16 @@ RASI_LORDS = {
     "Capricorn": "Saturn", "Aquarius": "Saturn", "Pisces": "Jupiter",
 }
 
-# Gulika/Mandi daytime segment index (0-based, out of 8) by Python weekday (Mon=0)
-# Verified against reference tables (e.g. templesinindiainfo.com, anytimeastro.com):
-# Sun=7th, Mon=6th, Tue=5th, Wed=4th, Thu=3rd, Fri=2nd, Sat=1st (1-indexed).
-# Matches _GULIKA_SEGMENT in dinaphalam_engine.py (same table, 0-indexed here).
+# Gulika/Mandi daytime segment index (0-based, out of 8) by Python weekday
+# (Mon=0) -- derived from app.utils.panchangam_calc's
+# GULIKA_DAYTIME_SEGMENT_1INDEXED (the single canonical source, shared with
+# dinaphalam_engine.py's "today" Gulika Kaalam window; this module needs it
+# 0-indexed since segment_idx is used directly as a multiplier below, not
+# through the same (segment - 1) conversion dinaphalam_engine.py's
+# _window_times() does internally). See CLAUDE.md's 2026-09-13 entry.
 _MANDI_DAYTIME_SEGMENT: Dict[int, int] = {
-    0: 5,  # Monday   — segment 6 (0-indexed: 5)
-    1: 4,  # Tuesday  — segment 5
-    2: 3,  # Wednesday— segment 4
-    3: 2,  # Thursday — segment 3
-    4: 1,  # Friday   — segment 2
-    5: 0,  # Saturday — segment 1
-    6: 6,  # Sunday   — segment 7
+    weekday: segment_1indexed - 1
+    for weekday, segment_1indexed in GULIKA_DAYTIME_SEGMENT_1INDEXED.items()
 }
 
 # Nighttime segment offsets (different sequence, not used for birth charts by default)

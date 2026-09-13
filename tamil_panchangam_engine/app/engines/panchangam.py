@@ -11,16 +11,11 @@ This module will compute Tamil Panchangam elements:
 from datetime import datetime
 from typing import Dict
 
+from app.utils.panchangam_calc import compute_tithi as _compute_tithi_shared
+
 # -----------------------------
 # CONSTANTS
 # -----------------------------
-
-TITHI_NAMES = [
-    "Prathama", "Dvitiya", "Tritiya", "Chaturthi", "Panchami",
-    "Shashthi", "Saptami", "Ashtami", "Navami", "Dashami",
-    "Ekadashi", "Dwadashi", "Trayodashi", "Chaturdashi",
-    "Pournami / Amavasya"
-]
 
 YOGA_NAMES = [
     "Vishkumbha", "Preeti", "Ayushman", "Saubhagya", "Shobhana",
@@ -56,17 +51,14 @@ TAMIL_MONTHS = [
 # -----------------------------
 
 def compute_tithi(sun_lon: float, moon_lon: float) -> Dict:
-    diff = (moon_lon - sun_lon) % 360
-    tithi_index = int(diff // 12)
-    paksha = "Shukla" if tithi_index < 15 else "Krishna"
-    tithi_number = (tithi_index % 15) + 1
-
-    return {
-        "paksha": paksha,
-        "tithi_number": tithi_number,
-        "name": f"{paksha} {TITHI_NAMES[tithi_number - 1]}",
-        "index": tithi_index
-    }
+    """Delegates to app.utils.panchangam_calc (the single canonical
+    implementation, shared with dinaphalam_engine.py's "today" display --
+    see CLAUDE.md's 2026-09-13 entry). "name" is now the bare tithi name
+    (e.g. "Ashtami", or "Pournami"/"Amavasya" correctly distinguished by
+    paksha) rather than a "Paksha TithiName" concatenated string --
+    "paksha" is still reported as its own field, matching the shape
+    dinaphalam_engine.py's version already used."""
+    return _compute_tithi_shared(sun_lon, moon_lon)
 
 
 def compute_yoga(sun_lon: float, moon_lon: float) -> Dict:

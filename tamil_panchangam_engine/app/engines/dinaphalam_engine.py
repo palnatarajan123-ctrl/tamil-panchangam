@@ -17,6 +17,10 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, Tuple
 
 from app.utils.swisseph_utils import compute_planet_longitude_at_jd
+from app.utils.panchangam_calc import (
+    compute_tithi as _compute_tithi_shared,
+    GULIKA_DAYTIME_SEGMENT_1INDEXED,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,27 +48,9 @@ _YAMA_SEGMENT: Dict[int, int] = {
     6: 5,  # Sunday    — 5th
 }
 
-# Gulika Kaalam segment by weekday (daytime table)
-# Verified against reference tables (e.g. templesinindiainfo.com, anytimeastro.com):
-# Sun=7th, Mon=6th, Tue=5th, Wed=4th, Thu=3rd, Fri=2nd, Sat=1st.
-_GULIKA_SEGMENT: Dict[int, int] = {
-    0: 6,  # Monday    — 6th
-    1: 5,  # Tuesday   — 5th
-    2: 4,  # Wednesday — 4th
-    3: 3,  # Thursday  — 3rd
-    4: 2,  # Friday    — 2nd
-    5: 1,  # Saturday  — 1st
-    6: 7,  # Sunday    — 7th
-}
-
-TITHI_NAMES = [
-    "Prathama", "Dvitiya", "Tritiya", "Chaturthi", "Panchami",
-    "Shashthi", "Saptami", "Ashtami", "Navami", "Dashami",
-    "Ekadashi", "Dwadashi", "Trayodashi", "Chaturdashi", "Pournami",
-    "Prathama", "Dvitiya", "Tritiya", "Chaturthi", "Panchami",
-    "Shashthi", "Saptami", "Ashtami", "Navami", "Dashami",
-    "Ekadashi", "Dwadashi", "Trayodashi", "Chaturdashi", "Amavasya",
-]
+# Gulika Kaalam segment by weekday -- imported from app.utils.panchangam_calc
+# (the single canonical source, shared with upagraha_engine.py's natal
+# Gulika/Mandi) as GULIKA_DAYTIME_SEGMENT_1INDEXED.
 
 from app.engines.nakshatra_names import canonical_nakshatra_list as _canonical_nakshatra_list
 NAKSHATRA_NAMES = _canonical_nakshatra_list()
@@ -162,7 +148,7 @@ def compute_dinaphalam(
 
     rahu_seg = _RAHU_SEGMENT[weekday]
     yama_seg = _YAMA_SEGMENT[weekday]
-    gulika_seg = _GULIKA_SEGMENT[weekday]
+    gulika_seg = GULIKA_DAYTIME_SEGMENT_1INDEXED[weekday]
 
     rahu_window = _window_times(sunrise_jd, segment_duration, rahu_seg, utc_offset_hours)
     yama_window = _window_times(sunrise_jd, segment_duration, yama_seg, utc_offset_hours)
@@ -184,10 +170,7 @@ def compute_dinaphalam(
     tara_key, tara_name, tara_quality = TARA_BALA_CYCLE[tara_idx]
 
     # Tithi
-    diff = (moon_lon - sun_lon) % 360
-    tithi_idx = int(diff / 12)
-    paksha = "Shukla" if tithi_idx < 15 else "Krishna"
-    tithi_name = TITHI_NAMES[tithi_idx]
+    tithi = _compute_tithi_shared(sun_lon, moon_lon)
 
     return {
         "date": date_utc.strftime("%Y-%m-%d"),
@@ -219,9 +202,9 @@ def compute_dinaphalam(
             "distance": distance,
         },
         "tithi": {
-            "name": tithi_name,
-            "paksha": paksha,
-            "number": (tithi_idx % 15) + 1,
+            "name": tithi["name"],
+            "paksha": tithi["paksha"],
+            "number": tithi["tithi_number"],
         },
         "sunrise": _jd_to_local_time(sunrise_jd, utc_offset_hours),
         "sunset": _jd_to_local_time(sunset_jd, utc_offset_hours),

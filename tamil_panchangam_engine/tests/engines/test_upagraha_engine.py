@@ -5,12 +5,19 @@ Tests for upagraha_engine.compute_gulika_mandi — natal Gulika (Mandi) point.
 Segment table cross-checked against the same reference used in
 test_dinaphalam_engine.py (Gulika column): Sun=7th, Mon=6th, Tue=5th,
 Wed=4th, Thu=3rd, Fri=2nd, Sat=1st (1-indexed daylight segment).
+
+2026-09-13: upagraha_engine.py's _MANDI_DAYTIME_SEGMENT and
+dinaphalam_engine.py's Gulika segment lookup are now both derived from
+app.utils.panchangam_calc.GULIKA_DAYTIME_SEGMENT_1INDEXED (the single
+canonical source) instead of two independently-maintained copies --
+see CLAUDE.md's entry from that date. The cross-check test below still
+verifies both modules actually use it (not just happen to agree).
 """
 
 from datetime import datetime, timezone
 
 from app.engines.upagraha_engine import compute_gulika_mandi, _MANDI_DAYTIME_SEGMENT
-from app.engines.dinaphalam_engine import _GULIKA_SEGMENT
+from app.utils.panchangam_calc import GULIKA_DAYTIME_SEGMENT_1INDEXED
 
 CHENNAI_LAT = 13.0827
 CHENNAI_LON = 80.2707
@@ -48,16 +55,19 @@ class TestGulikaMandiComputation:
     def test_segment_table_matches_dinaphalam_gulika_table(self):
         """
         The natal (upagraha_engine) and daily (dinaphalam_engine) Gulika
-        segment tables must stay in sync — both derive from the same
-        classical rule and were fixed together after an off-by-one weekday
-        bug was found (each day was using the previous day's segment).
+        segment tables must stay in sync — both now derive from the same
+        canonical app.utils.panchangam_calc.GULIKA_DAYTIME_SEGMENT_1INDEXED
+        source (2026-09-13 consolidation), so this is now structurally
+        guaranteed rather than a hand-verified coincidence -- kept as a
+        regression guard against a future change reintroducing a second
+        independent copy.
         """
         for weekday_0indexed in range(7):
             natal_1indexed = _MANDI_DAYTIME_SEGMENT[weekday_0indexed] + 1
-            daily_1indexed = _GULIKA_SEGMENT[weekday_0indexed]
-            assert natal_1indexed == daily_1indexed, (
+            canonical_1indexed = GULIKA_DAYTIME_SEGMENT_1INDEXED[weekday_0indexed]
+            assert natal_1indexed == canonical_1indexed, (
                 f"weekday {weekday_0indexed}: natal={natal_1indexed} "
-                f"daily={daily_1indexed}"
+                f"canonical={canonical_1indexed}"
             )
 
 
