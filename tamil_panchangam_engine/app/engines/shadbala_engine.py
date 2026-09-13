@@ -7,6 +7,8 @@ Scores are in Rupas (1 Rupa = 60 Shashtiamsas).
 import logging
 from typing import Dict, Any
 
+from app.utils.house_math import house_from_longitude
+
 logger = logging.getLogger(__name__)
 
 # ── Natural strength (Naisargika Bala) ─────────────────────────────
@@ -91,9 +93,7 @@ def _get_sign(longitude: float) -> int:
 
 def _get_house(planet_lon: float, lagna_lon: float) -> int:
     """Get house number 1-12 from lagna."""
-    planet_sign = _get_sign(planet_lon)
-    lagna_sign = _get_sign(lagna_lon)
-    return ((planet_sign - lagna_sign + 12) % 12) + 1
+    return house_from_longitude(planet_lon, lagna_lon)
 
 
 def compute_sthana_bala(
@@ -219,7 +219,6 @@ def compute_drik_bala(
     Net strength from aspects received from other planets.
     7th house aspect = full, 4th/8th = 3/4, 5th/9th = 1/2, others = 1/4
     """
-    planet_sign = _get_sign(longitude)
     net_score = 0.0
     aspects_received = []
 
@@ -230,10 +229,9 @@ def compute_drik_bala(
             continue
 
         other_lon = other_data.get("longitude_deg", 0)
-        other_sign = _get_sign(other_lon)
 
         # House distance from other planet to this planet
-        distance = ((planet_sign - other_sign + 12) % 12) + 1
+        distance = house_from_longitude(longitude, other_lon)
 
         # Aspect multiplier
         if distance == 7:

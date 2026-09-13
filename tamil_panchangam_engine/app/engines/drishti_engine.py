@@ -29,6 +29,8 @@ filter list.
 import logging
 from typing import Dict, List, Any
 
+from app.utils.house_math import house_from_longitude
+
 logger = logging.getLogger(__name__)
 
 NODAL_DRISHTI_MODE = "SYMMETRIC_NODES"
@@ -149,7 +151,7 @@ def compute_drishti(
                 continue
 
             planet_lon = planet_data.get("longitude_deg", 0.0)
-            planet_house = ((int(planet_lon // 30) - int(lagna_deg // 30) + 12) % 12) + 1
+            planet_house = house_from_longitude(planet_lon, lagna_deg)
             
             aspected_houses = compute_aspected_houses(planet_house, planet_name)
             

@@ -9,6 +9,7 @@ import logging
 from typing import Dict, List, Any
 
 from app.utils.planet_lists import NATURAL_MALEFICS
+from app.utils.house_math import house_from_longitude
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +201,7 @@ def compute_all_house_strength(
         planet_houses = {}
         for planet_name, planet_data in planets_data.items():
             p_lon = planet_data.get("longitude_deg", 0.0)
-            p_house = ((int(p_lon // 30) - int(lagna_lon // 30) + 12) % 12) + 1
+            p_house = house_from_longitude(p_lon, lagna_lon)
             planet_houses[planet_name] = p_house
         
         house_aspects = drishti_data.get("house_aspects", {h: [] for h in range(1, 13)})

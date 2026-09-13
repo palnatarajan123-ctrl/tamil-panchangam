@@ -17,6 +17,8 @@ import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
 
+from app.utils.house_math import house_from_sign_number
+
 logger = logging.getLogger(__name__)
 
 # Approximate Saturn ingress dates per sign (Lahiri / Nirayana)
@@ -120,7 +122,7 @@ def _get_sign_from_longitude(longitude: float) -> int:
 
 def _get_house_from_moon(saturn_sign: int, moon_sign: int) -> int:
     """Get house number of Saturn from Moon sign."""
-    return ((saturn_sign - moon_sign + 12) % 12) + 1
+    return house_from_sign_number(saturn_sign, moon_sign)
 
 
 def _get_current_saturn_sign(reference_date: Optional[datetime] = None) -> Optional[int]:

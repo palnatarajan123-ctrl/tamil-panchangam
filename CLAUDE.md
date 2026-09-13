@@ -25,6 +25,92 @@ these — this list has been wrong before; see "Gulika/Sani Oorai" and
 "family surfaces" audits in git history, 2026-08-14, for what "confirmed
 stale" and "confirmed real" looked like in practice):
 
+- **PRIORITY — `ashtakavarga_engine.py`'s "classical" Sarvashtakavarga
+  is not a real classical calculation, and it's used for LIVE Saturn/
+  Jupiter transit validation** (investigated 2026-09-13, not fixed —
+  needs a decision, not a unilateral patch). `_compute_sarvashtakavarga()`
+  (source="classical" branch, the one actually reached in production —
+  `prediction_envelope.py:321`'s only caller always supplies
+  `natal_positions`/`lagna_longitude`) gives each of the 8 contributors
+  (7 grahas + Lagna) exactly ONE fixed benefic-house list
+  (`SUN_AV_BENEFIC_HOUSES`, etc.), applied identically regardless of
+  which planet's chart is being assessed, summing to a fixed 57-bindu
+  total.
+
+  Confirmed via cross-referencing real classical Bhinnashtakavarga
+  mechanics (web search, corroborated by multiple independent
+  astrology-software sources): real Bhinnashtakavarga assigns each
+  contributor a DIFFERENT benefic-house table depending on which planet
+  is being assessed (64 separate (contributor, assessed-planet) tables,
+  not 8) — e.g. "Saturn's contribution to the Sun's BAV" uses houses
+  `[1,2,4,7,8,9,10,11]`, a different list than Saturn's contribution to
+  any other planet's BAV. Each assessed planet's own complete BAV
+  (summed across all 8 contributors) has a well-known FIXED total
+  regardless of the chart — Sun 48, Moon 49, Mars 39, Mercury 54,
+  Jupiter 56, Venus 52, Saturn 39, summing to 337 — and this is what
+  real "Sarvashtakavarga" sums. `ashtakavarga_engine.py`'s single-list-
+  per-contributor approach can't reproduce this: it was never computing
+  a per-assessed-planet BAV at all, so there's no real "Sarvashtakavarga"
+  or "Shodhita Ashtakavarga" being approximated here — it's a
+  structurally different, seemingly ad-hoc calculation that happens to
+  produce a plausible-looking 57-bindu total, despite the file's own
+  docstring calling it "Full Classical Parashari Calculation."
+
+  **This means the originally-proposed fix (just rename it to
+  "Shodhita Ashtakavarga" for clarity) would be actively misleading** --
+  that name claims a real classical reduction (Trikona + Ekadhipatya
+  Shodhana applied to a real SAV) that this code was never doing.
+  Deliberately not renamed to any classical-sounding term.
+
+  **`bhinnashtakavarga_engine.py`'s classical BAV/SAV implementation is
+  mostly correct, verified against the same real fixed totals above**
+  — a real chart's computed totals exactly matched Sun (48), Mercury
+  (54), Venus (52), Saturn (39), but Moon came out 48 (expected 49),
+  Mars 41 (expected 39), Jupiter 57 (expected 56) — net SAV total 339
+  vs. the classical 337. 4 of 7 exact matches suggests the overall
+  8×8 `BAV_TABLES` structure/approach is correct, with 1-2 likely
+  transcription errors in specific table cells for Moon/Mars/Jupiter's
+  rows, not a structural problem. `refined_av_engine.py` (Trikona/
+  Ekadhipatya Shodhana) is correctly built on top of this engine's real
+  SAV output — that pipeline (`bhinnashtakavarga_engine.py` →
+  `refined_av_engine.py`) is the legitimate one.
+
+  **Not fixed — needs a decision**: `ashtakavarga_engine.py`'s
+  `compute_ashtakavarga_validation()` is live, used for real Saturn/
+  Jupiter transit-strength validation feeding `remedy_engine.py` (via
+  `prediction_envelope.py`). Options, not chosen here: (a) replace its
+  usage with the already-more-correct `bhinnashtakavarga_engine.py` SAV
+  + `refined_av_engine.py` Shodhita reduction pipeline (the "do it
+  right" option, larger integration work); (b) keep the current
+  heuristic but rename/relabel honestly (e.g. drop all classical
+  terminology, document as "an estimated bindu-density heuristic, not
+  verified against classical Ashtakavarga tables") without changing its
+  output; (c) leave as-is with this finding recorded, if the live
+  impact is judged acceptable for now. Also worth a small separate fix
+  regardless of which option is chosen: `bhinnashtakavarga_engine.py`'s
+  Moon/Mars/Jupiter table discrepancies (a few cells in `BAV_TABLES`
+  likely need correcting against a verified reference).
+- **`transit_hits_engine.py`'s `_house_of()` uses a different house
+  SYSTEM than the rest of the app, not just a differently-styled
+  formula** — found 2026-09-13 while consolidating the whole-sign
+  house-from-longitude formula (`app/utils/house_math.py`) across the
+  files that share it. `_house_of(natal_planet_lon, lagna_lon)` computes
+  `int((natal_planet_lon - lagna_lon) % 360.0 / 30.0) % 12 + 1` — this
+  divides the raw angular DISTANCE between the two points by 30°, which
+  is an Equal House calculation (cusps exactly 30° apart starting at the
+  exact Lagna degree), not Whole Sign (which every other engine in this
+  app uses — the whole point of `house_from_longitude()` is
+  `int(target//30) - int(ref//30)`, i.e. "which SIGN, not which 30°
+  angular slice"). Confirmed these genuinely disagree, not just
+  differently-styled: random-sampled 2000 (target, reference) pairs,
+  1003 disagreed (about half, as expected whenever the reference point
+  isn't exactly at 0° of its sign — true for nearly every real Lagna).
+  Deliberately NOT touched in the house_math.py consolidation — this
+  needs its own investigation (is Equal House intentional for
+  `transit_hits_engine.py`'s specific purpose — labeling which life area
+  a transit-degree hit affects — or is it an accidental formula choice
+  that should be Whole Sign like everywhere else?) before deciding
+  whether to fix it, not a blind merge into the new shared helper.
 - **Night-birth Gulika (Mandi)** — `_MANDI_NIGHTTIME_SEGMENT` in
   `upagraha_engine.py` exists but is unwired. Deferred, not guessed at:
   the daytime table's mechanism (a continuous Saturn→Jupiter→Mars→Sun→

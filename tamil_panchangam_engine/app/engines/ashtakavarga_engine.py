@@ -11,6 +11,7 @@ import logging
 from typing import Dict, List, Optional
 
 from app.utils.rasi_utils import to_english_rasi
+from app.utils.house_math import house_from_sign_number
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +124,8 @@ def compute_ashtakavarga_validation(
                 moon_idx = RASI_TO_INDEX.get(to_english_rasi(birth_moon_rasi), 0)
                 saturn_idx = RASI_TO_INDEX.get(to_english_rasi(saturn_transit_rasi), 0)
                 jupiter_idx = RASI_TO_INDEX.get(to_english_rasi(jupiter_transit_rasi), 0)
-                saturn_house = ((saturn_idx - moon_idx) % 12) + 1
-                jupiter_house = ((jupiter_idx - moon_idx) % 12) + 1
+                saturn_house = house_from_sign_number(saturn_idx, moon_idx)
+                jupiter_house = house_from_sign_number(jupiter_idx, moon_idx)
                 if saturn_house in [3, 6, 11]:
                     saturn_bindu += 1
                 elif saturn_house in [1, 4, 7, 8]:

@@ -10,6 +10,8 @@ Detects only the most significant yogas:
 import logging
 from typing import Dict, List, Any, Optional
 
+from app.utils.house_math import house_from_longitude
+
 logger = logging.getLogger(__name__)
 
 KENDRA_FROM_POSITIONS = [1, 4, 7, 10]
@@ -70,9 +72,7 @@ def get_rasi_from_longitude(longitude: float) -> int:
 
 def get_house_from_lagna(planet_lon: float, lagna_lon: float) -> int:
     """Get house number from lagna."""
-    planet_rasi = get_rasi_from_longitude(planet_lon)
-    lagna_rasi = get_rasi_from_longitude(lagna_lon)
-    return ((planet_rasi - lagna_rasi + 12) % 12) + 1
+    return house_from_longitude(planet_lon, lagna_lon)
 
 
 def check_gaja_kesari(
@@ -83,10 +83,7 @@ def check_gaja_kesari(
     Check for Gaja Kesari Yoga.
     Jupiter must be in kendra (1, 4, 7, 10) from Moon.
     """
-    moon_rasi = get_rasi_from_longitude(moon_lon)
-    jupiter_rasi = get_rasi_from_longitude(jupiter_lon)
-    
-    distance = ((jupiter_rasi - moon_rasi + 12) % 12) + 1
+    distance = house_from_longitude(jupiter_lon, moon_lon)
     
     if distance in KENDRA_FROM_POSITIONS:
         strength = "strong" if distance in [1, 7] else "moderate"
@@ -251,12 +248,9 @@ def check_neecha_bhanga(
             
             if deb_lord and deb_lord in planets_data:
                 deb_lord_lon = planets_data[deb_lord].get("longitude_deg", 0)
-                deb_lord_rasi = get_rasi_from_longitude(deb_lord_lon)
-                
                 moon_lon = planets_data.get("Moon", {}).get("longitude_deg", 0)
-                moon_rasi = get_rasi_from_longitude(moon_lon)
-                
-                distance_from_moon = ((deb_lord_rasi - moon_rasi + 12) % 12) + 1
+
+                distance_from_moon = house_from_longitude(deb_lord_lon, moon_lon)
                 
                 if distance_from_moon in KENDRA_FROM_POSITIONS:
                     yogas.append({
