@@ -85,7 +85,16 @@ class TestOverviewMatchesRealScoreEndToEnd(unittest.TestCase):
 
         life_areas = result["synthesis"]["life_areas"]
         avg_score = sum(la["score"] for la in life_areas.values()) / len(life_areas)
-        self.assertGreater(avg_score, 75, "fixture drifted -- expected a clearly high-scoring chart")
+        # Threshold lowered 75 -> 70 on 2026-09-13: this fixture's real
+        # measured score was 77.0 when captured, now correctly recomputes
+        # to ~73.8 after two decided-doctrine scoring fixes that same day
+        # (Sun added to MALEFIC_LORDS; Ketu's drishti no longer silently
+        # excluded) -- both real, deliberate, sourced changes to the
+        # deterministic pipeline, not fixture drift or a bug. Still
+        # clearly high-scoring relative to the low_score fixture's 53.2 --
+        # not loosened to paper over a regression. See CLAUDE.md's
+        # 2026-09-13 entry.
+        self.assertGreater(avg_score, 70, "fixture drifted -- expected a clearly high-scoring chart")
 
         window_summary = result["interpretation"]["ai_interpretation"]["window_summary"]
         self.assertEqual(window_summary["momentum"], "growth")

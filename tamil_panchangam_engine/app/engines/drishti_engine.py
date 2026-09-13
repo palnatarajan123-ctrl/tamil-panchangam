@@ -6,12 +6,32 @@ Implements classical Vedic aspects:
 - Mars: Special aspects on 4th and 8th houses
 - Jupiter: Special aspects on 5th and 9th houses
 - Saturn: Special aspects on 3rd and 10th houses
-- Rahu/Ketu: Special aspects on 5th and 9th houses
+- Rahu/Ketu: Special aspects on 5th and 9th houses (NODAL_DRISHTI_MODE
+  = "SYMMETRIC_NODES", the default -- see below)
+
+Nodal drishti convention (2026-09-13 decision): whether Ketu casts
+drishti symmetrically with Rahu, or is treated as drishti-silent, is a
+genuine doctrinal split across traditions -- not settled by consensus.
+SYMMETRIC_NODES (both Rahu and Ketu cast 5th/7th/9th aspects) was
+chosen specifically for Tamil/South Indian practice: corroborated by a
+Chennai-based astrologer source and documented by Jagannatha Hora
+(a widely-used reference implementation) as "common in South Indian
+traditions." Implemented as an explicit, named mode rather than a
+silent assumption so it can be revisited/overridden without
+re-litigating from scratch -- see CLAUDE.md's 2026-09-13 entry.
+Before this fix, PARASHARA_SPECIAL_ASPECTS already listed Ketu's
+aspects correctly, but compute_drishti()'s main loop explicitly
+skipped Ketu entirely (`if planet_name in ["Ketu"]: continue`), so
+that entry was dead -- Ketu cast zero drishti in practice regardless
+of mode. That was the actual bug, not (only) the significant_aspects
+filter list.
 """
 import logging
 from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
+
+NODAL_DRISHTI_MODE = "SYMMETRIC_NODES"
 
 PARASHARA_SPECIAL_ASPECTS = {
     "Mars": [4, 8],
@@ -95,34 +115,39 @@ def determine_aspect_effect(planet_name: str, aspected_house: int, house_occupan
 def compute_drishti(
     ephemeris: Dict[str, Any],
     houses: Dict[int, Any],
-    lagna_longitude: float = 0.0
+    lagna_longitude: float = 0.0,
+    nodal_drishti_mode: str = NODAL_DRISHTI_MODE,
 ) -> Dict[str, Any]:
     """
     Compute planetary aspects (drishti) for the natal chart.
-    
+
     Args:
         ephemeris: Planetary positions from base chart
         houses: House data with occupants
         lagna_longitude: Lagna degree for house calculation
-        
+        nodal_drishti_mode: "SYMMETRIC_NODES" (default) -- Ketu casts
+            drishti the same as Rahu (5th/7th/9th). See module docstring
+            for the sourcing behind this default; only mode implemented
+            today, but named/overridable rather than a silent assumption.
+
     Returns:
         Structured drishti data with aspects and effects
     """
     try:
         logger.debug("DEBUG: Computing Drishti (aspects)")
-        
+
         planets_data = ephemeris.get("planets", {})
         aspects = []
         house_aspects_received = {h: [] for h in range(1, 13)}
-        
+
         lagna_deg = lagna_longitude
         if ephemeris.get("lagna"):
             lagna_deg = ephemeris["lagna"].get("longitude_deg", 0.0)
-        
+
         for planet_name, planet_data in planets_data.items():
-            if planet_name in ["Ketu"]:
+            if planet_name == "Ketu" and nodal_drishti_mode != "SYMMETRIC_NODES":
                 continue
-                
+
             planet_lon = planet_data.get("longitude_deg", 0.0)
             planet_house = ((int(planet_lon // 30) - int(lagna_deg // 30) + 12) % 12) + 1
             
@@ -151,7 +176,7 @@ def compute_drishti(
         
         significant_aspects = []
         for aspect in aspects:
-            if aspect["planet"] in ["Jupiter", "Saturn", "Mars", "Rahu"]:
+            if aspect["planet"] in ["Jupiter", "Saturn", "Mars", "Rahu", "Ketu"]:
                 if aspect["aspect_type"] == "special" or aspect["effect"] != "mixed":
                     significant_aspects.append(aspect)
         
