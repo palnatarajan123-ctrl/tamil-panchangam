@@ -207,12 +207,22 @@ def compute_gochara(
         rahu_cs = _conjunction_strength(rahu_long, natal_moon_longitude) if natal_moon_longitude is not None else None
         ketu_cs = _conjunction_strength(ketu_long, natal_moon_longitude) if natal_moon_longitude is not None else None
 
-        # L3: Drishti aspect bonus — natal aspects on the house occupied by transit planet
-        if drishti_data and natal_lagna_rasi:
+        # Lagna-based house (independent of drishti_data -- previously only
+        # computed when drishti_data was also present, since that was its
+        # only consumer; exposed unconditionally now so callers that want
+        # a house number relative to Lagna, not just Moon, don't need to
+        # thread drishti_data through just to get it. See CLAUDE.md's
+        # 2026-09-12 chat-grounding fix for why this is needed.
+        if natal_lagna_rasi:
             jup_natal_house = _transit_natal_house(jup_rasi, natal_lagna_rasi)
             sat_natal_house = _transit_natal_house(sat_rasi, natal_lagna_rasi)
             rahu_natal_house = _transit_natal_house(rahu_rasi, natal_lagna_rasi)
             ketu_natal_house = _transit_natal_house(ketu_rasi, natal_lagna_rasi)
+        else:
+            jup_natal_house = sat_natal_house = rahu_natal_house = ketu_natal_house = None
+
+        # L3: Drishti aspect bonus — natal aspects on the house occupied by transit planet
+        if drishti_data and natal_lagna_rasi:
             jup_drishti_bonus = _drishti_bonus_for_transit_house(jup_natal_house, drishti_data)
             sat_drishti_bonus = _drishti_bonus_for_transit_house(sat_natal_house, drishti_data)
             rahu_drishti_bonus = _drishti_bonus_for_transit_house(rahu_natal_house, drishti_data)
@@ -230,6 +240,8 @@ def compute_gochara(
             "is_retrograde": jup_speed < 0,
             "days_in_sign": _days_in_sign(jup_deg, jup_speed),
         }
+        if jup_natal_house is not None:
+            jup_entry["from_lagna_house"] = jup_natal_house
         if jup_cs is not None:
             jup_entry["conjunction_strength"] = jup_cs
         if jup_drishti_bonus is not None:
@@ -246,6 +258,8 @@ def compute_gochara(
             "is_retrograde": sat_speed < 0,
             "days_in_sign": _days_in_sign(sat_deg, sat_speed),
         }
+        if sat_natal_house is not None:
+            sat_entry["from_lagna_house"] = sat_natal_house
         if sat_cs is not None:
             sat_entry["conjunction_strength"] = sat_cs
         if sat_drishti_bonus is not None:
@@ -265,6 +279,10 @@ def compute_gochara(
             "ketu_phase": _transit_phase(ketu_deg),
             "is_retrograde": True,  # Rahu/Ketu always retrograde by convention
         }
+        if rahu_natal_house is not None:
+            rahu_ketu_entry["rahu_from_lagna_house"] = rahu_natal_house
+        if ketu_natal_house is not None:
+            rahu_ketu_entry["ketu_from_lagna_house"] = ketu_natal_house
         if rahu_cs is not None:
             rahu_ketu_entry["rahu_conjunction_strength"] = rahu_cs
         if ketu_cs is not None:

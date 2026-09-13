@@ -57,6 +57,28 @@ RULES:
 - If the chart is mixed, say so simply: "Mixed signals here —"
 - If the question is outside astrology scope, redirect warmly in one sentence
 
+HOUSE-COUNTING CONVENTION:
+- When you state a house number for any transit or placement, always say
+  whether it's counted from the Moon sign (Rasi) or the Ascendant (Lagna)
+  — e.g. "10th house from your Moon sign", never a bare "10th house".
+
+GROUNDING — NEVER STATE AN UNGROUNDED FACT:
+- Only state a specific sign, house, date, or degree if it is explicitly
+  given to you in the context above (including CURRENT TRANSITS, if
+  present). If asked for something more precise than what's provided —
+  an exact transit/peyarchi date, a dasha end date, a divisional chart
+  placement not listed, or a transit further out than what's shown —
+  say plainly "I don't have that specific data available" rather than
+  generating a plausible-sounding but ungrounded answer.
+
+WHEN CHALLENGED:
+- If the user states something as fact that contradicts what you said
+  (e.g. "other astrologers say X" or "that doesn't match what I've
+  read"), do not simply repeat your prior claim with more confidence.
+  Re-check it against the grounded data in this context; if your
+  earlier statement wasn't grounded in it, say so and correct yourself
+  instead of doubling down.
+
 TIME HORIZON RULE:
 - If the question is about a Mahadasha (6–20 years), answer in broad
   themes only. Do not name specific months or years.
@@ -442,6 +464,46 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
                 "Frame as karmic work in progress, not doom. "
                 "Never use the words 'Gulika' or 'Mandi' in your response.\n"
             )
+    if context.get("gochara_context"):
+        g = context["gochara_context"]
+        lines = []
+        jup = g.get("jupiter", {})
+        if jup.get("transit_rasi"):
+            lines.append(
+                f"- Jupiter: currently in {jup['transit_rasi']} "
+                f"(house {jup.get('from_moon_house', '?')} from your Moon sign, "
+                f"house {jup.get('from_lagna_house', '?')} from your Ascendant), {jup.get('effect', 'neutral')}"
+            )
+        sat = g.get("saturn", {})
+        if sat.get("transit_rasi"):
+            lines.append(
+                f"- Saturn: currently in {sat['transit_rasi']} "
+                f"(house {sat.get('from_moon_house', '?')} from your Moon sign, "
+                f"house {sat.get('from_lagna_house', '?')} from your Ascendant), phase: {sat.get('phase', 'neutral')}"
+            )
+        rk = g.get("rahu_ketu", {})
+        if rk.get("rahu_rasi"):
+            lines.append(
+                f"- Rahu: currently in {rk['rahu_rasi']} "
+                f"(house {rk.get('rahu_from_moon_house', '?')} from your Moon sign, "
+                f"house {rk.get('rahu_from_lagna_house', '?')} from your Ascendant)"
+            )
+            lines.append(
+                f"- Ketu: currently in {rk['ketu_rasi']} "
+                f"(house {rk.get('ketu_from_moon_house', '?')} from your Moon sign, "
+                f"house {rk.get('ketu_from_lagna_house', '?')} from your Ascendant)"
+            )
+        if lines:
+            system_prompt += (
+                "\n\n## CURRENT TRANSITS (Gochara) — as of today, computed live\n"
+                + "\n".join(lines)
+                + "\nThese are the ONLY current planetary transit positions you have. "
+                "Do not state a different sign, house, or transit/peyarchi date than what's "
+                "listed here. If asked about a transit further out than what's shown (a future "
+                "sign change, an exact ingress date), say you don't have that specific date "
+                "rather than guessing.\n"
+            )
+
     if reading_as_name:
         system_prompt = f"Reading from {reading_as_name}'s chart.\n\n" + system_prompt
     return system_prompt
@@ -559,6 +621,33 @@ def _build_chat_context(base_chart_id: str) -> dict:
     except Exception as e:
         logger.warning(f"Upagraha context extraction failed: {e}")
 
+    # Live Gochara (current transits) — grounds any LLM answer about
+    # current/near-term transits or peyarchi in real computed data
+    # instead of leaving the LLM to infer or fabricate sign/house facts.
+    # Previously missing entirely -- see CLAUDE.md's 2026-09-12 Ask
+    # Jyotishi investigation (chart 7c6e34be: LLM fabricated both the
+    # transit sign and house number, with nothing here to ground it).
+    gochara_context: dict = {}
+    try:
+        from app.engines.gochara_engine import compute_gochara
+        from app.utils.rasi_utils import to_english_rasi
+
+        natal_moon_rasi_en = to_english_rasi(moon_data.get("rasi"))
+        natal_lagna_rasi_en = to_english_rasi(ephemeris.get("lagna", {}).get("rasi"))
+        if natal_moon_rasi_en:
+            gochara_context = compute_gochara(
+                reference_date_utc=datetime.now(timezone.utc),
+                latitude=birth.get("latitude", 0.0),
+                longitude=birth.get("longitude", 0.0),
+                natal_moon_rasi=natal_moon_rasi_en,
+                natal_lagna_rasi=natal_lagna_rasi_en,
+                natal_moon_longitude=moon_data.get("longitude_deg"),
+                ayanamsa=ephemeris.get("ayanamsa", "lahiri"),
+                node_type=payload.get("chart_metadata", {}).get("node_type", "mean"),
+            )
+    except Exception as e:
+        logger.warning(f"Gochara computation failed in chat context: {e}")
+
     # Divisional signals for D10/D2/D7
     divisional_summary = ""
     try:
@@ -656,6 +745,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "yearly_summary": yearly_summary,
         "divisional_summary": divisional_summary,
         "upagraha_context": upagraha_context,
+        "gochara_context": gochara_context,
     }
 
 
