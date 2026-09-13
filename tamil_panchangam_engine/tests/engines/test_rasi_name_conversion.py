@@ -14,6 +14,7 @@ from datetime import datetime
 from app.utils.rasi_utils import to_english_rasi, ENGLISH_TO_TAMIL_RASI
 from app.engines.gochara_engine import compute_gochara
 from app.engines.moon_transit_engine import compute_chandra_gati
+from app.engines.ashtakavarga_engine import compute_ashtakavarga_validation
 
 
 def test_to_english_rasi_converts_tamil():
@@ -68,3 +69,21 @@ def test_chandra_gati_house_from_natal_matches_for_tamil_and_english_input():
     tamil_houses = [p["house_from_natal"] for p in tamil_result["moon_positions"]]
     english_houses = [p["house_from_natal"] for p in english_result["moon_positions"]]
     assert tamil_houses == english_houses
+
+
+def test_ashtakavarga_fallback_branch_matches_for_tamil_and_english_input():
+    # This is the same bug shape as gochara/moon_transit, in a branch
+    # that's unreachable from the engine's only real caller today
+    # (prediction_envelope.py always supplies natal_positions +
+    # lagna_longitude, so the classical branch runs instead) -- fixed
+    # anyway as cheap defense-in-depth. Omitting natal_positions/
+    # lagna_longitude here forces the fallback branch under test.
+    tamil_result = compute_ashtakavarga_validation(
+        saturn_transit_rasi="Capricorn", jupiter_transit_rasi="Cancer", birth_moon_rasi="Simmam",
+    )
+    english_result = compute_ashtakavarga_validation(
+        saturn_transit_rasi="Capricorn", jupiter_transit_rasi="Cancer", birth_moon_rasi="Leo",
+    )
+    assert tamil_result["source"] == english_result["source"] == "estimated"
+    assert tamil_result["saturn"]["bindus"] == english_result["saturn"]["bindus"]
+    assert tamil_result["jupiter"]["bindus"] == english_result["jupiter"]["bindus"]

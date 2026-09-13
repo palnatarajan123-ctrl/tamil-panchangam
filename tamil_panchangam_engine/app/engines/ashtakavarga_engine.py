@@ -10,6 +10,8 @@ from its own position. Total bindus in Sarvashtakavarga = 57.
 import logging
 from typing import Dict, List, Optional
 
+from app.utils.rasi_utils import to_english_rasi
+
 logger = logging.getLogger(__name__)
 
 RASI_ORDER = [
@@ -99,8 +101,8 @@ def compute_ashtakavarga_validation(
             total = sum(sarva.values())
             logger.debug(f"DEBUG: Sarvashtakavarga total={total} (expected 57), distribution={sarva}")
 
-            saturn_bindu = sarva.get(saturn_transit_rasi, 4)
-            jupiter_bindu = sarva.get(jupiter_transit_rasi, 4)
+            saturn_bindu = sarva.get(to_english_rasi(saturn_transit_rasi), 4)
+            jupiter_bindu = sarva.get(to_english_rasi(jupiter_transit_rasi), 4)
             source = "classical"
         else:
             # Fallback: simplified estimation using birth moon position
@@ -114,13 +116,13 @@ def compute_ashtakavarga_validation(
                 "Leo": 4, "Virgo": 4, "Libra": 5, "Scorpio": 5,
                 "Sagittarius": 6, "Capricorn": 4, "Aquarius": 4, "Pisces": 5,
             }
-            saturn_bindu = SATURN_AV_TEMPLATE.get(saturn_transit_rasi, 3)
-            jupiter_bindu = JUPITER_AV_TEMPLATE.get(jupiter_transit_rasi, 4)
+            saturn_bindu = SATURN_AV_TEMPLATE.get(to_english_rasi(saturn_transit_rasi), 3)
+            jupiter_bindu = JUPITER_AV_TEMPLATE.get(to_english_rasi(jupiter_transit_rasi), 4)
 
             if birth_moon_rasi:
-                moon_idx = RASI_TO_INDEX.get(birth_moon_rasi, 0)
-                saturn_idx = RASI_TO_INDEX.get(saturn_transit_rasi, 0)
-                jupiter_idx = RASI_TO_INDEX.get(jupiter_transit_rasi, 0)
+                moon_idx = RASI_TO_INDEX.get(to_english_rasi(birth_moon_rasi), 0)
+                saturn_idx = RASI_TO_INDEX.get(to_english_rasi(saturn_transit_rasi), 0)
+                jupiter_idx = RASI_TO_INDEX.get(to_english_rasi(jupiter_transit_rasi), 0)
                 saturn_house = ((saturn_idx - moon_idx) % 12) + 1
                 jupiter_house = ((jupiter_idx - moon_idx) % 12) + 1
                 if saturn_house in [3, 6, 11]:

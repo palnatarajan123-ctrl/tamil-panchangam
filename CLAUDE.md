@@ -254,45 +254,62 @@ stale" and "confirmed real" looked like in practice):
     functions for these two sections unchanged. Needs its own fix,
     prioritized as a real content gap affecting every natal-only
     report, not a minor mapping oversight.
-- **Ask Jyotishi chat's ungrounded-fact pattern extends beyond Gochara
-  (2026-09-12, deferred half of the peyarchi/chat-fabrication fix)** —
-  the fix landed 2026-09-12 grounded `_build_chat_context()`'s Gochara/
-  transit data specifically (real `compute_gochara()` call + a
-  GROUNDING/anti-fabrication system-prompt rule that covers ANY
-  ungrounded claim generically). The rule is in place chart-wide, but
-  the underlying DATA gaps it's compensating for elsewhere were not
-  individually closed the way Gochara's was: `_build_chat_context()`
-  still gives the LLM only current dasha LORD names (no start/end
-  dates), one hardcoded D10 Sun/Saturn snippet (no other divisional
-  chart placements), and yoga NAMES only (no house/planet specifics).
-  A question asking for a dasha end date, a D9/D7/D10-beyond-Sun-Saturn
-  placement, or which house a named yoga's planets sit in still has
-  no precomputed answer to draw from — the new GROUNDING rule should
-  make the model decline rather than fabricate in these cases (same
-  mechanism that now catches ungrounded Gochara questions), but this
-  wasn't individually verified per question type the way Gochara was
-  (real chart, real prompt, real re-run). If a future report shows the
-  model confidently answering one of these with a specific wrong
-  number, checking whether the GROUNDING rule actually fired (vs. the
-  model ignoring it) is the first thing to check, before assuming a new
-  bug. Actually grounding these (precomputed dasha timeline dates,
-  fuller divisional-chart data, yoga house/planet detail) was
-  deliberately scoped out of the 2026-09-12 fix as its own, separate
-  piece of work.
-- **`ashtakavarga_engine.py`'s fallback estimation branch has the same
-  Tamil/English rasi-name mismatch as the two bugs fixed 2026-09-12 in
-  `gochara_engine.py`/`moon_transit_engine.py`, but is dead code in
-  practice** — `compute_ashtakavarga_validation()`'s fallback branch
-  (`RASI_TO_INDEX.get(birth_moon_rasi, 0)`, line ~121) has the identical
-  bug shape (Tamil `birth_moon_rasi` against an English-keyed lookup),
-  but its only real caller (`prediction_envelope.py:319`) always passes
-  `natal_positions`/`lagna_longitude` as non-None, so the "classical"
-  branch (which doesn't use `birth_moon_rasi` at all) is always taken
-  instead — confirmed by reading the caller, not assumed. Not fixed —
-  normalizing it would be a one-line no-op change to live behavior
-  today, so it wasn't worth bundling into that fix's commit, but if
-  `compute_ashtakavarga_validation()` ever gets a second caller that
-  omits `natal_positions`/`lagna_longitude`, this exact bug reactivates.
+- **Ask Jyotishi chat's ungrounded-fact pattern extends beyond
+  Gochara — the GROUNDING rule was verified (live LLM call) to hold for
+  all three flagged question types, but the underlying DATA gaps are
+  still open** (2026-09-12 fix, verified same day). The 2026-09-12 fix
+  grounded `_build_chat_context()`'s Gochara/transit data specifically
+  (real `compute_gochara()` call) plus a generic GROUNDING/anti-
+  fabrication system-prompt rule. `_build_chat_context()` still gives
+  the LLM only current dasha LORD names (no start/end dates), one
+  hardcoded D10 Sun/Saturn snippet (no other divisional placements), and
+  yoga NAMES only (no house/planet specifics) — none of that DATA was
+  added. What WAS verified, via three real live `anthropic.Anthropic`
+  calls against chart `7c6e34be`'s actual context+system prompt (not
+  just prompt inspection): asked for an exact antardasha end date, a
+  specific D9 Saturn placement, and the specific houses in its (real,
+  present) Raja Yoga — all three got an honest "I don't have that
+  specific data available"-shaped answer, no fabricated date/sign/house
+  in any of them. So the rule generalizes in practice, today, for this
+  chart. Important asymmetry to remember: this is instruction-compliance
+  verified by sampling, not a guarantee the way Gochara's fix is — Gochara
+  can no longer fabricate because it now has the real answer to state;
+  these three still rely on the model choosing to follow a textual rule
+  every time, for every chart, every phrasing of the question. If a
+  future report shows confident fabrication on one of these three (or
+  a similar ungrounded-fact question chat wasn't designed to answer),
+  don't assume the rule is broken — re-test with that exact question
+  first, since compliance-by-instruction isn't provably universal the
+  way a data fix is. Actually grounding these (precomputed dasha
+  timeline dates, fuller divisional-chart data, yoga house/planet
+  detail) remains deliberately out of scope, its own separate piece of
+  work.
+- **`ashtakavarga_engine.py` had the same Tamil/English rasi-name
+  mismatch as the two bugs fixed 2026-09-12 in `gochara_engine.py`/
+  `moon_transit_engine.py` — confirmed dead code in its only real
+  caller, fixed anyway 2026-09-12 as cheap defense-in-depth, same day.**
+  `compute_ashtakavarga_validation()`'s fallback ("estimated") branch
+  (`RASI_TO_INDEX.get(birth_moon_rasi, 0)` + two template-dict lookups
+  keyed the same way) only runs in the `else` of
+  `if natal_positions is not None and lagna_longitude is not None`. Its
+  one real caller, `prediction_envelope.py:321`, always passes
+  `natal_positions=ephemeris` (`ephemeris = base_chart["ephemeris"]` at
+  line 99, accessed via `[...]` not `.get()` — would already have raised
+  earlier in the function if absent, so it's never `None` in practice)
+  and `lagna_longitude=natal_lagna_longitude` (`ephemeris.get("lagna",
+  {}).get("longitude_deg", 0.0)` — a float default, never `None`). So
+  that `if` is always true and the buggy branch is unreachable from this
+  caller — verified by reading both files directly, not assumed from
+  the earlier investigation. Fixed anyway: all `RASI_TO_INDEX`/
+  template-dict lookups in the function (both branches, not just the
+  reachable one) now go through `to_english_rasi()` — same shared
+  utility as the other two fixes, zero behavior change confirmed via a
+  direct before/after call in both branches, plus a regression test
+  (`tests/engines/test_rasi_name_conversion.py`). Was cheap (3-line
+  diff, no new caller behavior to verify) specifically because the
+  branch was provably unreachable, so there was no live behavior to
+  regress — that's what made "fix it anyway" the right call here, not a
+  general license to fix every dead-code finding on sight.
 
 ## 2026-09-11 regression investigation retrospective (Issue 4)
 
