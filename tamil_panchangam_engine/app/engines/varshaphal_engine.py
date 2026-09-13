@@ -11,6 +11,8 @@ from typing import Any, Dict, Optional
 
 import swisseph as swe
 
+from app.utils.swisseph_utils import compute_planet_longitude_at_jd, AYANAMSA_MODES
+
 logger = logging.getLogger(__name__)
 
 RASI_NAMES = [
@@ -23,19 +25,7 @@ _RASI_LORDS = [
     "Venus", "Mars", "Jupiter", "Saturn", "Saturn", "Jupiter",
 ]
 
-_BENEFIC_IDS = {
-    "Moon": swe.MOON,
-    "Mercury": swe.MERCURY,
-    "Jupiter": swe.JUPITER,
-    "Venus": swe.VENUS,
-}
-
-_AYANAMSA_MODES = {
-    "lahiri": swe.SIDM_LAHIRI,
-    "kp": swe.SIDM_KRISHNAMURTI,
-}
-
-_FLAGS = swe.FLG_SWIEPH | swe.FLG_SIDEREAL
+_BENEFIC_PLANETS = ["Moon", "Mercury", "Jupiter", "Venus"]
 
 
 def _sign_idx(lon: float) -> int:
@@ -51,8 +41,6 @@ def _find_solar_return_jd(
     Walk day by day from Jan 1 of `year` to find when the Sun crosses natal_sun_lon,
     then binary-search for the exact Julian Day.
     """
-    swe.set_sid_mode(_AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
-
     jd = swe.julday(year, 1, 1, 0.0)
     jd_limit = swe.julday(year + 1, 1, 2, 0.0)
 
@@ -60,8 +48,7 @@ def _find_solar_return_jd(
     crossing_jd: Optional[float] = None
 
     while jd < jd_limit:
-        res, _ = swe.calc_ut(jd, swe.SUN, _FLAGS)
-        cur_lon = res[0] % 360.0
+        cur_lon = compute_planet_longitude_at_jd("Sun", jd, ayanamsa)
 
         if prev_lon is not None:
             delta = (cur_lon - prev_lon) % 360.0
@@ -81,8 +68,8 @@ def _find_solar_return_jd(
     lo, hi = crossing_jd - 1.0, crossing_jd + 1.0
     for _ in range(48):
         mid = (lo + hi) / 2.0
-        res, _ = swe.calc_ut(mid, swe.SUN, _FLAGS)
-        diff = (res[0] % 360.0 - natal_sun_lon + 180.0) % 360.0 - 180.0
+        cur_lon = compute_planet_longitude_at_jd("Sun", mid, ayanamsa)
+        diff = (cur_lon - natal_sun_lon + 180.0) % 360.0 - 180.0
         if abs(diff) < 1e-7:
             break
         if diff < 0:
@@ -114,7 +101,6 @@ def compute_varshaphal(
     if year is None:
         year = datetime.now(timezone.utc).year
 
-    swe.set_sid_mode(_AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
     swe.set_ephe_path(".")
 
     natal_sun_lon = ephemeris.get("planets", {}).get("Sun", {}).get("longitude_deg", 0.0)
@@ -142,6 +128,14 @@ def compute_varshaphal(
 
     # ── Varshaphal Lagna ─────────────────────────────────────────────────────
     try:
+        # houses_ex (unlike calc_ut) has no shared JD-native wrapper in
+        # swisseph_utils.py, so it's called directly -- but the sidereal
+        # mode it reads is still sourced from the one canonical
+        # AYANAMSA_MODES, not a local copy, and is set explicitly here
+        # rather than relying on a leftover value from an earlier
+        # compute_planet_longitude_at_jd() call succeeding (it might not
+        # have, on the exception fallback path above).
+        swe.set_sid_mode(AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
         _, ascmc = swe.houses_ex(sr_jd, latitude, longitude, b"P", swe.FLG_SIDEREAL)
         sr_lagna_lon = ascmc[0] % 360.0
     except Exception as e:
@@ -167,10 +161,9 @@ def compute_varshaphal(
     # ── Benefics in kendras of SR chart ──────────────────────────────────────
     kendras = {1, 4, 7, 10}
     benefics_in_kendra = 0
-    for pid in _BENEFIC_IDS.values():
+    for planet_name in _BENEFIC_PLANETS:
         try:
-            res, _ = swe.calc_ut(sr_jd, pid, _FLAGS)
-            plon = res[0] % 360.0
+            plon = compute_planet_longitude_at_jd(planet_name, sr_jd, ayanamsa)
             house = (_sign_idx(plon) - sr_lagna_idx) % 12 + 1
             if house in kendras:
                 benefics_in_kendra += 1

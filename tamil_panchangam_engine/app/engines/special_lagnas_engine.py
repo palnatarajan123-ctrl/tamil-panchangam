@@ -10,6 +10,8 @@ from typing import Any, Dict, Optional
 
 import swisseph as swe
 
+from app.utils.swisseph_utils import AYANAMSA_MODES
+
 logger = logging.getLogger(__name__)
 
 RASI_NAMES = [
@@ -22,11 +24,6 @@ _RASI_LORDS = [
     "Mars", "Venus", "Mercury", "Moon", "Sun", "Mercury",
     "Venus", "Mars", "Jupiter", "Saturn", "Saturn", "Jupiter",
 ]
-
-_AYANAMSA_MODES = {
-    "lahiri": swe.SIDM_LAHIRI,
-    "kp": swe.SIDM_KRISHNAMURTI,
-}
 
 
 def _sign_idx(lon: float) -> int:
@@ -105,7 +102,7 @@ def compute_special_lagnas(
     Returns:
         {"arudha": {...}, "hora": {...}, "ghati": {...}, "upapada": {...}}
     """
-    swe.set_sid_mode(_AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
+    swe.set_sid_mode(AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
     swe.set_ephe_path(".")
 
     lagna_lon = ephemeris.get("lagna", {}).get("longitude_deg", 0.0)

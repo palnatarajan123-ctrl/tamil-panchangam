@@ -7,6 +7,22 @@ import swisseph as swe
 
 swe.set_ephe_path('.')
 
+# Default string values for the many `ayanamsa: str = "lahiri"` /
+# `node_type: str = "mean"` parameter defaults scattered across the
+# engines -- exported so a call site can reference DEFAULT_AYANAMSA/
+# DEFAULT_NODE_TYPE instead of re-typing the literal. Not retrofitted
+# across every existing call site in one sweep (2026-09-13): the actual
+# drift risk this project hit twice (once for AYANAMSA_MODES, once for
+# NODE_TYPES) was in the swe-constant LOOKUP TABLES, not these default
+# strings -- a stray "Lahiri"/"LAHIRI" typo in one file's default just
+# falls through .get(ayanamsa, swe.SIDM_LAHIRI) to the same fallback
+# every other file already uses, so it's a much lower-value target than
+# the dict consolidation was. Use these for new code and when a file is
+# touched for other reasons; not worth a dedicated 20+-file sweep on
+# its own.
+DEFAULT_AYANAMSA = "lahiri"
+DEFAULT_NODE_TYPE = "mean"
+
 AYANAMSA_MODES = {
     "lahiri": swe.SIDM_LAHIRI,
     "kp": swe.SIDM_KRISHNAMURTI,
@@ -84,15 +100,27 @@ def compute_planet_longitude_with_speed(
     return result[0] % 360, result[3]
 
 
-def compute_planet_longitude(
-    planet_name: str, dt_utc: datetime, ayanamsa: str = "lahiri", node_type: str = "mean"
+def compute_planet_longitude_at_jd(
+    planet_name: str, jd: float, ayanamsa: str = "lahiri", node_type: str = "mean"
 ) -> float:
     """
-    Compute sidereal longitude for a planet at a given UTC datetime.
+    Compute sidereal longitude for a planet at a given Julian Day.
+
+    JD-native counterpart to compute_planet_longitude(), for callers
+    that already work in JD-space (a sunrise-relative time, a
+    binary-search refinement, etc.) rather than starting from a plain
+    UTC datetime -- routing those through the datetime-based function
+    would mean converting JD -> datetime -> JD on every call for no
+    benefit. This is the one place swe.set_sid_mode()/swe.calc_ut() get
+    called for a non-speed planet longitude; every caller that needs
+    one should use this (or compute_planet_longitude(), for the
+    datetime-native case) instead of calling swe directly, so an
+    ayanamsa/node_type change only ever needs to happen here. See
+    CLAUDE.md's 2026-09-13 entry.
 
     Args:
         planet_name: Name of planet (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu)
-        dt_utc: UTC datetime
+        jd: Julian Day (UT)
         ayanamsa: Ayanamsa system ("lahiri" or "kp")
         node_type: "mean" (traditional Tamil astrology, default) or "true"
             (astronomical) -- only affects Rahu/Ketu.
@@ -101,7 +129,6 @@ def compute_planet_longitude(
         Sidereal longitude in degrees (0-360)
     """
     swe.set_sid_mode(AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
-    jd = to_julian_day(dt_utc)
 
     if planet_name in ("Rahu", "Ketu"):
         node_id = NODE_TYPES.get(node_type.lower(), swe.MEAN_NODE)
@@ -118,3 +145,22 @@ def compute_planet_longitude(
     flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL
     longitude, _ = swe.calc_ut(jd, planet_id, flags)
     return longitude[0] % 360
+
+
+def compute_planet_longitude(
+    planet_name: str, dt_utc: datetime, ayanamsa: str = "lahiri", node_type: str = "mean"
+) -> float:
+    """
+    Compute sidereal longitude for a planet at a given UTC datetime.
+
+    Args:
+        planet_name: Name of planet (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu)
+        dt_utc: UTC datetime
+        ayanamsa: Ayanamsa system ("lahiri" or "kp")
+        node_type: "mean" (traditional Tamil astrology, default) or "true"
+            (astronomical) -- only affects Rahu/Ketu.
+
+    Returns:
+        Sidereal longitude in degrees (0-360)
+    """
+    return compute_planet_longitude_at_jd(planet_name, to_julian_day(dt_utc), ayanamsa, node_type)

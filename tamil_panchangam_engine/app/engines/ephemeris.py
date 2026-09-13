@@ -11,6 +11,8 @@ import swisseph as swe
 from datetime import datetime
 from typing import Dict
 
+from app.utils.swisseph_utils import PLANETS, NODE_TYPES, AYANAMSA_MODES
+
 # -----------------------------
 # CONSTANTS
 # -----------------------------
@@ -18,20 +20,12 @@ from typing import Dict
 NAKSHATRA_SPAN = 13 + 1/3  # 13°20'
 PADA_SPAN = NAKSHATRA_SPAN / 4
 
-PLANETS = {
-    "Sun": swe.SUN,
-    "Moon": swe.MOON,
-    "Mars": swe.MARS,
-    "Mercury": swe.MERCURY,
-    "Jupiter": swe.JUPITER,
-    "Venus": swe.VENUS,
-    "Saturn": swe.SATURN,
-}
-
-NODE_TYPES = {
-    "true": swe.TRUE_NODE,
-    "mean": swe.MEAN_NODE,
-}
+# PLANETS, NODE_TYPES, AYANAMSA_MODES are imported from swisseph_utils.py
+# (the single canonical source for all three, as of 2026-09-13) rather
+# than redefined here -- this file and swisseph_utils.py used to each
+# maintain their own copy of all three, which is exactly the
+# duplication class CLAUDE.md's 2026-09-12 true/mean-node bug came
+# from. See CLAUDE.md's 2026-09-13 entry.
 
 RASI_NAMES = [
     "Mesham", "Rishabam", "Mithunam", "Kadakam",
@@ -49,11 +43,6 @@ NAKSHATRA_NAMES = [
     "Shatabhisha", "Purva Bhadrapada",
     "Uttara Bhadrapada", "Revati"
 ]
-
-AYANAMSA_MODES = {
-    "lahiri": swe.SIDM_LAHIRI,
-    "kp": swe.SIDM_KRISHNAMURTI,
-}
 
 # -----------------------------
 # INITIALIZE SWISS EPHEMERIS

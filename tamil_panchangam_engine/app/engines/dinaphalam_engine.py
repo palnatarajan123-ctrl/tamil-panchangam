@@ -16,6 +16,8 @@ import swisseph as swe
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, Tuple
 
+from app.utils.swisseph_utils import compute_planet_longitude_at_jd
+
 logger = logging.getLogger(__name__)
 
 # Rahu Kaalam segment (1-indexed, 1=first daylight segment) by Python weekday Mon=0
@@ -53,11 +55,6 @@ _GULIKA_SEGMENT: Dict[int, int] = {
     4: 2,  # Friday    — 2nd
     5: 1,  # Saturday  — 1st
     6: 7,  # Sunday    — 7th
-}
-
-AYANAMSA_MODES = {
-    "lahiri": swe.SIDM_LAHIRI,
-    "kp": swe.SIDM_KRISHNAMURTI,
 }
 
 TITHI_NAMES = [
@@ -154,7 +151,6 @@ def compute_dinaphalam(
     Returns dict with keys:
         rahu_kaalam, yamagandam, gulika_kaalam, nakshatra, tara_bala, tithi
     """
-    swe.set_sid_mode(AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
     swe.set_ephe_path(".")
 
     y, m, d = date_utc.year, date_utc.month, date_utc.day
@@ -174,12 +170,8 @@ def compute_dinaphalam(
 
     # Compute Moon longitude at local noon
     jd_noon = swe.julday(y, m, d, 12.0 - utc_offset_hours)
-    flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL
-    moon_result, _ = swe.calc_ut(jd_noon, swe.MOON, flags)
-    moon_lon = moon_result[0] % 360.0
-
-    sun_result, _ = swe.calc_ut(jd_noon, swe.SUN, flags)
-    sun_lon = sun_result[0] % 360.0
+    moon_lon = compute_planet_longitude_at_jd("Moon", jd_noon, ayanamsa)
+    sun_lon = compute_planet_longitude_at_jd("Sun", jd_noon, ayanamsa)
 
     # Nakshatra
     nak_idx = int(moon_lon / (360 / 27)) % 27

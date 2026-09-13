@@ -20,6 +20,8 @@ import swisseph as swe
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
+from app.utils.swisseph_utils import AYANAMSA_MODES, compute_planet_longitude_at_jd
+
 logger = logging.getLogger(__name__)
 
 RASI_NAMES = [
@@ -32,11 +34,6 @@ RASI_LORDS = {
     "Cancer": "Moon", "Leo": "Sun", "Virgo": "Mercury",
     "Libra": "Venus", "Scorpio": "Mars", "Sagittarius": "Jupiter",
     "Capricorn": "Saturn", "Aquarius": "Saturn", "Pisces": "Jupiter",
-}
-
-AYANAMSA_MODES = {
-    "lahiri": swe.SIDM_LAHIRI,
-    "kp": swe.SIDM_KRISHNAMURTI,
 }
 
 # Gulika/Mandi daytime segment index (0-based, out of 8) by Python weekday (Mon=0)
@@ -140,9 +137,7 @@ def compute_gulika_mandi(
     except Exception as e:
         logger.warning(f"Upagraha Lagna computation failed: {e}")
         # Fallback: use Sun's longitude at Mandi time as a reasonable proxy
-        sun_flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL
-        result, _ = swe.calc_ut(mandi_jd, swe.SUN, sun_flags)
-        mandi_lon = result[0] % 360.0
+        mandi_lon = compute_planet_longitude_at_jd("Sun", mandi_jd, ayanamsa)
 
     rasi = _get_rasi(mandi_lon)
     rasi_lord = RASI_LORDS.get(rasi, "Unknown")
