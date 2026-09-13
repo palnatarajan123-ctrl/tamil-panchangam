@@ -46,6 +46,35 @@ def _payload_with_tamil_rasi_names() -> dict:
     }
 
 
+def _payload_with_distinct_tamil_rasi_and_lagna() -> dict:
+    # Rasi (Moon) = Simmam/Leo, Lagna = Rishabam/Taurus -- deliberately
+    # DIFFERENT signs. The other fixture above (_payload_with_tamil_rasi_names)
+    # uses the same sign for both, which is exactly the blind spot that let
+    # a real Lagna-conversion regression go undetected here: a 0-sign-offset
+    # chart can't tell a working from_lagna_house apart from one silently
+    # defaulted to Aries, since Aries is index 0 either way when Rasi is
+    # also Aries. This fixture can tell the difference. See CLAUDE.md's
+    # 2026-09-13 chart fd79efb3 investigation.
+    return {
+        "birth_details": {
+            "name": "Test Person",
+            "date_of_birth": "1990-01-01",
+            "time_of_birth": "10:00",
+            "place_of_birth": "Chennai",
+            "latitude": 13.0827,
+            "longitude": 80.2707,
+        },
+        "ephemeris": {
+            "lagna": {"rasi": "Rishabam"},
+            "moon": {"rasi": "Simmam", "longitude_deg": 130.0, "nakshatra": {"name": "Magha"}},
+            "planets": {},
+            "ayanamsa": "lahiri",
+        },
+        "dashas": {},
+        "chart_metadata": {"node_type": "mean"},
+    }
+
+
 def _mock_conn_for_payload(payload: dict) -> MagicMock:
     conn = MagicMock()
     conn.execute.return_value.fetchone.side_effect = [(payload,), None, None]
@@ -124,6 +153,85 @@ class TestChatGocharaGrounding(unittest.TestCase):
         # in passing -- check for the live-data section header specifically,
         # not that substring, to confirm no fabricated block was rendered.
         self.assertNotIn("## CURRENT TRANSITS (Gochara)", system_prompt)
+
+    def test_lagna_rasi_is_converted_independently_of_moon_rasi(self):
+        """
+        Regression test for the 2026-09-13 investigation (chart
+        fd79efb3): that chart turned out to be a genuine 0-sign-offset
+        (Rasi == Lagna == Aries), which cannot distinguish a working
+        Lagna conversion from one silently defaulted to Aries -- both
+        produce the same number when the real Lagna already IS Aries.
+        This fixture uses Rasi=Simmam(Leo)/Lagna=Rishabam(Taurus) --
+        genuinely different signs -- so a reintroduced bug (Lagna value
+        passed to compute_gochara() without going through
+        to_english_rasi() first, silently defaulting to index 0/Aries)
+        would produce a WRONG house_from_lagna, provably different from
+        the correct one, rather than one that's merely unlabeled.
+        """
+        payload = _payload_with_distinct_tamil_rasi_and_lagna()
+        with patch.object(chat_module, "get_conn", return_value=_mock_conn_for_payload(payload)):
+            context = chat_module._build_chat_context("fake-chart-id")
+
+        g = context["gochara_context"]
+        RASI_ORDER = [
+            "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+            "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+        ]
+        idx = {r: i for i, r in enumerate(RASI_ORDER)}
+
+        for planet_key, house_key in [
+            ("jupiter", "from_lagna_house"),
+            ("saturn", "from_lagna_house"),
+        ]:
+            entry = g[planet_key]
+            transit_rasi = entry["transit_rasi"]
+            correct_house = ((idx[transit_rasi] - idx["Taurus"]) % 12) + 1
+            buggy_aries_default_house = ((idx[transit_rasi] - idx["Aries"]) % 12) + 1
+            self.assertEqual(entry[house_key], correct_house)
+            # Taurus (idx 1) vs Aries (idx 0) always differ by exactly one
+            # house in this formula, so these two expected values can
+            # never accidentally coincide -- a real assertion, not a
+            # coin-flip check.
+            self.assertNotEqual(entry[house_key], buggy_aries_default_house)
+
+        rk = g["rahu_ketu"]
+        correct_rahu_house = ((idx[rk["rahu_rasi"]] - idx["Taurus"]) % 12) + 1
+        buggy_rahu_house = ((idx[rk["rahu_rasi"]] - idx["Aries"]) % 12) + 1
+        self.assertEqual(rk["rahu_from_lagna_house"], correct_rahu_house)
+        self.assertNotEqual(rk["rahu_from_lagna_house"], buggy_rahu_house)
+
+        # And the house-from-Moon vs house-from-Lagna numbers must
+        # actually differ for at least one planet -- if they were all
+        # silently equal, that alone would be a red flag for this
+        # deliberately-non-0-offset fixture.
+        houses_differ = any(
+            g[p]["from_moon_house"] != g[p]["from_lagna_house"] for p in ("jupiter", "saturn")
+        ) or rk["rahu_from_moon_house"] != rk["rahu_from_lagna_house"]
+        self.assertTrue(houses_differ)
+
+    def test_chat_context_passes_already_english_lagna_to_compute_gochara(self):
+        """
+        Isolates chat.py's OWN conversion responsibility specifically,
+        independent of gochara_engine.py's internal normalization
+        (added as defense-in-depth during the 2026-09-12 fix, which
+        would mask a regression here if this test only checked the
+        final house numbers -- confirmed by literally reintroducing the
+        bug in chat.py during this investigation and observing the
+        other test above still passed, because the engine-level
+        safety net caught it). Mocks compute_gochara() at its source
+        module so this checks the exact argument chat.py passes,
+        not the end-to-end answer.
+        """
+        payload = _payload_with_distinct_tamil_rasi_and_lagna()
+        with patch.object(chat_module, "get_conn", return_value=_mock_conn_for_payload(payload)):
+            with patch("app.engines.gochara_engine.compute_gochara") as mock_gochara:
+                mock_gochara.return_value = {}
+                chat_module._build_chat_context("fake-chart-id")
+
+        self.assertTrue(mock_gochara.called)
+        call_kwargs = mock_gochara.call_args.kwargs
+        self.assertEqual(call_kwargs["natal_moon_rasi"], "Leo")
+        self.assertEqual(call_kwargs["natal_lagna_rasi"], "Taurus")
 
 
 if __name__ == "__main__":

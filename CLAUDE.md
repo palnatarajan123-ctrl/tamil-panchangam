@@ -484,6 +484,36 @@ this, not the automated suite alone).
   this (hardcodes a node type, or doesn't accept the parameter at all)
   reintroduces the exact bug that moved Rahu's real Dec 2026 Capricorn
   ingress ~10 days early.
+- **A 0-sign-offset chart (Rasi == Lagna) cannot prove the Lagna-rasi
+  Tamil→English conversion is working** — investigated 2026-09-13 after
+  a second real chart (`fd79efb3-87e8-4533-bec3-0c3d5396ce53`) looked
+  suspicious (Ask Jyotishi stated the same house number "from both your
+  Moon sign and Ascendant"). Ground truth: this chart's Rasi AND Lagna
+  are genuinely both Mesham/Aries — not a bug, same situation as
+  `7c6e34be` earlier. But the reason it's *structurally* untestable is
+  worth remembering: `RASI_TO_INDEX` uses index 0 for Aries, so an
+  unconverted Tamil Lagna silently defaulting to "Aries" (the bug's
+  failure mode) and a REAL Aries Lagna produce byte-identical output —
+  no 0-offset chart can distinguish "conversion worked" from "conversion
+  is silently broken but happens not to matter here." Re-verified the
+  three non-Aries-Lagna charts checked the previous night
+  (`954f9482`/`7916f261`/`d6a77175`) against the actual buggy-vs-correct
+  arithmetic (not just "different from the moon-house number") and
+  confirmed all three match the correct Lagna-index formula, ruling out
+  the same masking risk for them. Also found gochara_engine.py's
+  `_house_from_moon()`/`_transit_natal_house()` normalize their inputs
+  internally (added as defense-in-depth in the 2026-09-12 fix) — so
+  even a hypothetical regression in chat.py's own `to_english_rasi()`
+  call wouldn't currently reach a real user; confirmed this doesn't
+  mean it's fine to skip the conversion at the call site (redundant
+  layers are the point, not proof either one is unnecessary).
+  `tests/api/test_chat_gochara_grounding.py`'s
+  `test_chat_context_passes_already_english_lagna_to_compute_gochara`
+  mocks `compute_gochara()` directly to isolate and pin chat.py's own
+  conversion specifically, since the engine-level safety net masks a
+  chat.py-level regression in any test that only checks final house
+  numbers (confirmed by literally reintroducing the bug and watching
+  the end-to-end test still pass).
 
 Before writing any new engine that reads base_charts.payload,
 always run this first to see actual structure:
