@@ -284,6 +284,65 @@ stale" and "confirmed real" looked like in practice):
   timeline dates, fuller divisional-chart data, yoga house/planet
   detail) remains deliberately out of scope, its own separate piece of
   work.
+- **Closed 2026-09-13: chat now has real future ingress (peyarchi)
+  dates for Rahu/Ketu/Jupiter/Saturn, via a new `ingress_engine.py` +
+  `planet_ingress_events` table** — this was the one ungrounded-fact
+  gap from the list above that WAS worth closing with real data rather
+  than an instruction, because (unlike dasha dates or yoga house
+  detail) an ingress date is a single small global fact, not something
+  that multiplies per-user or per-question. Key design point worth
+  remembering: the ingress date itself ("Rahu enters Capricorn on Dec
+  5, 2026") is the same for every user and computed ONCE, cached, and
+  looked up cheaply at chat time (never a live ephemeris call in the
+  request path) — only the resulting HOUSE NUMBER is personal, computed
+  from the cached sign + the user's own Rasi/Lagna via
+  `ingress_engine.house_from_sign()`.
+  - `find_next_ingress()` uses coarse-then-refine, not a day-by-day
+    scan: estimates an adaptive step toward the next 30° boundary from
+    the planet's current speed (re-estimated every step, so it
+    naturally shrinks near a station rather than assuming monotonic
+    motion), then bisects once a sampled sign change is observed.
+    Verified against a real, unplanned example this feature's own build
+    surfaced: Saturn enters Aries on 2027-06-03, then genuinely
+    retrogrades back into Pisces around 2027-10-20 before settling —
+    `find_next_ingress()` correctly reports the first crossing (the
+    conventionally-reported peyarchi date) and separately flags the
+    retrograde return via `retrograde_return_date_utc`, matching an
+    exhaustive 264-call day-by-day scan while using ~49 calls itself.
+    Rahu/Ketu are always retrograde by convention and never station, so
+    this check is skipped for them (`_find_retrograde_return()` returns
+    `None` immediately for both).
+  - `planet_ingress_events` (new table, `app/db/bootstrap.py`) stores
+    `node_type` as `'mean'`/`'true'` for Rahu/Ketu (their ingress date
+    genuinely differs by node type) and the literal string `'n/a'` —
+    never `NULL` — for Jupiter/Saturn, specifically to keep the
+    `UNIQUE(planet, node_type, to_sign, ingress_date_utc)` constraint
+    (and the lazy-backfill's `ON CONFLICT ... DO NOTHING`) working:
+    Postgres treats `NULL != NULL`, so a `NULL` placeholder there would
+    have silently defeated deduplication on concurrent backfills.
+  - Refresh is lazy-backfill-on-read (`get_upcoming_ingresses()`, same
+    pattern as `upagrahas_engine.py`'s lazy backfill, not a new
+    scheduled-job mechanism — none exists in this codebase to hook
+    into) — always keeps the next 2 known ingresses per
+    planet/node_type computed ahead of `now`; a request that finds
+    fewer computes and inserts more, subsequent requests just read the
+    cache. Chat only ever reads the next 1 per planet today.
+  - Scope: all four gochara_engine.py-tracked planets (Rahu, Ketu,
+    Jupiter, Saturn), not just Rahu/Ketu — recommended since the
+    marginal cost per planet is the same small algorithm, and
+    Jupiter/Saturn peyarchi questions are equally common for this
+    audience (per the Shelvi Guru Peyarchi content reviewed during the
+    original December-2026 investigation).
+  - Verified live end-to-end: re-asked the exact real question that
+    started this whole investigation ("Ragu, Kethu peyarchi for Mesha
+    rasi in 2026 transition?") through the real fixed pipeline against
+    chart `7c6e34be` with a live LLM call — correct answer (Rahu into
+    Capricorn, 10th house from Moon sign, Dec 5 2026), no hedge needed,
+    sourced from the cached table. A follow-up asking for the ingress
+    AFTER that one correctly got "I don't have that specific data
+    available" (with an explicitly-caveated rough estimate offered, not
+    stated as fact) — confirms the fix didn't make the model
+    overconfident generally, only for what's actually in the table now.
 - **`ashtakavarga_engine.py` had the same Tamil/English rasi-name
   mismatch as the two bugs fixed 2026-09-12 in `gochara_engine.py`/
   `moon_transit_engine.py` — confirmed dead code in its only real

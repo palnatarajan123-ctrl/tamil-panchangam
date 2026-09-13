@@ -454,6 +454,37 @@ def bootstrap():
             ON porutham_prospects(candidate_chart_id)
         """)
 
+        # planet_ingress_events -- global (not per-user, not per-chart)
+        # cache of upcoming sign-change ("peyarchi") dates for Rahu,
+        # Ketu, Jupiter, Saturn. An ingress date is the same
+        # astronomical fact for every user; only the resulting house
+        # number is personal. Computed lazily by
+        # ingress_engine.get_upcoming_ingresses() (coarse-then-refine,
+        # not a day-by-day scan) and read from here at chat time --
+        # never a live ephemeris call in the request hot path.
+        # node_type is 'mean'/'true' for Rahu/Ketu (their ingress date
+        # depends on it) and the literal 'n/a' for Jupiter/Saturn
+        # (never NULL -- Postgres treats NULL != NULL under UNIQUE, so
+        # a NULL placeholder would silently defeat the ON CONFLICT
+        # dedup this table's lazy-backfill writes rely on).
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS planet_ingress_events (
+            id SERIAL PRIMARY KEY,
+            planet TEXT NOT NULL CHECK (planet IN ('Rahu', 'Ketu', 'Jupiter', 'Saturn')),
+            node_type TEXT NOT NULL,
+            from_sign TEXT NOT NULL,
+            to_sign TEXT NOT NULL,
+            ingress_date_utc TIMESTAMP WITH TIME ZONE NOT NULL,
+            retrograde_return_date_utc TIMESTAMP WITH TIME ZONE,
+            computed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            UNIQUE(planet, node_type, to_sign, ingress_date_utc)
+        )
+        """)
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_planet_ingress_lookup
+            ON planet_ingress_events(planet, node_type, ingress_date_utc)
+        """)
+
         conn.commit()
         logger.info("PostgreSQL schema bootstrapped successfully")
     except Exception as e:

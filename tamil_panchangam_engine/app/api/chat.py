@@ -64,12 +64,13 @@ HOUSE-COUNTING CONVENTION:
 
 GROUNDING — NEVER STATE AN UNGROUNDED FACT:
 - Only state a specific sign, house, date, or degree if it is explicitly
-  given to you in the context above (including CURRENT TRANSITS, if
-  present). If asked for something more precise than what's provided —
-  an exact transit/peyarchi date, a dasha end date, a divisional chart
-  placement not listed, or a transit further out than what's shown —
-  say plainly "I don't have that specific data available" rather than
-  generating a plausible-sounding but ungrounded answer.
+  given to you in the context above (including CURRENT TRANSITS and
+  UPCOMING SIGN CHANGES, if present). If asked for something more
+  precise than what's provided — a dasha end date, a divisional chart
+  placement not listed, an ingress further out than the next one shown,
+  or anything else not explicitly given — say plainly
+  "I don't have that specific data available" rather than generating a
+  plausible-sounding but ungrounded answer.
 
 WHEN CHALLENGED:
 - If the user states something as fact that contradicts what you said
@@ -498,10 +499,38 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
                 "\n\n## CURRENT TRANSITS (Gochara) — as of today, computed live\n"
                 + "\n".join(lines)
                 + "\nThese are the ONLY current planetary transit positions you have. "
-                "Do not state a different sign, house, or transit/peyarchi date than what's "
-                "listed here. If asked about a transit further out than what's shown (a future "
-                "sign change, an exact ingress date), say you don't have that specific date "
-                "rather than guessing.\n"
+                "Do not state a different current sign or house than what's listed here. "
+                "For a future sign change or exact ingress/peyarchi date, check the UPCOMING "
+                "SIGN CHANGES section below before saying you don't have that data.\n"
+            )
+
+    if context.get("ingress_context"):
+        ic = context["ingress_context"]
+        lines = []
+        for planet in ("Rahu", "Ketu", "Jupiter", "Saturn"):
+            entry = ic.get(planet)
+            if not entry:
+                continue
+            ingress_date = entry["ingress_date_utc"].strftime("%Y-%m-%d")
+            house_bits = f"house {entry.get('house_from_moon', '?')} from your Moon sign"
+            if "house_from_lagna" in entry:
+                house_bits += f", house {entry['house_from_lagna']} from your Ascendant"
+            line = f"- {planet}: next enters {entry['to_sign']} on {ingress_date} (will be {house_bits})"
+            if entry.get("retrograde_return_date_utc"):
+                retro_date = entry["retrograde_return_date_utc"].strftime("%Y-%m-%d")
+                line += (
+                    f"; may retrograde back into its previous sign around {retro_date} "
+                    "before finally settling — mention this if asked, don't just say a single date"
+                )
+            lines.append(line)
+        if lines:
+            system_prompt += (
+                "\n\n## UPCOMING SIGN CHANGES (Peyarchi)\n"
+                + "\n".join(lines)
+                + "\nThese are real, precomputed dates — use them directly when asked \"when "
+                "does X enter Y\" or similar, instead of declining. This is ONLY the next "
+                "ingress for each planet; if asked about the one after that, or a longer-range "
+                "prediction, say you don't have that specific data available.\n"
             )
 
     if reading_as_name:
@@ -648,6 +677,39 @@ def _build_chat_context(base_chart_id: str) -> dict:
     except Exception as e:
         logger.warning(f"Gochara computation failed in chat context: {e}")
 
+    # Upcoming Peyarchi (sign-change) dates -- a global astronomical
+    # fact, not per-user, so this is a cheap cached lookup
+    # (ingress_engine.get_upcoming_ingresses()), never a live ephemeris
+    # call here. Gives the model a real answer to "when does X enter
+    # Y" instead of the correct-but-incomplete refusal the earlier
+    # grounding fix left it with for this question type. See CLAUDE.md's
+    # 2026-09-13 entry.
+    ingress_context: dict = {}
+    try:
+        from app.engines.ingress_engine import get_upcoming_ingresses, house_from_sign
+
+        if natal_moon_rasi_en:
+            chart_node_type = payload.get("chart_metadata", {}).get("node_type", "mean")
+            now_utc = datetime.now(timezone.utc)
+            with get_conn() as ingress_conn:
+                for planet in ("Rahu", "Ketu", "Jupiter", "Saturn"):
+                    rows = get_upcoming_ingresses(
+                        ingress_conn, planet, node_type=chart_node_type, now_utc=now_utc, count=1
+                    )
+                    if rows:
+                        row = rows[0]
+                        entry = {
+                            "to_sign": row["to_sign"],
+                            "ingress_date_utc": row["ingress_date_utc"],
+                            "retrograde_return_date_utc": row["retrograde_return_date_utc"],
+                            "house_from_moon": house_from_sign(row["to_sign"], natal_moon_rasi_en),
+                        }
+                        if natal_lagna_rasi_en:
+                            entry["house_from_lagna"] = house_from_sign(row["to_sign"], natal_lagna_rasi_en)
+                        ingress_context[planet] = entry
+    except Exception as e:
+        logger.warning(f"Ingress lookup failed in chat context: {e}")
+
     # Divisional signals for D10/D2/D7
     divisional_summary = ""
     try:
@@ -746,6 +808,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "divisional_summary": divisional_summary,
         "upagraha_context": upagraha_context,
         "gochara_context": gochara_context,
+        "ingress_context": ingress_context,
     }
 
 
