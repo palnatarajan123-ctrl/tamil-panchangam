@@ -146,18 +146,25 @@ def compute_gochara(
     natal_moon_longitude: Optional[float] = None,
     drishti_data: Optional[Dict] = None,
     ayanamsa: str = "lahiri",
+    node_type: str = "mean",
 ) -> Dict:
     """
     Compute Gochara (transit) effects for slow-moving planets.
-    
+
+    Args:
+        node_type: "mean" (traditional Tamil astrology, default) or "true"
+            (astronomical) -- pass the chart's own chart_metadata.node_type
+            so Rahu/Ketu's transit sign matches the same convention the
+            natal chart was computed with.
+
     Returns structured transit data with effects classification.
     """
     logger.debug(f"DEBUG: Gochara engine computing for {reference_date_utc}")
-    
+
     try:
         jup_long, jup_speed = compute_planet_longitude_with_speed("Jupiter", reference_date_utc, ayanamsa=ayanamsa)
         sat_long, sat_speed = compute_planet_longitude_with_speed("Saturn", reference_date_utc, ayanamsa=ayanamsa)
-        rahu_long, rahu_speed = compute_planet_longitude_with_speed("Rahu", reference_date_utc, ayanamsa=ayanamsa)
+        rahu_long, rahu_speed = compute_planet_longitude_with_speed("Rahu", reference_date_utc, ayanamsa=ayanamsa, node_type=node_type)
         ketu_long = (rahu_long + 180) % 360
 
         jup_deg = jup_long % 30

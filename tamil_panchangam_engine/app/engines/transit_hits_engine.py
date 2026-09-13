@@ -58,6 +58,7 @@ def compute_transit_hits(
     reference_date: Optional[date] = None,
     ayanamsa: str = "lahiri",
     window_days: int = 45,
+    node_type: str = "mean",
 ) -> List[Dict[str, Any]]:
     """
     Detect transit hits of slow planets over natal positions within
@@ -68,6 +69,9 @@ def compute_transit_hits(
         reference_date: center of window; defaults to today UTC.
         ayanamsa: ayanamsa name.
         window_days: half-window size (total window = 2 × window_days days).
+        node_type: "mean" (traditional Tamil astrology, default) or "true"
+            (astronomical) -- only affects Rahu/Ketu hits; pass the chart's
+            own chart_metadata.node_type.
 
     Returns:
         List of transit hit dicts sorted by hit_date.
@@ -92,7 +96,7 @@ def compute_transit_hits(
         while day <= end_day:
             dt = datetime(day.year, day.month, day.day, 12, 0, tzinfo=timezone.utc)
             try:
-                transit_lon = compute_planet_longitude(transit_planet, dt, ayanamsa)
+                transit_lon = compute_planet_longitude(transit_planet, dt, ayanamsa, node_type=node_type)
             except Exception as e:
                 logger.debug("Transit lon %s %s: %s", transit_planet, day, e)
                 day += timedelta(days=1)

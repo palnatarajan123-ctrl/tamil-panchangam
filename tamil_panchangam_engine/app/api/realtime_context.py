@@ -64,7 +64,8 @@ def get_realtime_context(base_chart_id: str, user: dict = Depends(get_current_us
     birth_details = payload.get("birth_details", {})
     latitude = birth_details.get("latitude", 13.0827)
     longitude = birth_details.get("longitude", 80.2707)
-    
+    node_type = payload.get("chart_metadata", {}).get("node_type", "mean")
+
     context = compute_realtime_context(
         birth_moon_longitude=birth_moon_longitude,
         birth_moon_rasi=birth_moon_rasi,
@@ -73,6 +74,7 @@ def get_realtime_context(base_chart_id: str, user: dict = Depends(get_current_us
         latitude=latitude,
         longitude=longitude,
         base_chart_payload=payload,
+        node_type=node_type,
     )
     
     return {

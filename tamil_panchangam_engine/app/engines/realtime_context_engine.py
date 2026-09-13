@@ -31,10 +31,11 @@ def compute_realtime_context(
     longitude: float = 80.2707,
     reference_time_utc: Optional[datetime] = None,
     base_chart_payload: Optional[dict] = None,
+    node_type: str = "mean",
 ) -> Dict:
     """
     Compute real-time astrological context for display.
-    
+
     Args:
         birth_moon_longitude: Natal Moon longitude in degrees
         birth_moon_rasi: Natal Moon's Rasi (e.g., "Aries")
@@ -43,7 +44,10 @@ def compute_realtime_context(
         latitude: Location latitude for calculations
         longitude: Location longitude for calculations
         reference_time_utc: Override time (defaults to now)
-    
+        node_type: "mean" (traditional Tamil astrology, default) or "true"
+            (astronomical) -- pass the chart's own chart_metadata.node_type
+            so Rahu/Ketu's transit matches the natal chart's convention.
+
     Returns:
         Dict with transit_context, nakshatra_timing_context, pakshi_context
     """
@@ -67,6 +71,7 @@ def compute_realtime_context(
             longitude=longitude,
             natal_moon_rasi=birth_moon_rasi,
             natal_lagna_rasi=birth_lagna_rasi,
+            node_type=node_type,
         )
         logger.debug(f"Gochara result: {gochara}")
         

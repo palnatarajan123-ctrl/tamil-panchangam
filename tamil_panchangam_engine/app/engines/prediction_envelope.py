@@ -98,6 +98,7 @@ def build_monthly_prediction_envelope(
     birth_details = base_chart["birth_details"]
     ephemeris = base_chart["ephemeris"]
     ayanamsa = ephemeris.get("ayanamsa", "lahiri")
+    node_type = base_chart.get("chart_metadata", {}).get("node_type", "mean")
 
     latitude = birth_details["latitude"]
     longitude = birth_details["longitude"]
@@ -285,6 +286,7 @@ def build_monthly_prediction_envelope(
         natal_lagna_rasi=natal_lagna_rasi_for_gochara,
         drishti_data=drishti,
         ayanamsa=ayanamsa,
+        node_type=node_type,
     )
 
     # -------------------------------------------------

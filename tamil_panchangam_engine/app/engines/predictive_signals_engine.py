@@ -41,6 +41,7 @@ def compute_predictive_signals(
     yogas_payload = payload.get("yogas", {})
     bav = payload.get("bhinnashtakavarga", {})
     ayanamsa = ephemeris.get("ayanamsa", "lahiri")
+    node_type = payload.get("chart_metadata", {}).get("node_type", "mean")
 
     signals: Dict[str, Any] = {"computed_for": f"{year}-{month:02d}"}
 
@@ -65,6 +66,7 @@ def compute_predictive_signals(
             reference_date=reference_date,
             ayanamsa=ayanamsa,
             window_days=45,
+            node_type=node_type,
         )
     except Exception as e:
         logger.warning("transit_hits failed chart=%s: %s", chart_id, e)

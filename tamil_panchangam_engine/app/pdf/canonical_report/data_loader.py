@@ -1194,6 +1194,7 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
             natal_lagna_rasi=natal_lagna_rasi,
             natal_moon_longitude=natal_moon_longitude,
             ayanamsa=ayanamsa,
+            node_type=chart_metadata.get("node_type", "mean"),
         )
         jup = gochara.get("jupiter", {})
         sat = gochara.get("saturn", {})
