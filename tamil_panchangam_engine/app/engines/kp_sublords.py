@@ -4,8 +4,9 @@ KP Sub-lord Engine — low-level calculation helpers.
 Superseded by kp_engine.py for full chart computation.
 This module is retained as a helper library; kp_engine.py imports
 get_star_lord, get_sub_lord, and get_sub_sub_lord from here.
-compute_kp_sublords() (planets-only, old format) is no longer called
-by any pipeline code.
+compute_kp_sublords() (planets-only, old format) used to also live
+here but was confirmed dead (superseded, zero callers) and deleted
+2026-09-13 -- see CLAUDE.md's entry from that date.
 
 Sub-lord division: each nakshatra (13°20') is divided into
 9 sub-lords proportional to Vimshottari dasha periods.
@@ -88,35 +89,3 @@ def get_sub_sub_lord(longitude: float) -> str:
         if pos_in_sub <= accumulated2:
             return ssl
     return VIMSHOTTARI_ORDER[(sub_lord_idx + 8) % 9]
-
-
-def compute_kp_sublords(ephemeris: dict) -> dict:
-    result = {}
-    planets = ephemeris.get("planets", {})
-    for planet_name, planet_data in planets.items():
-        lon = planet_data.get("longitude_deg", 0)
-        result[planet_name] = {
-            "longitude": lon,
-            "star_lord": get_star_lord(lon),
-            "sub_lord": get_sub_lord(lon),
-            "sub_sub_lord": get_sub_sub_lord(lon),
-        }
-    moon = ephemeris.get("moon", {})
-    if moon:
-        lon = moon.get("longitude_deg", 0)
-        result["Moon"] = {
-            "longitude": lon,
-            "star_lord": get_star_lord(lon),
-            "sub_lord": get_sub_lord(lon),
-            "sub_sub_lord": get_sub_sub_lord(lon),
-        }
-    lagna = ephemeris.get("lagna", {})
-    if lagna:
-        lon = lagna.get("longitude_deg", 0)
-        result["Lagna"] = {
-            "longitude": lon,
-            "star_lord": get_star_lord(lon),
-            "sub_lord": get_sub_lord(lon),
-            "sub_sub_lord": get_sub_sub_lord(lon),
-        }
-    return result
