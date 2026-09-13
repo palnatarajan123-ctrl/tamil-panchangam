@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { authHeaders } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,16 +59,16 @@ interface FamilyPrediction {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-async function apiFetch(method: string, path: string, body?: unknown) {
-  const res = await fetch(path, {
-    method,
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || res.statusText);
-  }
+// Was a local bare fetch() + manual authHeaders() -- sent a token if one
+// existed, but (unlike apiRequest()) never retried on a since-expired
+// access token via the refresh flow. Migrated to apiRequest() (2026-09-13)
+// -- see CLAUDE.md's entry: this file was previously logged as
+// "already-fixed" for this exact issue, but only the PDF download call
+// site (handlePdfDownload, below) had actually been migrated; this
+// helper's 3 call sites (group fetch, predictions fetch, predictions
+// delete) still used the old pattern.
+async function apiJson(method: string, path: string, body?: unknown) {
+  const res = await apiRequest(method, path, body);
   if (res.status === 204) return null;
   return res.json();
 }
@@ -295,14 +294,14 @@ export default function FamilyPredictionScreen() {
   // Fetch group info (for name + primary chart)
   const { data: groupData } = useQuery({
     queryKey: ["/api/family/groups", groupId],
-    queryFn: () => apiFetch("GET", `/api/family/groups/${groupId}`),
+    queryFn: () => apiJson("GET", `/api/family/groups/${groupId}`),
     enabled: !!groupId,
   });
 
   // Fetch prediction
   const { data, isLoading, error } = useQuery<FamilyPrediction>({
     queryKey: ["/api/family/groups", groupId, "predictions", year],
-    queryFn: () => apiFetch("GET", `/api/family/groups/${groupId}/predictions?year=${year}`),
+    queryFn: () => apiJson("GET", `/api/family/groups/${groupId}/predictions?year=${year}`),
     enabled: !!groupId,
     staleTime: 1000 * 60 * 5,
   });
@@ -310,7 +309,7 @@ export default function FamilyPredictionScreen() {
   // Regenerate: clear cache then refetch
   const regenerateMutation = useMutation({
     mutationFn: () =>
-      apiFetch("DELETE", `/api/family/groups/${groupId}/predictions?year=${year}`),
+      apiJson("DELETE", `/api/family/groups/${groupId}/predictions?year=${year}`),
     onSuccess: () => {
       setShowConfirm(false);
       qc.invalidateQueries({ queryKey: ["/api/family/groups", groupId, "predictions", year] });

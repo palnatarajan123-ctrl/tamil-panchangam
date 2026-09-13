@@ -89,8 +89,19 @@ stale" and "confirmed real" looked like in practice):
   these DO send a token, so they're not "always 401" — but they miss
   `apiRequest()`'s auto-refresh-on-401 retry, so any of them can fail for
   a user with a just-expired access token. Not fixed now (out of scope
-  for a PDF-specific bug), same class as the already-fixed
-  `family-prediction-screen.tsx` instance.
+  for a PDF-specific bug).
+  **Correction (2026-09-13):** this entry used to call
+  `family-prediction-screen.tsx` "already-fixed" — that was wrong. Only
+  its PDF download call site had actually been migrated; its other 3
+  call sites (group fetch, predictions fetch, predictions delete) still
+  used a local `apiJson()`/`apiFetch()` wrapper with the same gap, found
+  during a broader duplication audit that specifically re-checked this
+  claim rather than trusting it. Now genuinely fully migrated (all 4
+  call sites), verified via `tsc --noEmit` (zero errors) and the
+  existing frontend test suite. The other five screens listed above are
+  still unfixed as of this correction — don't assume any of them are
+  done without re-checking the file directly, the way this one's claim
+  turned out not to hold.
 - **Weekly/yearly prompt-token margins weren't re-verified after the
   Issue 2 fix** (2026-09-11, `payload_builder.py`'s `MAX_PROMPT_TOKENS`).
   Monthly was confirmed stale (0 real margin against a real chart) and
