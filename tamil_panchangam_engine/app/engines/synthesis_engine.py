@@ -141,7 +141,7 @@ def synthesize_from_envelope(envelope: dict) -> dict:
             "valence": "neg" if rahu_effect == "disruptive" else "pos",
             "strength": 0.7,
             "confidence": 0.75,
-            "rationale": f"Rahu-Ketu axis {rahu_ketu.get('axis', 'unknown')} ({rahu_effect})",
+            "rationale": f"Rahu-Ketu axis {rahu_ketu.get('axis', 'unknown')} from Moon ({rahu_effect})",
         })
     
     # -------------------------------------------------

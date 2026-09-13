@@ -218,8 +218,8 @@ def _format_transit(transit: Dict, planet: str) -> Optional[str]:
             "neutral": "Neutral",
         }.get(effect, "Neutral")
         
-        return f"{rasi} (H{house}) - {effect_label}"
-    
+        return f"{rasi} (H{house} from Moon) - {effect_label}"
+
     return None
 
 
@@ -240,9 +240,9 @@ def _format_saturn_transit(transit: Dict) -> Optional[str]:
         }
         
         if phase in special_phases:
-            return f"{rasi} (H{house}) - {special_phases[phase]}"
-        
-        return f"{rasi} (H{house})"
+            return f"{rasi} (H{house} from Moon) - {special_phases[phase]}"
+
+        return f"{rasi} (H{house} from Moon)"
     
     return None
 
@@ -257,7 +257,7 @@ def _format_rahu_ketu(axis: Dict) -> Optional[str]:
     theme = axis.get("theme", "")
     
     if rahu_house and ketu_house:
-        formatted = f"Rahu H{rahu_house} / Ketu H{ketu_house}"
+        formatted = f"Rahu H{rahu_house} / Ketu H{ketu_house} (from Moon)"
         if theme:
             formatted += f" ({theme})"
         return formatted

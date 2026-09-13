@@ -1199,9 +1199,9 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
         jup = gochara.get("jupiter", {})
         sat = gochara.get("saturn", {})
         rahu_ketu = gochara.get("rahu_ketu", {})
-        jupiter_transit = f"{jup.get('transit_rasi', '')} (H{jup.get('from_moon_house', '')}) - {jup.get('effect', '')}"
-        saturn_transit = f"{sat.get('transit_rasi', '')} (H{sat.get('from_moon_house', '')})"
-        rahu_ketu_axis_str = f"Rahu H{rahu_ketu.get('rahu_from_moon_house', '')} / Ketu H{rahu_ketu.get('ketu_from_moon_house', '')}"
+        jupiter_transit = f"{jup.get('transit_rasi', '')} (H{jup.get('from_moon_house', '')} from Moon) - {jup.get('effect', '')}"
+        saturn_transit = f"{sat.get('transit_rasi', '')} (H{sat.get('from_moon_house', '')} from Moon)"
+        rahu_ketu_axis_str = f"Rahu H{rahu_ketu.get('rahu_from_moon_house', '')} / Ketu H{rahu_ketu.get('ketu_from_moon_house', '')} (from Moon)"
         live_transit_context = TransitContext(
             jupiter_transit=jupiter_transit,
             saturn_transit=saturn_transit,
