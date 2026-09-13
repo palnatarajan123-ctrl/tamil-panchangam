@@ -248,7 +248,7 @@ def build_monthly_prediction_envelope(
 
     d9_context = {
         "planet_signs": {
-            planet: data.get("navamsa_sign")
+            planet: data.get("sign")
             for planet, data in d9_raw.items()
             if isinstance(data, dict)
         },

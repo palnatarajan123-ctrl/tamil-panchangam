@@ -10,12 +10,12 @@ D10: Dasamsa (Career, authority)
 
 from .d2_hora import build_hora_chart, compute_hora_sign
 from .d7_saptamsa import build_saptamsa_chart, compute_saptamsa_sign
-from .d9_navamsa import build_navamsa_chart, compute_navamsa_sign
+from .d9_navamsa import build_navamsa_chart, compute_navamsa_sign, to_legacy_shape as navamsa_to_legacy_shape
 from .d10_dasamsa import build_dasamsa_chart, compute_dasamsa_sign
 
 __all__ = [
     "build_hora_chart", "compute_hora_sign",
     "build_saptamsa_chart", "compute_saptamsa_sign",
-    "build_navamsa_chart", "compute_navamsa_sign",
+    "build_navamsa_chart", "compute_navamsa_sign", "navamsa_to_legacy_shape",
     "build_dasamsa_chart", "compute_dasamsa_sign",
 ]

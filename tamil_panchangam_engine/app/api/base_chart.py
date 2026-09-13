@@ -56,14 +56,12 @@ from app.engines.panchangam import compute_panchangam
 from app.engines.dasha_vimshottari import compute_vimshottari_dasha
 from app.engines.pancha_pakshi import get_birth_pakshi
 
-# ✅ Navamsa engine (legacy import for compatibility)
-from app.engines.navamsa_engine import build_navamsa_chart
-
 # ✅ Tier-1 Divisional Charts
 from app.engines.divisional_charts import (
     build_hora_chart,
     build_saptamsa_chart,
     build_navamsa_chart as build_d9_chart,
+    navamsa_to_legacy_shape,
     build_dasamsa_chart,
 )
 
@@ -345,8 +343,11 @@ def create_base_chart(
     # D10: Dasamsa (Career/Authority)
     d10_dasamsa = build_dasamsa_chart(ephemeris)
     
-    # Legacy navamsa for backward compatibility
-    navamsa_legacy = build_navamsa_chart(ephemeris)
+    # Legacy navamsa shape for backward compatibility (payload["charts"]["D9"],
+    # read by data_loader.py's PDF generation) -- derived from the single
+    # canonical d9_navamsa computation above, not a second engine call.
+    # See CLAUDE.md's 2026-09-13 D9 consolidation entry.
+    navamsa_legacy = navamsa_to_legacy_shape(d9_navamsa)
 
     # -------------------------------------------------
     # 7b. Functional Roles (yogakaraka/benefic/malefic)

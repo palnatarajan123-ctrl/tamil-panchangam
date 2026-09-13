@@ -2,14 +2,27 @@
 D9 Navamsa Chart - Dharma & Maturity
 Parashara Method
 
-This is a wrapper around the existing navamsa_engine.py for consistency
-with the divisional_charts module structure.
+THE canonical D9 implementation (2026-09-13 consolidation). A second,
+independent implementation used to exist at app.engines.navamsa_engine
+-- this file's own docstring used to (incorrectly) describe itself as
+"a wrapper around" it, but never actually called it; both were fully
+separate reimplementations with different output shapes
+("navamsa_sign" here vs "sign" there), which caused
+prediction_envelope.py's d9_context to silently read the wrong key
+and made the classical Vargottama (same D1/D9 sign) strength bonus in
+d9_strength_engine.py never fire, for any chart. The formula itself
+was never wrong -- verified identical output across real charts, and
+independently confirmed against Parashara's movable/fixed/dual-sign
+Navamsa rule (Brihat Parashara Hora Sastra) before deleting the other
+copy. See CLAUDE.md's 2026-09-13 entry.
 
 Division: Each sign divided into 9 equal parts of 3°20' each.
 """
 
 from typing import Any, Dict, Optional
 import logging
+
+from app.utils.rasi_utils import to_english_rasi
 
 logger = logging.getLogger(__name__)
 
@@ -20,19 +33,15 @@ SIGNS = [
 
 SIGN_INDEX = {s: i for i, s in enumerate(SIGNS)}
 
-RASI_NORMALIZATION = {
-    "mesham": "Aries", "rishabam": "Taurus", "mithunam": "Gemini",
-    "kadakam": "Cancer", "katakam": "Cancer",
-    "simmam": "Leo", "simham": "Leo",
-    "kanni": "Virgo", "thulam": "Libra",
-    "vrischikam": "Scorpio", "vrischigam": "Scorpio",
-    "viruchigam": "Scorpio", "viruchikam": "Scorpio",
-    "dhanusu": "Sagittarius", "dhanus": "Sagittarius", "dhanush": "Sagittarius",
-    "makaram": "Capricorn", "kumbham": "Aquarius", "meenam": "Pisces",
-    "aries": "Aries", "taurus": "Taurus", "gemini": "Gemini",
-    "cancer": "Cancer", "leo": "Leo", "virgo": "Virgo",
-    "libra": "Libra", "scorpio": "Scorpio", "sagittarius": "Sagittarius",
-    "capricorn": "Capricorn", "aquarius": "Aquarius", "pisces": "Pisces",
+# Transliteration variants real chart data has never actually used
+# (checked live production data 2026-09-13) but kept defensively, since
+# this is the one thing the old duplicate copy of this table handled
+# that app.utils.rasi_utils doesn't -- see _normalize_rasi().
+_EXTRA_SPELLING_VARIANTS = {
+    "katakam": "Cancer",
+    "simham": "Leo",
+    "vrischigam": "Scorpio", "viruchigam": "Scorpio", "viruchikam": "Scorpio",
+    "dhanus": "Sagittarius", "dhanush": "Sagittarius",
 }
 
 NAVAMSA_SPAN = 30.0 / 9  # 3.333... degrees per division
@@ -51,10 +60,28 @@ DEBILITATION_SIGNS = {
 
 
 def _normalize_rasi(rasi: Any) -> Optional[str]:
+    """
+    Normalize a rasi name (Tamil, English, or a known transliteration
+    variant) to canonical English. Delegates the canonical Tamil<->English
+    mapping to app.utils.rasi_utils.to_english_rasi() -- the single
+    source of truth for that conversion (see CLAUDE.md's 2026-09-12
+    rasi-name bug fix) -- rather than maintaining a second copy of that
+    table here. _EXTRA_SPELLING_VARIANTS covers only transliteration
+    variants to_english_rasi() doesn't.
+    """
     if not rasi or not isinstance(rasi, str):
         return None
-    key = rasi.strip().casefold()
-    return RASI_NORMALIZATION.get(key)
+    stripped = rasi.strip()
+    english = to_english_rasi(stripped)
+    if english in SIGN_INDEX:
+        return english
+    variant = _EXTRA_SPELLING_VARIANTS.get(stripped.casefold())
+    if variant:
+        return variant
+    for sign in SIGNS:
+        if stripped.casefold() == sign.casefold():
+            return sign
+    return None
 
 
 def _extract_longitude_deg(data: Dict[str, Any]) -> Optional[float]:
@@ -155,5 +182,25 @@ def build_navamsa_chart(ephemeris: Dict[str, Any]) -> Dict[str, Any]:
             degree_in_rasi = lon % 30.0
             navamsa_data = compute_navamsa_sign(rasi, degree_in_rasi)
             navamsa_chart["planets"]["Lagna"] = navamsa_data
-    
+
     return navamsa_chart
+
+
+def to_legacy_shape(navamsa_chart: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+    """
+    Convert this engine's native output (per-planet {"sign", "part",
+    "longitude", "dignity"}) to the shape the old, now-deleted
+    navamsa_engine.py used to produce ({"navamsa_sign", "dignity"}),
+    for the one remaining consumer (data_loader.py's PDF generation,
+    via base_chart.py's payload["charts"]["D9"]) that still expects it.
+
+    Excludes "Lagna" -- navamsa_engine.py never computed a Lagna entry,
+    and payload["charts"]["D9"] consumers were never built to expect
+    one; keeping this conversion behaviorally identical to what that
+    payload key used to contain, not silently adding a new field to it.
+    """
+    return {
+        planet: {"navamsa_sign": data.get("sign", ""), "dignity": data.get("dignity", "neutral")}
+        for planet, data in navamsa_chart.get("planets", {}).items()
+        if planet != "Lagna"
+    }
