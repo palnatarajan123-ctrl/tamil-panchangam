@@ -126,6 +126,39 @@ stale" and "confirmed real" looked like in practice):
   a transit-degree hit affects — or is it an accidental formula choice
   that should be Whole Sign like everywhere else?) before deciding
   whether to fix it, not a blind merge into the new shared helper.
+- **Closed 2026-09-14: Southern Hemisphere and boundary-degree gaps,
+  both confirmed working, not just "didn't error"** — flagged in the
+  2026-09-13 comprehensive audit as untested edge cases; investigated
+  with real data and closed. Permanent regression tests:
+  `tests/engines/test_southern_hemisphere_chart.py`,
+  `tests/engines/test_boundary_degree_chart.py`.
+  - **Southern Hemisphere**: a real chart (Sydney, Australia, latitude
+    -33.8688, 1990-01-15) run through natal generation, Gochara
+    house-from-Moon/house-from-Lagna, and the full chat-grounding
+    pipeline. Since planetary sidereal longitudes are geocentric and
+    latitude-independent by construction, the only genuinely
+    latitude-dependent pieces are the Lagna/Ascendant and sunrise/
+    sunset-based calculations (Upagraha, daily panchangam) — both
+    independently verified, not just run: Lagna cross-checked against
+    the standard spherical-astronomy Ascendant formula (RAMC/obliquity/
+    ayanamsa taken from Swiss Ephemeris as trusted sub-inputs, but the
+    latitude-dependent `tan(lat)` trigonometric step — exactly where a
+    Southern-Hemisphere sign bug would appear — computed independently
+    in plain Python), matched to within 0.01°; sunrise/sunset (06:01/
+    20:07 AEDT) matched Sydney's well-known real mid-January times. No
+    bug found.
+  - **Boundary-degree**: a real chart already in the DB
+    (`11656fc5-c67b-4b0b-9929-c14a28105e56`) has Mars at 240.00705°,
+    ~25 arcseconds past the Scorpio/Sagittarius cusp — and, coincidentally,
+    240° is also exactly a nakshatra boundary (18×13°20′ = 240.0 exactly,
+    the Jyeshtha/Mula cusp), so this one chart tests both at once.
+    Checked every independent longitude-to-sign implementation found
+    across the app this session (`ephemeris.py`, `gochara_engine.py`,
+    `yoga_engine.py`, `ashtakavarga_engine.py`, `moon_transit_engine.py`,
+    `divisional_charts/d9_navamsa.py`) plus nakshatra derivation — all
+    agree (Sagittarius/Mula, not Scorpio/Jyeshtha), including through D9
+    and the chat-grounding `planets_summary` field. No inconsistency
+    found.
 - **Night-birth Gulika (Mandi)** — `_MANDI_NIGHTTIME_SEGMENT` in
   `upagraha_engine.py` exists but is unwired. Deferred, not guessed at:
   the daytime table's mechanism (a continuous Saturn→Jupiter→Mars→Sun→

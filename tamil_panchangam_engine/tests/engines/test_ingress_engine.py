@@ -8,6 +8,13 @@ Jupiter) and cross-checked against external Tamil peyarchi sources
 (Rahu into Capricorn Dec 5 2026 mean node; Jupiter into Cancer ~June
 2026, confirmed via a coarser sample sweep) -- see CLAUDE.md's
 2026-09-13 entry.
+
+2026-09-14: added permanent Jupiter/Saturn confirmations, matching the
+same external-source rigor -- Saturn's dates cross-checked against
+multiple independent sites, one explicitly citing "Drik Siddhantam
+method... verified against published almanacs"; Jupiter's dates
+cross-checked with a noted ~1-day source variance (normal tolerance for
+this kind of published date) for the retrograde-return date only.
 """
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
@@ -50,26 +57,81 @@ def test_ketu_ingress_is_exactly_opposite_rahu():
 
 
 def test_jupiter_cancer_entry_matches_known_external_date():
-    # Cross-check against the June 2026 Jupiter-into-Cancer date already
-    # reviewed via external PDF content earlier in this project.
+    # External source: Jupiter into Cancer June 2, 2026 -- that date is
+    # in IST. The engine returns UTC by design (matching the rest of
+    # this app's convention); this app's computed instant, 2026-06-01
+    # 20:35 UTC, is 2026-06-02 02:05 IST (+5:30) -- the same real moment,
+    # not a discrepancy. Asserting the UTC calendar date the engine
+    # actually returns, with the IST correspondence noted here so a
+    # future reader doesn't "fix" this to 06-02 and silently reintroduce
+    # a real, if small, error.
     result = find_next_ingress("Jupiter", datetime(2026, 1, 1))
+    assert result["from_sign"] == "Gemini"
     assert result["to_sign"] == "Cancer"
-    assert result["ingress_date_utc"].month == 6
-    assert result["ingress_date_utc"].year == 2026
+    assert result["ingress_date_utc"].date() == datetime(2026, 6, 1).date()
+
+
+def test_jupiter_leo_entry_matches_known_external_date():
+    # External source: Jupiter into Leo October 31, 2026.
+    result = find_next_ingress("Jupiter", datetime(2026, 9, 13))
+    assert result["from_sign"] == "Cancer"
+    assert result["to_sign"] == "Leo"
+    assert result["ingress_date_utc"].date() == datetime(2026, 10, 31).date()
+
+
+def test_jupiter_retrograde_return_to_cancer_matches_known_external_date():
+    # External source: Jupiter retrogrades back into Cancer around
+    # 2027-01-24/25 (external sources vary by ~1 day, normal tolerance
+    # for this kind of published date) before finally settling in Leo.
+    result = find_next_ingress("Jupiter", datetime(2026, 9, 13))
+    assert result["retrograde_return_date_utc"] is not None
+    assert result["retrograde_return_date_utc"].date() in (
+        datetime(2027, 1, 24).date(), datetime(2027, 1, 25).date(),
+    )
 
 
 def test_saturn_ingress_detects_real_retrograde_return():
     # Saturn's real 2027 Pisces->Aries entry, followed by a retrograde
     # return to Pisces later the same year -- a genuine astronomical
     # event (not synthesized), found while validating this algorithm
-    # against real ephemeris data.
+    # against real ephemeris data. External source (2026-09-14):
+    # multiple independent sites, one explicitly citing "Drik
+    # Siddhantam method... verified against published almanacs" --
+    # retrograde return to Pisces October 20, 2027.
     result = find_next_ingress("Saturn", datetime(2026, 9, 13))
     assert result["from_sign"] == "Pisces"
     assert result["to_sign"] == "Aries"
     assert result["ingress_date_utc"].date() == datetime(2027, 6, 3).date()
     assert result["retrograde_return_date_utc"] is not None
-    assert result["retrograde_return_date_utc"] > result["ingress_date_utc"]
-    assert result["retrograde_return_date_utc"] < result["ingress_date_utc"] + timedelta(days=300)
+    assert result["retrograde_return_date_utc"].date() == datetime(2027, 10, 20).date()
+
+
+def test_saturn_pisces_entry_matches_known_external_date():
+    # External source: Saturn into Pisces March 29, 2025 -- the ingress
+    # immediately before the one covered by
+    # test_saturn_ingress_detects_real_retrograde_return above. Search
+    # starts well before this date since it's in the past relative to
+    # "today" elsewhere in this file.
+    result = find_next_ingress("Saturn", datetime(2025, 1, 1))
+    assert result["from_sign"] == "Aquarius"
+    assert result["to_sign"] == "Pisces"
+    assert result["ingress_date_utc"].date() == datetime(2025, 3, 29).date()
+
+
+def test_saturn_aries_reentry_after_retrograde_return_matches_known_external_date():
+    # External source: after retrograding back into Pisces (Oct 20
+    # 2027, tested above), Saturn re-enters Aries for good in February
+    # 2028. This is the THIRD ingress out from "today" (Pisces->Aries,
+    # ->Pisces retrograde, ->Aries again), found by searching forward
+    # from just after the retrograde-return date.
+    first = find_next_ingress("Saturn", datetime(2026, 9, 13))
+    reentry = find_next_ingress(
+        "Saturn", first["retrograde_return_date_utc"] + timedelta(days=1)
+    )
+    assert reentry["from_sign"] == "Pisces"
+    assert reentry["to_sign"] == "Aries"
+    assert reentry["ingress_date_utc"].year == 2028
+    assert reentry["ingress_date_utc"].month == 2
 
 
 def test_coarse_then_refine_uses_far_fewer_calls_than_day_by_day():
