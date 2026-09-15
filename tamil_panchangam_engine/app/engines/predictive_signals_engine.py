@@ -113,7 +113,7 @@ def compute_predictive_signals(
     # ── 6. Refined AV ─────────────────────────────────────────────────────────
     try:
         from app.engines.refined_av_engine import compute_refined_av
-        signals["refined_av_scores"] = compute_refined_av(bav)
+        signals["refined_av_scores"] = compute_refined_av(bav, natal_planets=ephemeris.get("planets", {}))
     except Exception as e:
         logger.warning("refined_av failed chart=%s: %s", chart_id, e)
         signals["refined_av_scores"] = {}
