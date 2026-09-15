@@ -688,6 +688,39 @@ this, not the automated suite alone).
   this (hardcodes a node type, or doesn't accept the parameter at all)
   reintroduces the exact bug that moved Rahu's real Dec 2026 Capricorn
   ingress ~10 days early.
+- **Mean-node default now traced to a specific, named Vakya-tradition
+  source, not just general "Tamil astrology sources"** (closed
+  2026-09-14, per the earlier-flagged gap that prior node-type
+  validation was never confirmed Vakya-specific). Prior validation
+  (`67605ed`/`7685348`, 2026-09-12's ingress fix) confirmed mean-node
+  output "matches external Tamil astrology sources" without naming
+  which tradition within Tamil astrology those sources followed —
+  Vakya and Thirukanitha (Drik Ganita) are two genuinely different
+  calendrical schools that can disagree by hours to days on tithi/
+  nakshatra boundaries, so agreement with an unnamed source didn't
+  actually confirm this app's mean-node default matches Vakya
+  specifically. Now sourced: Vākyapañcāṅga (the Vakya-tradition
+  almanac) is built on the katapayadi-encoded verse-tables of
+  *Vākyakaraṇa*, which compute planetary positions from constant MEAN
+  motions, not observed/perturbed ones (per Wikipedia's
+  [Vākyapañcāṅga](https://en.wikipedia.org/wiki/V%C4%81kyapa%C3%B1c%C4%81%E1%B9%85ga)
+  and [Vākyakaraṇa](https://en.wikipedia.org/wiki/V%C4%81kyakara%E1%B9%87a)
+  articles, corroborated by DrikPanchang's own Tamil-language
+  [Thiruganita vs. Vakyam](https://www.drikpanchang.com/tamil/info/thiruganita-versus-vakyam-panchangam.html)
+  comparison: "Vakya... computes the positions of planets based on the
+  mean motions of planets," contrasted explicitly against Thirukanitha's
+  modern ephemeris-based approach). Vakya's own root text for the
+  lunar nodes traces to the Surya Siddhanta's node model — the nodes as
+  "shadow planets" (chāyā grahāḥ) in constant retrograde MEAN motion,
+  with no true-node oscillatory correction at all — so a mean-node
+  default is not merely compatible with Vakya tradition, it's the only
+  node model Vakya's own source astronomy defines. Further corroborated
+  by B. V. Raman (a named, citable classical-Vedic-astrology authority):
+  "For all practical purposes of horoscopy, the Mean Node should be
+  used. The so-called True Node of Western tables introduces needless
+  irregularity." This closes the gap cleanly in mean-node's favor — no
+  contradiction found, unlike some of tonight's other "never
+  independently verified" items.
 - **A 0-sign-offset chart (Rasi == Lagna) cannot prove the Lagna-rasi
   Tamil→English conversion is working** — investigated 2026-09-13 after
   a second real chart (`fd79efb3-87e8-4533-bec3-0c3d5396ce53`) looked
