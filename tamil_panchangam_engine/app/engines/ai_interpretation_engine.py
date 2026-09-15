@@ -182,6 +182,61 @@ def _momentum_from_score(avg_score: float) -> str:
         return "pressure"
 
 
+def _infer_source_from_key(key: str) -> str | None:
+    """
+    Infer a signal's engine/source from its key prefix, for signals that
+    reach here via top_signals (which carries no "source" field of its
+    own -- see life_area_scorer.py's LifeAreaSignalContribution).
+
+    Single shared source of truth for this inference -- it used to be
+    duplicated independently in _normalize_signals() and
+    _generate_life_area_interpretation()'s engines_used loop, and only
+    covered the signal types that could ever reach a non-empty
+    top_signals before the 2026-09-15 life_area_scorer.py structural-
+    exclusion fix (see CLAUDE.md). MARAKA_ACTIVE_*, YOGAKARAKA_ACTIVE_*,
+    CHANDRA_GATI_RHYTHM, NAVAMSA_DIGNITY, D10_*/D2_*/D7_*, and
+    EVENT_WINDOWS_* were structurally excluded from top_signals until
+    that fix, so their missing inference here was latent and never
+    triggered. Confirmed live during the post-fix backfill:
+    MARAKA_ACTIVE_Mars fell through every branch in the old duplicated
+    logic, leaving source=None, which downstream turned into a literal
+    "key": None in the LLM payload's signals_used attribution and failed
+    schema validation. YOGAKARAKA_ACTIVE_* is checked before the generic
+    YOGA_ prefix since "YOGAKARAKA" also starts with "YOGA" and would
+    otherwise be misclassified as the yoga engine instead of
+    functional_roles.
+    """
+    if key.startswith("GOCHARA"):
+        return "gochara"
+    if key.startswith("DRISHTI"):
+        return "drishti"
+    if key.startswith("HOUSE"):
+        return "house_strength"
+    if key.startswith("YOGAKARAKA") or key.startswith("MARAKA"):
+        return "functional_roles"
+    if key.startswith("YOGA"):
+        return "yoga"
+    if key.startswith("DASHA"):
+        return "dasha"
+    if key.startswith("TARA"):
+        return "nakshatra"
+    if key.startswith("ASHTAKAVARGA"):
+        return "ashtakavarga"
+    if key.startswith("CHANDRA"):
+        return "chandra_gati"
+    if key.startswith("NAVAMSA"):
+        return "derived"
+    if key.startswith("D10"):
+        return "divisional_d10"
+    if key.startswith("D2"):
+        return "divisional_d2"
+    if key.startswith("D7"):
+        return "divisional_d7"
+    if key.startswith("EVENT"):
+        return "event_windows"
+    return None
+
+
 def _normalize_signals(raw_signals: List[Dict]) -> List[Dict]:
     """Normalize signals from synthesis top_signals format to standard format."""
     normalized = []
@@ -203,21 +258,8 @@ def _normalize_signals(raw_signals: List[Dict]) -> List[Dict]:
                     break
         
         if not source:
-            if key.startswith("GOCHARA"):
-                source = "gochara"
-            elif key.startswith("DRISHTI"):
-                source = "drishti"
-            elif key.startswith("HOUSE"):
-                source = "house_strength"
-            elif key.startswith("YOGA"):
-                source = "yoga"
-            elif key.startswith("DASHA"):
-                source = "dasha"
-            elif key.startswith("TARA"):
-                source = "nakshatra"
-            elif key.startswith("ASHTAKAVARGA"):
-                source = "ashtakavarga"
-        
+            source = _infer_source_from_key(key)
+
         normalized.append({
             "key": key,
             "valence": valence or "mix",
@@ -506,21 +548,9 @@ def _generate_life_area_interpretation(
         elif planet:
             planets_involved.append(planet)
         
-        if not source and key.startswith("GOCHARA"):
-            engines_used.append("gochara")
-        elif not source and key.startswith("DRISHTI"):
-            engines_used.append("drishti")
-        elif not source and key.startswith("HOUSE"):
-            engines_used.append("house_strength")
-        elif not source and key.startswith("YOGA"):
-            engines_used.append("yoga")
-        elif not source and key.startswith("DASHA"):
-            engines_used.append("dasha")
-        elif not source and key.startswith("TARA"):
-            engines_used.append("nakshatra")
-        elif not source and key.startswith("ASHTAKAVARGA"):
-            engines_used.append("ashtakavarga")
-        elif source:
+        if not source:
+            source = _infer_source_from_key(key)
+        if source:
             engines_used.append(source)
     
     planets_involved = list(set(planets_involved))[:3]
@@ -537,6 +567,10 @@ def _generate_life_area_interpretation(
         "chandra_gati": "Moon Rhythm",
         "dasha": "Dasha Analysis",
         "event_windows": "Event Windows",
+        "divisional_d10": "D10 (Career Chart)",
+        "divisional_d2": "D2 (Wealth Chart)",
+        "divisional_d7": "D7 (Creativity/Family Chart)",
+        "derived": "Navamsa Dignity",
     }
     
     signals_used = []

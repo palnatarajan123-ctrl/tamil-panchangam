@@ -36,7 +36,38 @@ from app.llm.payload_builder import (
 
 logger = logging.getLogger(__name__)
 
-LLM_MONTHLY_TOKEN_BUDGET = 1_000_000
+LLM_MONTHLY_TOKEN_BUDGET = 3_500_000
+# EMERGENCY RAISE, active through the 2026-09-30/10-01 monthly reset
+# only -- was 1_000_000. A manual backfill run (Karana/Ashtakavarga/
+# top_signals fixes, see CLAUDE.md) pushed real month-to-date usage to
+# 1,014,767, exceeding the original cap and causing real users'
+# concurrent monthly/yearly/weekly generation requests to silently fall
+# back to deterministic-only content (fallback_reason="budget_exceeded")
+# with no user-facing indication, in addition to stalling the backfill
+# itself. Sized to cover, for the rest of September 2026: already-used
+# tokens at the time of the raise (1,014,767) + projected remaining
+# organic traffic + the full backfill completion (Ashtakavarga's
+# remaining rows + the top_signals fix's 76-row backfill) + margin --
+# see CLAUDE.md's 2026-09-15 entries for the full calculation and the
+# actual final total (2,543,833 used by the time all backfill work
+# finished). Requires the deploy running this code to actually restart/
+# redeploy before it takes effect for live traffic -- a source change
+# alone does not affect an already-running process.
+#
+# DECIDED PERMANENT VALUE: 1_500_000/month, effective from the next
+# monthly reset (2026-10-01) onward -- NOT applied yet. Real Sept 1-14
+# organic-only usage (428,763 tokens over 4 active days out of 14)
+# extrapolates to a worst-case ~918,780/month if that rate held for a
+# full 30-day month, which would leave the ORIGINAL 1,000,000 cap only
+# ~8% headroom with zero room for admin/backfill work or growth --
+# 1,500,000 restores a genuine ~58% margin over that worst case. Do NOT
+# apply 1,500,000 before the October reset: September's cumulative usage
+# already exceeds it from this backfill alone, so setting it now would
+# immediately re-trigger the same real-user-facing fallback this raise
+# was meant to fix. Whoever owns this constant needs to make this change
+# manually at/after 2026-10-01 -- no automation exists for it (see
+# CLAUDE.md's admin-visibility backlog entry, itself a product of this
+# incident having no alerting until it was hit by accident).
 
 # v2.0: Upagraha context added (Gulika/Mandi)
 PROMPT_VERSION_BY_WINDOW = {

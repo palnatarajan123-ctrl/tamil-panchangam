@@ -25,59 +25,91 @@ these — this list has been wrong before; see "Gulika/Sani Oorai" and
 "family surfaces" audits in git history, 2026-08-14, for what "confirmed
 stale" and "confirmed real" looked like in practice):
 
-- **URGENT, LIVE 2026-09-15 — the app's shared, site-wide
-  `LLM_MONTHLY_TOKEN_BUDGET` (1,000,000 tokens/calendar-month,
-  `llm_interpretation_orchestrator.py:39`) is exhausted for the rest of
-  September, affecting REAL USERS right now, not just backfill work.**
-  Discovered mid-backfill: the Ashtakavarga backfill (56 rows, see
-  below) pushed usage from 428,763 (already used before the backfill
-  started) to 1,014,767 tokens -- over the 1,000,000 cap -- causing 21
-  of its 56 target rows to silently fall back to the deterministic
-  interpretation (`fallback_reason: "budget_exceeded"`) instead of a
-  real LLM regeneration. This budget is global and shared across ALL
-  monthly/yearly prediction generation app-wide (checked inside
-  `generate_llm_interpretation()`, independent of and in addition to
-  the separate dollar-based `llm_budget.llm_enabled` auto-pause) -- it
-  is NOT specific to this backfill. Until it resets at the next
-  calendar month (2026-10-01) or is manually raised, every real user
-  generating a fresh monthly/yearly prediction gets the same silent
-  deterministic-only fallback, with no user-facing error or banner
-  distinguishing it from a real LLM-authored result. No admin control
-  for this specific token ceiling was found (distinct from
-  `admin_llm.py`'s `/budget` endpoint, which only exposes the
-  dollar-based `monthly_budget_usd`/`per_account_daily_cap_usd` fields,
-  not this token count) -- raising it would require a code change to
-  the `LLM_MONTHLY_TOKEN_BUDGET` constant itself. Needs a product
-  decision: accept the fallback for the rest of the month, or raise the
-  constant. The 21 stuck Ashtakavarga rows (listed in the entry below)
-  and the top_signals fix's 76-row backfill are both blocked on this
-  same resolution -- pushing either forward now would just add more
-  wasted, already-fallen-back-to-fallback calls.
-- **CLOSED 2026-09-15 (Karana) / PARTIAL 2026-09-15 (Ashtakavarga) —
-  backfill from the 2026-09-14 recommendation below, executed.**
+- **RESOLVED 2026-09-15 (was URGENT/LIVE) — the app's shared, site-wide
+  `LLM_MONTHLY_TOKEN_BUDGET` was exhausted mid-backfill, affecting real
+  users; raised, both blocked backfills completed, and a permanent
+  right-sized value decided (not yet applied — see below).** Original
+  incident: the Ashtakavarga backfill (56 rows) pushed usage from
+  428,763 (already used before the backfill started) to 1,014,767 tokens
+  -- over the then-1,000,000 cap -- causing 21 of its 56 rows, and real
+  users' concurrent monthly/yearly/weekly generation requests app-wide,
+  to silently fall back to deterministic-only content
+  (`fallback_reason: "budget_exceeded"`) with no user-facing indication.
+  This budget is global and shared across ALL monthly/yearly/weekly
+  prediction generation (checked inside `generate_llm_interpretation()`,
+  independent of and in addition to the separate dollar-based
+  `llm_budget.llm_enabled` auto-pause).
+
+  **Fix applied**: raised `LLM_MONTHLY_TOKEN_BUDGET` to 3,500,000
+  (`llm_interpretation_orchestrator.py:39`), sized to cover already-used
+  tokens + projected remaining September organic traffic + the 21 stuck
+  Ashtakavarga rows (~332,000) + the top_signals fix's 76-row backfill
+  (~1,202,000) + 15% margin. Confirmed active for any freshly-started
+  process immediately after the code change (`get_monthly_token_usage()`
+  reflected the new ceiling on the next call) -- but this repo has no
+  visibility into or control over the actual deployed server process
+  (no local server found; this app was migrated from Replit and is
+  presumably deployed separately), so **the live deployment must be
+  redeployed/restarted for this to take effect for real traffic** -- a
+  source-only change does not affect an already-running process. This
+  is a real gap this investigation could not close from here.
+
+  **Both blocked backfills completed after the raise**: the 21 stuck
+  Ashtakavarga rows (all re-ran successfully, real content, zero
+  fallbacks, 333,054 tokens) and the top_signals fix's 76-row backfill
+  (75/76 succeeded immediately; 1 row -- chart `f1eb7ec4`, monthly
+  2026-07 -- hit a real, unrelated pre-existing bug in
+  `ai_interpretation_engine.py`'s signal-source inference, fixed
+  separately, see the entry below; re-ran clean afterward, 76/76 final).
+  Total real spend across all three backfill passes today (original
+  56-row Ashtakavarga run + 21-row stuck rerun + 76-row top_signals run,
+  including the one row's second attempt): ~2,115,070 tokens, ~$11.60 at
+  Sonnet 4.6 pricing ($3/$15 per MTok) -- month-to-date usage stood at
+  2,543,833/3,500,000 (72.7%) once everything finished.
+
+  **Capacity assessment (why NOT to just revert to 1,000,000)**: real
+  Sept 1-14 organic-only usage (i.e., excluding all of today's backfill
+  activity) was 428,763 tokens, but concentrated on only 4 of those 14
+  days (Sept 8, 11, 12, 13) -- a pattern that lines up with this
+  project's own documented live-LLM investigation/verification sessions
+  from that week (see the 2026-09-11 through 09-13 entries elsewhere in
+  this file), so it likely overstates genuine steady-state end-user
+  demand and can't be cleanly separated from it with the data available.
+  Even taking it at face value, though, extrapolating that rate across a
+  full 30-day month gives ~918,780 tokens -- which would leave the
+  ORIGINAL 1,000,000 cap only ~8% headroom, with zero room for periodic
+  admin/backfill work or organic growth. Reverting to exactly the number
+  that just failed would not be a safe permanent baseline.
+
+  **Decided permanent value: 1,500,000/month, NOT yet applied.** Chosen
+  for ~58% headroom over the worst-case organic estimate above --
+  meaningfully higher than the original (already shown inadequate),
+  well below the one-time emergency ceiling (which included non-
+  recurring backfill catch-up costs). Deliberately NOT set in code yet:
+  September's cumulative usage (2,543,833) already exceeds 1,500,000,
+  so applying it now would immediately regress real users again for the
+  rest of this month. Must be applied manually at/after the next
+  calendar-month reset (2026-10-01) -- there is no automation to do this
+  or to remind anyone, which is exactly the gap the admin-visibility
+  backlog entry below is about.
+- **CLOSED 2026-09-15 (both) — Karana and Ashtakavarga backfills from
+  the 2026-09-14 recommendation below, fully executed and verified.**
   - **Karana backfill: done, verified.** All 38 charts processed (pure
     recomputation, no LLM cost): 32 changed, 6 already coincidentally
     correct, 0 skipped. Spot-checked 2 of the changed charts against
     DrikPanchang post-backfill (Chennai chart -> Garaja, Madurai chart
     -> Naga) -- both confirmed correct.
-  - **Ashtakavarga backfill: 35/56 rows genuinely regenerated with a
-    real LLM call; 21/56 got `fallback_reason: "budget_exceeded"`
-    instead (deterministic-only, no real regeneration) because the run
-    exhausted the app's shared monthly LLM token budget partway through
-    -- see the URGENT entry above this one for the live production
-    impact.** Real cost incurred for the 35 that succeeded: 553,756
-    tokens at Sonnet 4.6 pricing ($3/$15 per MTok input/output) ~=
-    $4.85 -- close to, slightly above, the original ~$3-4 estimate (real
-    per-call payloads were somewhat richer than the historical average
-    used for that estimate). The 21 stuck rows still need a real
-    regeneration once the budget resolution above is settled --
-    monthly: c966cc99/2026-08, c966cc99/2026-09, cc589272/2026-01,
-    cc589272/2026-09, cc589272/2026-10, d6a77175/2026-09,
-    de3bef13/2026-09, f5da25da/2026-01, f5da25da/2026-09,
-    f5da25da/2026-10, fc588066/2026-08, fd79efb3/2026-07,
-    fd79efb3/2026-08, fd79efb3/2026-09; yearly: 1b74c4d0/2026,
-    966f5254/2026, 971df41e/2026, 971df41e/2027, 971df41e/2028,
-    cc589272/2026, f5da25da/2026.
+  - **Ashtakavarga backfill: 56/56 rows now genuinely regenerated with a
+    real LLM call, 0 fallbacks.** First pass got 35/56 real + 21/56
+    `fallback_reason: "budget_exceeded"` (the app's shared monthly LLM
+    token budget was exhausted partway through -- see the entry above);
+    after the budget was raised, all 21 stuck rows were re-run
+    successfully (333,054 tokens, real content confirmed, zero
+    fallbacks). Real cost for the original 35: $3.02 exact (from real
+    prompt/completion token counts at Sonnet 4.6 pricing, $3/$15 per
+    MTok) -- within the original ~$3-4 estimate, not above it as
+    initially miscalculated with a rough per-call heuristic before the
+    real DB numbers were pulled.
 - **RECOMMENDATION (2026-09-14) — dedicated pass: consolidate every
   remaining hardcoded rasi-name list/lookup onto the shared
   canonicalization utility (`app.utils.rasi_utils.to_english_rasi()`).**
@@ -305,6 +337,24 @@ stale" and "confirmed real" looked like in practice):
   a direct DB update. Same singleton-row pattern as the existing field,
   straightforward to add to that endpoint's request/response models when
   someone needs it.
+- **`LLM_MONTHLY_TOKEN_BUDGET` (`llm_interpretation_orchestrator.py`) has
+  no admin visibility or alerting at all — it was exhausted silently on
+  2026-09-15 and only discovered by accident** (a manual backfill run
+  happened to hit the wall; nothing paged anyone, no dashboard showed
+  it approaching the ceiling, and real users were silently getting
+  deterministic-only fallback content for however long it took someone
+  to notice). This is a different, unrelated gate from the dollar-based
+  `llm_budget.llm_enabled` auto-pause that `admin_llm.py`'s `/budget`
+  endpoint already surfaces — `get_monthly_token_usage()` has no
+  equivalent admin-facing endpoint or field at all. Needs, at minimum,
+  a loud log line (not just `logger.warning` buried per-call) when a
+  request first hits `budget_exceeded` in a given month, and ideally a
+  `/budget` response field (`token_budget`/`tokens_used`/
+  `tokens_remaining`) so an admin can see it coming before it's already
+  hit — the same category of gap as the per-account cap not being
+  exposed above, just for the global ceiling instead. Not built —
+  logged for a future pass, not urgent enough to justify scope-creeping
+  into the 2026-09-15 emergency budget raise.
 - **Several screens still use a local bare `fetch()` + manual
   `authHeaders()` instead of the shared `apiRequest()` helper** —
   `family-timeline-screen.tsx`, `children-timing-screen.tsx`,
@@ -461,22 +511,26 @@ stale" and "confirmed real" looked like in practice):
   Support/Strong Support/Excellent). See
   `tests/engines/test_life_area_scorer_signal_weights.py`.
 
-  **Backfill NOT executed yet** — deliberately paused. The Ashtakavarga
-  backfill run immediately before this one (see the entry above) pushed
-  the app's shared, site-wide `LLM_MONTHLY_TOKEN_BUDGET` (1,000,000
-  tokens/calendar-month, `llm_interpretation_orchestrator.py`) from
-  428,763 already-used to 1,014,767 -- over budget -- causing 21 of its
-  56 target rows to silently fall back to the deterministic
-  interpretation (`fallback_reason: "budget_exceeded"`) instead of a
-  real regeneration, and means EVERY real user's fresh monthly/yearly
-  prediction generation is ALSO getting the same silent fallback,
-  site-wide, until the budget resets at the next calendar month
-  (2026-10-01) or someone raises it. Running this fix's 76-row backfill
-  now would guarantee 100% fallback (wasted, zero real regeneration) and
-  was correctly NOT attempted. Needs its own remediation decision
-  (wait for reset vs. an admin override) before either this backfill or
-  a re-run of the 21 stuck Ashtakavarga rows can proceed -- see the
-  budget-exhaustion finding logged during the 2026-09-15 backfill pass.
+  **Backfill: done, 76/76, after the budget raise.** Initially paused
+  (the Ashtakavarga backfill immediately before this one had exhausted
+  the shared `LLM_MONTHLY_TOKEN_BUDGET` -- see that entry above), then
+  run after the emergency raise: 75/76 succeeded on the first pass;
+  1 row (chart `f1eb7ec4`, monthly 2026-07) hit a real, unrelated
+  pre-existing bug surfaced BY this fix -- `ai_interpretation_engine.py`'s
+  signal-source inference for `top_signals` entries had an incomplete
+  key-prefix list that only ever covered the signal types that could
+  reach a non-empty `top_signals` BEFORE this fix (a real
+  `MARAKA_ACTIVE_Mars` signal fell through every branch, producing a
+  literal `"key": None` in the LLM payload's attribution and failing
+  schema validation). Fixed by extracting a single shared
+  `_infer_source_from_key()` (previously duplicated independently in
+  two places, each incomplete) covering every real signal-key prefix;
+  see `tests/engines/test_ai_interpretation_signal_source_inference.py`
+  for the regression test built from this exact real chart/period/
+  signal. Re-ran the one failed row clean afterward -- 76/76 final,
+  0 fallbacks. Real cost: 1,196,012 tokens, $6.57 exact (from real
+  prompt/completion token counts at Sonnet 4.6 pricing) -- close to the
+  original ~$6-7 estimate.
 - **Every birth-chart-only PDF (`render_birth_chart_pdf()`) silently
   omits Sade Sati & Saturn Analysis and Shadow Points (Upagrahas)**,
   despite both sections' rendering code being present, wired in, and
