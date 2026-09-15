@@ -71,18 +71,36 @@ def compute_yoga(sun_lon: float, moon_lon: float) -> Dict:
     }
 
 
-def compute_karana(tithi_index: int) -> Dict:
-    if tithi_index in [0, 29]:
-        return {"name": "Kimstughna"}
-    elif tithi_index in [14]:
-        return {"name": "Shakuni"}
-    elif tithi_index in [15]:
-        return {"name": "Chatushpada"}
-    elif tithi_index in [16]:
-        return {"name": "Naga"}
+def compute_karana(karana_index: int) -> Dict:
+    """
+    Karana is HALF a tithi (30 tithis x 2 karanas = 60 slots per lunar
+    month), not one karana per tithi -- karana_index must be
+    int(diff // 6) where diff = (moon_lon - sun_lon) % 360, NOT the
+    0-29 whole-tithi index. Passing a 0-29 tithi index here (the
+    pre-2026-09-14 bug) collapses two real karanas into one and
+    misplaces all 4 fixed karanas into the middle of the month instead
+    of its boundaries -- confirmed wrong on 3/3 real dates cross-checked
+    against a published Panchangam (DrikPanchang), see CLAUDE.md.
+
+    Of the 11 real karana names: Kimstughna occurs ONCE, only in the
+    first half of Shukla Pratipada (karana_index 0). Shakuni,
+    Chatushpada, and Naga occur ONCE EACH, only at the very end of the
+    month (karana_index 57, 58, 59 -- spanning Krishna Chaturdashi into
+    Amavasya). The remaining 7 "chara" (movable) karanas
+    (KARANA_NAMES) cycle continuously 8 times across the other 56 slots
+    (karana_index 1-56).
+    """
+    if karana_index == 0:
+        return {"name": "Kimstughna", "index": karana_index}
+    elif karana_index == 57:
+        return {"name": "Shakuni", "index": karana_index}
+    elif karana_index == 58:
+        return {"name": "Chatushpada", "index": karana_index}
+    elif karana_index == 59:
+        return {"name": "Naga", "index": karana_index}
     else:
-        karana = KARANA_NAMES[(tithi_index - 1) % 7]
-        return {"name": karana}
+        karana = KARANA_NAMES[(karana_index - 1) % 7]
+        return {"name": karana, "index": karana_index}
 
 
 def compute_tamil_weekday(dt_local: datetime) -> Dict:
@@ -109,7 +127,8 @@ def compute_panchangam(
 ) -> Dict:
     tithi = compute_tithi(sun_lon, moon_lon)
     yoga = compute_yoga(sun_lon, moon_lon)
-    karana = compute_karana(tithi["index"])
+    karana_index = int(((moon_lon - sun_lon) % 360) // 6)
+    karana = compute_karana(karana_index)
     weekday = compute_tamil_weekday(dt_local)
     tamil_month = compute_tamil_month(sun_lon)
 
