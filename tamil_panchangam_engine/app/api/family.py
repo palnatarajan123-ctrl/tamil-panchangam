@@ -1190,7 +1190,21 @@ RULES:
 - Reference members by name, not role.
 - If two members have conflicting planetary influences, say so: "Mixed signals between X and Y —"
 - 3–5 sentences for direct questions; up to 5 short paragraphs for complex ones.
-- No preamble. No restating the question. No generic advice."""
+- No preamble. No restating the question. No generic advice.
+
+HOUSE-COUNTING CONVENTION:
+- When you state a house number for any transit or placement, always say
+  whether it's counted from that member's Moon sign (Rasi) or Ascendant
+  (Lagna) — e.g. "10th house from their Moon sign", never a bare "10th house".
+
+GROUNDING — NEVER STATE AN UNGROUNDED FACT:
+- Only state a specific sign, house, date, or degree if it is explicitly
+  given to you in the context above (including UPCOMING SIGN CHANGES,
+  if present). If asked for something more precise than what's provided
+  — a dasha end date, a divisional chart placement, an ingress further
+  out than the next one shown, or anything else not explicitly given —
+  say plainly "I don't have that specific data available" rather than
+  generating a plausible-sounding but ungrounded answer."""
 
 
 def _build_member_summary(row: tuple) -> str:
@@ -1237,6 +1251,80 @@ def _build_member_summary(row: tuple) -> str:
         f"Dasha {maha}›{antar}"
         f"{ss_suffix}"
         f"{yoga_upagraha_suffix}"
+    )
+
+
+def _build_family_ingress_block(rows: list) -> str:
+    """
+    Per-member upcoming Rahu/Ketu/Jupiter/Saturn ingress (peyarchi) dates --
+    the same grounding data chat.py's _build_chat_context() wires in via
+    ingress_engine.get_upcoming_ingresses(). family_group_chat_stream() is a
+    fully independent implementation (see this file's architecture notes in
+    CLAUDE.md) and previously had none of this: confirmed via live
+    reproduction of the exact question/chart that originally exposed
+    chat.py's fabrication bug that this pipeline gave a confident but wrong
+    sign AND house with no hedge. Ported the fix here rather than assuming
+    chat.py's fix generalized.
+
+    rows: the raw (fm.id, fm.role, fm.display_name, fm.chart_id, bc.payload)
+      tuples already fetched by the endpoint -- no new member query.
+    """
+    from app.engines.ingress_engine import get_upcoming_ingresses, house_from_sign
+    from app.utils.rasi_utils import to_english_rasi
+
+    now_utc = datetime.now(timezone.utc)
+    ingress_cache: dict = {}
+
+    def _get_ingress(conn, planet: str, node_type: str):
+        key = (planet, node_type)
+        if key not in ingress_cache:
+            found = get_upcoming_ingresses(conn, planet, node_type=node_type, now_utc=now_utc, count=1)
+            ingress_cache[key] = found[0] if found else None
+        return ingress_cache[key]
+
+    lines = []
+    try:
+        with get_conn() as conn:
+            for row in rows:
+                _, role, display_name, _chart_id, payload_raw = row
+                payload = payload_raw if isinstance(payload_raw, dict) else json.loads(payload_raw or "{}")
+                eph = payload.get("ephemeris", {})
+                moon_rasi_en = to_english_rasi(eph.get("moon", {}).get("rasi"))
+                lagna_rasi_en = to_english_rasi(eph.get("lagna", {}).get("rasi"))
+                if not moon_rasi_en:
+                    continue
+                name = display_name or payload.get("birth_details", {}).get("name", role)
+                node_type = payload.get("chart_metadata", {}).get("node_type", "mean")
+                for planet in ("Rahu", "Ketu", "Jupiter", "Saturn"):
+                    entry = _get_ingress(conn, planet, node_type)
+                    if not entry:
+                        continue
+                    ingress_date = entry["ingress_date_utc"].strftime("%Y-%m-%d")
+                    house_bits = f"house {house_from_sign(entry['to_sign'], moon_rasi_en)} from {name}'s Moon sign"
+                    if lagna_rasi_en:
+                        house_bits += f", house {house_from_sign(entry['to_sign'], lagna_rasi_en)} from {name}'s Ascendant"
+                    line = f"- {name}: {planet} next enters {entry['to_sign']} on {ingress_date} ({house_bits})"
+                    if entry.get("retrograde_return_date_utc"):
+                        retro_date = entry["retrograde_return_date_utc"].strftime("%Y-%m-%d")
+                        line += (
+                            f"; may retrograde back into its previous sign around {retro_date} "
+                            "before finally settling -- mention this if asked, don't just say a single date"
+                        )
+                    lines.append(line)
+    except Exception as e:
+        logger.warning(f"Ingress lookup failed for family chat: {e}")
+        return ""
+
+    if not lines:
+        return ""
+    return (
+        "\n\n## UPCOMING SIGN CHANGES (Peyarchi) -- per member, real precomputed dates\n"
+        + "\n".join(lines)
+        + "\nThese are real, precomputed dates -- use them directly when asked \"when "
+        "does X enter Y\" for a specific family member, instead of declining. This is "
+        "ONLY the next ingress for each planet per member; if asked about the one "
+        "after that, or a longer-range prediction, say you don't have that specific "
+        "data available.\n"
     )
 
 
@@ -1365,6 +1453,13 @@ async def family_group_chat_stream(
         group_name=group.get("name", "Family"),
         member_lines=member_lines,
     )
+
+    # Upcoming Peyarchi (sign-change) dates, per member -- see
+    # _build_family_ingress_block()'s docstring: this is the 2026-09-14
+    # port of chat.py's 2026-09-13 ingress-grounding fix.
+    ingress_block = _build_family_ingress_block(rows)
+    if ingress_block:
+        system_prompt += ingress_block
 
     # Inject cached family yearly interpretation for richer context
     family_block = _build_family_yearly_block(group_id)
