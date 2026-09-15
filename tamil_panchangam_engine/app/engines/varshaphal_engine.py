@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 
 import swisseph as swe
 
-from app.utils.swisseph_utils import compute_planet_longitude_at_jd, AYANAMSA_MODES
+from app.utils.swisseph_utils import compute_planet_longitude_at_jd
 
 logger = logging.getLogger(__name__)
 
@@ -127,17 +127,15 @@ def compute_varshaphal(
         sr_date = f"{year}-10-11"
 
     # ── Varshaphal Lagna ─────────────────────────────────────────────────────
+    # Consolidated 2026-09-14 onto the single shared compute_lagna() (see
+    # ephemeris.py) instead of this file's own independently-duplicated
+    # swe.houses_ex() call -- compute_lagna() already sets sidereal mode
+    # explicitly (same reasoning this comment used to give for doing it
+    # locally: not relying on a leftover value from an earlier
+    # compute_planet_longitude_at_jd() call succeeding).
     try:
-        # houses_ex (unlike calc_ut) has no shared JD-native wrapper in
-        # swisseph_utils.py, so it's called directly -- but the sidereal
-        # mode it reads is still sourced from the one canonical
-        # AYANAMSA_MODES, not a local copy, and is set explicitly here
-        # rather than relying on a leftover value from an earlier
-        # compute_planet_longitude_at_jd() call succeeding (it might not
-        # have, on the exception fallback path above).
-        swe.set_sid_mode(AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
-        _, ascmc = swe.houses_ex(sr_jd, latitude, longitude, b"P", swe.FLG_SIDEREAL)
-        sr_lagna_lon = ascmc[0] % 360.0
+        from app.engines.ephemeris import compute_lagna
+        sr_lagna_lon = compute_lagna(sr_jd, latitude, longitude, ayanamsa)
     except Exception as e:
         logger.warning("SR lagna computation failed: %s", e)
         sr_lagna_lon = natal_lagna_lon

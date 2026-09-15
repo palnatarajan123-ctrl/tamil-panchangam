@@ -155,9 +155,8 @@ def compute_gulika_mandi(
     mandi_jd = sunrise_jd + segment_idx * segment_duration
 
     try:
-        flags = swe.FLG_SIDEREAL
-        _houses, ascmc = swe.houses_ex(mandi_jd, latitude, longitude, b"P", flags)
-        mandi_lon = ascmc[0] % 360.0
+        from app.engines.ephemeris import compute_lagna
+        mandi_lon = compute_lagna(mandi_jd, latitude, longitude, ayanamsa)
     except Exception as e:
         logger.warning(f"Upagraha Lagna computation failed: {e}")
         # Fallback: use Sun's longitude at Mandi time as a reasonable proxy

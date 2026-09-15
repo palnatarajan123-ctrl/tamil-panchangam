@@ -75,10 +75,22 @@ def get_sidereal_longitude(jd: float, planet: int) -> float:
     return longitude[0] % 360
 
 
-def compute_lagna(jd: float, latitude: float, longitude: float) -> float:
+def compute_lagna(jd: float, latitude: float, longitude: float, ayanamsa: str = "lahiri") -> float:
     """
     Compute sidereal Lagna (Ascendant).
+
+    Sets ayanamsa mode explicitly (like compute_placidus_cusps()) so the
+    result is correct regardless of call order. Consolidated 2026-09-14:
+    this used to be one of 3 independently-duplicated 2-line
+    swe.houses_ex() call sites (this function -- relying on the caller
+    having already called swe.set_sid_mode() beforehand -- plus
+    upagraha_engine.py's Gulika/Mandi-at-segment-start Lagna and
+    varshaphal_engine.py's solar-return Lagna, both of which already set
+    sid_mode explicitly). Only this call site was ever independently
+    validated (the 2026-09-14 Southern Hemisphere audit); the other two
+    duplicated the same formula without their own independent check.
     """
+    swe.set_sid_mode(AYANAMSA_MODES.get(ayanamsa, swe.SIDM_LAHIRI))
     flags = swe.FLG_SIDEREAL
     houses, ascmc = swe.houses_ex(jd, latitude, longitude, b'P', flags)
     lagna = ascmc[0] % 360
@@ -191,14 +203,15 @@ def compute_sidereal_positions(
     }
 
     moon_lon = planets["Moon"]["longitude_deg"]
+    lagna_lon = compute_lagna(jd, latitude, longitude, ayanamsa)
 
     return {
         "julian_day": jd,
         "node_type": node_type.lower(),
         "ayanamsa": ayanamsa.lower(),
         "lagna": {
-            "longitude_deg": compute_lagna(jd, latitude, longitude),
-            "rasi": get_rasi(compute_lagna(jd, latitude, longitude))
+            "longitude_deg": lagna_lon,
+            "rasi": get_rasi(lagna_lon)
         },
         "moon": {
             "longitude_deg": moon_lon,
