@@ -109,3 +109,52 @@ class TestDayLengthVariation:
         actual_segment_minutes = (end_h * 60 + end_m) - (start_h * 60 + start_m)
 
         assert abs(actual_segment_minutes - expected_segment_minutes) <= 1
+
+
+class TestCircumpolarDate:
+    """
+    2026-09-14 fix: swe.rise_trans()'s circumpolar retflag (-2) was never
+    checked, so a genuine polar-day date at a high-latitude location
+    (e.g. Tromso, Norway near the summer solstice) silently divided
+    through rise_trans()'s zeroed circumpolar result as if it were a
+    real (near-zero) day-length, crashing several steps downstream with
+    an OverflowError rather than a clear error. Confirmed real, not
+    hypothetical, since this app has no latitude-range validation
+    gating chart creation to India.
+    """
+    TROMSO_LAT = 69.6492
+    TROMSO_LON = 18.9553
+
+    def test_polar_day_returns_clear_error_without_crashing(self):
+        result = compute_dinaphalam(
+            datetime(2026, 6, 21, tzinfo=timezone.utc),
+            self.TROMSO_LAT, self.TROMSO_LON,
+            birth_nakshatra_index=0,
+            utc_offset_hours=2.0,
+        )
+        assert "error" in result
+        assert "polar" in result["error"].lower()
+        assert result["sunrise"] is None
+        assert result["sunset"] is None
+        assert result["rahu_kaalam"] is None
+        assert result["yamagandam"] is None
+        assert result["gulika_kaalam"] is None
+
+    def test_polar_day_still_computes_latitude_independent_fields(self):
+        # Nakshatra/Tara Bala/Tithi don't depend on sunrise/sunset -- a
+        # circumpolar date shouldn't lose these too.
+        result = compute_dinaphalam(
+            datetime(2026, 6, 21, tzinfo=timezone.utc),
+            self.TROMSO_LAT, self.TROMSO_LON,
+            birth_nakshatra_index=0,
+            utc_offset_hours=2.0,
+        )
+        assert result["nakshatra"]["name"]
+        assert result["tithi"]["name"]
+        assert result["tara_bala"]["name"]
+
+    def test_normal_latitude_unaffected(self):
+        result = _run(2026, 9, 14)
+        assert "error" not in result
+        assert result["sunrise"] is not None
+        assert result["rahu_kaalam"] is not None

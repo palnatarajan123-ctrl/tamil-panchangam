@@ -16,7 +16,9 @@ verifies both modules actually use it (not just happen to agree).
 
 from datetime import datetime, timezone
 
-from app.engines.upagraha_engine import compute_gulika_mandi, _MANDI_DAYTIME_SEGMENT
+import pytest
+
+from app.engines.upagraha_engine import compute_gulika_mandi, _MANDI_DAYTIME_SEGMENT, NoSunriseSunsetError
 from app.utils.panchangam_calc import GULIKA_DAYTIME_SEGMENT_1INDEXED
 
 CHENNAI_LAT = 13.0827
@@ -97,3 +99,31 @@ class TestNightBirthKnownLimitation:
         # Same calendar date -> same weekday -> same (daytime) segment table
         # is applied for both, i.e. night birth is NOT yet treated specially.
         assert night_result["gulika"]["longitude_deg"] == day_result["gulika"]["longitude_deg"]
+
+
+class TestCircumpolarBirth:
+    """
+    2026-09-14 fix: swe.rise_trans()'s circumpolar retflag (-2) was never
+    checked here either, so a genuine polar-day birth (e.g. Tromso,
+    Norway near the summer solstice) silently divided through
+    rise_trans()'s zeroed circumpolar result as a fabricated exact
+    (0.0, 1.0) JD "day" -- producing a plausible-looking but physically
+    meaningless Gulika/Mandi position with no error at all, rather than
+    a crash or a clear failure. Confirmed real, not hypothetical: this
+    app has no latitude-range validation gating chart creation to India.
+    """
+    TROMSO_LAT = 69.6492
+    TROMSO_LON = 18.9553
+
+    def test_polar_day_birth_raises_clear_error(self):
+        with pytest.raises(NoSunriseSunsetError, match="polar"):
+            compute_gulika_mandi(
+                datetime(2026, 6, 21, 12, 0, tzinfo=timezone.utc),
+                self.TROMSO_LAT, self.TROMSO_LON,
+            )
+
+    def test_normal_latitude_unaffected(self):
+        result = compute_gulika_mandi(
+            datetime(2026, 8, 10, 10, 0, tzinfo=timezone.utc), CHENNAI_LAT, CHENNAI_LON,
+        )
+        assert result["gulika"]["longitude_deg"] is not None

@@ -25,6 +25,18 @@ from app.utils.panchangam_calc import GULIKA_DAYTIME_SEGMENT_1INDEXED
 
 logger = logging.getLogger(__name__)
 
+
+class NoSunriseSunsetError(Exception):
+    """Raised when swe.rise_trans() reports no sunrise/sunset event for
+    the given date/location (retflag -2, circumpolar day or night) --
+    real for high-latitude birth locations near a solstice. Previously
+    unchecked: rise_trans() doesn't raise on this condition, it silently
+    returns a zeroed result, which this function used to divide through
+    as if it were a real (0.0, 1.0) JD day-length -- a fabricated
+    exact-24-hour day producing a plausible-looking but physically
+    meaningless Gulika/Mandi position with no error at all."""
+
+
 RASI_NAMES = [
     "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
@@ -70,7 +82,13 @@ def _compute_sunrise_sunset(
     latitude: float,
     longitude: float,
 ) -> tuple[float, float]:
-    """Return (sunrise_jd, sunset_jd). Falls back to 6am/6pm if computation fails."""
+    """
+    Return (sunrise_jd, sunset_jd). Falls back to 6am/6pm on an
+    unexpected/transient failure; raises NoSunriseSunsetError on a
+    genuine circumpolar day/night (retflag -2) rather than silently
+    dividing through rise_trans()'s zeroed circumpolar result as a
+    fabricated 24-hour day.
+    """
     # JD at midnight local — approximate by using jd_noon - 0.5
     jd_start = jd_noon - 0.5
     try:
@@ -84,11 +102,18 @@ def _compute_sunrise_sunset(
             geopos=(longitude, latitude, 0.0),
             rsmi=swe.CALC_SET | swe.BIT_DISC_CENTER,
         )
+        if rise_res[0] != 0 or set_res[0] != 0:
+            raise NoSunriseSunsetError(
+                f"No sunrise/sunset event at JD {jd_start} for latitude "
+                f"{latitude} -- likely a polar day/night."
+            )
         sunrise_jd = rise_res[1][0]
         sunset_jd = set_res[1][0]
         if sunset_jd <= sunrise_jd:
             sunset_jd += 1.0
         return sunrise_jd, sunset_jd
+    except NoSunriseSunsetError:
+        raise
     except Exception as e:
         logger.debug(f"Sunrise/sunset computation failed ({e}); using 6am/6pm fallback")
         # Rough JD for midnight UTC on birth date
