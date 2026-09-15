@@ -106,6 +106,31 @@ LIFE_AREA_WEIGHTS = {
             "mix": 0.25,
         },
         "max_abs_contrib_per_signal": 1.50,
+        # Chart-wide yoga/event-window/divisional signals carry neither a
+        # house nor a planet (see life_area_scorer.py's house_w/planet_w
+        # lookup) -- weighted here by relevance to THIS area, same 0-1
+        # scale as "houses" above (1.00 = this area's defining house).
+        "signal_key_weights": {
+            "YOGA_RAJA": 0.85,             # power/success -> strongest for career
+            "YOGA_GAJA_KESARI": 0.55,      # leadership facet
+            "YOGA_DHANA": 0.35,            # wealth yoga still supports career standing
+            "D2_WEALTH_PATTERN": 0.20,
+            "D7_CREATIVE_POTENTIAL": 0.15,
+            "EVENT_WINDOWS_FAVORABLE": 0.30,
+            "EVENT_WINDOWS_CHALLENGING": 0.30,
+        },
+        # Fallback base weight for structurally house/planet-less signals
+        # not named above, keyed by "source" -- covers dynamically-
+        # suffixed keys (TARA_BALA_*, ASHTAKAVARGA_*) without enumerating
+        # every suffix. Only applied when a signal has no house/planet
+        # AND no signal_key_weights entry (see life_area_scorer.py).
+        "signal_source_weights": {
+            "nakshatra": 0.20,     # Tara Bala: general period quality
+            "ashtakavarga": 0.30,  # planetary support/strength summary
+            "chandra_gati": 0.15,  # Moon rhythm, weaker for career
+            "derived": 0.20,       # Navamsa dignity
+            "drishti": 0.20,       # aspect-balance summary
+        },
     },
 
     # ============================================================
@@ -144,6 +169,22 @@ LIFE_AREA_WEIGHTS = {
             "mix": 0.20,
         },
         "max_abs_contrib_per_signal": 1.40,
+        "signal_key_weights": {
+            "YOGA_DHANA": 0.85,            # wealth yoga -> strongest for finance
+            "YOGA_RAJA": 0.35,             # status yoga still supports finances
+            "YOGA_GAJA_KESARI": 0.20,
+            "D2_WEALTH_PATTERN": 0.60,     # Hora chart is wealth-specific
+            "D7_CREATIVE_POTENTIAL": 0.10,
+            "EVENT_WINDOWS_FAVORABLE": 0.30,
+            "EVENT_WINDOWS_CHALLENGING": 0.30,
+        },
+        "signal_source_weights": {
+            "nakshatra": 0.20,
+            "ashtakavarga": 0.35,  # planetary support summary matters most where it's already weighted heavily
+            "chandra_gati": 0.10,
+            "derived": 0.20,
+            "drishti": 0.15,
+        },
     },
 
     # ============================================================
@@ -183,6 +224,22 @@ LIFE_AREA_WEIGHTS = {
             "mix": 0.20,
         },
         "max_abs_contrib_per_signal": 1.40,
+        "signal_key_weights": {
+            "D7_CREATIVE_POTENTIAL": 0.45,  # family/creativity -> strongest for relationships
+            "YOGA_GAJA_KESARI": 0.15,
+            "YOGA_DHANA": 0.15,
+            "YOGA_RAJA": 0.15,
+            "D2_WEALTH_PATTERN": 0.10,
+            "EVENT_WINDOWS_FAVORABLE": 0.30,
+            "EVENT_WINDOWS_CHALLENGING": 0.30,
+        },
+        "signal_source_weights": {
+            "nakshatra": 0.20,
+            "ashtakavarga": 0.25,
+            "chandra_gati": 0.35,  # emotional rhythm matters most for relationships
+            "derived": 0.45,       # Navamsa (D9) is classically the marriage/spouse chart
+            "drishti": 0.20,
+        },
     },
 
     # ============================================================
@@ -221,6 +278,25 @@ LIFE_AREA_WEIGHTS = {
             "mix": 0.25,
         },
         "max_abs_contrib_per_signal": 1.50,
+        "signal_key_weights": {
+            # Yogas/divisional refinements are only weakly health-relevant
+            # classically; kept low rather than zero so a strong yoga still
+            # nudges health slightly (vitality/resilience), not excluded.
+            "YOGA_GAJA_KESARI": 0.15,
+            "YOGA_DHANA": 0.10,
+            "YOGA_RAJA": 0.10,
+            "D2_WEALTH_PATTERN": 0.10,
+            "D7_CREATIVE_POTENTIAL": 0.10,
+            "EVENT_WINDOWS_FAVORABLE": 0.30,
+            "EVENT_WINDOWS_CHALLENGING": 0.30,
+        },
+        "signal_source_weights": {
+            "nakshatra": 0.25,
+            "ashtakavarga": 0.30,
+            "chandra_gati": 0.35,  # emotional rhythm ties directly to psychosomatic health
+            "derived": 0.15,
+            "drishti": 0.15,
+        },
     },
 
     # ============================================================
@@ -258,5 +334,21 @@ LIFE_AREA_WEIGHTS = {
             "mix": 0.25,
         },
         "max_abs_contrib_per_signal": 1.40,
+        "signal_key_weights": {
+            "YOGA_GAJA_KESARI": 0.65,       # wisdom/leadership -> strongest for personal growth
+            "D7_CREATIVE_POTENTIAL": 0.45,  # creativity facet
+            "YOGA_DHANA": 0.15,
+            "YOGA_RAJA": 0.20,
+            "D2_WEALTH_PATTERN": 0.10,
+            "EVENT_WINDOWS_FAVORABLE": 0.30,
+            "EVENT_WINDOWS_CHALLENGING": 0.30,
+        },
+        "signal_source_weights": {
+            "nakshatra": 0.25,
+            "ashtakavarga": 0.30,
+            "chandra_gati": 0.25,
+            "derived": 0.35,  # Navamsa dignity reflects dharmic/inner strength
+            "drishti": 0.20,
+        },
     },
 }

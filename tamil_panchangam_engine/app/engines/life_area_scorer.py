@@ -100,14 +100,45 @@ class LifeAreaScorer:
             mal_w = cfg["malefics"].get(planet, 0.0) if isinstance(planet, str) else 0.0
             planet_w = ben_w + mal_w
 
+            # Some signals (yogas, Tara Bala, Ashtakavarga validation,
+            # Chandra Gati rhythm, Navamsa dignity, aspect-balance
+            # summaries, event-window confluence, some divisional-chart
+            # refinements) are structurally chart-wide: they carry
+            # NEITHER a house NOR a planet, so house_w/planet_w are both
+            # always 0.0 for them regardless of the signal's own
+            # "strength" -- previously this silently excluded every such
+            # signal from top_signals/scoring no matter how significant.
+            # Distinguish this from a signal that DOES have a house/
+            # planet but legitimately scores 0 for THIS specific area
+            # (e.g. a Sun-related signal in an area that doesn't weight
+            # Sun) -- that case must stay untouched, it's a real "not
+            # relevant here", not a structural gap.
+            has_house_or_planet = isinstance(house, int) or isinstance(planet, str)
+
+            # signal_key_weights: exact-key overrides for structurally
+            # house/planet-less signals whose classical relevance
+            # genuinely differs by area (e.g. a wealth yoga matters far
+            # more to "finance" than to "health"). Declared per area in
+            # life_area_config.py, same declarative home as every other
+            # weight here.
+            key_w = cfg.get("signal_key_weights", {}).get(s.get("key"), 0.0)
+
+            # signal_source_weights: a per-source fallback base weight,
+            # used ONLY when a signal has no house/planet AND no
+            # exact-key override -- covers dynamically-suffixed keys
+            # (e.g. "TARA_BALA_SAMPAT", "ASHTAKAVARGA_STRONG_SUPPORT")
+            # without having to enumerate every possible suffix.
+            if not has_house_or_planet and key_w == 0.0:
+                key_w = cfg.get("signal_source_weights", {}).get(source, 0.0)
+
             src_bias = cfg["source_bias"].get(source, 0.95)
             val_mult = cfg["valence_multiplier"][valence]
 
-            raw = (house_w + planet_w) * strength * src_bias * val_mult
+            raw = (house_w + planet_w + key_w) * strength * src_bias * val_mult
 
             print(
                 f"DEBUG: weights → house_w={house_w}, planet_w={planet_w}, "
-                f"src_bias={src_bias}, val_mult={val_mult}, raw={raw}"
+                f"key_w={key_w}, src_bias={src_bias}, val_mult={val_mult}, raw={raw}"
             )
 
             cap = cfg.get("max_abs_contrib_per_signal", 1.5)
@@ -124,6 +155,7 @@ class LifeAreaScorer:
                         weight_breakdown={
                             "house_w": house_w,
                             "planet_w": planet_w,
+                            "key_w": key_w,
                             "src_bias": src_bias,
                             "valence": valence,
                         },
@@ -146,6 +178,14 @@ class LifeAreaScorer:
             1.0,
         )
 
+        # Sort by |contrib| before truncating -- previously took the
+        # first top_k signals in iteration/insertion order, which could
+        # hide a genuinely significant contributor (e.g. a strong yoga)
+        # behind several weaker ones simply because it was appended
+        # later in the signal-generation sequence. "top_signals" should
+        # mean the biggest contributors, not the first ones encountered.
+        ranked_contributions = sorted(contributions, key=lambda c: abs(c.contrib), reverse=True)
+
         return {
             "score": int(round(score)),
             "confidence": round(confidence, 3),
@@ -159,6 +199,6 @@ class LifeAreaScorer:
                     "rationale": c.rationale,
                     "interpretive_hint": c.interpretive_hint,
                 }
-                for c in contributions[:top_k]
+                for c in ranked_contributions[:top_k]
             ],
         }

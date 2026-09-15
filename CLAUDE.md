@@ -25,32 +25,59 @@ these — this list has been wrong before; see "Gulika/Sani Oorai" and
 "family surfaces" audits in git history, 2026-08-14, for what "confirmed
 stale" and "confirmed real" looked like in practice):
 
-- **RECOMMENDATION (2026-09-14, from the v3.10.0 prediction-accuracy
-  investigation) — backfill Karana now, Ashtakavarga's 56 identified
-  cached rows now; do NOT execute either without separate explicit
-  go-ahead.** Split recommendation, not a single blanket call:
-  - **Karana backfill (38 charts)**: free — a pure re-computation of
-    `compute_panchangam()`'s stored `payload.panchangam.karana` field,
-    no LLM call involved, corrects a factual UI display field (natal
-    chart's Karana-at-birth), not narrative text. Recommend running
-    this as soon as someone signs off — there's no cost/tradeoff
-    argument for deferring it.
-  - **Ashtakavarga backfill (56 identified cached rows: 49
-    `monthly_predictions` + 7 `yearly_predictions`, on the 22 charts
-    with `predictive_signals` computed)**: real but trivial cost
-    (~$3-4 total at current Sonnet pricing, per real logged token
-    usage — see the investigation's B3 finding). Recommend
-    regenerating specifically those 56 identified rows now, rather
-    than either (a) a blanket cache-invalidation across all
-    monthly/yearly predictions (most were never affected — only charts
-    with `predictive_signals` computed touch the fixed
-    `sarvashtakavarga_refined` path), or (b) open-ended deferral to
-    natural rollover — neither `PROMPT_VERSION` nor `engine_version`
-    was bumped by the Ashtakavarga fix, so these caches will NOT
-    auto-invalidate; a yearly prediction could sit wrong for up to 12
-    months for a fix this cheap to apply directly. Both backfills
-    logged as recommendations only — not executed in the fix pass,
-    pending explicit sign-off.
+- **URGENT, LIVE 2026-09-15 — the app's shared, site-wide
+  `LLM_MONTHLY_TOKEN_BUDGET` (1,000,000 tokens/calendar-month,
+  `llm_interpretation_orchestrator.py:39`) is exhausted for the rest of
+  September, affecting REAL USERS right now, not just backfill work.**
+  Discovered mid-backfill: the Ashtakavarga backfill (56 rows, see
+  below) pushed usage from 428,763 (already used before the backfill
+  started) to 1,014,767 tokens -- over the 1,000,000 cap -- causing 21
+  of its 56 target rows to silently fall back to the deterministic
+  interpretation (`fallback_reason: "budget_exceeded"`) instead of a
+  real LLM regeneration. This budget is global and shared across ALL
+  monthly/yearly prediction generation app-wide (checked inside
+  `generate_llm_interpretation()`, independent of and in addition to
+  the separate dollar-based `llm_budget.llm_enabled` auto-pause) -- it
+  is NOT specific to this backfill. Until it resets at the next
+  calendar month (2026-10-01) or is manually raised, every real user
+  generating a fresh monthly/yearly prediction gets the same silent
+  deterministic-only fallback, with no user-facing error or banner
+  distinguishing it from a real LLM-authored result. No admin control
+  for this specific token ceiling was found (distinct from
+  `admin_llm.py`'s `/budget` endpoint, which only exposes the
+  dollar-based `monthly_budget_usd`/`per_account_daily_cap_usd` fields,
+  not this token count) -- raising it would require a code change to
+  the `LLM_MONTHLY_TOKEN_BUDGET` constant itself. Needs a product
+  decision: accept the fallback for the rest of the month, or raise the
+  constant. The 21 stuck Ashtakavarga rows (listed in the entry below)
+  and the top_signals fix's 76-row backfill are both blocked on this
+  same resolution -- pushing either forward now would just add more
+  wasted, already-fallen-back-to-fallback calls.
+- **CLOSED 2026-09-15 (Karana) / PARTIAL 2026-09-15 (Ashtakavarga) —
+  backfill from the 2026-09-14 recommendation below, executed.**
+  - **Karana backfill: done, verified.** All 38 charts processed (pure
+    recomputation, no LLM cost): 32 changed, 6 already coincidentally
+    correct, 0 skipped. Spot-checked 2 of the changed charts against
+    DrikPanchang post-backfill (Chennai chart -> Garaja, Madurai chart
+    -> Naga) -- both confirmed correct.
+  - **Ashtakavarga backfill: 35/56 rows genuinely regenerated with a
+    real LLM call; 21/56 got `fallback_reason: "budget_exceeded"`
+    instead (deterministic-only, no real regeneration) because the run
+    exhausted the app's shared monthly LLM token budget partway through
+    -- see the URGENT entry above this one for the live production
+    impact.** Real cost incurred for the 35 that succeeded: 553,756
+    tokens at Sonnet 4.6 pricing ($3/$15 per MTok input/output) ~=
+    $4.85 -- close to, slightly above, the original ~$3-4 estimate (real
+    per-call payloads were somewhat richer than the historical average
+    used for that estimate). The 21 stuck rows still need a real
+    regeneration once the budget resolution above is settled --
+    monthly: c966cc99/2026-08, c966cc99/2026-09, cc589272/2026-01,
+    cc589272/2026-09, cc589272/2026-10, d6a77175/2026-09,
+    de3bef13/2026-09, f5da25da/2026-01, f5da25da/2026-09,
+    f5da25da/2026-10, fc588066/2026-08, fd79efb3/2026-07,
+    fd79efb3/2026-08, fd79efb3/2026-09; yearly: 1b74c4d0/2026,
+    966f5254/2026, 971df41e/2026, 971df41e/2027, 971df41e/2028,
+    cc589272/2026, f5da25da/2026.
 - **RECOMMENDATION (2026-09-14) — dedicated pass: consolidate every
   remaining hardcoded rasi-name list/lookup onto the shared
   canonicalization utility (`app.utils.rasi_utils.to_english_rasi()`).**
@@ -383,40 +410,73 @@ stale" and "confirmed real" looked like in practice):
   200" test, not just the rejection-path coverage from the original auth
   sweep. Don't build this — it's a breadth-check across the whole API,
   not a quick add.
-- **`life_area_scorer.py`'s `top_signals` silently excludes every
-  yoga/dasha-activation/Ashtakavarga signal from a life area's scoring
-  breakdown** — found 2026-09-11 while investigating (and fixing, see
-  `_momentum_from_score` in `ai_interpretation_engine.py`) the front/back
-  Overview-contradiction bug. `LifeAreaScorer.score_one()` computes each
-  signal's contribution as `(house_w + planet_w) * strength * src_bias *
-  val_mult`, then only appends it to `contributions`/`top_signals` `if
-  abs(raw) > 0`. Yoga (`YOGA_DHANA`, `YOGA_RAJA`), Ashtakavarga
-  (`ASHTAKAVARGA_STRONG_SUPPORT`), and Yogakaraka-activation signals
-  carry no `house`/`planet` field in their raw dict, so `house_w` and
-  `planet_w` are both `0.0` regardless of the signal's real `strength` —
-  `raw` is always exactly `0`, so these signals can never enter
-  `top_signals` for ANY life area, no matter how strong. Confirmed via a
-  real trace (4 charts, avg scores 57-77): `top_signals` for every area
-  on every chart tested contained only Drishti/Gochara/house-affliction
-  signals — never a yoga or dasha-activation signal, even when those
-  were the dominant contributors to a high `base_score_0_100`. This
-  fix only changed how the deterministic Overview text READS
-  `top_signals` (switched to reading the final weighted `score`
-  instead) — it did NOT touch `top_signals`' own population logic, so
-  anything else that consumes `top_signals` (e.g. the "Signals" list
-  shown in the legacy per-area PDF breakdown, `_get_relevant_signals_for_area`)
-  still only ever shows house/planet-tagged signals, silently omitting
-  yoga/dasha ones from that display too — same root cause, different
-  visible symptom, not investigated further here. Also noticed but not
-  chased: for the one chart traced in detail, `top_signals` came out
-  IDENTICAL across all 5 life areas (same 6 signals, same order) despite
-  each area having a different house/benefic weighting config in
-  `LIFE_AREA_WEIGHTS` — expected if those specific signals happen to
-  outrank everything else for every area's weighting, but not verified
-  either way. Needs its own investigation — bigger blast radius than the
-  Overview fix (affects score deltas, not just narrative text, and
-  potentially the "Signals" display across all three prediction periods)
-  — deliberately scoped out of the Overview fix.
+- **CLOSED 2026-09-15: `life_area_scorer.py`'s `top_signals`/scoring gap
+  that silently excluded every structurally house/planet-less signal**
+  (yogas, Tara Bala, Ashtakavarga validation, Chandra Gati rhythm,
+  Navamsa dignity, aspect-balance summaries, event-window confluence,
+  some divisional-chart refinements) — first found 2026-09-11 during the
+  front/back Overview-contradiction investigation, fixed and verified
+  2026-09-15. Root cause confirmed exactly as originally diagnosed:
+  `score_one()` computed `raw = (house_w + planet_w) * strength *
+  src_bias * val_mult`, and any signal carrying neither a `house` nor a
+  `planet` got `house_w = planet_w = 0.0` regardless of its own
+  `strength`, so `raw` was always exactly `0` and `if abs(raw) > 0`
+  silently excluded it from both scoring and `top_signals` — no matter
+  how classically significant. A live signal-level trace found this
+  applied to more signal types than the original note named (that note's
+  literal `ASHTAKAVARGA_STRONG_SUPPORT` example turned out to be one of
+  several dynamically-suffixed keys, e.g. `TARA_BALA_SAMPAT`; Yogakaraka-
+  activation signals actually already carried a real `planet` field and
+  were NOT affected — confirmed by direct trace, not assumed from the
+  original note).
+
+  **Fix**: two new declarative weight tables added per life area in
+  `life_area_config.py` (same file, same philosophy as every other
+  weight there — "the ONLY place where astrology opinions live"):
+  `signal_key_weights` (exact-key overrides for signals whose classical
+  relevance genuinely differs by area, e.g. a wealth yoga matters far
+  more to "finance" than "health") and `signal_source_weights` (a
+  per-`source` fallback for dynamically-suffixed keys, applied only when
+  a signal has no house/planet AND no exact-key override). A signal that
+  DOES carry a house/planet but legitimately scores 0 for a *specific*
+  area (e.g. a Sun-related signal in an area that doesn't weight Sun) is
+  untouched — confirmed by a dedicated regression test — that's a real
+  "not relevant here", not the structural gap. Also fixed a related bug
+  found while verifying: `top_signals` sliced `contributions[:top_k]` in
+  raw insertion order, not by contribution magnitude, so a genuinely
+  significant signal (e.g. a strong yoga) could still be invisible in
+  the displayed `top_signals` even after getting real weight, simply by
+  being appended later than 6 weaker ones. Now sorted by `abs(contrib)`
+  descending before truncating.
+
+  **Verified**: unit tests for every previously-zero signal type across
+  all 5 areas, one real-chart-data regression test (chart `7c6e34be`,
+  confirmed active Raja Yoga, run through the real `synthesize_from_envelope()`
+  pipeline) that would have caught the original exclusion bug, and a
+  real before/after comparison across all 38 real charts for a real
+  September 2026 monthly envelope: 190 (chart, area) score comparisons,
+  average delta +2.49, average |delta| 4.55, 180/190 scores changed,
+  51/190 crossed a qualitative label boundary (ad-hoc 5-bucket scale
+  used for this verification only — Needs Support/Mixed/Moderate
+  Support/Strong Support/Excellent). See
+  `tests/engines/test_life_area_scorer_signal_weights.py`.
+
+  **Backfill NOT executed yet** — deliberately paused. The Ashtakavarga
+  backfill run immediately before this one (see the entry above) pushed
+  the app's shared, site-wide `LLM_MONTHLY_TOKEN_BUDGET` (1,000,000
+  tokens/calendar-month, `llm_interpretation_orchestrator.py`) from
+  428,763 already-used to 1,014,767 -- over budget -- causing 21 of its
+  56 target rows to silently fall back to the deterministic
+  interpretation (`fallback_reason: "budget_exceeded"`) instead of a
+  real regeneration, and means EVERY real user's fresh monthly/yearly
+  prediction generation is ALSO getting the same silent fallback,
+  site-wide, until the budget resets at the next calendar month
+  (2026-10-01) or someone raises it. Running this fix's 76-row backfill
+  now would guarantee 100% fallback (wasted, zero real regeneration) and
+  was correctly NOT attempted. Needs its own remediation decision
+  (wait for reset vs. an admin override) before either this backfill or
+  a re-run of the 21 stuck Ashtakavarga rows can proceed -- see the
+  budget-exhaustion finding logged during the 2026-09-15 backfill pass.
 - **Every birth-chart-only PDF (`render_birth_chart_pdf()`) silently
   omits Sade Sati & Saturn Analysis and Shadow Points (Upagrahas)**,
   despite both sections' rendering code being present, wired in, and
