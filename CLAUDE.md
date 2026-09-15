@@ -25,6 +25,72 @@ these — this list has been wrong before; see "Gulika/Sani Oorai" and
 "family surfaces" audits in git history, 2026-08-14, for what "confirmed
 stale" and "confirmed real" looked like in practice):
 
+- **RECOMMENDATION (2026-09-14, from the v3.10.0 prediction-accuracy
+  investigation) — backfill Karana now, Ashtakavarga's 56 identified
+  cached rows now; do NOT execute either without separate explicit
+  go-ahead.** Split recommendation, not a single blanket call:
+  - **Karana backfill (38 charts)**: free — a pure re-computation of
+    `compute_panchangam()`'s stored `payload.panchangam.karana` field,
+    no LLM call involved, corrects a factual UI display field (natal
+    chart's Karana-at-birth), not narrative text. Recommend running
+    this as soon as someone signs off — there's no cost/tradeoff
+    argument for deferring it.
+  - **Ashtakavarga backfill (56 identified cached rows: 49
+    `monthly_predictions` + 7 `yearly_predictions`, on the 22 charts
+    with `predictive_signals` computed)**: real but trivial cost
+    (~$3-4 total at current Sonnet pricing, per real logged token
+    usage — see the investigation's B3 finding). Recommend
+    regenerating specifically those 56 identified rows now, rather
+    than either (a) a blanket cache-invalidation across all
+    monthly/yearly predictions (most were never affected — only charts
+    with `predictive_signals` computed touch the fixed
+    `sarvashtakavarga_refined` path), or (b) open-ended deferral to
+    natural rollover — neither `PROMPT_VERSION` nor `engine_version`
+    was bumped by the Ashtakavarga fix, so these caches will NOT
+    auto-invalidate; a yearly prediction could sit wrong for up to 12
+    months for a fix this cheap to apply directly. Both backfills
+    logged as recommendations only — not executed in the fix pass,
+    pending explicit sign-off.
+- **RECOMMENDATION (2026-09-14) — dedicated pass: consolidate every
+  remaining hardcoded rasi-name list/lookup onto the shared
+  canonicalization utility (`app.utils.rasi_utils.to_english_rasi()`).**
+  This is the 4th confirmed occurrence THIS SESSION of the same bug
+  class (Tamil/English or inter-file Tamil-spelling rasi-name
+  mismatches): (1) `gochara_engine.py`/`moon_transit_engine.py` reading
+  Tamil rasi strings against English-keyed tables (fixed 2026-09-12),
+  (2) `ashtakavarga_engine.py`'s same mismatch in its unreachable
+  fallback branch (fixed defensively 2026-09-12), (3) the D9 divisional
+  engines' own historical instance of this pattern, and now (4)
+  `refined_av_engine.py`'s `RASI_NAMES` ("Midhunam", "Kadagam",
+  "Simham") silently disagreeing with `ephemeris.py`'s own
+  `RASI_NAMES` ("Mithunam", "Kadakam", "Simmam") for Gemini/Cancer/Leo
+  — found while fixing A3's Ekadhipatya Shodhana, sidestepped there via
+  longitude-based occupancy rather than name-matching, but not itself
+  fixed. Four independent occurrences of the identical failure shape is
+  a pattern, not a coincidence — recommend a named, prioritized future
+  pass: grep the full codebase for every remaining hardcoded 12-entry
+  rasi-name list or lookup table not yet routed through
+  `to_english_rasi()`, and consolidate onto the one shared utility the
+  way the Lagna/Gulika-segment/Tithi consolidations already did for
+  their respective duplications.
+- **RECOMMENDATION (2026-09-14) — include family predictions in
+  whatever periodic narrative-grounding spot-check practice gets
+  established.** `family_prediction_engine.py` was checked (B1) for the
+  same score-vs-signal-count momentum miscalibration bug already found
+  and fixed in `ai_interpretation_engine.py`'s `generate_interpretation()`
+  — it doesn't have that bug, but only because it has NO numeric
+  life-area scoring stage at all: it's a purely qualitative LLM
+  narrative built from dasha-lord names, Sade Sati phase, and yoga
+  names as text, with zero computational backstop checking whether the
+  LLM's tone/claims match anything underneath. This clears it of the
+  specific momentum bug but leaves it exposed to a softer version of
+  the same ungrounded-narrative risk this session repeatedly found
+  elsewhere (the chat fabrication bugs, the Overview tonal
+  contradiction). Recommend treating family predictions as an
+  explicitly-covered surface in any future grounding audit, not as
+  "cleared" just because this one specific bug class doesn't apply to
+  it.
+
 - **PRIORITY — `ashtakavarga_engine.py`'s "classical" Sarvashtakavarga
   is not a real classical calculation, and it's used for LIVE Saturn/
   Jupiter transit validation** (investigated 2026-09-13, not fixed —
