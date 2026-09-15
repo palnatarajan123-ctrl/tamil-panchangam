@@ -1,5 +1,40 @@
 # TamilPanchangam Astrology App
 
+## ⚠️ ACTION ITEMS — HUMAN REQUIRED, OUTSIDE THIS REPO'S REACH (2026-09-15)
+
+These two items cannot be completed by working in this codebase alone —
+each needs a human to act on infrastructure/scheduling outside this
+environment. Read this section first.
+
+1. **URGENT — redeploy the live production server now.** Commit
+   `d2661c7` raised `LLM_MONTHLY_TOKEN_BUDGET` from 1,000,000 to
+   3,500,000 (`llm_interpretation_orchestrator.py:39`) to fix a live
+   incident: real users generating fresh monthly/yearly/weekly
+   predictions were silently getting a degraded, deterministic-only
+   fallback instead of a real LLM-authored result, with no user-facing
+   indication. **That fix is committed to source but has NOT taken
+   effect for real users yet** — it only applies once the actual
+   deployed server process is restarted/redeployed; a source-only
+   change does not affect an already-running process, and this
+   environment has no access to that deployment (no local server
+   process found; this app was migrated from Replit and is deployed
+   separately). Until someone redeploys, real users are still hitting
+   the same silent fallback as before this session's fix. This is the
+   single most time-sensitive item from the 2026-09-15 work — see
+   "Next Priorities" below for the full incident writeup.
+2. **SCHEDULED — apply the permanent budget value of 1,500,000 on or
+   after 2026-10-01, not before.** `LLM_MONTHLY_TOKEN_BUDGET` is
+   currently 3,500,000 as a temporary emergency ceiling for the rest of
+   September only. Do NOT apply 1,500,000 early — September's
+   cumulative usage already exceeds it, so applying it before the
+   October 1 monthly reset would immediately re-break real users again.
+   Do NOT forget to apply it at rollover either — with no admin
+   dashboard or alert for this budget (see "Next Priorities" below), the
+   temporary 3,500,000 will simply persist by default if nobody changes
+   it, silently undermining the capacity-planning work done to size
+   1,500,000 as the right permanent number. Whoever owns deploys/ops for
+   this app needs a reminder for 2026-10-01 — none exists automatically.
+
 ## Purpose
 A Tamil Panchangam-based astrology application providing daily/monthly
 Panchangam calculations including Tithi, Vara, Nakshatra, Yoga, and Karana.
