@@ -558,6 +558,20 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
                 "prediction, say you don't have that specific data available.\n"
             )
 
+    if context.get("marriage_health_context"):
+        system_prompt += (
+            "\n\n## MARRIAGE & HEALTH TIMING SIGNALS (computed live)\n"
+            + context["marriage_health_context"]
+            + "\nThese are the ONLY real dasha-window facts you have for marriage/health "
+            "timing. When asked about marriage timing or health-vulnerability periods, cite "
+            "the specific significator and window given here (e.g. \"7th lord Venus "
+            "Antardasha, 2032-2035\") -- never state a year or period that isn't one of these "
+            "given windows. If none of the given windows fall near what the user is asking "
+            "about, say plainly you don't have a grounded window for that, rather than "
+            "inventing one. Kalatra Karaka is not available for this chart (this app does not "
+            "record gender) -- reason only from the 7th lord and Darakaraka for marriage.\n"
+        )
+
     if reading_as_name:
         system_prompt = f"Reading from {reading_as_name}'s chart.\n\n" + system_prompt
     return system_prompt
@@ -840,6 +854,32 @@ def _build_chat_context(base_chart_id: str) -> dict:
         except Exception:
             pass
 
+    # Marriage-timing / health-events signals -- 2026-09-19, generalizes
+    # children_timing_engine.py's proven pattern (real Dasha-window
+    # computation per classical significator) so chat has real facts to
+    # ground "when might I get married" / "any health periods to watch"
+    # questions on, instead of nothing at all (same gap class already
+    # closed for Gochara/ingress/children-timing this session).
+    # gender=None: this app's data model does not collect gender
+    # anywhere (confirmed 2026-09-19), so Kalatra Karaka is correctly
+    # omitted rather than guessed for an individual chart.
+    marriage_health_context = ""
+    try:
+        from app.engines.marriage_timing_engine import compute_marriage_timing_signals, format_marriage_timing_context
+        from app.engines.health_events_engine import compute_health_event_signals, format_health_events_context
+
+        this_year = datetime.now(timezone.utc).year
+        marriage_signals = compute_marriage_timing_signals(payload, this_year, this_year + 10, gender=None)
+        health_signals = compute_health_event_signals(payload, this_year, this_year + 5)
+        marriage_health_context = (
+            f"Marriage timing signals ({this_year}-{this_year + 10}):\n"
+            f"{format_marriage_timing_context(marriage_signals)}\n\n"
+            f"Health event signals ({this_year}-{this_year + 5}):\n"
+            f"{format_health_events_context(health_signals)}"
+        )
+    except Exception as e:
+        logger.warning(f"Marriage/health timing computation failed in chat context: {e}")
+
     return {
         "name": birth.get("name", "the chart holder"),
         "date": birth.get("date_of_birth", "unknown"),
@@ -860,6 +900,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "upagraha_context": upagraha_context,
         "gochara_context": gochara_context,
         "ingress_context": ingress_context,
+        "marriage_health_context": marriage_health_context,
     }
 
 

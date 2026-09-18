@@ -122,13 +122,21 @@ class TestFamilyYogaUpagrahaSuffixSharedHelper(unittest.TestCase):
 
 class TestBuildMemberSummaryExtension(unittest.TestCase):
     def test_base_fields_unaffected_when_no_new_data(self):
-        """Regression: rows without yogas/upagrahas produce byte-identical
-        output to the pre-change function."""
+        """Regression: rows without yogas/upagrahas leave the pre-change
+        fields untouched -- the new function's output must still START
+        WITH the pre-change function's exact output. It is no longer
+        byte-identical to the old function overall: marriage/health
+        timing signals (2026-09-19, see marriage_timing_engine.py /
+        health_events_engine.py) are now appended unconditionally, since
+        they only need ephemeris/dasha data (always present), not
+        yogas/upagrahas (this test's "no new data" case)."""
         payload = _member_payload(name="Ravi", rasi="Mesham", nak="Ashwini", lagna="Mesham")
         row = ("member-1", "husband", "Ravi", "chart-1", payload)
         old = _old_build_member_summary(row)
         new = _build_member_summary(row)
-        self.assertEqual(old, new)
+        self.assertTrue(new.startswith(old), f"{new!r} does not start with {old!r}")
+        self.assertIn("Marriage:", new)
+        self.assertIn("Health:", new)
 
     def test_yogas_and_shadow_point_appended(self):
         payload = _member_payload(name="Ravi")

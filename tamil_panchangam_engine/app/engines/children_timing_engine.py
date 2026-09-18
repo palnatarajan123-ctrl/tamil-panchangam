@@ -38,9 +38,25 @@ RASI_LORDS = {
 }
 
 
+def _get_house_lord(rasi_index: int, house_number: int) -> str:
+    """
+    Lord of `house_number` counted from `rasi_index` (0=Aries) as house 1.
+    Generalized 2026-09-19 from _get_5th_lord() for reuse by
+    marriage_timing_engine.py/health_events_engine.py -- this module's
+    established convention (also used by child_prediction_engine.py) is
+    to count houses from natal MOON RASI, not Lagna (a distinct, real
+    Chandra-Lagna-based technique, deliberately kept consistent with
+    this "timing engines" family rather than switched to the
+    Lagna-based convention gochara_engine.py/house_strength_engine.py
+    use for periodic scoring -- different purpose, different
+    established convention, not a bug).
+    """
+    target_sign = (rasi_index + house_number - 1) % 12
+    return RASI_LORDS[target_sign]
+
+
 def _get_5th_lord(rasi_index: int) -> str:
-    fifth_sign = (rasi_index + 4) % 12
-    return RASI_LORDS[fifth_sign]
+    return _get_house_lord(rasi_index, 5)
 
 
 def _find_planet_dashas(vimshottari, planet: str, year_from: int, year_to: int) -> list:

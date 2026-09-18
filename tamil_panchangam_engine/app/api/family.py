@@ -1204,7 +1204,14 @@ GROUNDING — NEVER STATE AN UNGROUNDED FACT:
   — a dasha end date, a divisional chart placement, an ingress further
   out than the next one shown, or anything else not explicitly given —
   say plainly "I don't have that specific data available" rather than
-  generating a plausible-sounding but ungrounded answer."""
+  generating a plausible-sounding but ungrounded answer.
+- For marriage timing or health-vulnerability questions, each member's
+  line gives you their 7th lord, Darakaraka, (Kalatra Karaka only for
+  husband/wife — not recorded for children) and 6th/8th lords, each with
+  a real computed window if one exists. Cite the specific significator
+  and window given (e.g. "7th lord Venus, window 2032-2035") — never
+  invent a year not shown. "No window in analyzed range" means exactly
+  that — say so plainly rather than guessing one further out."""
 
 
 def _build_member_summary(row: tuple) -> str:
@@ -1245,12 +1252,41 @@ def _build_member_summary(row: tuple) -> str:
     from app.llm.payload_builder import _build_family_yoga_upagraha_suffix
     yoga_upagraha_suffix = _build_family_yoga_upagraha_suffix(payload)
 
+    # Marriage-timing / health-events signals -- 2026-09-19, generalizes
+    # children_timing_engine.py's proven pattern. Kept to one compact
+    # line each (not the verbose per-window listing chat.py/
+    # child_prediction_engine.py use) since this summary is built once
+    # PER MEMBER and joined for every family chat message -- same
+    # cost-consciousness reasoning already applied to predictive_signals/
+    # kp_sublords above. gender inferred from role: husband->male,
+    # wife->female (a real, available fact for these two roles
+    # specifically); role='child' (or anything else) -> None, since
+    # this app's data model does not record gender anywhere and a
+    # child's gender is not implied by role -- Kalatra Karaka is
+    # correctly omitted rather than guessed for children.
+    timing_suffix = ""
+    try:
+        from app.engines.marriage_timing_engine import compute_marriage_timing_signals, format_marriage_timing_compact
+        from app.engines.health_events_engine import compute_health_event_signals, format_health_events_compact
+
+        gender = {"husband": "male", "wife": "female"}.get(role)
+        this_year = datetime.now(timezone.utc).year
+        marriage_signals = compute_marriage_timing_signals(payload, this_year, this_year + 10, gender=gender)
+        health_signals = compute_health_event_signals(payload, this_year, this_year + 5)
+        timing_suffix = (
+            f", Marriage: {format_marriage_timing_compact(marriage_signals)}"
+            f", Health: {format_health_events_compact(health_signals)}"
+        )
+    except Exception as e:
+        logger.warning(f"Marriage/health timing computation failed for family member {name}: {e}")
+
     return (
         f"{role.upper()} {name}: "
         f"Lagna {lagna}, Moon {moon_rasi} ({nak_name}), "
         f"Dasha {maha}›{antar}"
         f"{ss_suffix}"
         f"{yoga_upagraha_suffix}"
+        f"{timing_suffix}"
     )
 
 

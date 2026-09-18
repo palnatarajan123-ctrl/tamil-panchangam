@@ -19,6 +19,20 @@ from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.children_timing_engine import RASI_LORDS
 from app.engines.porutham_engine import _rasi_index
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled, get_llm_pause_reason
+from app.engines.marriage_timing_engine import compute_marriage_timing_signals, format_marriage_timing_context
+from app.engines.health_events_engine import compute_health_event_signals, format_health_events_context
+
+# Search windows for the longer-range marriage-timing/health-events
+# analysis, independent of the single per-year `year` this engine's
+# other fields (education, career_aptitude) are scoped to -- marriage/
+# health vulnerability windows are inherently multi-year searches, not
+# single-year snapshots. 10 years for marriage (wide enough to likely
+# capture at least one dasha transition for most children), 5 for
+# health (matching the nearer-term framing of this engine's other
+# fields). Reasonable defaults, not a deep design constraint -- could be
+# tuned later.
+_MARRIAGE_TIMING_HORIZON_YEARS = 10
+_HEALTH_EVENTS_HORIZON_YEARS = 5
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +77,6 @@ def _build_child_context(payload: dict, year: int) -> str:
         "4th (Education)": _get_house_lord(rasi_index, 4),
         "5th (Intelligence)": _get_house_lord(rasi_index, 5),
         "10th (Career)": _get_house_lord(rasi_index, 10),
-        "7th (Marriage)": _get_house_lord(rasi_index, 7),
         "12th (Leaving home)": _get_house_lord(rasi_index, 12),
     }
 
@@ -79,6 +92,30 @@ def _build_child_context(payload: dict, year: int) -> str:
     ]
     for house, lord in houses.items():
         lines.append(f"  {house}: {lord}")
+
+    # 2026-09-19: real, computed marriage-timing and health-event
+    # signals, replacing the previously-fabricated marriage_window/
+    # health_cautions content (a bare 7th-lord name with no dasha-window
+    # computation at all, and 6th/8th lords weren't even given for
+    # health -- see CLAUDE.md's 2026-09-18/19 findings). gender=None:
+    # family_members.role='child' carries no gender information (this
+    # app's data model does not collect gender anywhere -- confirmed
+    # 2026-09-19), so Kalatra Karaka is not computable for children
+    # specifically and is correctly omitted rather than guessed.
+    marriage_signals = compute_marriage_timing_signals(
+        payload, year, year + _MARRIAGE_TIMING_HORIZON_YEARS, gender=None
+    )
+    health_signals = compute_health_event_signals(
+        payload, year, year + _HEALTH_EVENTS_HORIZON_YEARS
+    )
+
+    lines.append("")
+    lines.append(f"Marriage Timing Signals ({year}-{year + _MARRIAGE_TIMING_HORIZON_YEARS}):")
+    lines.append(format_marriage_timing_context(marriage_signals))
+    lines.append("")
+    lines.append(f"Health Event Signals ({year}-{year + _HEALTH_EVENTS_HORIZON_YEARS}):")
+    lines.append(format_health_events_context(health_signals))
+
     return "\n".join(lines)
 
 

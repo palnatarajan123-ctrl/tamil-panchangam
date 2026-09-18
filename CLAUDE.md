@@ -94,79 +94,146 @@ stale" and "confirmed real" looked like in practice):
      never reached chat at all. Now reuses that same shared extractor
      for D10/D2/D7 instead of a second, incomplete, hand-rolled copy.
 
-  **Confirmed NOT implemented, NOT built** (marriage timing for the
-  primary chart holder, married-life quality, wealth events, health
-  events) -- each would need real new methodology work: a Darakaraka
-  (Jaimini lowest-degree-planet) calculation (doesn't exist at all,
-  would need a new engine), a 7th/2nd/11th/6th/8th-house-lord
-  dasha-window finder generalizing `children_timing_engine.py`'s own
-  `_find_planet_dashas()` pattern to those houses, and a decision on
-  whether to wire the already-computed-but-unused Upapada Lagna into
-  any of this. Rough scope: each domain is comparable in size to
-  `children_timing_engine.py` itself (a dedicated engine + prompt +
-  cache table + endpoint + PDF section), i.e. a multi-session build per
-  domain, not a quick addition. Not started -- reported for explicit
-  prioritization, per this file's own standing rule that this class of
-  decision isn't made unilaterally.
+  **CLOSED 2026-09-19 — marriage-timing and health-events now have real
+  dasha-window computation, wired into every consumer.** Two new
+  engines generalize `children_timing_engine.py`'s proven 5th-lord/
+  Jupiter pattern (real Dasha/Antardasha windows per classical
+  significator, handed to the LLM as citable facts, never a single
+  invented verdict):
+  - `marriage_timing_engine.py`: 7th house lord (from Moon, same
+    convention as `_get_house_lord()`), Darakaraka (Jaimini -- lowest
+    degree-within-sign among the 7 classical grahas, Rahu/Ketu
+    excluded, deterministic tiebreak), and Kalatra Karaka (Parashari --
+    Venus for a male native, Jupiter for a female native). Each gets
+    its own real bounded Dasha-window list via
+    `children_timing_engine._find_planet_dashas()`, reused directly
+    (fully planet-agnostic already).
+  - `health_events_engine.py`: 6th house lord (disease/daily struggle)
+    and 8th house lord (longevity/chronic), both from Moon, same
+    dasha-window computation, plus a real natal-affliction check
+    (whether a natural malefic -- Saturn/Mars/Rahu/Ketu -- occupies the
+    6th/8th house itself).
 
-  **Live grounding risk found 2026-09-18, EMERGENCY-HEDGED 2026-09-19
-  (real timing analysis in progress separately)**:
-  `child_prediction_engine.py` (per-child predictions for family
-  members with role='child') generated a `marriage_window` field
-  (`earliest_favorable` **year** + `peak_window` **year range**) and
-  `health_cautions` (specific **period** + **area**) via LLM, but
-  `_build_child_context()` gave the LLM only the bare 7th-house-lord
-  NAME for marriage (no dasha-window computation backing it at all --
-  unlike `children_timing_engine.py`'s proper technique for the 5th
-  house) and didn't even include the 6th/8th house lords for health.
-  The prompt still asked for and received a specific year/period despite
-  softening language ("never definitive", "distant future") -- the same
-  *shape* of ungrounded-fact fabrication already fixed twice this
-  session (chat.py's Gochara fabrication, family.py's ingress
-  fabrication), in a different, already-shipping, LLM-cached feature
-  (`family_child_predictions` table).
+  **Design decision -- how multiple, possibly-disagreeing signals
+  combine**: neither engine synthesizes a single verdict itself (same
+  choice `children_timing_engine.py`'s own "combined_windows" already
+  made). Each returns raw per-significator facts; the LLM narrative
+  layer is required (via a `"basis"` field in the JSON schema) to name
+  which specific significator(s) and window(s) back any date claim it
+  makes, and must return `null`/an empty list rather than invent a date
+  when no real window falls in the requested range. This was chosen
+  over having the engine pre-merge signals into one window because the
+  significators can legitimately disagree (e.g. 7th lord dasha in one
+  range, Darakaraka dasha in another) and collapsing that into a single
+  number would itself be a kind of fabrication -- citing the specific
+  basis lets a reader judge the claim's strength themselves.
 
-  **Confirmed live and reachable, not hypothetical**: `family-screen.tsx`
-  renders a real, unconditional "{Child's Name}'s Predictions" button
-  for every family member with `role === "child"` (no feature flag),
-  routing to the live, App.tsx-registered `child-prediction-screen.tsx`.
-  2 real child family members exist in the DB today; 0 cached
-  `family_child_predictions` rows existed before the fix (nobody had
-  clicked through yet) -- the exposure was live and armed, not yet
-  realized against a real family.
+  **Confirmed data-model gap, not silently guessed around**: this app
+  collects no gender field anywhere (`base_charts`, `family_members`,
+  `birth_details` -- checked directly, none). Kalatra Karaka requires
+  gender, so it's only computed for family members with
+  `role='husband'`/`'wife'` (inferred from role); for individual charts
+  and `role='child'` members it's correctly omitted rather than
+  guessed, and the prompt/system-prompt both say so explicitly.
 
-  **Immediate fix applied same day**: `child_prediction_prompt.txt`'s
-  schema now forces `"marriage_window": {}` and `"health_cautions": []`
-  with an explicit GROUNDING instruction, rather than asking for a
-  specific year/period. Both the UI and the PDF renderer
-  (`family_pdf_renderer.py`) already gracefully hide these sections when
-  empty/falsy (confirmed by direct code read before choosing this fix)
-  -- so this is a clean omission, not an awkward "not available yet"
-  message shown to parents. Live-verified against a real child chart:
-  `marriage_window={}`, `health_cautions=[]`, no fabrication. See
-  `tests/engines/test_child_prediction_grounding.py`.
+  **Wired into every consumer**: `child_prediction_engine.py`'s
+  `_build_child_context()` now includes real "Marriage Timing Signals"
+  and "Health Event Signals" sections (removed the old bare "7th
+  (Marriage): {lord name}" line, now redundant/superseded);
+  `child_prediction_prompt.txt`'s schema requires a `"basis"` citation
+  for both `marriage_window` and `health_cautions` and instructs `null`/
+  `[]` over guessing. Both `chat.py` (individual-chart chat, verbose
+  formatter) and `family.py` (family-group chat, compact formatter --
+  the two independent chat implementations noted elsewhere in this
+  file) now compute and inject these signals; `family.py`'s per-member
+  gender is inferred from `role` the same way. All new/changed code has
+  test coverage (`test_marriage_timing_engine.py`,
+  `test_health_events_engine.py`, updated
+  `test_child_prediction_grounding.py`); full suite green (708 passed).
 
-  **Note, not yet investigated**: `career_aptitude.peak_period` and
-  `leaving_home.window` in this same prompt share the identical
+  **Verified with real charts and live LLM calls, not just unit
+  tests**: `child_prediction_engine.py` re-run for chart `b1a35180`
+  (member AN Sr) produced a grounded `marriage_window` citing "7th lord
+  Venus Antardasha (Jan 2026 – Jan 2027) and Darakaraka Sun Antardasha
+  (Jan 2027 – May 2027)" and `health_cautions` citing "8th house lord
+  Mars active as Mahadasha lord (Jan 2026 – Dec 2027)" -- both an exact
+  match to the real computed windows, not paraphrased or invented.
+  `chat.py` re-verified live for chart `7c6e34be`: correctly cited
+  "Venus Antardasha (2032–2035)" and "Mercury Antardasha... 2028-2031"
+  matching computed data. `family.py` re-verified against the real "PN
+  KP" family group (`dbd3fbbd-389b-409e-b26c-a4737b627002`): husband/
+  wife correctly show Kalatra Karaka, children correctly omit it (no
+  gender). This IS the fabrication risk's actual fix, not just the
+  2026-09-19-morning hedge below (which forced empty output as a same-
+  day stopgap) -- these fields now populate with real, cited content.
+
+  **Cached-content exposure, checked before this fix landed**: 1 row
+  existed in `family_child_predictions` at fix time -- it was created
+  by this session's own live-verification call above (chart `b1a35180`,
+  2026-09-18 16:13 UTC) using the fixed prompt, so it already carries
+  real cited windows, not fabricated ones; nothing to backfill there.
+  `family_children_timing` (the feature this pattern was generalized
+  from) has 0 cached rows. **No backfill needed or executed.**
+
+  **Note, still not investigated**: `career_aptitude.peak_period` and
+  `leaving_home.window` in the same prompt share the identical
   underlying weakness (a specific year/period claim from house-lord
   identity alone, no dasha-window computation) -- found while fixing
-  marriage_window/health_cautions but deliberately NOT touched in this
-  pass, since it wasn't the reported symptom and widening scope
-  mid-fix risks under-verifying both. Flagging so it isn't mistaken for
+  marriage_window/health_cautions, deliberately not touched here since
+  it wasn't the reported symptom and widening scope risks
+  under-verifying everything. Flagging so it isn't mistaken for
   "already covered."
 
-  **Real dasha-window computation for 7th/Kalatra-Karaka/Darakaraka
-  (marriage) and 6th/8th lords (health) is being built separately** --
-  see the marriage-timing/health-events entries below. Once that lands
-  and is wired into `child_prediction_engine.py`, these two fields
-  populate with real computed content instead of staying empty.
+  **Part 3 (scoped, deliberately NOT built) -- married-life quality and
+  wealth events**, since neither is causing an active fabrication
+  exposure the way marriage-timing/health-events were:
+  - **Wealth events**: comparable in size to `health_events_engine.py`,
+    i.e. small. Same pattern generalizes directly -- 2nd house lord
+    (accumulated wealth) and 11th house lord (income/gains), both from
+    Moon, real dasha-window computation via the same
+    `_find_planet_dashas()`. No Jaimini-karaka-equivalent complexity
+    needed (unlike marriage's Darakaraka). Genuinely free bonus signals
+    already computed elsewhere and just need citing, not building:
+    `yoga_engine.py` already detects Dhana Yoga by name, and
+    `family_prediction_engine.py` already extracts KP 2nd/11th-house
+    cuspal significators for KP-verified charts -- `event_window_engine.py`
+    was checked and is NOT reusable here despite the "wealth" tag
+    appearing in it (it's a monthly Moon-transit/Tara-Bala favorability
+    tagger, a structurally different multi-year dasha-window engine).
+  - **Married-life quality** (distinct from marriage *timing*, just
+    closed above -- this is "how is the marriage," not "when does it
+    start"): genuinely larger and structurally different, not a
+    dasha-window generalization at all. Would need a new
+    dignity/affliction synthesis: 7th lord's natal dignity (reuse
+    `shadbala_engine.compute_sthana_bala()`/`functional_role_engine.py`,
+    same as the Gochara dispositor fix), aspects to the 7th house/lord
+    (reuse `drishti_engine.py`), Kalatra Karaka's and Venus/Jupiter's
+    own condition, and a Kuja Dosha (Mangal/Manglik) check -- confirmed
+    this does NOT exist anywhere in this codebase today (grepped;
+    `yoga_engine.py`'s only Mars-related hit is the unrelated
+    Chandra-Mangala Yoga). Rough scope: a new "quality scoring" engine
+    comparable to `life_area_scorer.py`'s shape (weighing multiple
+    dignity/affliction signals into a score+narrative) rather than
+    `children_timing_engine.py`'s shape (one dasha-window lookup) --
+    larger than wealth-events, roughly the size of the two engines just
+    built combined. Not started -- logged here for explicit
+    prioritization, per this file's own standing rule that this class
+    of decision isn't made unilaterally.
 
-  **Also could not verify from this environment**: no record of a
-  "Relationship Timing Corroboration" feature's prior scoping notes, or
-  Darakaraka, found anywhere in this repository's `CLAUDE.md` or git
-  history -- same honest limitation already hit once this session (the
-  5-source classical-text validation documents referenced 2026-09-15
-  also could not be located here).
+  **Historical note (fixed same-day stopgap, since superseded)**: a
+  2026-09-19-morning emergency fix forced `child_prediction_prompt.txt`
+  to return literal `"marriage_window": {}`/`"health_cautions": []`
+  while the real engines above were being built, to immediately close
+  the live fabrication risk found 2026-09-18 (the LLM had been asked
+  for a specific marriage year/health period backed only by a bare
+  house-lord name, no real dasha-window computation -- the same
+  ungrounded-fact-fabrication shape already fixed twice elsewhere this
+  session, chat.py's Gochara fabrication and family.py's ingress
+  fabrication). Confirmed live/reachable at the time via
+  `family-screen.tsx`'s unconditional child-predictions button routing
+  to `child-prediction-screen.tsx`. Superseded by the real fix above the
+  same week -- kept only as a record of the fix sequence, not as
+  current behavior.
 
 - **IMPLEMENTED 2026-09-17, backfill held pending sign-off — Gochara
   dispositor analysis** (closes the methodology gap found 2026-09-15:
