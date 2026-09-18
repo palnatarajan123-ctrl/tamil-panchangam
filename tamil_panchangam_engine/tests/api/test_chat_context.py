@@ -110,12 +110,19 @@ def _pre_refactor_build_system_prompt(context: dict, reading_as_name=None) -> st
     request object). Kept here, independent of app/api/chat.py, so the
     regression test below is a real before/after comparison rather than
     the refactored function compared against itself.
+
+    2026-09-18: the "D10 career chart:" label was intentionally changed
+    to "Divisional charts:" in the real function, since
+    divisional_summary can now include D2/D7 alongside D10 (the D7
+    children/creativity wiring-gap fix). Updated here to match -- this
+    oracle tracks deliberate changes to the real function; it exists to
+    catch ACCIDENTAL divergence day-to-day, not to stay frozen forever.
     """
     system_prompt = chat_module.SYSTEM_PROMPT_TEMPLATE.format(**context)
     if context.get("divisional_summary"):
         system_prompt = system_prompt.replace(
             "- Key planets:",
-            f"- D10 career chart: {context['divisional_summary']}\n- Key planets:"
+            f"- Divisional charts: {context['divisional_summary']}\n- Key planets:"
         )
     if context.get("upagraha_context"):
         upa = context["upagraha_context"]

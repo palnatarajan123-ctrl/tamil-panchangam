@@ -37,7 +37,7 @@ from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.budget_guard import log_llm_call
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled, get_llm_pause_reason
 from app.engines.family_prediction_engine import run_family_prediction
-from app.engines.children_timing_engine import run_children_timing
+from app.engines.children_timing_engine import run_children_timing, _safe_json_list
 from app.engines.timeline_aggregator import build_timeline
 from app.engines.child_prediction_engine import run_child_prediction
 from app.pdf.family_report.family_pdf_renderer import render_family_pdf
@@ -1370,6 +1370,58 @@ def _build_porutham_chat_block(rows: list, group_id: str) -> str:
         return ""
 
 
+def _build_children_timing_chat_block(group_id: str) -> str:
+    """
+    Surface an already-computed children-timing analysis (5th house/lord
+    + Jupiter Putra Karaka dasha windows, see children_timing_engine.py)
+    into family_group_chat_stream()'s system prompt, or "" if none is
+    cached yet.
+
+    Found 2026-09-18 during the life-event-predictions investigation:
+    children_timing_engine.py does a real, classical dasha-timing
+    calculation for this exact question ("when might we have
+    children?"), already reachable via its own dedicated endpoint/PDF
+    (get_children_timing/get_children_timing_pdf) -- but
+    family_group_chat_stream() never referenced it at all, so asking
+    this same question through family chat had nothing to ground on
+    despite the answer already sitting in family_children_timing for
+    most groups a user would ask this in.
+
+    Deliberately READ-ONLY (a plain cache lookup, using the same
+    default year_from=this year / year_to=+3 window
+    get_children_timing() uses) -- does NOT call run_children_timing()
+    itself, since that computes+persists on a cache miss via its own
+    LLM call, and chat context-building should stay cheap, not trigger
+    a second expensive LLM generation just to ground a first one.
+    """
+    year_from = date.today().year
+    year_to = year_from + 3
+    try:
+        with get_conn() as conn:
+            row = conn.execute("""
+                SELECT overall_outlook, combined_windows, has_children_already
+                FROM family_children_timing
+                WHERE group_id = %s AND year_from = %s AND year_to = %s
+            """, (group_id, year_from, year_to)).fetchone()
+        if not row:
+            return ""
+        overall_outlook, combined_windows_raw, has_children_already = row
+        combined_windows = _safe_json_list(combined_windows_raw) if combined_windows_raw else []
+
+        lines = [f"\n\nCHILDREN TIMING (5th house/lord + Jupiter dasha windows, {year_from}-{year_to}, already computed):"]
+        if has_children_already:
+            lines.append("This family already has child member(s) in the group.")
+        if overall_outlook:
+            lines.append(f"Outlook: {overall_outlook[:300]}")
+        if combined_windows:
+            window_bits = [str(w)[:100] for w in combined_windows[:3]]
+            lines.append("Favorable windows: " + "; ".join(window_bits))
+        return "\n".join(lines) if len(lines) > 1 else ""
+    except Exception as e:
+        logger.warning(f"Children timing lookup failed for family chat: {e}")
+        return ""
+
+
 def _build_prospect_chat_block(user_id: str, base_chart_id: str) -> str:
     """
     Build the '## COMPATIBILITY CHECKS' block for family_group_chat_stream(),
@@ -1475,6 +1527,10 @@ async def family_group_chat_stream(
     porutham_block = _build_porutham_chat_block(rows, group_id)
     if porutham_block:
         system_prompt += porutham_block
+
+    children_timing_block = _build_children_timing_chat_block(group_id)
+    if children_timing_block:
+        system_prompt += children_timing_block
 
     prospect_block = _build_prospect_chat_block(user_id, req.base_chart_id)
     if prospect_block:

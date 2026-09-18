@@ -60,6 +60,85 @@ these — this list has been wrong before; see "Gulika/Sani Oorai" and
 "family surfaces" audits in git history, 2026-08-14, for what "confirmed
 stale" and "confirmed real" looked like in practice):
 
+- **2026-09-18 life-event-predictions investigation (marriage timing,
+  children, married-life quality, wealth events, health events) —
+  2 wiring gaps FIXED, 3 domains + 1 live grounding risk confirmed and
+  reported, NOT built.** These are discrete, dasha-timing-based
+  natal-chart predictions, a genuinely different feature class from the
+  existing 5-area periodic scores (which are transit-modulated, not
+  discrete-event).
+
+  | Domain | Exists? | Wired to reports? | Wired to chat? |
+  |---|---|---|---|
+  | Marriage timing (primary chart) | Partial — 7th lord identified generically, no dasha-timing analysis; Upapada Lagna computed (`special_lagnas_engine.py`) but confirmed **zero consumers anywhere in the codebase**; Darakaraka (Jaimini) absent entirely | No discrete report | No |
+  | Children — likelihood/timing | **Yes** — `children_timing_engine.py` does the real classical technique (5th house/lord + Jupiter Putra Karaka dasha windows) | Yes (dedicated endpoint + PDF, though the PDF has no UI download button, per the earlier 2026-09-14 surface-matrix audit) | **Fixed today** (was: no) |
+  | Married-life quality | Partial — generic 7th-house/Venus/Jupiter affliction already folds into the periodic Relationships score; D9 dignity exists chart-wide, not 7th-lord/Kalatra-Karaka-specific | No discrete report | No |
+  | Wealth — discrete events | Not implemented — `event_windows` is the same generic 5-area periodic confluence mechanism, no 2nd/11th-house dasha-activation-specific timing | No | No |
+  | Health — discrete events | Not implemented — same generic periodic mechanism, no 6th/8th-house dasha-timing vulnerability-window mechanism | No | No |
+
+  **Fixed (pure wiring, no methodology change, no sign-off needed)**:
+  1. `children_timing_engine.py`'s already-computed, already-cached
+     analysis is now surfaced into `family.py`'s
+     `family_group_chat_stream()` via `_build_children_timing_chat_block()`
+     -- a read-only cache lookup (same default year window
+     `get_children_timing()` uses), deliberately never triggering a
+     fresh `run_children_timing()` computation from the chat path (that
+     has its own LLM call). Before this, asking family chat "when might
+     we have children?" had nothing to ground on even when the real
+     answer was already cached.
+  2. `chat.py`'s `divisional_summary` always claimed to cover "D10/D2/D7"
+     in its own comment but only ever extracted D10 (Sun/Saturn) --
+     confirmed by direct code read, not assumed. D7's Jupiter placement
+     (already labeled `"d7_children"` and given to monthly/yearly REPORT
+     generation via `payload_builder.py`'s `_extract_divisional_signals()`)
+     never reached chat at all. Now reuses that same shared extractor
+     for D10/D2/D7 instead of a second, incomplete, hand-rolled copy.
+
+  **Confirmed NOT implemented, NOT built** (marriage timing for the
+  primary chart holder, married-life quality, wealth events, health
+  events) -- each would need real new methodology work: a Darakaraka
+  (Jaimini lowest-degree-planet) calculation (doesn't exist at all,
+  would need a new engine), a 7th/2nd/11th/6th/8th-house-lord
+  dasha-window finder generalizing `children_timing_engine.py`'s own
+  `_find_planet_dashas()` pattern to those houses, and a decision on
+  whether to wire the already-computed-but-unused Upapada Lagna into
+  any of this. Rough scope: each domain is comparable in size to
+  `children_timing_engine.py` itself (a dedicated engine + prompt +
+  cache table + endpoint + PDF section), i.e. a multi-session build per
+  domain, not a quick addition. Not started -- reported for explicit
+  prioritization, per this file's own standing rule that this class of
+  decision isn't made unilaterally.
+
+  **Live grounding risk found, not fixed, flagged prominently**:
+  `child_prediction_engine.py` (per-child predictions for family
+  members with role='child') generates a `marriage_window` field
+  (`earliest_favorable` **year** + `peak_window` **year range**) and
+  `health_cautions` (specific **period** + **area**) via LLM, but
+  `_build_child_context()` gives the LLM only the bare 7th-house-lord
+  NAME for marriage (no dasha-window computation backing it at all --
+  unlike `children_timing_engine.py`'s proper technique for the 5th
+  house) and doesn't even include the 6th/8th house lords for health.
+  The prompt (`child_prediction_prompt.txt`) still asks for and
+  receives a specific year/period despite softening language ("never
+  definitive", "distant future") -- this is the same *shape* of
+  ungrounded-fact fabrication risk already fixed twice this session
+  (chat.py's Gochara fabrication, family.py's ingress fabrication), just
+  in a different, already-shipping, LLM-cached feature
+  (`family_child_predictions` table) that real families see today. NOT
+  fixed in this pass -- extending `_find_planet_dashas()`-style real
+  dasha-window computation to the 7th/6th/8th lords here would change
+  the content of an already-cached, already-shipping prediction (same
+  backfill-sign-off category as the top_signals/dispositor fixes), so
+  it needs its own explicit scoping decision, not a blind fix alongside
+  a wiring pass.
+
+  **Also could not verify from this environment**: no record of a
+  "Relationship Timing Corroboration" feature's prior scoping notes, or
+  Darakaraka, found anywhere in this repository's `CLAUDE.md` or git
+  history -- same honest limitation already hit once this session (the
+  5-source classical-text validation documents referenced 2026-09-15
+  also could not be located here).
+
 - **IMPLEMENTED 2026-09-17, backfill held pending sign-off — Gochara
   dispositor analysis** (closes the methodology gap found 2026-09-15:
   Gochara was house-position-only, the same static `JUPITER_EFFECTS`/

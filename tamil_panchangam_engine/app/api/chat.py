@@ -446,9 +446,12 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
     """Render the chat system prompt from context assembled by _build_chat_context()."""
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(**context)
     if context.get("divisional_summary"):
+        # Label generalized 2026-09-18 -- divisional_summary can now
+        # include D2/D7 alongside D10 (see _build_chat_context()), not
+        # just career.
         system_prompt = system_prompt.replace(
             "- Key planets:",
-            f"- D10 career chart: {context['divisional_summary']}\n- Key planets:"
+            f"- Divisional charts: {context['divisional_summary']}\n- Key planets:"
         )
     if context.get("upagraha_context"):
         upa = context["upagraha_context"]
@@ -740,19 +743,37 @@ def _build_chat_context(base_chart_id: str) -> dict:
     except Exception as e:
         logger.warning(f"Ingress lookup failed in chat context: {e}")
 
-    # Divisional signals for D10/D2/D7
+    # Divisional signals for D10/D2/D7 -- this comment always claimed all
+    # three, but the code only ever extracted D10 (Sun/Saturn). Found
+    # 2026-09-18 while investigating life-event predictions: D7's
+    # Jupiter placement (already labeled "d7_children" and given to
+    # monthly/yearly REPORT generation via payload_builder.py's
+    # _extract_divisional_signals()) never reached chat at all, despite
+    # this file's own comment implying it did. Now reuses that same
+    # shared extractor instead of maintaining a second, incomplete,
+    # hand-rolled copy -- same "duplicated logic drifts" lesson as the
+    # family-chat/PDF-download/bare-fetch() cases in CLAUDE.md.
     divisional_summary = ""
     try:
-        div = payload.get("divisional_charts", {})
-        d10 = div.get("D10", {}).get("planets", {})
-        d10_planets = []
-        for p in ["Sun", "Saturn"]:
-            if d10.get(p, {}).get("rasi"):
-                sign = d10[p]["rasi"]
-                dignity = d10[p].get("dignity", "")
-                d10_planets.append(f"{p} in {sign}" + (f" ({dignity})" if dignity != "neutral" else ""))
-        if d10_planets:
-            divisional_summary = f"D10 career: {', '.join(d10_planets)}"
+        from app.llm.payload_builder import _extract_divisional_signals
+
+        div_signals = _extract_divisional_signals(payload)
+        summary_parts = []
+        for out_key, label in (
+            ("d10_career", "D10 career"),
+            ("d2_wealth", "D2 wealth"),
+            ("d7_children", "D7 children/creativity"),
+        ):
+            entry = div_signals.get(out_key)
+            if not entry:
+                continue
+            placement_bits = [
+                f"{p['planet']} in {p['sign']}" + (f" ({p['dignity']})" if p.get("dignity") not in (None, "neutral") else "")
+                for p in entry.get("key_placements", [])
+            ]
+            if placement_bits:
+                summary_parts.append(f"{label}: {', '.join(placement_bits)}")
+        divisional_summary = "; ".join(summary_parts)
     except Exception:
         pass
 
