@@ -109,28 +109,57 @@ stale" and "confirmed real" looked like in practice):
   prioritization, per this file's own standing rule that this class of
   decision isn't made unilaterally.
 
-  **Live grounding risk found, not fixed, flagged prominently**:
+  **Live grounding risk found 2026-09-18, EMERGENCY-HEDGED 2026-09-19
+  (real timing analysis in progress separately)**:
   `child_prediction_engine.py` (per-child predictions for family
-  members with role='child') generates a `marriage_window` field
+  members with role='child') generated a `marriage_window` field
   (`earliest_favorable` **year** + `peak_window` **year range**) and
   `health_cautions` (specific **period** + **area**) via LLM, but
-  `_build_child_context()` gives the LLM only the bare 7th-house-lord
+  `_build_child_context()` gave the LLM only the bare 7th-house-lord
   NAME for marriage (no dasha-window computation backing it at all --
   unlike `children_timing_engine.py`'s proper technique for the 5th
-  house) and doesn't even include the 6th/8th house lords for health.
-  The prompt (`child_prediction_prompt.txt`) still asks for and
-  receives a specific year/period despite softening language ("never
-  definitive", "distant future") -- this is the same *shape* of
-  ungrounded-fact fabrication risk already fixed twice this session
-  (chat.py's Gochara fabrication, family.py's ingress fabrication), just
-  in a different, already-shipping, LLM-cached feature
-  (`family_child_predictions` table) that real families see today. NOT
-  fixed in this pass -- extending `_find_planet_dashas()`-style real
-  dasha-window computation to the 7th/6th/8th lords here would change
-  the content of an already-cached, already-shipping prediction (same
-  backfill-sign-off category as the top_signals/dispositor fixes), so
-  it needs its own explicit scoping decision, not a blind fix alongside
-  a wiring pass.
+  house) and didn't even include the 6th/8th house lords for health.
+  The prompt still asked for and received a specific year/period despite
+  softening language ("never definitive", "distant future") -- the same
+  *shape* of ungrounded-fact fabrication already fixed twice this
+  session (chat.py's Gochara fabrication, family.py's ingress
+  fabrication), in a different, already-shipping, LLM-cached feature
+  (`family_child_predictions` table).
+
+  **Confirmed live and reachable, not hypothetical**: `family-screen.tsx`
+  renders a real, unconditional "{Child's Name}'s Predictions" button
+  for every family member with `role === "child"` (no feature flag),
+  routing to the live, App.tsx-registered `child-prediction-screen.tsx`.
+  2 real child family members exist in the DB today; 0 cached
+  `family_child_predictions` rows existed before the fix (nobody had
+  clicked through yet) -- the exposure was live and armed, not yet
+  realized against a real family.
+
+  **Immediate fix applied same day**: `child_prediction_prompt.txt`'s
+  schema now forces `"marriage_window": {}` and `"health_cautions": []`
+  with an explicit GROUNDING instruction, rather than asking for a
+  specific year/period. Both the UI and the PDF renderer
+  (`family_pdf_renderer.py`) already gracefully hide these sections when
+  empty/falsy (confirmed by direct code read before choosing this fix)
+  -- so this is a clean omission, not an awkward "not available yet"
+  message shown to parents. Live-verified against a real child chart:
+  `marriage_window={}`, `health_cautions=[]`, no fabrication. See
+  `tests/engines/test_child_prediction_grounding.py`.
+
+  **Note, not yet investigated**: `career_aptitude.peak_period` and
+  `leaving_home.window` in this same prompt share the identical
+  underlying weakness (a specific year/period claim from house-lord
+  identity alone, no dasha-window computation) -- found while fixing
+  marriage_window/health_cautions but deliberately NOT touched in this
+  pass, since it wasn't the reported symptom and widening scope
+  mid-fix risks under-verifying both. Flagging so it isn't mistaken for
+  "already covered."
+
+  **Real dasha-window computation for 7th/Kalatra-Karaka/Darakaraka
+  (marriage) and 6th/8th lords (health) is being built separately** --
+  see the marriage-timing/health-events entries below. Once that lands
+  and is wired into `child_prediction_engine.py`, these two fields
+  populate with real computed content instead of staying empty.
 
   **Also could not verify from this environment**: no record of a
   "Relationship Timing Corroboration" feature's prior scoping notes, or

@@ -30,11 +30,7 @@ You will receive:
     "plain_english": "2-3 sentences. Encouraging, possibility-focused."
   },
 
-  "marriage_window": {
-    "earliest_favorable": "Year only — never a specific date",
-    "peak_window": "Year range",
-    "plain_english": "1-2 sentences. Use 'favorable window' framing only. Never definitive. Note this is distant and circumstances vary."
-  },
+  "marriage_window": {},
 
   "leaving_home": {
     "window": "Year range",
@@ -42,13 +38,7 @@ You will receive:
     "plain_english": "1 sentence."
   },
 
-  "health_cautions": [
-    {
-      "period": "Year or month range",
-      "area": "Brief description — e.g. 'digestive health', 'fatigue'",
-      "plain_english": "1 sentence. Gentle framing — 'be attentive to'."
-    }
-  ],
+  "health_cautions": [],
 
   "key_takeaways": [
     "3-5 short actionable points for parents about this year specifically."
@@ -57,7 +47,18 @@ You will receive:
 
 ## Tone rules
 - Write for parents, not astrologers — no Sanskrit terms without explanation
-- Marriage window: child may be under 18 — always frame as distant future, never specific, always note circumstances vary
-- Health cautions: never alarming — always 'be attentive', 'monitor gently'
 - Career: encouraging and possibility-focused, not deterministic
 - Overall tone: like a wise, caring family astrologer speaking at home
+
+## GROUNDING — marriage_window and health_cautions
+You are given only the child's 7th-house lord's NAME for marriage, and
+the 6th/8th-house lords are not given to you at all for health -- there
+is no real dasha-period computation behind either topic yet. Always
+return "marriage_window" as the exact empty object {} and
+"health_cautions" as the exact empty array [] -- do not invent a
+specific year, year range, month range, or caution period for either,
+even softened as "distant future" or "a favorable window". A bare house
+lord's name is not enough to support a timing claim. These sections will
+populate with real computed dasha-window data once that analysis exists
+-- until then, omitting them entirely is correct; the app hides both
+sections automatically when empty.
