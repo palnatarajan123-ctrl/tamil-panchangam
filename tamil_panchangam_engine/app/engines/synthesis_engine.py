@@ -93,6 +93,15 @@ def synthesize_from_envelope(envelope: dict) -> dict:
         jup_drishti_bonus = jup_gochara.get("drishti_aspect_bonus")
         if jup_drishti_bonus is not None:
             jup_strength = round(max(0.1, min(1.5, jup_strength * (1 + jup_drishti_bonus))), 3)
+        # L4: dispositor bonus -- natal condition of the transited house's
+        # own lord (see gochara_engine.py's _dispositor_analysis()).
+        jup_dispositor = jup_gochara.get("dispositor")
+        jup_rationale = f"Jupiter transiting house {jup_house} from Moon ({jup_effect})"
+        if jup_dispositor:
+            jup_strength = round(max(0.1, min(1.5, jup_strength * (1 + jup_dispositor["strength_bonus"]))), 3)
+            jup_rationale += f"; house lord {jup_dispositor['lord']} is {jup_dispositor['lord_placement'].replace('_', ' ')}"
+            if jup_dispositor["lord_functional_role"]:
+                jup_rationale += f" and a {jup_dispositor['lord_functional_role']} for this chart"
         signals.append({
             "key": "GOCHARA_JUPITER",
             "source": "gochara",
@@ -102,7 +111,7 @@ def synthesize_from_envelope(envelope: dict) -> dict:
             "valence": "pos" if jup_effect == "favorable" else "neg",
             "strength": jup_strength,
             "confidence": 0.85,
-            "rationale": f"Jupiter transiting house {jup_house} from Moon ({jup_effect})",
+            "rationale": jup_rationale,
         })
 
     # Saturn Gochara Signal
@@ -119,6 +128,15 @@ def synthesize_from_envelope(envelope: dict) -> dict:
         sat_drishti_bonus = sat_gochara.get("drishti_aspect_bonus")
         if sat_drishti_bonus is not None:
             sat_strength = round(max(0.1, min(1.5, sat_strength * (1 + sat_drishti_bonus))), 3)
+        # L4: dispositor bonus -- natal condition of the transited house's
+        # own lord (see gochara_engine.py's _dispositor_analysis()).
+        sat_dispositor = sat_gochara.get("dispositor")
+        sat_rationale = f"Saturn {sat_phase} phase, house {sat_house} from Moon"
+        if sat_dispositor:
+            sat_strength = round(max(0.1, min(1.5, sat_strength * (1 + sat_dispositor["strength_bonus"]))), 3)
+            sat_rationale += f"; house lord {sat_dispositor['lord']} is {sat_dispositor['lord_placement'].replace('_', ' ')}"
+            if sat_dispositor["lord_functional_role"]:
+                sat_rationale += f" and a {sat_dispositor['lord_functional_role']} for this chart"
         signals.append({
             "key": f"GOCHARA_SATURN_{sat_phase.upper()}",
             "source": "gochara",
@@ -128,13 +146,29 @@ def synthesize_from_envelope(envelope: dict) -> dict:
             "valence": "neg" if sat_effect == "challenging" else "pos",
             "strength": sat_strength,
             "confidence": 0.90,
-            "rationale": f"Saturn {sat_phase} phase, house {sat_house} from Moon",
+            "rationale": sat_rationale,
         })
     
     # Rahu-Ketu Gochara Signal
     rahu_ketu = gochara.get("rahu_ketu", {})
     rahu_effect = rahu_ketu.get("effect", "neutral")
     if rahu_effect != "neutral":
+        rk_strength = 0.7
+        rk_rationale = f"Rahu-Ketu axis {rahu_ketu.get('axis', 'unknown')} from Moon ({rahu_effect})"
+        # L4: dispositor bonus -- average of Rahu's and Ketu's own
+        # transited-house lord conditions, since this signal represents
+        # the combined axis rather than each node separately.
+        rahu_dispositor = rahu_ketu.get("rahu_dispositor")
+        ketu_dispositor = rahu_ketu.get("ketu_dispositor")
+        dispositor_bonuses = [d["strength_bonus"] for d in (rahu_dispositor, ketu_dispositor) if d]
+        if dispositor_bonuses:
+            avg_bonus = sum(dispositor_bonuses) / len(dispositor_bonuses)
+            rk_strength = round(max(0.1, min(1.5, rk_strength * (1 + avg_bonus))), 3)
+            for label, d in (("Rahu", rahu_dispositor), ("Ketu", ketu_dispositor)):
+                if d:
+                    rk_rationale += f"; {label}'s house lord {d['lord']} is {d['lord_placement'].replace('_', ' ')}"
+                    if d["lord_functional_role"]:
+                        rk_rationale += f" ({d['lord_functional_role']} for this chart)"
         signals.append({
             "key": "GOCHARA_RAHU_KETU",
             "source": "gochara",
@@ -142,9 +176,9 @@ def synthesize_from_envelope(envelope: dict) -> dict:
             "planet": "Rahu",
             "house": rahu_ketu.get("rahu_from_moon_house", 0),
             "valence": "neg" if rahu_effect == "disruptive" else "pos",
-            "strength": 0.7,
+            "strength": rk_strength,
             "confidence": 0.75,
-            "rationale": f"Rahu-Ketu axis {rahu_ketu.get('axis', 'unknown')} from Moon ({rahu_effect})",
+            "rationale": rk_rationale,
         })
     
     # -------------------------------------------------

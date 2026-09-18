@@ -261,6 +261,18 @@ def build_monthly_prediction_envelope(
     }
 
     # -------------------------------------------------
+    # 6B. FUNCTIONAL ROLE ENGINE - Prompt 2 (moved here 2026-09-17, from
+    # its old position after House Strength, so Gochara's dispositor
+    # analysis below can use it -- it only needs ephemeris/houses, both
+    # already available)
+    # -------------------------------------------------
+    logger.debug("DEBUG: Computing Functional Roles")
+    functional_roles = compute_functional_roles(
+        ephemeris=ephemeris,
+        houses=houses,
+    )
+
+    # -------------------------------------------------
     # 7. DRISHTI ENGINE - computed early so Gochara L3 can use it
     # -------------------------------------------------
     logger.debug("DEBUG: Computing Drishti (aspects) [early, for Gochara L3]")
@@ -284,6 +296,9 @@ def build_monthly_prediction_envelope(
         natal_moon_rasi=natal_moon_rasi,
         natal_moon_longitude=birth_moon_longitude if birth_moon_longitude else None,
         natal_lagna_rasi=natal_lagna_rasi_for_gochara,
+        natal_lagna_longitude=natal_lagna_longitude if natal_lagna_longitude else None,
+        natal_planets=ephemeris.get("planets", {}),
+        functional_roles=functional_roles,
         drishti_data=drishti,
         ayanamsa=ayanamsa,
         node_type=node_type,
@@ -346,14 +361,10 @@ def build_monthly_prediction_envelope(
         drishti_data=drishti,
     )
 
-    # -------------------------------------------------
-    # 14. FUNCTIONAL ROLE ENGINE - Prompt 2
-    # -------------------------------------------------
-    logger.debug("DEBUG: Computing Functional Roles")
-    functional_roles = compute_functional_roles(
-        ephemeris=ephemeris,
-        houses=houses,
-    )
+    # 14. FUNCTIONAL ROLE ENGINE -- moved to step 6B (2026-09-17), before
+    # Gochara, so Gochara's dispositor analysis can use it. `functional_roles`
+    # only depends on `ephemeris`/`houses` (both available from the start
+    # of this function), so moving it earlier is safe.
 
     # -------------------------------------------------
     # 15. YOGA ENGINE - Prompt 2

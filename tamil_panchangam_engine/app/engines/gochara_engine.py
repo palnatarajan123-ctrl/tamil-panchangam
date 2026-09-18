@@ -4,12 +4,25 @@ Gochara (Transit) Engine - EPIC Signal Expansion
 Computes planetary transit effects from Moon sign (Chandra Rasi) and Lagna.
 Evaluates Jupiter, Saturn, Rahu, Ketu transits with traditional classifications.
 L3: Drishti (natal aspect) bonus adjusts transit signal strength.
+L4 (2026-09-17): Dispositor bonus -- the base house-position effect
+(JUPITER_EFFECTS/SATURN_PHASES) is generic and identical for every
+chart with the same Moon-house transit. Classical Gochara also colors
+the reading by the natal condition of the TRANSITED HOUSE'S OWN LORD
+(from Lagna) -- this was previously computed nowhere; see CLAUDE.md's
+2026-09-15 Gochara-methodology investigation. Reuses existing natal
+engines rather than reinventing dignity/lordship tables:
+house_strength_engine.get_lord_for_house() for house->lord, and
+shadbala_engine.compute_sthana_bala() for that lord's own placement/
+dignity (it already combines exaltation/debilitation/own/friendly/
+neutral classification with kendra/trikona bonus into one 0-60 score).
 """
 import logging
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from app.utils.swisseph_utils import compute_planet_longitude, compute_planet_longitude_with_speed
 from app.utils.rasi_utils import to_english_rasi
+from app.engines.house_strength_engine import get_lord_for_house
+from app.engines.shadbala_engine import compute_sthana_bala
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +138,74 @@ def _drishti_bonus_for_transit_house(transit_house: int, drishti_data: Dict) -> 
     return round(max(-0.25, min(0.25, bonus)), 3)
 
 
+def _dispositor_analysis(
+    house_from_lagna: Optional[int],
+    natal_lagna_longitude: Optional[float],
+    natal_planets: Optional[Dict[str, Any]],
+    functional_roles: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """
+    Modulate a transit's base house-position effect by the natal
+    condition of the TRANSITED HOUSE'S OWN LORD (dispositor) -- the
+    layer classical Gochara adds beyond "planet X is in house N",
+    previously absent from this engine (see CLAUDE.md's 2026-09-15
+    Gochara-methodology investigation).
+
+    Uses house_from_lagna (not house_from_moon) since house LORDSHIP is
+    a Lagna-relative concept -- house_strength_engine.py's own natal
+    analysis, the explicit model for this, is entirely Lagna-based.
+    This is a complementary layer alongside the existing Moon-based
+    effect classification, not a competing reference point: the app
+    already tracks from_lagna_house per transiting planet for exactly
+    this kind of secondary analysis.
+
+    Returns None (graceful degradation, same pattern as the drishti
+    bonus) if the inputs needed aren't available. Otherwise returns:
+        {
+            "lord": str,                  # dispositor planet name
+            "lord_placement": str,        # e.g. "exaltation", "dusthana"
+            "lord_functional_role": str,  # "yogakaraka" | "maraka" | ""
+            "strength_bonus": float,      # bounded [-0.4, 0.4]
+        }
+    """
+    if house_from_lagna is None or not natal_lagna_longitude or not natal_planets:
+        return None
+
+    lagna_rasi_index = int(natal_lagna_longitude // 30) + 1
+    lord = get_lord_for_house(house_from_lagna, lagna_rasi_index)
+    lord_data = natal_planets.get(lord, {})
+    lord_lon = lord_data.get("longitude_deg")
+    if lord_lon is None:
+        return None
+
+    sthana = compute_sthana_bala(lord, lord_lon, natal_lagna_longitude)
+
+    # sthana["score"] range: 0 (debilitated) .. 15 (neutral) .. 30
+    # (friendly) .. 45 (own sign) .. up to 60 (own/exalted + kendra/
+    # trikona bonus). Normalize around the neutral(15) baseline to a
+    # bounded modifier on the same order of magnitude as the existing
+    # drishti_aspect_bonus (+/-0.25).
+    normalized = (sthana["score"] - 15.0) / 45.0
+    bonus = max(-0.3, min(0.3, normalized * 0.3))
+
+    lord_functional_role = ""
+    if functional_roles:
+        summary = functional_roles.get("summary", {})
+        if lord in summary.get("yogakarakas", []):
+            lord_functional_role = "yogakaraka"
+            bonus += 0.15
+        elif lord in summary.get("marakas", []):
+            lord_functional_role = "maraka"
+            bonus -= 0.15
+
+    return {
+        "lord": lord,
+        "lord_placement": sthana["placement"],
+        "lord_functional_role": lord_functional_role,
+        "strength_bonus": round(max(-0.4, min(0.4, bonus)), 3),
+    }
+
+
 def _conjunction_strength(transit_long: float, natal_long: float, orb: float = 6.0) -> float:
     """
     Compute angular proximity between a transit planet and a natal point.
@@ -144,6 +225,9 @@ def compute_gochara(
     natal_moon_rasi: str,
     natal_lagna_rasi: Optional[str] = None,
     natal_moon_longitude: Optional[float] = None,
+    natal_lagna_longitude: Optional[float] = None,
+    natal_planets: Optional[Dict[str, Any]] = None,
+    functional_roles: Optional[Dict[str, Any]] = None,
     drishti_data: Optional[Dict] = None,
     ayanamsa: str = "lahiri",
     node_type: str = "mean",
@@ -156,6 +240,12 @@ def compute_gochara(
             (astronomical) -- pass the chart's own chart_metadata.node_type
             so Rahu/Ketu's transit sign matches the same convention the
             natal chart was computed with.
+        natal_lagna_longitude, natal_planets, functional_roles: optional --
+            when all three are provided, enables dispositor analysis (see
+            _dispositor_analysis()'s docstring): the transited house's own
+            natal lord's placement/dignity/functional-role modulates the
+            base house-position effect. Degrades gracefully (no dispositor
+            fields, same as when drishti_data is omitted) if not given.
 
     Returns structured transit data with effects classification.
     """
@@ -230,6 +320,13 @@ def compute_gochara(
         else:
             jup_drishti_bonus = sat_drishti_bonus = rahu_drishti_bonus = ketu_drishti_bonus = None
 
+        # L4: Dispositor analysis — natal condition of the transited
+        # house's own lord (see _dispositor_analysis()'s docstring).
+        jup_dispositor = _dispositor_analysis(jup_natal_house, natal_lagna_longitude, natal_planets, functional_roles)
+        sat_dispositor = _dispositor_analysis(sat_natal_house, natal_lagna_longitude, natal_planets, functional_roles)
+        rahu_dispositor = _dispositor_analysis(rahu_natal_house, natal_lagna_longitude, natal_planets, functional_roles)
+        ketu_dispositor = _dispositor_analysis(ketu_natal_house, natal_lagna_longitude, natal_planets, functional_roles)
+
         jup_entry = {
             "transit_rasi": jup_rasi,
             "from_moon_house": jup_house_from_moon,
@@ -246,6 +343,8 @@ def compute_gochara(
             jup_entry["conjunction_strength"] = jup_cs
         if jup_drishti_bonus is not None:
             jup_entry["drishti_aspect_bonus"] = jup_drishti_bonus
+        if jup_dispositor is not None:
+            jup_entry["dispositor"] = jup_dispositor
 
         sat_entry = {
             "transit_rasi": sat_rasi,
@@ -264,6 +363,8 @@ def compute_gochara(
             sat_entry["conjunction_strength"] = sat_cs
         if sat_drishti_bonus is not None:
             sat_entry["drishti_aspect_bonus"] = sat_drishti_bonus
+        if sat_dispositor is not None:
+            sat_entry["dispositor"] = sat_dispositor
 
         rahu_ketu_entry = {
             "rahu_rasi": rahu_rasi,
@@ -291,6 +392,10 @@ def compute_gochara(
             rahu_ketu_entry["rahu_drishti_bonus"] = rahu_drishti_bonus
         if ketu_drishti_bonus is not None:
             rahu_ketu_entry["ketu_drishti_bonus"] = ketu_drishti_bonus
+        if rahu_dispositor is not None:
+            rahu_ketu_entry["rahu_dispositor"] = rahu_dispositor
+        if ketu_dispositor is not None:
+            rahu_ketu_entry["ketu_dispositor"] = ketu_dispositor
 
         gochara = {
             "jupiter": jup_entry,

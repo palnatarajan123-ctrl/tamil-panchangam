@@ -468,12 +468,29 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
     if context.get("gochara_context"):
         g = context["gochara_context"]
         lines = []
+
+        def _dispositor_suffix(entry: dict) -> str:
+            # 2026-09-17: surfaces the transited house's own natal lord
+            # condition (see gochara_engine.py's _dispositor_analysis())
+            # as a real, chart-specific grounded fact -- not a scoring
+            # detail chat needs, but a genuine "why this transit means
+            # something different for you" fact the LLM can now state
+            # instead of a generic house-position reading.
+            disp = entry.get("dispositor")
+            if not disp:
+                return ""
+            suffix = f"; this house's lord {disp['lord']} is {disp['lord_placement'].replace('_', ' ')} in your natal chart"
+            if disp["lord_functional_role"]:
+                suffix += f" and a {disp['lord_functional_role']} for your chart"
+            return suffix
+
         jup = g.get("jupiter", {})
         if jup.get("transit_rasi"):
             lines.append(
                 f"- Jupiter: currently in {jup['transit_rasi']} "
                 f"(house {jup.get('from_moon_house', '?')} from your Moon sign, "
                 f"house {jup.get('from_lagna_house', '?')} from your Ascendant), {jup.get('effect', 'neutral')}"
+                f"{_dispositor_suffix(jup)}"
             )
         sat = g.get("saturn", {})
         if sat.get("transit_rasi"):
@@ -481,18 +498,23 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
                 f"- Saturn: currently in {sat['transit_rasi']} "
                 f"(house {sat.get('from_moon_house', '?')} from your Moon sign, "
                 f"house {sat.get('from_lagna_house', '?')} from your Ascendant), phase: {sat.get('phase', 'neutral')}"
+                f"{_dispositor_suffix(sat)}"
             )
         rk = g.get("rahu_ketu", {})
         if rk.get("rahu_rasi"):
+            rahu_disp = {"dispositor": rk.get("rahu_dispositor")} if rk.get("rahu_dispositor") else {}
+            ketu_disp = {"dispositor": rk.get("ketu_dispositor")} if rk.get("ketu_dispositor") else {}
             lines.append(
                 f"- Rahu: currently in {rk['rahu_rasi']} "
                 f"(house {rk.get('rahu_from_moon_house', '?')} from your Moon sign, "
                 f"house {rk.get('rahu_from_lagna_house', '?')} from your Ascendant)"
+                f"{_dispositor_suffix(rahu_disp)}"
             )
             lines.append(
                 f"- Ketu: currently in {rk['ketu_rasi']} "
                 f"(house {rk.get('ketu_from_moon_house', '?')} from your Moon sign, "
                 f"house {rk.get('ketu_from_lagna_house', '?')} from your Ascendant)"
+                f"{_dispositor_suffix(ketu_disp)}"
             )
         if lines:
             system_prompt += (
@@ -671,6 +693,14 @@ def _build_chat_context(base_chart_id: str) -> dict:
                 natal_moon_rasi=natal_moon_rasi_en,
                 natal_lagna_rasi=natal_lagna_rasi_en,
                 natal_moon_longitude=moon_data.get("longitude_deg"),
+                # 2026-09-17: enables dispositor analysis (see
+                # gochara_engine.py's _dispositor_analysis()) -- gives
+                # the LLM the transited house's own natal lord condition
+                # as a real, chart-specific grounded fact instead of the
+                # same generic house-position reading for every chart.
+                natal_lagna_longitude=ephemeris.get("lagna", {}).get("longitude_deg"),
+                natal_planets=ephemeris.get("planets", {}),
+                functional_roles=payload.get("functional_roles", {}),
                 ayanamsa=ephemeris.get("ayanamsa", "lahiri"),
                 node_type=payload.get("chart_metadata", {}).get("node_type", "mean"),
             )

@@ -60,6 +60,64 @@ these — this list has been wrong before; see "Gulika/Sani Oorai" and
 "family surfaces" audits in git history, 2026-08-14, for what "confirmed
 stale" and "confirmed real" looked like in practice):
 
+- **IMPLEMENTED 2026-09-17, backfill held pending sign-off — Gochara
+  dispositor analysis** (closes the methodology gap found 2026-09-15:
+  Gochara was house-position-only, the same static `JUPITER_EFFECTS`/
+  `SATURN_PHASES` table applying identically to every chart with the
+  same Moon-house transit, regardless of who ruled that house or that
+  lord's natal condition). `gochara_engine.py`'s new
+  `_dispositor_analysis()` looks up the transited house's own lord
+  (from Lagna, reusing `house_strength_engine.get_lord_for_house()`),
+  that lord's natal placement/dignity (reusing
+  `shadbala_engine.compute_sthana_bala()`, which already combines
+  exaltation/debilitation/own/friendly/neutral + kendra/trikona bonus
+  into one score), and this chart's yogakaraka/maraka status for that
+  lord (reusing `functional_role_engine.compute_functional_roles()`).
+  Returns a bounded `strength_bonus` (+/-0.4) that modulates
+  `synthesis_engine.py`'s existing Gochara signal strength the same way
+  `drishti_aspect_bonus` already does -- it does not replace the base
+  house-position classification, it qualifies it.
+  `prediction_envelope.py`'s Functional Role step was moved earlier
+  (step 6B, before Gochara) since it only needs `ephemeris`/`houses`
+  and Gochara now needs its output.
+
+  **Verified**: real two-chart differentiation proof (charts
+  `cc8325b8` and `fca1abca`) -- identical base Saturn transit (same
+  phase `kantaka_sani`, same "challenging" effect, same Moon-house 7),
+  identical dispositor lord and natal placement (Jupiter, own_sign),
+  but different chart-specific functional role (yogakaraka vs. maraka)
+  produces genuinely different final signal contribution (-0.724 vs.
+  -0.506) -- exactly the differentiation this gap was about, and a test
+  case that was structurally impossible to write before this fix. Real
+  before/after across all 38 charts: 190 (chart, area) comparisons,
+  average |delta| 0.332 (appropriately modest -- a modulation of
+  existing signals, not a new signal category like the top_signals
+  fix), 54/190 scores changed, 3/190 crossed a label boundary. See
+  `tests/engines/test_gochara_dispositor_analysis.py`.
+
+  **Chat wiring**: `chat.py`'s `compute_gochara()` call and system-prompt
+  "CURRENT TRANSITS" text both updated -- the LLM now gets the
+  dispositor's condition as a real grounded fact (see
+  `tests/api/test_chat_dispositor_grounding.py`). `family.py` has
+  **zero** Gochara/current-transit grounding at all (confirmed: no
+  `compute_gochara` reference anywhere in that file) -- a separate,
+  already-partially-known gap distinct from the ingress/peyarchi fix
+  already ported there; this dispositor fix has nothing to attach to
+  until that base gap is closed.
+
+  **Backfill NOT executed -- held pending explicit sign-off**, same
+  category of decision as the `top_signals` fix (methodology change to
+  cached prediction content). Scope: all 65 `monthly_predictions` + 12
+  `yearly_predictions` (77 total; `weekly_predictions` has 0 cached rows
+  currently, so nothing to backfill there). Estimated cost: ~1,211,826
+  tokens (~$6.70 at Sonnet 4.6 pricing), extrapolated from the
+  top_signals backfill's real observed per-row average (15,738
+  tokens/row). **Cannot safely run right now even with sign-off**: only
+  926,810 tokens remain under the current temporary 3,500,000 budget
+  ceiling -- less than this backfill alone would need -- so running it
+  today would repeat the exact same budget-exhaustion incident. Needs
+  either the emergency ceiling raised further or to wait until closer
+  to the October reset.
 - **RESOLVED 2026-09-15 (was URGENT/LIVE) — the app's shared, site-wide
   `LLM_MONTHLY_TOKEN_BUDGET` was exhausted mid-backfill, affecting real
   users; raised, both blocked backfills completed, and a permanent
