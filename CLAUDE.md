@@ -1,8 +1,8 @@
 # TamilPanchangam Astrology App
 
-## ⚠️ ACTION ITEMS — HUMAN REQUIRED, OUTSIDE THIS REPO'S REACH (2026-09-15)
+## ⚠️ ACTION ITEMS — HUMAN REQUIRED, OUTSIDE THIS REPO'S REACH (2026-09-15, #3 added 2026-09-19)
 
-These two items cannot be completed by working in this codebase alone —
+These items cannot be completed by working in this codebase alone —
 each needs a human to act on infrastructure/scheduling outside this
 environment. Read this section first.
 
@@ -34,6 +34,22 @@ environment. Read this section first.
    it, silently undermining the capacity-planning work done to size
    1,500,000 as the right permanent number. Whoever owns deploys/ops for
    this app needs a reminder for 2026-10-01 — none exists automatically.
+3. **UNCONFIRMED — the 2026-09-19 marriage/health fabrication fix
+   (commit `194cf66`, pushed to `origin/main`) may also need a live
+   redeploy before it reaches real users, same as item 1 above.** This
+   repo has a `render.yaml` (Render Blueprint, `rootDir:
+   tamil_panchangam_engine`, `startCommand: python -m uvicorn
+   app.main:app ...`), but this environment has no access to the actual
+   Render dashboard/service — the same limitation item 1 already hit —
+   so it's not possible to confirm from here whether that service has
+   Render's auto-deploy-on-push enabled or requires a manual redeploy
+   for a new commit to reach the running process. Given item 1's
+   confirmed precedent (a committed, pushed fix sat inert against real
+   traffic until someone manually redeployed), **assume manual redeploy
+   is required until a human confirms otherwise** — don't treat
+   `194cf66` as live for real users just because it's pushed. Whoever
+   owns deploys/ops should confirm this app's actual Render auto-deploy
+   setting and redeploy if it's off.
 
 ## Purpose
 A Tamil Panchangam-based astrology application providing daily/monthly
@@ -128,13 +144,47 @@ stale" and "confirmed real" looked like in practice):
   number would itself be a kind of fabrication -- citing the specific
   basis lets a reader judge the claim's strength themselves.
 
-  **Confirmed data-model gap, not silently guessed around**: this app
-  collects no gender field anywhere (`base_charts`, `family_members`,
-  `birth_details` -- checked directly, none). Kalatra Karaka requires
-  gender, so it's only computed for family members with
-  `role='husband'`/`'wife'` (inferred from role); for individual charts
-  and `role='child'` members it's correctly omitted rather than
-  guessed, and the prompt/system-prompt both say so explicitly.
+  **Confirmed data-model gap, not silently guessed around**: the live,
+  actually-used chart-creation path collects no gender anywhere.
+  `BaseChartCreateRequest` (`app/models/schema.py`, the real input
+  schema for `POST /api/base-chart/create` and every other real chart-
+  creation call site) has no gender field at all -- confirmed by direct
+  read, not inference. A `gender` field DOES exist, but only on
+  `ui_birthchart_schema.py`'s `BirthIdentity` model, consumed solely by
+  `app/services/birthchart_view_builder.py`'s `build_birthchart_view()`
+  -- confirmed via repo-wide grep to have ZERO callers anywhere in the
+  app, i.e. genuinely dead code, the same shape as this file's other
+  documented dead-code findings (`predictions_ui.py`,
+  `AuthContext.tsx`'s `googleLogin()`). Do not confuse it with the
+  live, similarly-named `app/services/birth_chart_builder.py`'s
+  `build_birth_chart_view_model()`, which the real, mounted
+  `/api/ui/birth-chart` route actually calls -- that one has no gender
+  field either. `bootstrap.py`'s own `porutham_prospects` table comment
+  independently confirms this: "`birth_details.gender` exists in the
+  schema but is null on every chart in the DB today."
+
+  **Confirmed scope, per explicit follow-up (2026-09-19): this gap is
+  NOT family-context-specific.** A standalone individual chart (never
+  linked into any family group) has no gender/role indicator captured
+  at creation time either -- there is no live code path, anywhere in
+  this app, through which ANY chart (individual or family) can ever
+  end up with a real gender value. `family.py`'s `role='husband'`/
+  `'wife'` inference is not "the family case is covered, individual
+  isn't" -- it's the ONLY gender signal that exists anywhere in this
+  app, and it only exists because family-group membership happens to
+  carry a role label; it is not derived from any gender field at all.
+  So today, an individual user asking Ask Jyotishi about their own
+  marriage timing never gets Kalatra Karaka considered, full stop --
+  not a family-vs-individual asymmetry, a total absence for anyone not
+  in a family group with an explicit husband/wife role. Kalatra Karaka
+  is one of the two primary classical marriage-timing significators
+  (alongside the 7th lord, which IS always available), so this
+  meaningfully narrows what Ask Jyotishi can ground for the majority
+  of users. Not fixed here -- logged as the real scope of the
+  limitation, per the request that led to this confirmation. A real
+  fix would need a gender field added to `BaseChartCreateRequest` (and
+  a migration/UI change to collect it), which is a product decision,
+  not a code-only fix.
 
   **Wired into every consumer**: `child_prediction_engine.py`'s
   `_build_child_context()` now includes real "Marriage Timing Signals"
@@ -209,16 +259,36 @@ stale" and "confirmed real" looked like in practice):
     same as the Gochara dispositor fix), aspects to the 7th house/lord
     (reuse `drishti_engine.py`), Kalatra Karaka's and Venus/Jupiter's
     own condition, and a Kuja Dosha (Mangal/Manglik) check -- confirmed
-    this does NOT exist anywhere in this codebase today (grepped;
-    `yoga_engine.py`'s only Mars-related hit is the unrelated
-    Chandra-Mangala Yoga). Rough scope: a new "quality scoring" engine
-    comparable to `life_area_scorer.py`'s shape (weighing multiple
-    dignity/affliction signals into a score+narrative) rather than
-    `children_timing_engine.py`'s shape (one dasha-window lookup) --
-    larger than wealth-events, roughly the size of the two engines just
-    built combined. Not started -- logged here for explicit
-    prioritization, per this file's own standing rule that this class
-    of decision isn't made unilaterally.
+    this does NOT exist anywhere in this codebase today (grepped,
+    including the Tamil term "Chevvai Dosham" and "Manglik" --
+    zero hits anywhere in `app/`; `yoga_engine.py`'s only Mars-related
+    hit is the unrelated Chandra-Mangala Yoga). Rough scope: a new
+    "quality scoring" engine comparable to `life_area_scorer.py`'s shape
+    (weighing multiple dignity/affliction signals into a score+
+    narrative) rather than `children_timing_engine.py`'s shape (one
+    dasha-window lookup) -- larger than wealth-events, roughly the size
+    of the two engines just built combined. Not started -- logged here
+    for explicit prioritization, per this file's own standing rule that
+    this class of decision isn't made unilaterally.
+
+    **Cross-reference check requested 2026-09-19 -- could not be
+    confirmed.** Asked to cross-reference this finding against "the
+    earlier dosha-coverage audit (Mangal Dosha -- highest user-demand
+    dosha not yet computed)" as reinforcing evidence. Searched this
+    repo's current `CLAUDE.md`, this file's full git history (`git log
+    -p -S"Mangal Dosha"` and `-S"highest user-demand"`, both files and
+    all commits), every commit message mentioning "dosha" (the four
+    Porutham Vedha/Rajju/Nadi-table fixes and the mandatory-dosha
+    commentary softening -- all about inter-chart Porutham matching
+    doshas, a different mechanism from an individual's own Kuja Dosha),
+    and this session's memory files -- no such prior entry exists
+    anywhere found. Reporting this honestly rather than fabricating a
+    cross-reference: either that audit happened somewhere this
+    environment can't see (a different repo, a conversation not
+    persisted here), or the recollection doesn't match what's actually
+    on record. Treat this as the FIRST recorded flag of the Kuja Dosha
+    gap, not a second confirmation of an earlier one, unless someone
+    can point to where that earlier audit actually lives.
 
   **Historical note (fixed same-day stopgap, since superseded)**: a
   2026-09-19-morning emergency fix forced `child_prediction_prompt.txt`
