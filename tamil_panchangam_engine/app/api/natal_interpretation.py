@@ -550,6 +550,21 @@ def get_natal_interpretation(request: Request, body: NatalInterpretationRequest,
         if key not in llm_response:
             llm_response[key] = {} if key != "dasha_life_map" else []
 
+    # 5b. Truncated reply (hit max_tokens, then JSON-repaired): incomplete,
+    # so never stored as a clean success -- stored as "truncated" (content
+    # kept, shown to the user with a flag) and retried on the next view,
+    # bounded by the retry cooldown. Natal outputs measured 2026-10-02:
+    # median 4226, max 4915 of the 7000 cap -- no truncation seen yet.
+    if (usage_info or {}).get("truncated"):
+        logger.warning(f"Natal reply truncated at max_tokens for {base_chart_id}; not caching as success")
+        llm_response["_truncated"] = True
+        _save_cache(
+            base_chart_id, llm_response, provider, model,
+            prompt_tokens, completion_tokens, total_tokens, "truncated",
+            user_id=user["id"],
+        )
+        return {"interpretation": llm_response, "cached": False, "truncated": True}
+
     # 6. Cache and return
     _save_cache(
         base_chart_id, llm_response, provider, model,
@@ -756,6 +771,16 @@ def get_kp_interpretation(chart_id: str, request: Request, user: dict = Depends(
     # 6. Ensure required keys present
     if "life_areas" not in llm_response:
         llm_response["life_areas"] = {}
+
+    # 6b. Truncated reply: never a clean success (see get_natal_interpretation).
+    # KP outputs measured 2026-10-02: median 1129, max 1229 of the 3000 cap.
+    if (usage_info or {}).get("truncated"):
+        logger.warning(f"KP reply truncated at max_tokens for {chart_id}; not caching as success")
+        llm_response["_truncated"] = True
+        _save_kp_cache(chart_id, llm_response, provider, model,
+                       prompt_tokens, completion_tokens, total_tokens, "truncated",
+                       user_id=user["id"])
+        return {"kp_available": True, "interpretation": llm_response, "cached": False, "truncated": True}
 
     # 7. Cache and return
     _save_kp_cache(chart_id, llm_response, provider, model,

@@ -136,6 +136,13 @@ def call_llm(
             "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
             "model": MODEL,
             "provider": PROVIDER_NAME,
+            # 2026-10-02: callers can tell an incomplete reply from a clean
+            # one. "truncated" = the model hit max_tokens (the reply is
+            # incomplete even if _repair_json() closes the braces);
+            # "json_repaired" = the text only parsed after repair.
+            "stop_reason": stop_reason,
+            "truncated": stop_reason == "max_tokens",
+            "json_repaired": False,
         }
 
         if stop_reason == "max_tokens":
@@ -161,6 +168,7 @@ def call_llm(
 
             repaired = _repair_json(content)
             if repaired is not None:
+                usage_info["json_repaired"] = True
                 logger.info(
                     "JSON repair successful: %d tokens", usage_info["total_tokens"]
                 )

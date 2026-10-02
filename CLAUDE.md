@@ -870,9 +870,16 @@ stale" and "confirmed real" looked like in practice):
   orchestrator, natal and KP (replacing two inline INSERT copies); live KP
   call raised the token counter by 4,741 = its `llm_calls` row.
   **Two ledgers, remember**: `log_llm_call()` → `llm_calls` ($ budget);
-  `record_token_usage()` → `llm_token_usage` (`LLM_MONTHLY_TOKEN_BUDGET`). Natal also caches a
-  truncated-then-JSON-repaired reply as a success (it only back-fills
-  missing keys), the same silent-truncation shape the yearly cap had.
+Natal truncation FIXED 2026-10-02: the provider
+  (`anthropic_provider.call_llm`) now reports `usage_info["truncated"]`
+  (stop_reason == "max_tokens") and `["json_repaired"]`; natal and KP
+  store a truncated reply as `fallback_reason="truncated"` (content kept,
+  returned with `truncated: True`, retried next view under the cooldown)
+  instead of caching it as success. Reproduced on the old code with an
+  injected truncated reply: cached and served forever. Measured real
+  outputs: natal median 4,226 / max 4,915 of the 7000 cap, KP median 1,129
+  / max 1,229 of 3000 -- no truncation actually occurring, so no cap
+  change. Other callers get the flag but don't act on it yet (see sweep).
 
 - **Web-view transit badge fixed 2026-10-02 (`de633b6`)**:
   `MonthlyPredictionView.tsx` showed `envelope.ashtakavarga.*.bindus` --
