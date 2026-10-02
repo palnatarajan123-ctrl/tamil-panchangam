@@ -94,7 +94,10 @@ class TestCacheVersionFiltering(unittest.TestCase):
         mock_cm.__enter__.return_value = mock_conn
         mock_cm.__exit__.return_value = False
 
-        with patch.object(natal_module, "get_conn", return_value=mock_cm):
+        # The query runs in the shared reader (load_stored_interpretation)
+        # since 2026-10-02.
+        import app.engines.llm_interpretation_orchestrator as orch
+        with patch.object(orch, "get_conn", return_value=mock_cm):
             natal_module._get_cached("some-chart-id")
 
         args, _ = mock_conn.execute.call_args
@@ -105,3 +108,34 @@ class TestCacheVersionFiltering(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNatalFailureNotCachedForever(unittest.TestCase):
+    """2026-10-02: a natal/KP call that failed first was served as the cached
+    result forever (reproduced on the old code: view 2 returned the empty
+    fallback as cached=True, no LLM call). Now only a success is a cache hit,
+    and repeated failures hit the shared retry cooldown."""
+
+    def test_only_a_success_is_a_cache_hit(self):
+        import app.engines.llm_interpretation_orchestrator as orch
+        failed = {"content": {"engine_version": "natal-v2.0"}, "fallback_reason": "json_parse_error", "reflection_text": None}
+        good = {"content": {"engine_version": "natal-v2.2"}, "fallback_reason": None, "reflection_text": None}
+        with patch.object(natal_module, "load_stored_interpretation", return_value=failed):
+            self.assertIsNone(natal_module._get_cached("c"))
+            self.assertIsNone(natal_module._get_kp_cached("c"))
+        with patch.object(natal_module, "load_stored_interpretation", return_value=good):
+            self.assertEqual(natal_module._get_cached("c"), good["content"])
+
+    def test_cooldown_returns_stored_fallback_without_calling(self):
+        failed = {"content": {"engine_version": "natal-v2.0"}, "fallback_reason": "json_parse_error", "reflection_text": None}
+        with patch.object(natal_module, "retry_cooldown_status", return_value={"failures": 3, "retry_after": None}), \
+             patch.object(natal_module, "load_stored_interpretation", return_value=failed):
+            self.assertEqual(natal_module._cooldown_fallback("c", "natal_interpretation", "natal_v2.2"), failed["content"])
+        with patch.object(natal_module, "retry_cooldown_status", return_value=None):
+            self.assertIsNone(natal_module._cooldown_fallback("c", "natal_interpretation", "natal_v2.2"))
+
+    def test_endpoints_check_cooldown_before_calling(self):
+        import inspect
+        for fn in (natal_module.get_natal_interpretation, natal_module.get_kp_interpretation):
+            src = inspect.getsource(fn)
+            self.assertLess(src.index("_cooldown_fallback("), src.index("call_llm("))

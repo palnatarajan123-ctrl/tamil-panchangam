@@ -20,7 +20,9 @@ from app.core.limiter import limiter
 from app.core.auth import get_current_user
 from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import get_base_chart_by_id, user_owns_chart
-from app.engines.llm_interpretation_orchestrator import is_llm_enabled
+from app.engines.llm_interpretation_orchestrator import (
+    is_llm_enabled, load_stored_interpretation, retry_cooldown_status,
+)
 from app.engines.budget_guard import log_llm_call, check_user_llm_cap
 from app.llm.providers import anthropic_provider
 
@@ -206,23 +208,26 @@ class NatalInterpretationRequest(BaseModel):
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
 def _get_cached(base_chart_id: str) -> Optional[Dict[str, Any]]:
-    try:
-        with get_conn() as conn:
-            row = conn.execute("""
-                SELECT content_json FROM prediction_llm_interpretation
-                WHERE base_chart_id = ?
-                  AND period_type = 'natal'
-                  AND period_key = 'natal'
-                  AND feature_name = ?
-                  AND prompt_version = ?
-                ORDER BY created_at DESC LIMIT 1
-            """, [base_chart_id, FEATURE_NAME, PROMPT_VERSION]).fetchone()
-            if row and row[0]:
-                data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
-                return data
-    except Exception as e:
-        logger.warning(f"Natal cache lookup failed: {e}")
-    return None
+    """The cached SUCCESSFUL natal interpretation, else None (caller calls
+    the LLM). A stored failed attempt is never served as the cached result
+    -- until 2026-10-02 a first call that failed was returned as cached
+    forever (never retried)."""
+    return _stored_success(base_chart_id, FEATURE_NAME, PROMPT_VERSION)
+
+
+def _stored_success(base_chart_id: str, feature_name: str, prompt_version: str) -> Optional[Dict[str, Any]]:
+    row = load_stored_interpretation(base_chart_id, "natal", "natal", feature_name, prompt_version)
+    return row["content"] if row and row["fallback_reason"] is None else None
+
+
+def _cooldown_fallback(base_chart_id: str, feature_name: str, prompt_version: str) -> Optional[Dict[str, Any]]:
+    """If this chart's natal/KP interpretation is in retry cooldown (repeated
+    real failures -- same rule as monthly/yearly), the stored fallback to
+    show instead of calling the LLM again; else None."""
+    if not retry_cooldown_status(base_chart_id, "natal", "natal", feature_name, prompt_version):
+        return None
+    row = load_stored_interpretation(base_chart_id, "natal", "natal", feature_name, prompt_version)
+    return (row or {}).get("content") or {}
 
 
 def _save_cache(
@@ -251,7 +256,8 @@ def _save_cache(
                 prompt_tokens, completion_tokens, total_tokens,
                 json.dumps(content_json), fallback_reason,
             ])
-            if total_tokens > 0 and not fallback_reason:
+            # Failed calls cost tokens too (same fix as the orchestrator, 2026-10-02).
+            if total_tokens > 0:
                 conn.execute("""
                     INSERT INTO llm_token_usage (id, feature_name, prompt_version, total_tokens, created_at)
                     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -460,6 +466,12 @@ def get_natal_interpretation(request: Request, body: NatalInterpretationRequest,
     if not is_llm_enabled() or not anthropic_provider.is_available():
         return {"interpretation": _fallback_response(), "cached": False, "llm_disabled": True}
 
+    # 2a. Retry cooldown: repeated real failures -> serve the stored
+    # fallback, no new call (same rule as monthly/yearly).
+    cooling = _cooldown_fallback(base_chart_id, FEATURE_NAME, PROMPT_VERSION)
+    if cooling is not None:
+        return {"interpretation": cooling or _fallback_response(), "cached": False, "retry_cooldown": True}
+
     # 2b. Per-account daily cap (Task 3/backlog #1, 2026-09-10): raises
     # HTTPException(429) if this account is already at/over its daily
     # cap -- checked before the (expensive, 7000-max-token) LLM call.
@@ -555,23 +567,8 @@ def get_natal_interpretation(request: Request, body: NatalInterpretationRequest,
 # ── KP Natal Interpretation ───────────────────────────────────────────────────
 
 def _get_kp_cached(base_chart_id: str) -> Optional[Dict[str, Any]]:
-    try:
-        with get_conn() as conn:
-            row = conn.execute("""
-                SELECT content_json FROM prediction_llm_interpretation
-                WHERE base_chart_id = ?
-                  AND period_type = 'natal'
-                  AND period_key = 'natal'
-                  AND feature_name = ?
-                  AND prompt_version = ?
-                ORDER BY created_at DESC LIMIT 1
-            """, [base_chart_id, KP_FEATURE_NAME, KP_PROMPT_VERSION]).fetchone()
-            if row and row[0]:
-                data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
-                return data
-    except Exception as e:
-        logger.warning(f"KP cache lookup failed: {e}")
-    return None
+    """Cached SUCCESSFUL KP interpretation, else None (see _get_cached)."""
+    return _stored_success(base_chart_id, KP_FEATURE_NAME, KP_PROMPT_VERSION)
 
 
 def _save_kp_cache(
@@ -720,6 +717,12 @@ def get_kp_interpretation(chart_id: str, request: Request, user: dict = Depends(
     # 4. LLM disabled?
     if not is_llm_enabled() or not anthropic_provider.is_available():
         return {"kp_available": True, "interpretation": _kp_fallback_response(), "cached": False, "llm_disabled": True}
+
+    # 4a. Retry cooldown (see get_natal_interpretation).
+    cooling = _cooldown_fallback(chart_id, KP_FEATURE_NAME, KP_PROMPT_VERSION)
+    if cooling is not None:
+        return {"kp_available": True, "interpretation": cooling or _kp_fallback_response("retry_cooldown"),
+                "cached": False, "retry_cooldown": True}
 
     # 4b. Per-account daily cap (Task 3/backlog #1, 2026-09-10): raises
     # HTTPException(429) if this account is already at/over its daily cap.

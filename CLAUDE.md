@@ -853,11 +853,23 @@ stale" and "confirmed real" looked like in practice):
   good merged interpretation with a failed one (yearly already had this
   guard). Append-only rows remain the "last attempt" history.
   `tests/engines/test_failed_attempt_never_hides_good.py`.
-  **Found, not fixed**: natal (`natal_interpretation.py`) stores failed
-  attempts and `_get_cached()`/`_get_kp_cached()` return the newest row for
-  the version -- so a first natal call that FAILS is served as the cached
-  result forever (never retried). Not this bug (no good row is ever
-  superseded there) but the old stale-fallback-cache class.
+  **Natal follow-up FIXED 2026-10-02**: natal/KP-natal stored failed
+  attempts and `_get_cached()`/`_get_kp_cached()` returned the newest row,
+  so a first call that failed was served as `cached: True` forever
+  (reproduced on the old code with test chart `11656fc5`: view 2 returned
+  the empty fallback, no LLM call). Both now go through
+  `load_stored_interpretation()` and only a SUCCESS is a cache hit; the
+  shared `retry_cooldown_status()` applies before any natal/KP call. Real
+  charts stuck at fix time: 0 (18 natal + 12 KP all had a success), so
+  nothing regenerated. Smoke (same chart): failures retried, cooldown at 3
+  failures, real success after simulated expiry, then cache hit. Also:
+  natal's `_save_cache` excluded failures from `llm_token_usage` (same gap
+  as the orchestrator) -- fixed. **Found, not fixed**: KP-natal
+  (`_save_kp_cache`) never writes `llm_token_usage` at all, success or
+  failure, so KP calls don't count toward `LLM_MONTHLY_TOKEN_BUDGET`
+  (they are in `llm_calls`, i.e. the $ budget). Natal also caches a
+  truncated-then-JSON-repaired reply as a success (it only back-fills
+  missing keys), the same silent-truncation shape the yearly cap had.
 
 - **Web-view transit badge fixed 2026-10-02 (`de633b6`)**:
   `MonthlyPredictionView.tsx` showed `envelope.ashtakavarga.*.bindus` --
