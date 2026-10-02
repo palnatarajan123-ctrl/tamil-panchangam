@@ -199,28 +199,19 @@ def load_cached_llm_interpretation(
     period_key: str,
     feature_name: str = "prediction"
 ) -> Optional[Dict[str, Any]]:
-    """Load cached LLM interpretation if available."""
+    """Load the LLM interpretation to show: newest SUCCESSFUL row, never a
+    newer failed attempt over it (see load_stored_interpretation)."""
     try:
-        with get_conn() as conn:
-            result = conn.execute("""
-                SELECT content_json, reflection_text FROM prediction_llm_interpretation
-                WHERE base_chart_id = ?
-                AND period_type = ?
-                AND period_key = ?
-                AND feature_name = ?
-                ORDER BY created_at DESC
-                LIMIT 1
-            """, [base_chart_id, period_type, period_key, feature_name]).fetchone()
-            
-            if result and result[0]:
-                content = _safe_json(result[0], {})
-                # FIX 3: Inject stored reflection_text into response
-                if result[1]:  # reflection_text column
-                    # Ensure practices_and_reflection has the stored text
-                    if "practices_and_reflection" not in content:
-                        content["practices_and_reflection"] = {}
-                    content["practices_and_reflection"]["reflection_guidance"] = result[1]
-                return content
+        from app.engines.llm_interpretation_orchestrator import load_stored_interpretation
+        row = load_stored_interpretation(base_chart_id, period_type, period_key, feature_name)
+        if row:
+            content = _safe_json(row["content"], {})
+            # FIX 3: Inject stored reflection_text into response
+            if row["reflection_text"]:
+                if "practices_and_reflection" not in content:
+                    content["practices_and_reflection"] = {}
+                content["practices_and_reflection"]["reflection_guidance"] = row["reflection_text"]
+            return content
     except Exception as e:
         logger.warning(f"Failed to load cached LLM interpretation: {e}")
     

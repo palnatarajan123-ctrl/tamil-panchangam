@@ -89,6 +89,17 @@ def _run_llm_background(
                 if existing.get("interpretation")
                 else {}
             )
+            new_meta = llm_result.get("llm_metadata") or {}
+            old_meta = interp.get("llm_metadata") or {}
+            # Never replace a good stored interpretation with a failed
+            # attempt (same guard prediction_yearly.py already had).
+            if new_meta.get("fallback_reason") and interp.get("llm_interpretation") \
+                    and not old_meta.get("fallback_reason"):
+                logger.warning(
+                    f"LLM retry for {base_chart_id}/{period_key} failed "
+                    f"({new_meta.get('fallback_reason')}); keeping the existing interpretation"
+                )
+                return
             interp["llm_interpretation"] = llm_result.get("llm_interpretation")
             interp["llm_metadata"] = llm_result.get("llm_metadata")
             with get_conn() as conn:
@@ -301,23 +312,10 @@ def generate_monthly_prediction(
         # read it directly from prediction_llm_interpretation table
         if interpretation and "llm_interpretation" not in interpretation:
             period_key = f"{payload.year}-{payload.month:02d}"
-            with get_conn() as conn:
-                llm_row = conn.execute(
-                    """
-                    SELECT content_json FROM prediction_llm_interpretation
-                    WHERE base_chart_id = ?
-                      AND period_type = 'monthly'
-                      AND period_key = ?
-                    ORDER BY created_at DESC LIMIT 1
-                    """,
-                    [payload.base_chart_id, period_key],
-                ).fetchone()
-            if llm_row and llm_row[0]:
-                llm_data = (
-                    _safe_json(llm_row[0])
-                    if isinstance(llm_row[0], str)
-                    else llm_row[0]
-                )
+            from app.engines.llm_interpretation_orchestrator import load_stored_interpretation
+            llm_row = load_stored_interpretation(payload.base_chart_id, "monthly", period_key)
+            if llm_row:
+                llm_data = llm_row["content"]
                 interpretation["llm_interpretation"] = (
                     llm_data.get("llm_interpretation") or llm_data
                 )

@@ -798,6 +798,30 @@ stale" and "confirmed real" looked like in practice):
   "cleared" just because this one specific bug class doesn't apply to
   it.
 
+- **Failed attempt never hides a good result (fixed 2026-10-02).**
+  `prediction_llm_interpretation` is append-only -- every attempt inserts a
+  row -- and every reader took the newest row, so a failed retry buried a
+  good report (reproduced from real history: `966f5254` yearly 2026's PDF
+  served v1.0 fallback text 16:30-16:53 while the good v7 row sat below).
+  Real production path, not just scripts: with the LLM disabled/budget-
+  paused, the orchestrator appended an `llm_disabled` row BEFORE checking
+  the cache on every yearly view, and `_check_cache()` then served
+  `llm_disabled` rows as reusable even after re-enabling. Fix: one shared
+  reader, `llm_interpretation_orchestrator.load_stored_interpretation()`
+  (newest SUCCESS, else newest row), used by `_check_cache`, the PDF
+  loader, the monthly cached-read path and chat's KP-natal read;
+  `_check_cache` never serves a fallback (incl. `llm_disabled`); the
+  disabled path serves an existing good result instead of appending a
+  fallback; `prediction._run_llm_background()` no longer overwrites a
+  good merged interpretation with a failed one (yearly already had this
+  guard). Append-only rows remain the "last attempt" history.
+  `tests/engines/test_failed_attempt_never_hides_good.py`.
+  **Found, not fixed**: natal (`natal_interpretation.py`) stores failed
+  attempts and `_get_cached()`/`_get_kp_cached()` return the newest row for
+  the version -- so a first natal call that FAILS is served as the cached
+  result forever (never retried). Not this bug (no good row is ever
+  superseded there) but the old stale-fallback-cache class.
+
 - **Web-view transit badge fixed 2026-10-02 (`de633b6`)**:
   `MonthlyPredictionView.tsx` showed `envelope.ashtakavarga.*.bindus` --
   the old engine's value, read from the CACHED envelope (so a code switch
@@ -842,10 +866,7 @@ stale" and "confirmed real" looked like in practice):
   are invisible to `LLM_MONTHLY_TOKEN_BUDGET` (~3 such calls here, ~50k
   unrecorded), and the yearly route re-calls the LLM on every view after
   a fallback, so a persistently failing report burns tokens unseen.
-  (2) `data_loader.load_cached_llm_interpretation()` (PDF) takes the latest
-  `prediction_llm_interpretation` row even if it's a fallback, so one
-  failed retry replaces a good report's PDF content with deterministic
-  text. `ashtakavarga_engine.py` deleted in the cleanup commit.
+  (2) FIXED 2026-10-02 -- see "failed attempt never hides a good result". `ashtakavarga_engine.py` deleted in the cleanup commit.
   Historical record of the decision follows:
 - **(historical) NEXT UP (per 2026-10-02 decision) — Ashtakavarga pipeline switch.**
   Three flagged workarounds in two rounds came from the wrong-engine /

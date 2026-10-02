@@ -185,6 +185,50 @@ def get_monthly_token_usage() -> Dict[str, Any]:
         }
 
 
+def load_stored_interpretation(
+    base_chart_id: str,
+    period_type: str,
+    period_key: str,
+    feature_name: str = "prediction",
+    prompt_version: Optional[str] = None,
+    explainability_mode: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    The stored LLM result to SHOW for a report: the newest successful row,
+    or -- only if no attempt ever succeeded -- the newest row (a fallback).
+    Returns {"content", "fallback_reason", "reflection_text"} or None.
+
+    prediction_llm_interpretation is append-only (every attempt, success or
+    failure, inserts a row). Until 2026-10-02 every reader took the newest
+    row, so one failed retry (json_parse_error, llm_disabled, ...) silently
+    replaced a good report -- e.g. 966f5254's yearly 2026 PDF served
+    deterministic fallback text for 23 minutes while the good row sat
+    underneath. Every reader goes through here so that can't recur.
+    """
+    sql = """
+        SELECT content_json, fallback_reason, reflection_text FROM prediction_llm_interpretation
+        WHERE base_chart_id = ? AND period_type = ? AND period_key = ? AND feature_name = ?
+    """
+    args: list = [base_chart_id, period_type, period_key, feature_name]
+    if prompt_version is not None:
+        sql += " AND prompt_version = ?"
+        args.append(prompt_version)
+    if explainability_mode is not None:
+        sql += " AND COALESCE(explainability_mode, 'standard') = ?"
+        args.append(explainability_mode)
+    sql += " ORDER BY (fallback_reason IS NULL) DESC, created_at DESC LIMIT 1"
+    try:
+        with get_conn() as conn:
+            row = conn.execute(sql, args).fetchone()
+    except Exception as e:
+        logger.warning(f"Stored interpretation lookup failed: {e}")
+        return None
+    if not row or not row[0]:
+        return None
+    content = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+    return {"content": content, "fallback_reason": row[1], "reflection_text": row[2]}
+
+
 def _check_cache(
     base_chart_id: str,
     period_type: str,
@@ -193,47 +237,22 @@ def _check_cache(
     prompt_version: str,
     explainability_mode: str = "standard"
 ) -> Optional[Dict[str, Any]]:
-    """Check for cached LLM interpretation. Cache key includes explainability_mode (v1.9)."""
-    try:
-        with get_conn() as conn:
-            result = conn.execute("""
-                SELECT content_json, fallback_reason FROM prediction_llm_interpretation
-                WHERE base_chart_id = ?
-                AND period_type = ?
-                AND period_key = ?
-                AND feature_name = ?
-                AND prompt_version = ?
-                AND COALESCE(explainability_mode, 'standard') = ?
-                ORDER BY created_at DESC
-                LIMIT 1
-            """, [base_chart_id, period_type, period_key, feature_name, prompt_version, explainability_mode]).fetchone()
-            
-            if result and result[0]:
-                fallback_reason = result[1] if len(result) > 1 else None
-                # llm_disabled: serve the cached deterministic result — LLM is
-                # administratively off so retrying would just fail again.
-                if fallback_reason == "llm_disabled":
-                    logger.info(f"LLM cache hit (llm_disabled): {base_chart_id}/{period_type}/{period_key}")
-                    if isinstance(result[0], str):
-                        return json.loads(result[0])
-                    return result[0]
-                # Any other fallback_reason (anthropic_key_missing, budget_exceeded,
-                # missing_interpretive_hint, invalid_payload_none_leak, etc.) means a
-                # transient failure was cached. Force a retry on every request so a
-                # restored API key or cleared budget gets a real LLM call.
-                if fallback_reason is not None:
-                    logger.info(
-                        f"LLM cache skip (transient fallback '{fallback_reason}'): "
-                        f"{base_chart_id}/{period_type}/{period_key}"
-                    )
-                    return None
-                logger.info(f"LLM cache hit: {base_chart_id}/{period_type}/{period_key}/{explainability_mode}")
-                if isinstance(result[0], str):
-                    return json.loads(result[0])
-                return result[0]
-    except Exception as e:
-        logger.warning(f"Cache lookup failed: {e}")
-    
+    """Cached SUCCESSFUL interpretation for this key, else None (caller
+    calls the LLM). A newer failed attempt never hides an older success.
+
+    Fallback rows are never served as a cache hit. That includes
+    "llm_disabled", which used to be: this is only reached when
+    is_llm_enabled() is True, so a disabled-era fallback must be retried,
+    not reused (the latent issue noted in CLAUDE.md, 2026-09-11)."""
+    row = load_stored_interpretation(
+        base_chart_id, period_type, period_key, feature_name, prompt_version, explainability_mode
+    )
+    if row and row["fallback_reason"] is None:
+        logger.info(f"LLM cache hit: {base_chart_id}/{period_type}/{period_key}/{explainability_mode}")
+        return row["content"]
+    if row:
+        logger.info(f"LLM cache skip (only fallback '{row['fallback_reason']}' stored): "
+                    f"{base_chart_id}/{period_type}/{period_key}")
     return None
 
 
@@ -629,6 +648,14 @@ def generate_llm_interpretation(
     }
     
     if not is_llm_enabled():
+        # An existing good result stays visible while the LLM is off --
+        # don't append a fallback row over it (the yearly view calls this
+        # on every visit, so it used to bury good reports page by page).
+        cached = _check_cache(base_chart_id, period_type, period_key, feature_name, effective_prompt_version, explainability_mode)
+        if cached:
+            result["llm_interpretation"] = cached
+            result["llm_metadata"]["provider"] = "cache"
+            return result
         logger.info("LLM disabled - using deterministic fallback")
         result["llm_interpretation"] = deterministic_interpretation
         result["llm_metadata"]["fallback_reason"] = "llm_disabled"

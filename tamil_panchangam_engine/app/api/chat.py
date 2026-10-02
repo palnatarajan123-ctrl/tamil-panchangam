@@ -262,17 +262,10 @@ def _build_monthly_context_block(base_chart_id: str) -> str:
             if _kp_bc and _kp_bc[0]:
                 _kp_payload = _kp_bc[0] if isinstance(_kp_bc[0], dict) else json.loads(_kp_bc[0] or "{}")
                 if _kp_payload.get("kp_sublords"):
-                    with get_conn() as conn:
-                        kp_row = conn.execute("""
-                            SELECT content_json FROM prediction_llm_interpretation
-                            WHERE base_chart_id = ?
-                              AND period_type = 'natal'
-                              AND period_key = 'natal'
-                              AND feature_name = 'kp_natal'
-                            ORDER BY created_at DESC LIMIT 1
-                        """, [base_chart_id]).fetchone()
-                    if kp_row and kp_row[0]:
-                        kp_interp = kp_row[0] if isinstance(kp_row[0], dict) else json.loads(kp_row[0] or "{}")
+                    from app.engines.llm_interpretation_orchestrator import load_stored_interpretation
+                    kp_row = load_stored_interpretation(base_chart_id, "natal", "natal", "kp_natal")
+                    if kp_row and kp_row["fallback_reason"] is None:
+                        kp_interp = kp_row["content"]
                         overall = kp_interp.get("overall_summary", "")
                         if overall:
                             lines.append(f"KP Natal Summary: {overall[:300]}")
