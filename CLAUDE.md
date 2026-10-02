@@ -887,11 +887,23 @@ stale" and "confirmed real" looked like in practice):
     `tests/engines/test_bav_jupiter_table.py`. Real-chart regression: of
     28 charts with a stored BAV, 0 non-Jupiter rows change; 1 chart's
     stored Jupiter score would move 6→5 (`9b7c3ed9`, still "strong").
-  - **NOT done, blocked on permission**: recomputing the STORED
-    `payload.bhinnashtakavarga` for those 28 charts (it's written once at
-    chart creation; the LLM payload, PDF and predictive_signals read the
-    stored copy). The 13 charts without one compute it lazily and get the
-    fix. Until the 28 are recomputed, they still carry Jupiter = 57.
+  - **Stored tables recomputed 2026-10-02 (all 28)** with the fully
+    corrected tables (`scripts/backfill_bav_classical_tables.py`, dry run
+    by default; backup in `scripts/backfill_backups/`, git-ignored). Every
+    chart's stored totals moved Jupiter 57→56, Mars 41→39, Moon 48→49 (Sun/
+    Mercury/Venus totals unchanged, per-sign changed). `transit_scores`: 70
+    field changes, almost all SAV; one label change -- `f5da25da` Rahu
+    moderate→weak (SAV 21→19); one BAV change -- `9b7c3ed9` Jupiter 6→5
+    (still strong). Event-window spot check (`f5da25da`, `9b7c3ed9`, Oct
+    2026): identical windows before/after. **Found, not fixed**:
+    `event_window_engine`'s Signal 5 calls a sign "strong" at refined SAV
+    ≥ 5, but that's a 7-planet sum -- 10 of 12 signs qualify for
+    `f5da25da` after the fix (7 before), so the signal barely
+    discriminates. Same calibration issue as the
+    `ashtakavarga_engine.py` thresholds noted above.
+    **The Ashtakavarga→chat wiring is now unblocked on data correctness**
+    (tables classical, stored copies recomputed, sign names consolidated);
+    the threshold calibration is the remaining open question for it.
   - **Fixed 2026-10-02 (code)**: the other 9 rows. Sources per row: BPHS
     Ch. 66 vv. 43-60 (Santhanam tr., parsed mechanically), Raman's tables
     (vedastro), Raman's published per-sign BAVs for Moon/Mars/Mercury/
