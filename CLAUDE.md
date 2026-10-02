@@ -1239,10 +1239,14 @@ stale" and "confirmed real" looked like in practice):
   compared against the estimate, so caps are effectively in estimate units.
   Yearly: 2500 → 3000 (~36% headroom; implied ceiling 8000-4000 = 4000, so
   1000 under it), with a dated `PAYLOAD_SIZE_MEASURED` constant beside the
-  caps and tests that fail under 30% headroom. **Monthly is NOT fixed and
-  equally thin**: 2,600 cap over 2,206 (~18%), and its implied ceiling is
-  only 3,000 (8000-5000), so a real raise also needs `MAX_TOTAL_TOKENS`
-  monthly raised -- logged for a decision. To re-measure: rebuild payloads
+  caps and tests that fail under 30% headroom. **Monthly fixed the same
+  day**: all 70 cached monthly payloads max 2,206 estimated / 2,800 real
+  (median 1,974 / 2,452); prompt cap 2600 → 3000 (~36% headroom), total
+  8000 → 8500 so the implied ceiling is 3500 (it was exactly 3000). Since
+  `aff2c43` yearly's ceiling is 9500-6000 = 3500 too. Monthly outputs:
+  median 3,264, max 3,487 under the unchanged 5000 completion cap. Nothing
+  else reads these values (`token_estimator.py`'s 10000 is the known dead
+  duplicate). `TestPromptCapHeadroom` covers both periods. To re-measure: rebuild payloads
   from cached rows via `extract_payload_inputs()` +
   `llm_interpretation_orchestrator.build_generation_payload()`, take
   `estimate_tokens(json.dumps(payload))`, update `PAYLOAD_SIZE_MEASURED`.

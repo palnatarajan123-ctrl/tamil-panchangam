@@ -30,50 +30,39 @@ from app.utils.prompt_dates import fmt_date
 
 logger = logging.getLogger(__name__)
 
+# ┌──────────────────────────────────────────────────────────────────────┐
+# │ RE-MEASURE BEFORE ADDING ANYTHING TO THE MONTHLY/YEARLY PAYLOAD.      │
+# │ These margins have gone stale silently THREE times (monthly           │
+# │ 2026-09-11, yearly and monthly 2026-10-02). Over the cap = the LLM is │
+# │ never called and the user gets deterministic fallback text, with no   │
+# │ visible error. Over MAX_TOTAL - MAX_COMPLETION = same, as             │
+# │ "token_budget_exceeded".                                              │
+# └──────────────────────────────────────────────────────────────────────┘
+# The caps are compared against estimate_tokens() (len//4), which
+# UNDERCOUNTS the real tokenizer by up to ~28% -- so these are "estimate
+# units", not real tokens. How to re-measure: rebuild payloads from cached
+# rows via extract_payload_inputs() + build_generation_payload() (steps in
+# CLAUDE.md, "re-measurement of real generation payloads"), then update
+# PAYLOAD_SIZE_MEASURED -- tests/llm/test_payload_size_validation.py fails
+# if a cap has under 30% headroom over it, or sits within 500 of its
+# implied ceiling (MAX_TOTAL_TOKENS - MAX_COMPLETION_TOKENS).
 MAX_PROMPT_TOKENS = {
     "weekly": 1400,
-    # Raised from 2000 -> 2600 (Issue 2 fix, 2026-09-11) after v7's context
-    # additions (yogas/KP/upagraha/shadbala/divisional signals) pushed a
-    # real chart's Monthly payload to 2001 estimated tokens, silently
-    # triggering validate_payload_size()'s "prompt_too_large" fallback --
-    # the LLM was never called, and a terse deterministic
-    # (ai-interpretation-v1.0) response came back with no visible error,
-    # no exception, nothing to signal it wasn't the real generated
-    # content. estimate_tokens() is a crude len//4 heuristic, not an exact
-    # tokenizer, so 2000 left zero margin for that imprecision. 2600
-    # leaves real margin under the 3000-token ceiling
-    # MAX_TOTAL_TOKENS(8000) - MAX_COMPLETION_TOKENS(5000) already allows.
-    # If a future prompt version adds more context, RE-MEASURE A REAL
-    # CHART'S payload size (see tests/llm/test_payload_size_validation.py)
-    # before assuming this margin still holds -- this went stale silently
-    # once already, via incremental bumps (900->1000->1200->1800->2000)
-    # that each chased the last failure instead of budgeting real margin.
-    "monthly": 2600,
-    # ┌──────────────────────────────────────────────────────────────────┐
-    # │ RE-MEASURE BEFORE ADDING ANYTHING TO THE MONTHLY/YEARLY PAYLOAD.  │
-    # │ This margin has gone stale silently TWICE (monthly 2026-09-11,   │
-    # │ yearly 2026-10-02). Over the cap = the LLM is never called and   │
-    # │ the user gets deterministic fallback text, with no visible error.│
-    # └──────────────────────────────────────────────────────────────────┘
-    # Raised 2500 -> 3000 on 2026-10-02. Measured that day across all 12
-    # real cached yearly payloads (see PAYLOAD_SIZE_MEASURED): max 2206
-    # estimated (2802 by the real tokenizer -- estimate_tokens() undercounts
-    # ~27%, but this cap is compared against the estimate), median 1960.
-    # 2500 had left 294 (12%). 3000 leaves ~800 estimated (~36%) for
-    # near-term additions and stays 1000 under yearly's implied ceiling
-    # (MAX_TOTAL_TOKENS 8000 - MAX_COMPLETION_TOKENS 4000 = 4000).
-    # How to re-measure: rebuild payloads from cached rows via
-    # extract_payload_inputs() + build_generation_payload() (steps in
-    # CLAUDE.md, "re-measurement of real generation payloads"), then update
-    # PAYLOAD_SIZE_MEASURED -- tests/llm/test_payload_size_validation.py
-    # fails if the cap has under 30% headroom over the recorded measurement.
+    # History: 900->1000->1200->1800->2000 (each chasing the last failure),
+    # 2000->2600 on 2026-09-11 (a real chart hit 2001 -> silent fallback),
+    # 2600->3000 on 2026-10-02: all 70 cached monthly payloads measured max
+    # 2206 estimated (2800 real tokenizer), median 1974 -- 2600 had left
+    # ~18%. 3000 leaves ~36%; implied ceiling 8500-5000 = 3500 (500 above).
+    "monthly": 3000,
+    # 2500->3000 on 2026-10-02: all 12 cached yearly payloads measured max
+    # 2206 estimated (2802 real), median 1960 -- 2500 had left 12%. 3000
+    # leaves ~36%; implied ceiling 9500-6000 = 3500 (500 above).
     "yearly": 3000
 }
 
 # Largest real payload (estimate_tokens units) per period at the last
-# measurement. Update this whenever you re-measure; the tests check the cap
-# against it. NOTE monthly: 2600 cap over 2206 is only ~18% headroom, and its
-# implied ceiling is 3000 -- see CLAUDE.md (raising it needs MAX_TOTAL too).
+# measurement. Update this whenever you re-measure; the tests check each cap
+# against it.
 PAYLOAD_SIZE_MEASURED = {
     "date": "2026-10-02",
     "monthly": 2206,
@@ -94,7 +83,10 @@ MAX_COMPLETION_TOKENS = {
 
 MAX_TOTAL_TOKENS = {
     "weekly": 3500,
-    "monthly": 8000,  # raised to accommodate v7 completion headroom
+    # 8000 -> 8500 on 2026-10-02 so the monthly prompt cap (3000) +
+    # completion (5000) still leaves 500 margin; at 8000 the implied ceiling
+    # was exactly 3000.
+    "monthly": 8500,
     # 9500 = yearly prompt cap 3000 + completion 6000 + 500 margin; at 8000
     # the 6000 completion would fail every yearly prompt over 2000 estimated
     # tokens as token_budget_exceeded.
