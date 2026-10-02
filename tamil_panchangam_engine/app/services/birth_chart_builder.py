@@ -1,9 +1,11 @@
 # app/services/birth_chart_builder.py
 
-from typing import Dict, Any, List
+from datetime import datetime, timezone
+from typing import Dict, Any, List, Optional
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.yoga_engine import compute_yogas
 from app.engines.shadbala_engine import compute_shadbala
+from app.engines.dasha_resolver import resolve_antar_dasha
 
 
 # -------------------------------------------------
@@ -180,12 +182,19 @@ def build_nakshatra_view(planetary_positions: dict) -> list:
 # DASHAS
 # -------------------------------------------------
 
-def extract_active_dasha_lords(dashas: dict) -> dict:
+def extract_active_dasha_lords(dashas: dict, reference_date: Optional[datetime] = None) -> dict:
+    """Active Mahadasha lord for reference_date (default now), resolved live
+    from the timeline -- not vimshottari["current"], which is frozen at chart
+    creation. The stored field is only a fallback outside the timeline."""
     vim = dashas.get("vimshottari", {})
-    current = vim.get("current") or {}
+    resolved = resolve_antar_dasha(
+        vimshottari=vim,
+        reference_date=reference_date or datetime.now(timezone.utc),
+    ) if vim.get("timeline") else None
+    maha = (resolved or {}).get("maha") or vim.get("current") or {}
 
     return {
-        "maha": current.get("lord"),
+        "maha": maha.get("lord"),
         "antar": None,
     }
 
@@ -266,7 +275,9 @@ def derive_prediction_gates(dasha_lords: dict) -> dict:
 # MAIN VIEW BUILDER
 # -------------------------------------------------
 
-def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
+def build_birth_chart_view_model(
+    base_chart: Dict[str, Any], reference_date: Optional[datetime] = None,
+) -> Dict[str, Any]:
     birth = base_chart["birth_details"]
     eph = base_chart["ephemeris"]
     lagna_rasi = eph["lagna"]["rasi"]
@@ -297,7 +308,7 @@ def build_birth_chart_view_model(base_chart: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     dashas = base_chart.get("dashas", {})
-    dasha_lords = extract_active_dasha_lords(dashas)
+    dasha_lords = extract_active_dasha_lords(dashas, reference_date)
 
     planetary_positions = overlay_dasha_on_planets(
         planetary_positions,

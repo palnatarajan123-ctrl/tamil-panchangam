@@ -107,7 +107,7 @@ def build_monthly_prediction_envelope(
     # -------------------------------------------------
     # 🔑 DERIVE HOUSES (SINGLE SOURCE OF TRUTH)
     # -------------------------------------------------
-    birth_chart_view = build_birth_chart_view_model(base_chart)
+    birth_chart_view = build_birth_chart_view_model(base_chart, reference_date_utc)
 
     # 🔒 Normalize houses → dict keyed by house number (REQUIRED)
     houses = {
@@ -130,19 +130,26 @@ def build_monthly_prediction_envelope(
     # -------------------------------------------------
     vimshottari = base_chart["dashas"]["vimshottari"]
 
-    active_maha = vimshottari.get("current")
-    if not active_maha:
-        raise RuntimeError("Active Mahadasha missing from Vimshottari data")
-
     timeline = build_mahadasha_timeline(vimshottari)
 
     # -------------------------------------------------
-    # 3. Antar Dasha (resolved ONCE)
+    # 3. Maha + Antar Dasha (resolved ONCE, live, for reference_date_utc)
     # -------------------------------------------------
+    # The Mahadasha comes from the same timeline resolution as the
+    # Antardasha. It used to be vimshottari["current"], frozen at chart
+    # creation: once a reference date crossed that MD's end (e.g. chart
+    # fc588066's Jupiter MD ends 2027-04-14, so its May 2027 report), the
+    # envelope paired the ENDED Mahadasha (weight 0.7) with an Antardasha of
+    # the next one. The stored field is only a fallback when the date falls
+    # outside the timeline.
     antar_dasha = resolve_antar_dasha(
         vimshottari=vimshottari,
         reference_date=reference_date_utc,
     )
+
+    active_maha = (antar_dasha or {}).get("maha") or vimshottari.get("current")
+    if not active_maha:
+        raise RuntimeError("Active Mahadasha missing from Vimshottari data")
 
     antar = antar_dasha.get("antar") if antar_dasha else None
 

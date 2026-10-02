@@ -335,13 +335,31 @@ stale" and "confirmed real" looked like in practice):
   today is outside the timeline); the unused stale read at ~271 was
   removed. PDFs are built fresh per download, so no backfill. Verified
   on `130d0025`: PDF Antardasha went Jupiter → Saturn, matching chat;
-  0/41 mismatches after. **Still reading the stale field, not fixed**:
-  `birth_chart_builder.py:185`
-  (`extract_active_dasha_lords()`, Mahadasha only, so it only goes wrong
-  once a chart crosses an MD boundary), and `prediction_envelope.py:133`
-  (existence check only; the Antardasha there is already resolved live).
-  Same fix shape for all: resolve from `timeline` for today, or rewrite
-  `current` on read.
+  0/41 mismatches after.
+  **Envelope + birth-chart view fixed 2026-10-02**: `prediction_envelope.py`
+  took the MAHADASHA from the stored field (the Antardasha was already
+  resolved live for the reference date). Now both come from the same
+  `resolve_antar_dasha()` call (the live timeline resolver family.py also
+  uses), so MD/AD can't come from different periods; stored field is a
+  fallback only. `birth_chart_builder.extract_active_dasha_lords()` (runs
+  on every chart-view request and inside every envelope build, not just
+  at creation) does the same, with an optional reference date the
+  envelope passes. **Blast radius: 0 cached rows** -- all 68 monthly + 12
+  yearly envelopes match the live MD/AD at their own reference dates, and
+  no chart's stored MD is stale today (the 6 stale charts are AD-level
+  only). Latent: first hit would have been `fc588066` (Jupiter MD ends
+  2027-04-14) -- its May 2027 envelope said "MD Jupiter (0.7), AD Saturn".
+  Fresh real May 2027 report generated as smoke test: envelope Saturn/
+  Saturn, text cites "Saturn's dasha", 15,682 tokens.
+  `tests/engines/test_envelope_live_mahadasha.py`.
+  **Found, not fixed (inert)**: in the envelope's `lord_weights`, an
+  Antardasha of the Mahadasha's own lord (e.g. Saturn-Saturn) overwrites
+  the MD's 0.7 with the AD weight (5/68 cached monthly rows show e.g.
+  `{'Saturn': 0.16}`), and `active_lords` lists it twice. Nothing reads
+  `lord_weights` except a fallback constructor in `prediction.py`, so no
+  score is affected today -- fix before anything starts consuming it.
+  `birth_chart_builder.build_dasha_timeline()` reads `vimshottari["maha"/
+  "antar"/"pratyantar"]` keys that don't exist in payloads (always empty).
 
 - **2026-10-02 chat build, Phase 1: live dasha period dates in both chats.**
   `compute_dasha_snapshot()` gives current + next MD/AD/PD with exact
