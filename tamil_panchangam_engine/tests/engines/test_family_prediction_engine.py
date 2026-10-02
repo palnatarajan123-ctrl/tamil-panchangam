@@ -74,19 +74,37 @@ class TestKpSublordsInFamilyContext(unittest.TestCase):
             "cuspal_significators": {"2": ["Venus", "Saturn"], "11": ["Mercury"]},
         })
         ctx = _build_family_context({"name": "Test Group"}, [member], 2026, MagicMock())
-        self.assertIn("KP wealth-house significators: Venus, Saturn", ctx)
+        self.assertIn("KP significators -- 2nd cusp (wealth): Venus, Saturn; 11th cusp (gains): Mercury", ctx)
+
+    def test_kp_11th_cusp_kept_when_2nd_cusp_present(self):
+        """Regression (2026-10-02): `cuspal.get("2") or cuspal.get("11")`
+        dropped every 11th-cusp significator whenever the 2nd cusp had any,
+        and [:4] cut the list. Real chart PN KP lost Jupiter/Mars (11th);
+        PK lost Moon/Rahu (11th) and Mercury (5th 2nd-cusp entry)."""
+        member = _base_member(kp_sublords={
+            "cuspal_significators": {"2": ["Ketu", "Saturn", "Jupiter", "Venus", "Mercury"],
+                                     "11": ["Moon", "Rahu"]},
+        })
+        ctx = _build_family_context({"name": "Test Group"}, [member], 2026, MagicMock())
+        self.assertIn("2nd cusp (wealth): Ketu, Saturn, Jupiter, Venus, Mercury", ctx)
+        self.assertIn("11th cusp (gains): Moon, Rahu", ctx)
+
+    def test_kp_only_11th_cusp(self):
+        member = _base_member(kp_sublords={"cuspal_significators": {"11": ["Moon"]}})
+        ctx = _build_family_context({"name": "Test Group"}, [member], 2026, MagicMock())
+        self.assertIn("2nd cusp (wealth): none; 11th cusp (gains): Moon", ctx)
 
     def test_kp_none_no_line_no_crash(self):
         """Most charts won't have kp_sublords at all — payload.get() returns
         None, not a missing key. Must not crash on None.get(...)."""
         member = _base_member(kp_sublords=None)
         ctx = _build_family_context({"name": "Test Group"}, [member], 2026, MagicMock())
-        self.assertNotIn("KP wealth-house", ctx)
+        self.assertNotIn("KP significators", ctx)
 
     def test_kp_absent_key_no_line_no_crash(self):
         member = _base_member()  # kp_sublords key not present at all
         ctx = _build_family_context({"name": "Test Group"}, [member], 2026, MagicMock())
-        self.assertNotIn("KP wealth-house", ctx)
+        self.assertNotIn("KP significators", ctx)
 
 
 class TestPredictiveSignalsInFamilyContext(unittest.TestCase):

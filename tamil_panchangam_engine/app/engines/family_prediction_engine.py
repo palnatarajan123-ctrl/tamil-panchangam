@@ -142,10 +142,18 @@ def _build_family_context(group: dict, members_with_charts: list, year: int, db)
         try:
             kp_sublords = payload.get("kp_sublords") if isinstance(payload, dict) else None
             if kp_sublords:
-                cuspal = kp_sublords.get("cuspal_significators", {})
-                wealth_sigs = cuspal.get("2", []) or cuspal.get("11", [])
-                if wealth_sigs:
-                    kp_note = f"KP wealth-house significators: {', '.join(wealth_sigs[:4])}"
+                # Both cusps, reported separately and untruncated (same shape
+                # as wealth_events_engine.py). Was `cuspal.get("2") or
+                # cuspal.get("11")`, which dropped every 11th-cusp
+                # significator whenever the 2nd cusp had any, then cut to 4.
+                cuspal = kp_sublords.get("cuspal_significators", {}) or {}
+                second = list(cuspal.get("2", []) or [])
+                eleventh = list(cuspal.get("11", []) or [])
+                if second or eleventh:
+                    kp_note = (
+                        f"KP significators -- 2nd cusp (wealth): {', '.join(second) or 'none'}; "
+                        f"11th cusp (gains): {', '.join(eleventh) or 'none'}"
+                    )
         except Exception as e:
             logger.warning(f"KP extraction failed for {name}: {e}")
 

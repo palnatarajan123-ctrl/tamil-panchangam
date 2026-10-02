@@ -436,10 +436,17 @@ stale" and "confirmed real" looked like in practice):
     `family.py`. In real chat history (`chat_messages`, `chat.py` only;
     `family.py` doesn't persist messages), 30/182 user questions were
     finance/career, and only 2 mentioned a child (both career, not money).
-  - **Found, not fixed**: `family_prediction_engine.py`'s KP note does
-    `cuspal.get("2", []) or cuspal.get("11", [])`, which silently drops
-    every 11th-cusp significator whenever the 2nd cusp has any. The new
-    engine reports both separately.
+  - **Fixed 2026-10-02**: `family_prediction_engine.py`'s KP note did
+    `cuspal.get("2", []) or cuspal.get("11", [])` then `[:4]`, dropping
+    every 11th-cusp significator whenever the 2nd cusp had any. Now both
+    cusps, separately, untruncated (same shape as the wealth engine).
+    Reproduced on real charts first: PN KP lost 11th Jupiter/Mars; PK lost
+    11th Moon/Rahu plus 2nd-cusp Mercury (truncation). The old unit test
+    had asserted the buggy output. The family prompt forbids "KP" in its
+    output, so the narrative never names cusps; verified at the context
+    level. **Not regenerated**: the one affected cached row,
+    `family_predictions` PN KP / 2026 (family_v2.0, 2026-08-14). Family
+    chat (`family.py`) carries no KP cusps at all (compact wealth clause).
   - **Live-verification caveat**: in one `chat.py` run the model said
     Venus was a KP significator of "both the 2nd and 11th cusps". The
     clearly labelled data has Venus for the 2nd cusp only. This is
