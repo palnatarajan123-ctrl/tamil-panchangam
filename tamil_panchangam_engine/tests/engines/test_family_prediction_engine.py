@@ -131,7 +131,7 @@ class TestPredictiveSignalsInFamilyContext(unittest.TestCase):
         ])
         ctx = _build_family_context({"name": "Test Group"}, [member], 2026, MagicMock())
         self.assertIn("High-Confidence Windows (2026):", ctx)
-        self.assertIn("2026-05-17 to 2026-05-30", ctx)
+        self.assertIn("17 May 2026 to 30 May 2026", ctx)
 
     def test_low_confidence_window_excluded(self):
         member = self._ps_member(event_windows=[
@@ -172,7 +172,7 @@ class TestExistingFieldsRegression(unittest.TestCase):
         self.assertIn("--- WIFE: Priya ---", ctx)
         self.assertIn("Nakshatra: Ashwini", ctx)
         self.assertIn("Rasi: Mesham", ctx)
-        self.assertIn("Date of Birth: 1980-01-01", ctx)
+        self.assertIn("Date of Birth: 1 Jan 1980", ctx)
         # Sade Sati's Active/Not-active value depends on today's real transiting
         # Saturn position relative to this minimal fixture's Moon rasi, not on
         # anything Phase 1 touched -- just confirm the line still renders.

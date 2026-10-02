@@ -11,7 +11,9 @@ PATTERN, not one date:
   2. every date-bearing formatter that feeds chat.py / family.py;
   3. both prompt assemblers end to end, with every section builder forced
      to emit ISO dates -- so a section added later is covered too;
-  4. both streaming endpoints send exactly the assembled prompt.
+  4. both streaming endpoints send exactly the assembled prompt;
+  5. (2026-10-02) the monthly/yearly/weekly generation message and the
+     family-prediction message, the same way.
 """
 import inspect
 from datetime import date, datetime, timezone
@@ -165,3 +167,63 @@ def test_family_stream_sends_only_the_assembled_prompt():
         family.family_group_chat_stream,
         "_assemble_family_chat_system_prompt(group, rows, group_id, user_id, req.base_chart_id)",
     )
+
+
+# ── 5. monthly/yearly/weekly generation + family predictions ─────────────────
+
+def test_generation_user_prompt_has_no_iso_dates():
+    from app.engines.llm_interpretation_orchestrator import build_generation_user_prompt
+    payload = {"overall_context": {"predictive_signals": {
+        "varshaphal": {"solar_return_date": "2025-12-05"},
+        "event_windows": [{"start": "2026-07-12", "end": "2026-07-25T00:00:00+00:00"}]}},
+        "note": ISO_SOUP}
+    prompt = build_generation_user_prompt(payload)
+    assert "5 Dec 2025" in prompt and "12 Jul 2026" in prompt
+    assert not contains_iso_date(prompt), prompt
+
+
+def test_generation_sends_only_the_built_user_prompt():
+    from app.engines import llm_interpretation_orchestrator as orch
+    src = inspect.getsource(orch.generate_llm_interpretation)
+    assert "user_prompt = build_generation_user_prompt(payload)" in src
+    assert [l.strip() for l in src.splitlines() if l.strip().startswith("user_prompt")] == \
+        ["user_prompt = build_generation_user_prompt(payload)"]
+    assert "call_openai(\n        system_prompt, user_prompt," in src
+
+
+def test_event_windows_reach_the_payload_with_human_dates():
+    """payload_builder read w["start"]/w["end"], but event_window_engine emits
+    window_start/window_end -- every window reached the LLM with empty dates."""
+    from app.llm import payload_builder
+    src = inspect.getsource(payload_builder)
+    assert 'fmt_date(str(w.get("window_start")' in src and 'fmt_date(str(w.get("window_end")' in src
+
+
+def test_family_prediction_message_has_no_iso_dates():
+    from app.engines.family_prediction_engine import build_family_user_message
+    msg = build_family_user_message("Date of Birth: 1980-01-01\nAntardasha ends: 2028-08-08\n" + ISO_SOUP, 2026)
+    assert "1 Jan 1980" in msg and "8 Aug 2028" in msg
+    assert not contains_iso_date(msg), msg
+
+
+def test_family_context_sources_render_human_dates():
+    from unittest.mock import MagicMock
+    from app.engines.family_prediction_engine import _build_family_context
+    member = {"member": {"role": "husband", "display_name": "T"}, "payload": {
+        "birth_details": {"date_of_birth": "1980-01-01"},
+        "ephemeris": {"moon": {"rasi": "Mesham", "nakshatra": {"name": "Ashwini"}}},
+        "dashas": {"vimshottari": {}},
+        "predictive_signals": {"event_windows": [{"window_start": "2026-05-17", "window_end": "2026-05-30",
+                                                  "confidence": "high", "life_area": "self", "direction": "opportunity"}]}}}
+    ctx = _build_family_context({"name": "G"}, [member], 2026, MagicMock())
+    assert "Date of Birth: 1 Jan 1980" in ctx and "17 May 2026 to 30 May 2026" in ctx
+    assert not contains_iso_date(ctx), ctx
+
+
+def test_family_prediction_sends_only_the_built_message():
+    from app.engines import family_prediction_engine as fpe
+    src = inspect.getsource(fpe.run_family_prediction)
+    assert "user_message = build_family_user_message(context, year)" in src
+    assert [l.strip() for l in src.splitlines() if l.strip().startswith("user_message =")] == \
+        ["user_message = build_family_user_message(context, year)"]
+    assert '{"role": "user", "content": user_message}' in src

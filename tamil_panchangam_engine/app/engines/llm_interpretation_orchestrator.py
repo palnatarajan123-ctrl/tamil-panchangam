@@ -26,7 +26,8 @@ from typing import Dict, Any, Optional, Literal
 from app.db.postgres import get_conn
 from app.engines.budget_guard import log_llm_call
 from app.llm.token_estimator import check_token_limits, get_max_completion_tokens
-from app.llm.providers import anthropic_provider as openai_provider  # openai_provider alias kept for internal references
+from app.llm.providers import anthropic_provider as openai_provider
+from app.utils.prompt_dates import humanize_iso_dates  # openai_provider alias kept for internal references
 from app.llm.payload_builder import (
     build_llm_payload,
     validate_payload_size,
@@ -546,6 +547,49 @@ def _validate_llm_output(output: Dict[str, Any]) -> bool:
     return True
 
 
+def build_generation_payload(payload_inputs: Dict[str, Any], period_type: str, explainability_mode: str) -> Dict[str, Any]:
+    """The monthly/yearly/weekly LLM payload, from extract_payload_inputs()'s
+    output. May raise AssertionError (dasha leak) / RuntimeError (missing
+    interpretive_hint), which generate_llm_interpretation() handles."""
+    return build_llm_payload(
+        period_type=period_type,
+        period_label=payload_inputs["period_label"],
+        lagna=payload_inputs["lagna"],
+        moon_nakshatra=payload_inputs["moon_nakshatra"],
+        active_dasha=payload_inputs["active_dasha"],
+        life_area_scores=payload_inputs["life_area_scores"],
+        top_signals_by_life_area=payload_inputs["top_signals_by_life_area"],
+        explainability_mode=explainability_mode,
+        transit_context=payload_inputs.get("transit_context"),
+        dasha_timing=payload_inputs.get("dasha_timing"),
+        moon_rasi=payload_inputs.get("moon_rasi"),
+        birth_year=payload_inputs.get("birth_year"),
+        lagnadipathi_status=payload_inputs.get("lagnadipathi_status"),
+        saturn_phase=payload_inputs.get("saturn_phase"),
+        rahu_ketu_axis=payload_inputs.get("rahu_ketu_axis"),
+        yogas=payload_inputs.get("yogas"),
+        chandrashtama_periods=payload_inputs.get("chandrashtama_periods"),
+        nakshatra_pada=payload_inputs.get("nakshatra_pada"),
+        sade_sati_data=payload_inputs.get("sade_sati_data"),
+        shadbala_data=payload_inputs.get("shadbala_data"),
+        ayanamsa=payload_inputs.get("ayanamsa", "lahiri"),
+        kp_sublords=payload_inputs.get("kp_sublords"),
+        divisional_signals=payload_inputs.get("divisional_signals"),
+        panchangam_context=payload_inputs.get("panchangam_context"),
+        shadbala_detail=payload_inputs.get("shadbala_detail"),
+        bav_context=payload_inputs.get("bav_context"),
+        upagraha_context=payload_inputs.get("upagraha_context"),
+        predictive_signals=payload_inputs.get("predictive_signals"),
+    )
+
+
+def build_generation_user_prompt(payload: Dict[str, Any]) -> str:
+    """The exact user message sent for monthly/yearly/weekly generation. Every
+    ISO date in the payload is rewritten ("2029-05-22" -> "22 May 2029") --
+    the model was seen transposing ISO dates (app/utils/prompt_dates.py)."""
+    return humanize_iso_dates(f"Generate interpretation:\n\n{json.dumps(payload, indent=2)}")
+
+
 def generate_llm_interpretation(
     base_chart_id: str,
     envelope: Dict[str, Any],
@@ -631,36 +675,7 @@ def generate_llm_interpretation(
     )
     
     try:
-        payload = build_llm_payload(
-            period_type=period_type,
-            period_label=payload_inputs["period_label"],
-            lagna=payload_inputs["lagna"],
-            moon_nakshatra=payload_inputs["moon_nakshatra"],
-            active_dasha=payload_inputs["active_dasha"],
-            life_area_scores=payload_inputs["life_area_scores"],
-            top_signals_by_life_area=payload_inputs["top_signals_by_life_area"],
-            explainability_mode=explainability_mode,
-            transit_context=payload_inputs.get("transit_context"),
-            dasha_timing=payload_inputs.get("dasha_timing"),
-            moon_rasi=payload_inputs.get("moon_rasi"),
-            birth_year=payload_inputs.get("birth_year"),
-            lagnadipathi_status=payload_inputs.get("lagnadipathi_status"),
-            saturn_phase=payload_inputs.get("saturn_phase"),
-            rahu_ketu_axis=payload_inputs.get("rahu_ketu_axis"),
-            yogas=payload_inputs.get("yogas"),
-            chandrashtama_periods=payload_inputs.get("chandrashtama_periods"),
-            nakshatra_pada=payload_inputs.get("nakshatra_pada"),
-            sade_sati_data=payload_inputs.get("sade_sati_data"),
-            shadbala_data=payload_inputs.get("shadbala_data"),
-            ayanamsa=payload_inputs.get("ayanamsa", "lahiri"),
-            kp_sublords=payload_inputs.get("kp_sublords"),
-            divisional_signals=payload_inputs.get("divisional_signals"),
-            panchangam_context=payload_inputs.get("panchangam_context"),
-            shadbala_detail=payload_inputs.get("shadbala_detail"),
-            bav_context=payload_inputs.get("bav_context"),
-            upagraha_context=payload_inputs.get("upagraha_context"),
-            predictive_signals=payload_inputs.get("predictive_signals"),
-        )
+        payload = build_generation_payload(payload_inputs, period_type, explainability_mode)
     except AssertionError as e:
         logger.error(f"Dasha payload leak detected: {e}")
         result["llm_interpretation"] = deterministic_interpretation
@@ -713,7 +728,7 @@ def generate_llm_interpretation(
         return result
     
     system_prompt = _load_prompt_template(effective_prompt_version)
-    user_prompt = f"Generate interpretation:\n\n{json.dumps(payload, indent=2)}"
+    user_prompt = build_generation_user_prompt(payload)
     
     max_completion = MAX_COMPLETION_TOKENS.get(period_type, 900)
     llm_response, usage_info, error = openai_provider.call_openai(

@@ -26,6 +26,7 @@ from datetime import date
 from typing import Dict, Any, List, Literal, Optional
 
 from app.engines.porutham_engine import compute_porutham
+from app.utils.prompt_dates import fmt_date
 
 logger = logging.getLogger(__name__)
 
@@ -1272,8 +1273,11 @@ def extract_payload_inputs(
                 if high_windows:
                     predictive_signals_context["event_windows"] = [
                         {
-                            "start": str(w.get("start", ""))[:10],
-                            "end": str(w.get("end", ""))[:10],
+                            # event_window_engine emits window_start/window_end;
+                            # reading "start"/"end" sent every window with
+                            # empty dates until 2026-10-02.
+                            "start": fmt_date(str(w.get("window_start") or w.get("start") or "")[:10]),
+                            "end": fmt_date(str(w.get("window_end") or w.get("end") or "")[:10]),
                             "life_area": w.get("life_area", ""),
                             "confidence": w.get("confidence", ""),
                             "signal_count": w.get("signal_count", 0),
@@ -1293,7 +1297,7 @@ def extract_payload_inputs(
                     vp = ps["varshaphal"]
                     predictive_signals_context["varshaphal"] = {
                         "year": vp.get("year"),
-                        "solar_return_date": vp.get("solar_return_date"),
+                        "solar_return_date": fmt_date(vp.get("solar_return_date")),
                         "lagna": vp.get("lagna"),
                         "annual_lagna_lord": vp.get("annual_lagna_lord"),
                         "strength": vp.get("strength"),

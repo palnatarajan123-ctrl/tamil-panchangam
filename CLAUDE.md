@@ -508,10 +508,25 @@ stale" and "confirmed real" looked like in practice):
   41 charts + 4 family groups: 0 ISO dates even with the net off.
   `tests/api/test_prompt_iso_dates.py` guards the pattern (mutation-checked).
   Live: Saturn return 3/3 "22 May 2029", Jupiter-to-Moon aspect 3/3
-  "6 November 2026". **Not covered (not chat)**: the monthly/yearly LLM
-  payload (`payload_builder.py`, e.g. `solar_return_date`, event-window
-  dates) and `family_prediction_engine.py` ("Date of Birth",
-  "Antardasha ends") still send ISO dates to their own LLM calls.
+  "6 November 2026".
+  **Extended 2026-10-02 to monthly/yearly/weekly generation and family
+  predictions** (live prompts are v7/v6 + `family_prediction_prompt.txt`;
+  `interpretation_prompt_v4.txt` is not loaded by any generation path).
+  `build_generation_user_prompt()` (orchestrator) and
+  `build_family_user_message()` apply `humanize_iso_dates()`; sources fixed
+  with `fmt_date`: Varshaphal `solar_return_date`, event windows,
+  family "Date of Birth", "Antardasha ends", "High-Confidence Windows".
+  **Silent bug found and fixed on the way**: `payload_builder.py` read
+  event windows' `start`/`end`, but `event_window_engine` emits
+  `window_start`/`window_end`, so every high-confidence window reached the
+  monthly LLM with empty dates (14 charts' cached signals had such
+  windows). Real payloads from all 81 cached monthly/yearly rows and all
+  4 family groups: 0 ISO dates even without the net. Smoke: fresh
+  `7916f261` Nov 2026 report and fresh PK & KN 2026 family prediction,
+  no ISO dates in input or output (`generated_at` metadata is set by code).
+  **Still sending ISO (not in scope)**: `children_timing_engine.py`
+  (`json.dumps` of dasha windows) and `child_prediction_engine.py`'s own
+  non-formatter lines.
 
 - **2026-10-01: chat's self-reported data gaps (wealth-timing question)
   checked against the real live prompt. Scoped only; nothing built,

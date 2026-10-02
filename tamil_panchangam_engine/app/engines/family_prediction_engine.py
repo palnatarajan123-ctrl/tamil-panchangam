@@ -17,6 +17,7 @@ from app.engines.budget_guard import log_llm_call
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled, get_llm_pause_reason
+from app.utils.prompt_dates import fmt_date, humanize_iso_dates
 from app.llm.payload_builder import (
     _build_upagraha_context, _extract_nak_rasi,
     _get_or_compute_porutham, _format_porutham_lines,
@@ -184,10 +185,10 @@ def _build_family_context(group: dict, members_with_charts: list, year: int, db)
             f"--- {role.upper()}: {name} ---",
             f"Nakshatra: {nakshatra or 'unknown'}",
             f"Rasi: {rasi or 'unknown'}",
-            f"Date of Birth: {birth.get('date_of_birth', 'unknown')}",
+            f"Date of Birth: {fmt_date(birth.get('date_of_birth')) or 'unknown'}",
             f"Current Mahadasha: {maha_lord}",
             f"Current Antardasha: {antar_lord}",
-            f"Antardasha ends: {antar_end[:10] if antar_end else 'unknown'}",
+            f"Antardasha ends: {fmt_date(antar_end[:10]) if antar_end else 'unknown'}",
             f"Sade Sati: {'Active – ' + ss_phase if ss_active else 'Not active'}",
         ]
         if yoga_names:
@@ -204,7 +205,7 @@ def _build_family_context(group: dict, members_with_charts: list, year: int, db)
         if year_event_windows:
             window_parts = []
             for w in year_event_windows[:3]:
-                label = f"{w.get('window_start', '')} to {w.get('window_end', '')}"
+                label = f"{fmt_date(w.get('window_start'))} to {fmt_date(w.get('window_end'))}"
                 area = str(w.get("life_area", "")).replace("_", " ")
                 direction = w.get("direction", "")
                 window_parts.append(f"{label} ({area}, {direction})")
@@ -244,6 +245,17 @@ def _build_family_context(group: dict, members_with_charts: list, year: int, db)
             ]
 
     return "\n".join(lines)
+
+
+def build_family_user_message(context: str, year: int) -> str:
+    """The exact user message sent for a family prediction. Every ISO date
+    left in it is rewritten ("2029-05-22" -> "22 May 2029") -- the model was
+    seen transposing ISO dates (app/utils/prompt_dates.py)."""
+    return humanize_iso_dates(
+        f"Here is the family chart data for analysis:\n\n{context}\n\n"
+        f"Generate the family prediction JSON for {year} following the schema "
+        f"in your instructions exactly. Return only valid JSON."
+    )
 
 
 def run_family_prediction(
@@ -305,11 +317,7 @@ def run_family_prediction(
 
     # ── Build context ─────────────────────────────────────────────────────────
     context = _build_family_context(group, members_with_charts, year, db)
-    user_message = (
-        f"Here is the family chart data for analysis:\n\n{context}\n\n"
-        f"Generate the family prediction JSON for {year} following the schema "
-        f"in your instructions exactly. Return only valid JSON."
-    )
+    user_message = build_family_user_message(context, year)
 
     # ── LLM call (same pattern as anthropic_provider.py) ─────────────────────
     input_tokens = 0
