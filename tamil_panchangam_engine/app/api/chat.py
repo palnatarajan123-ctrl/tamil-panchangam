@@ -604,6 +604,16 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
             "the topic asked about. Never state a period boundary not listed here.\n"
         )
 
+    if context.get("varshaphal_context"):
+        system_prompt += (
+            "\n\n## ANNUAL CHART (Varshaphal / Tajika solar return)\n"
+            + context["varshaphal_context"]
+            + "\nThese are the only annual-chart facts you have. Use them for \"this year\" "
+            "questions, keeping the year boundary at the solar-return date (not January). "
+            "The formal Tajika year-lord (Varsheshwara) and the annual chart's other planet "
+            "placements are NOT computed -- do not name or describe them.\n"
+        )
+
     if reading_as_name:
         system_prompt = f"Reading from {reading_as_name}'s chart.\n\n" + system_prompt
     return system_prompt
@@ -671,6 +681,11 @@ def _build_chat_context(base_chart_id: str) -> dict:
             dasha_periods_context = format_dasha_snapshot_context(dasha_snap)
     except Exception as e:
         logger.warning(f"Live dasha snapshot failed in chat context: {e}")
+
+    # Annual chart in force today -- cached per chart per solar-return year
+    # in the payload (computed at most once a year per chart).
+    from app.engines.varshaphal_engine import get_current_varshaphal, format_varshaphal_context
+    varshaphal_context = format_varshaphal_context(get_current_varshaphal(base_chart_id, payload))
 
     # Yogas — compute fresh using yoga engine
     yogas_summary = "none notable"
@@ -940,6 +955,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "ingress_context": ingress_context,
         "marriage_health_context": marriage_health_context,
         "dasha_periods_context": dasha_periods_context,
+        "varshaphal_context": varshaphal_context,
     }
 
 

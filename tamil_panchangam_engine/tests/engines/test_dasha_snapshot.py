@@ -85,4 +85,5 @@ def test_formatters():
     assert "Next Antardasha: Mercury, 2028-08-08 to 2031-02-25" in verbose
     compact = format_dasha_snapshot_compact(snap)
     assert compact.startswith("Dasha Rahu›Saturn›Ketu (sub-period to Aug 2028")
+    assert "sub-sub-period to Oct 2026 then Venus" in compact
     assert "next sub-period Mercury from Aug 2028" in compact

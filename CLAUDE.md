@@ -347,6 +347,33 @@ stale" and "confirmed real" looked like in practice):
   line. Chat no longer reads the Pratyantar lord from the month-scoped
   `predictive_signals` cache.
 
+- **2026-10-02 chat build, Phase 2: Varshaphal in both chats**, via
+  `varshaphal_engine.get_current_varshaphal()`. It's cached per chart per
+  solar-return year in `base_charts.payload.varshaphal_by_year` (bump
+  `_CACHE_VERSION` to invalidate). It picks the return IN FORCE today (the
+  most recent on or before today), not the calendar year's return.
+  Muntha checked on all 41 charts (natal Lagna + age).
+  **Found, not fixed, in `compute_varshaphal()` itself** (still used
+  as-is by `predictive_signals_engine.py` → monthly report payload):
+  1. Its `year` is the CALENDAR year, so for anyone whose birthday is
+     later in the year (8/41 charts on 2026-10-02) the monthly report gets
+     a solar return that hasn't happened yet.
+  2. `varshesha` is just the annual Lagna's lord, not the classical
+     Tajika Varsheshwara (chosen from five office-bearers by strength).
+  3. `varshesha_house` is the house of the first sign that planet OWNS,
+     not where it is placed. Meaningless.
+  4. `muntha_house` is counted from the NATAL Lagna, so it's always
+     (age % 12) + 1. Tajika judges Muntha from the annual Lagna.
+  5. `strength` is just a count of natural benefics in annual kendras,
+     a heuristic.
+  Chat avoids 2-4 (it shows "lord of the annual Lagna", Muntha from
+  both Lagnas, and no house for the lord) and states the benefic count
+  as a count.
+  **Also seen in verification**: `family.py` has no CURRENT-transit data
+  (already known, see the Gochara entry below), and in one run it read
+  "Rahu enters Capricorn (10th) on Dec 5" as Rahu being in the 10th now.
+  Closing that gap would fix it.
+
 - **2026-10-01: chat's self-reported data gaps (wealth-timing question)
   checked against the real live prompt. Scoped only; nothing built,
   pending sign-off.** A user-reported answer listed 6 missing items.

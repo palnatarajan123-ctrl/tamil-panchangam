@@ -1216,6 +1216,10 @@ GROUNDING — NEVER STATE AN UNGROUNDED FACT:
   range" means exactly that — say so plainly rather than guessing one
   further out. A "marriage-timing window" is ONLY about marriage and a
   "health-caution window" is ONLY about health — see the rule below.
+- "Annual chart" on a member's line is their current Varshaphal (Tajika
+  solar return): its year runs from the date shown, not from January.
+  Only the annual Lagna and Muntha are given — do not name a Tajika
+  year-lord (Varsheshwara) or other annual-chart placements.
 """ + DOMAIN_WINDOW_RULE
 
 
@@ -1249,6 +1253,14 @@ def _build_member_summary(row: tuple) -> str:
         maha = dasha.get("maha", {}).get("lord", "—") if dasha else "—"
         antar = dasha.get("antar", {}).get("lord", "—") if dasha else "—"
         dasha_bit = f"Dasha {maha}›{antar}"
+
+    varshaphal_bit = ""
+    try:
+        from app.engines.varshaphal_engine import get_current_varshaphal, format_varshaphal_compact
+        vp_text = format_varshaphal_compact(get_current_varshaphal(_chart_id, payload))
+        varshaphal_bit = f", {vp_text}" if vp_text else ""
+    except Exception as e:
+        logger.warning(f"Varshaphal failed for family member {display_name}: {e}")
 
     ss = compute_sade_sati(payload)
     ss_data = ss.get("sade_sati", {}) if ss else {}
@@ -1300,6 +1312,9 @@ def _build_member_summary(row: tuple) -> str:
         f"{ss_suffix}"
         f"{yoga_upagraha_suffix}"
         f"{timing_suffix}"
+        # Last: anything after it (e.g. natal "Yogas:") was being read as
+        # belonging to the annual chart.
+        f"{varshaphal_bit}"
     )
 
 

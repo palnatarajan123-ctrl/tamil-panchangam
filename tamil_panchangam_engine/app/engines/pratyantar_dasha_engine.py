@@ -239,6 +239,10 @@ def format_dasha_snapshot_compact(snap: Dict[str, Any]) -> str:
     md, ad, pt = snap["mahadasha"], snap["antardasha"], snap["pratyantar"]
     out = (f"Dasha {md['lord']}›{ad['lord']}›{pt['lord']} "
            f"(sub-period to {_ym(ad['end'])}, sub-sub-period to {_ym(pt['end'])}")
+    npt = snap.get("next_pratyantar")
+    if npt:
+        # Without this the model was observed inventing the next one.
+        out += f" then {npt['lord']}"
     nad = snap.get("next_antardasha")
     if nad:
         out += f"; next sub-period {nad['lord']} from {_ym(nad['start'])}"

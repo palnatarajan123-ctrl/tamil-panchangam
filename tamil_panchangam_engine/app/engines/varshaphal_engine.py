@@ -188,3 +188,118 @@ def compute_varshaphal(
         "strength": strength,
         "benefics_in_kendra": benefics_in_kendra,
     }
+
+
+# ── Chat-facing: current annual chart, cached per chart per solar-return year ──
+
+_ENGLISH_RASI = [
+    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+]
+_CACHE_KEY = "varshaphal_by_year"
+# Bump to invalidate cached entries if compute_varshaphal()'s semantics change.
+_CACHE_VERSION = 1
+
+
+def _cached_or_compute(chart_id: Optional[str], payload: Dict[str, Any], year: int) -> Dict[str, Any]:
+    """compute_varshaphal() for `year`, read from / written to
+    base_charts.payload[_CACHE_KEY][str(year)]. The annual chart only
+    depends on static natal data + the year, so it never needs recomputing."""
+    cached = (payload.get(_CACHE_KEY) or {}).get(str(year))
+    if cached and cached.get("cache_version") == _CACHE_VERSION:
+        return cached
+
+    result = compute_varshaphal(
+        ephemeris=payload.get("ephemeris", {}),
+        birth_details=payload.get("birth_details", {}),
+        year=year,
+        ayanamsa=(payload.get("chart_metadata") or {}).get("ayanamsa", "lahiri"),
+    )
+    result["cache_version"] = _CACHE_VERSION
+    payload.setdefault(_CACHE_KEY, {})[str(year)] = result
+
+    if chart_id:
+        try:
+            import json
+            from app.db.postgres import get_conn
+            with get_conn() as conn:
+                conn.execute(
+                    "UPDATE base_charts SET payload = jsonb_set(payload, %s, "
+                    "COALESCE(payload->%s, '{}'::jsonb) || %s::jsonb) WHERE id = %s",
+                    ("{" + _CACHE_KEY + "}", _CACHE_KEY, json.dumps({str(year): result}), chart_id),
+                )
+        except Exception as e:
+            logger.warning("Varshaphal cache write failed chart=%s: %s", chart_id, e)
+    return result
+
+
+def get_current_varshaphal(
+    chart_id: Optional[str],
+    payload: Dict[str, Any],
+    today: Optional["date"] = None,
+) -> Dict[str, Any]:
+    """
+    The annual chart in force on `today`: the most recent solar return on or
+    before today -- NOT simply compute_varshaphal(this calendar year), whose
+    return may still be in the future (birthday later in the year).
+
+    Adds chat-safe fields on top of compute_varshaphal()'s output:
+      muntha_house_from_annual_lagna -- classical Tajika judges Muntha from
+          the annual Lagna; compute_varshaphal()'s muntha_house is counted
+          from the NATAL Lagna (always age % 12 + 1).
+      annual_lagna_lord -- what compute_varshaphal() calls "varshesha". It
+          is only the annual Lagna's lord, not the classical Tajika
+          Varsheshwara (chosen among five office-bearers), so chat must not
+          call it the year-lord.
+    Returns {} if the computation fails.
+    """
+    from datetime import date as _date
+    today = today or datetime.now(timezone.utc).date()
+    try:
+        vp = _cached_or_compute(chart_id, payload, today.year)
+        if _date.fromisoformat(vp["solar_return_date"]) > today:
+            vp = _cached_or_compute(chart_id, payload, today.year - 1)
+    except Exception as e:
+        logger.warning("Current varshaphal failed chart=%s: %s", chart_id, e)
+        return {}
+
+    lagna_idx = RASI_NAMES.index(vp["lagna"])
+    muntha_idx = RASI_NAMES.index(vp["muntha"])
+    sr = _date.fromisoformat(vp["solar_return_date"])
+    return {
+        **vp,
+        "annual_lagna_lord": vp["varshesha"],
+        "lagna_english": _ENGLISH_RASI[lagna_idx],
+        "muntha_english": _ENGLISH_RASI[muntha_idx],
+        "muntha_house_from_annual_lagna": (muntha_idx - lagna_idx) % 12 + 1,
+        "next_return_approx": f"{sr.year + 1}-{sr.month:02d}",
+    }
+
+
+def _ordinal(n: int) -> str:
+    return f"{n}{'th' if 11 <= n % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def format_varshaphal_context(vp: Dict[str, Any]) -> str:
+    """Verbose rendering for chat.py's system prompt."""
+    if not vp:
+        return ""
+    return "\n".join([
+        f"- Annual year in force: from the solar return on {vp['solar_return_date']} "
+        f"until the next one (around {vp['next_return_approx']})",
+        f"- Annual Lagna: {vp['lagna_english']} ({vp['lagna']}); its lord: {vp['annual_lagna_lord']}",
+        f"- Muntha: {vp['muntha_english']} ({vp['muntha']}) -- "
+        f"{_ordinal(vp['muntha_house_from_annual_lagna'])} house from the annual Lagna, "
+        f"{_ordinal(vp['muntha_house'])} from the natal Lagna",
+        f"- Natural benefics (Moon, Mercury, Jupiter, Venus) in kendras (1/4/7/10) of the "
+        f"annual chart: {vp['benefics_in_kendra']} of 4",
+    ])
+
+
+def format_varshaphal_compact(vp: Dict[str, Any]) -> str:
+    """One-clause rendering for family.py's per-member line."""
+    if not vp:
+        return ""
+    return (f"Annual chart (from {vp['solar_return_date']}): Lagna {vp['lagna_english']}, "
+            f"Muntha {vp['muntha_english']} ({_ordinal(vp['muntha_house_from_annual_lagna'])} "
+            f"from annual Lagna)")
