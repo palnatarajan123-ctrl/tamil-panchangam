@@ -32,6 +32,25 @@ CHAT_LIMITS = {
     "admin": None,  # unlimited
 }
 
+# Shared by family.py's _FAMILY_CHAT_SYSTEM_PROMPT -- one copy, so the two
+# chat implementations can't drift. No braces: concatenated into templates
+# that are later .format()-ed.
+DOMAIN_WINDOW_RULE = """
+DATED WINDOWS ARE DOMAIN-SPECIFIC — NEVER BORROW ONE ACROSS LIFE AREAS:
+- Every dasha window in this context was computed for ONE named life area
+  (e.g. "7th lord ... marriage", "6th/8th lord ... health", children).
+  Cite a window only as evidence for the life area it was computed for.
+- If asked about a life area (wealth, career, etc.) that has no window of
+  its own here, say plainly that you don't have a computed timing window
+  for that area. Do NOT re-present a marriage, health, or children window
+  as if it indicated wealth or career timing, and do not argue a planet's
+  general significations to stretch one across (e.g. "Venus also signifies
+  wealth, so the 7th-lord Venus window is a financial window" is NOT
+  allowed).
+- Current-transit and sign-change (peyarchi) dates are not tied to one life
+  area; you may discuss them for any question, describing the house they
+  fall in rather than claiming they were computed for that topic."""
+
 SYSTEM_PROMPT_TEMPLATE = """You are Jyotishi, a warm and direct personal astrologer for {name}.
 
 CHART CONTEXT:
@@ -71,6 +90,7 @@ GROUNDING — NEVER STATE AN UNGROUNDED FACT:
   or anything else not explicitly given — say plainly
   "I don't have that specific data available" rather than generating a
   plausible-sounding but ungrounded answer.
+""" + DOMAIN_WINDOW_RULE + """
 
 WHEN CHALLENGED:
 - If the user states something as fact that contradicts what you said

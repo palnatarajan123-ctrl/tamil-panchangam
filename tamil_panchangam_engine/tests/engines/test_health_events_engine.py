@@ -74,6 +74,7 @@ class TestFormatHealthEventsCompact:
         assert "8th lord Mars" in result
         assert "8th afflicted" in result
         assert "6th afflicted" not in result
+        assert "health-caution window" in result
 
     def test_no_affliction_bit_omitted_when_neither_house_afflicted(self):
         result = format_health_events_compact(compute_health_event_signals(self._payload(mars_lon=100.0), 2026, 2030))

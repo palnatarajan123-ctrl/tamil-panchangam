@@ -113,9 +113,9 @@ def format_health_events_compact(signals: Dict[str, Any]) -> str:
     all_windows = signals["sixth_lord_dashas"] + signals["eighth_lord_dashas"]
     if all_windows:
         w = min(all_windows, key=lambda d: d["from"])
-        window_bit = f", window {w['from'][:4]}-{w['to'][:4]} ({w['lord']})"
+        window_bit = f", health-caution window {w['from'][:4]}-{w['to'][:4]} ({w['lord']})"
     else:
-        window_bit = ", no window in analyzed range"
+        window_bit = ", no health-caution window in analyzed range"
     afflicted_bits = []
     if signals["sixth_house_afflicted"]:
         afflicted_bits.append("6th afflicted")

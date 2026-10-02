@@ -158,8 +158,8 @@ def format_marriage_timing_compact(signals: Dict[str, Any]) -> str:
     all_windows = signals["seventh_lord_dashas"] + signals["darakaraka_dashas"] + signals["kalatra_karaka_dashas"]
     if all_windows:
         w = min(all_windows, key=lambda d: d["from"])
-        window_bit = f", window {w['from'][:4]}-{w['to'][:4]} ({w['lord']})"
+        window_bit = f", marriage-timing window {w['from'][:4]}-{w['to'][:4]} ({w['lord']})"
     else:
-        window_bit = ", no window in analyzed range"
+        window_bit = ", no marriage-timing window in analyzed range"
     karaka_bit = f", Kalatra Karaka {signals['kalatra_karaka']}" if signals["gender_known"] else ""
     return f"7th lord {signals['seventh_lord']}, Darakaraka {signals['darakaraka']}{karaka_bit}{window_bit}"

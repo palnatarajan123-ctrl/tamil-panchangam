@@ -124,7 +124,8 @@ class TestFormatMarriageTimingCompact:
         assert "Darakaraka Moon" in result
         assert "Kalatra Karaka Venus" in result
         assert "Moon/Venus" not in result
-        assert "window 2032-2035 (Venus)" in result
+        # Domain-labelled so family chat can't re-present it as a wealth window.
+        assert "marriage-timing window 2032-2035 (Venus)" in result
 
     def test_gender_unknown_omits_kalatra_karaka_entirely(self):
         signals = {
@@ -138,4 +139,4 @@ class TestFormatMarriageTimingCompact:
         }
         result = format_marriage_timing_compact(signals)
         assert "Kalatra Karaka" not in result
-        assert "no window in analyzed range" in result
+        assert "no marriage-timing window in analyzed range" in result

@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
+from app.api.chat import DOMAIN_WINDOW_RULE
 from app.core.auth import get_current_user
 from app.db.postgres import get_conn
 from app.repositories.base_chart_repo import get_base_chart_by_id
@@ -1209,9 +1210,12 @@ GROUNDING — NEVER STATE AN UNGROUNDED FACT:
   line gives you their 7th lord, Darakaraka, (Kalatra Karaka only for
   husband/wife — not recorded for children) and 6th/8th lords, each with
   a real computed window if one exists. Cite the specific significator
-  and window given (e.g. "7th lord Venus, window 2032-2035") — never
-  invent a year not shown. "No window in analyzed range" means exactly
-  that — say so plainly rather than guessing one further out."""
+  and window given (e.g. "7th lord Venus, marriage-timing window
+  2032-2035") — never invent a year not shown. "No ... window in analyzed
+  range" means exactly that — say so plainly rather than guessing one
+  further out. A "marriage-timing window" is ONLY about marriage and a
+  "health-caution window" is ONLY about health — see the rule below.
+""" + DOMAIN_WINDOW_RULE
 
 
 def _build_member_summary(row: tuple) -> str:
