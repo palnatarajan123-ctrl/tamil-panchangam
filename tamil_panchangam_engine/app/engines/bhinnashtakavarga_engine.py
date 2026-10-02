@@ -66,7 +66,9 @@ BAV_TABLES: Dict[str, Dict[str, list]] = {
         "mercury": [1, 2, 4, 5, 6, 9, 10, 11],
         "jupiter": [1, 2, 3, 4, 7, 8, 10, 11],
         "venus":   [2, 5, 6, 9, 10, 11],
-        "saturn":  [3, 5, 6, 11, 12],
+        # Saturn: [3, 5, 6, 12] (BPHS / B.V. Raman). Was [3, 5, 6, 11, 12],
+        # which made Jupiter's BAV total 57 instead of the classical 56.
+        "saturn":  [3, 5, 6, 12],
         "lagna":   [1, 2, 4, 5, 6, 7, 9, 10, 11],
     },
     "venus": {

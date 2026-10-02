@@ -817,6 +817,36 @@ stale" and "confirmed real" looked like in practice):
      reused as-is.
   Both preconditions require their own dedicated work sessions — not
   started here.
+
+  **2026-10-02 update on precondition 1: the premise was too narrow.**
+  Cell-by-cell comparison of `BAV_TABLES` against the classical tables
+  (vedastro.org "Mastering Ashtakavarga Part 2", B.V. Raman) found **10
+  wrong contributor rows across 6 of 7 planets**, not 3 transcription
+  slips: Sun from Mars/Mercury/Venus/Saturn/Lagna (5 rows -- its 48
+  total matched only by coincidence), Moon from Jupiter (missing 12),
+  Mars from Lagna (`[1,2,4,7,8,10,11]` vs `[1,3,6,10,11]`), Mercury from
+  Lagna (7 vs 6), Venus from Mars (4 vs 5), Jupiter from Saturn (extra
+  11). Only Saturn's table is fully correct. Decisive check: the full
+  classical table set reproduces an independent source's published
+  Sarvashtakavarga (thevedichoroscope.com "Ashtakvarga Lessons-1", 24 Mar
+  1989 04:45 Rudraprayag) on all 12 signs (337); current code gives 339.
+  - **Fixed (Phase 5)**: Jupiter only -- Saturn row `[3,5,6,12]`, total
+    56. Per-sign match with Raman's Standard Horoscope (12/12 signs;
+    Gemini was 8, now 7) and the 1989 source (its published
+    Jupiter-from-Saturn row and Aries value).
+    `tests/engines/test_bav_jupiter_table.py`. Real-chart regression: of
+    28 charts with a stored BAV, 0 non-Jupiter rows change; 1 chart's
+    stored Jupiter score would move 6→5 (`9b7c3ed9`, still "strong").
+  - **NOT done, blocked on permission**: recomputing the STORED
+    `payload.bhinnashtakavarga` for those 28 charts (it's written once at
+    chart creation; the LLM payload, PDF and predictive_signals read the
+    stored copy). The 13 charts without one compute it lazily and get the
+    fix. Until the 28 are recomputed, they still carry Jupiter = 57.
+  - **NOT fixed, still blocks the Ashtakavarga→chat wiring**: the other 9
+    rows above. Recommend fixing all at once against the same table (the
+    1989 SAV match is a ready-made regression test), then one recompute.
+  - Also seen: `transit_scores.*.current_sign_index` is the NATAL sign
+    (it reads natal planet positions), not a transit -- mislabelled.
 - **`transit_hits_engine.py`'s `_house_of()` uses a different house
   SYSTEM than the rest of the app, not just a differently-styled
   formula** — found 2026-09-13 while consolidating the whole-sign
