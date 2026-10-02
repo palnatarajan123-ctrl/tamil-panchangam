@@ -1200,9 +1200,10 @@ HOUSE-COUNTING CONVENTION:
 
 GROUNDING — NEVER STATE AN UNGROUNDED FACT:
 - Only state a specific sign, house, date, or degree if it is explicitly
-  given to you in the context above (including UPCOMING SIGN CHANGES,
-  if present). If asked for something more precise than what's provided
-  — a dasha end date, a divisional chart placement, an ingress further
+  given to you in the context above (including each member's dasha
+  period dates and UPCOMING SIGN CHANGES, if present). If asked for
+  something more precise than what's provided — a dasha period beyond
+  those listed, a divisional chart placement, an ingress further
   out than the next one shown, or anything else not explicitly given —
   say plainly "I don't have that specific data available" rather than
   generating a plausible-sounding but ungrounded answer.
@@ -1234,12 +1235,20 @@ def _build_member_summary(row: tuple) -> str:
 
     vimshottari = payload.get("dashas", {}).get("vimshottari", {}) \
         if isinstance(payload.get("dashas"), dict) else {}
-    dasha = resolve_antar_dasha(
-        vimshottari=vimshottari,
-        reference_date=datetime.now(timezone.utc),
-    )
-    maha = dasha.get("maha", {}).get("lord", "—") if dasha else "—"
-    antar = dasha.get("antar", {}).get("lord", "—") if dasha else "—"
+    from app.engines.pratyantar_dasha_engine import compute_dasha_snapshot, format_dasha_snapshot_compact
+    dasha_bit = ""
+    try:
+        dasha_bit = format_dasha_snapshot_compact(compute_dasha_snapshot(vimshottari))
+    except Exception as e:
+        logger.warning(f"Live dasha snapshot failed for family member {display_name}: {e}")
+    if not dasha_bit:
+        dasha = resolve_antar_dasha(
+            vimshottari=vimshottari,
+            reference_date=datetime.now(timezone.utc),
+        )
+        maha = dasha.get("maha", {}).get("lord", "—") if dasha else "—"
+        antar = dasha.get("antar", {}).get("lord", "—") if dasha else "—"
+        dasha_bit = f"Dasha {maha}›{antar}"
 
     ss = compute_sade_sati(payload)
     ss_data = ss.get("sade_sati", {}) if ss else {}
@@ -1287,7 +1296,7 @@ def _build_member_summary(row: tuple) -> str:
     return (
         f"{role.upper()} {name}: "
         f"Lagna {lagna}, Moon {moon_rasi} ({nak_name}), "
-        f"Dasha {maha}›{antar}"
+        f"{dasha_bit}"
         f"{ss_suffix}"
         f"{yoga_upagraha_suffix}"
         f"{timing_suffix}"

@@ -37,9 +37,9 @@ CHAT_LIMITS = {
 # that are later .format()-ed.
 DOMAIN_WINDOW_RULE = """
 DATED WINDOWS ARE DOMAIN-SPECIFIC — NEVER BORROW ONE ACROSS LIFE AREAS:
-- Every dasha window in this context was computed for ONE named life area
-  (e.g. "7th lord ... marriage", "6th/8th lord ... health", children).
-  Cite a window only as evidence for the life area it was computed for.
+- Every dasha window listed under a life area (e.g. "7th lord ...
+  marriage", "6th/8th lord ... health", children) was computed for that ONE
+  life area. Cite it only as evidence for the life area it was computed for.
 - If asked about a life area (wealth, career, etc.) that has no window of
   its own here, say plainly that you don't have a computed timing window
   for that area. Do NOT re-present a marriage, health, or children window
@@ -47,9 +47,10 @@ DATED WINDOWS ARE DOMAIN-SPECIFIC — NEVER BORROW ONE ACROSS LIFE AREAS:
   general significations to stretch one across (e.g. "Venus also signifies
   wealth, so the 7th-lord Venus window is a financial window" is NOT
   allowed).
-- Current-transit and sign-change (peyarchi) dates are not tied to one life
-  area; you may discuss them for any question, describing the house they
-  fall in rather than claiming they were computed for that topic."""
+- The general current/next dasha periods, current-transit and sign-change
+  (peyarchi) dates are not tied to one life area; you may discuss them for
+  any question, describing the ruling planet or the house involved rather
+  than claiming they were computed for that topic."""
 
 SYSTEM_PROMPT_TEMPLATE = """You are Jyotishi, a warm and direct personal astrologer for {name}.
 
@@ -83,9 +84,10 @@ HOUSE-COUNTING CONVENTION:
 
 GROUNDING — NEVER STATE AN UNGROUNDED FACT:
 - Only state a specific sign, house, date, or degree if it is explicitly
-  given to you in the context above (including CURRENT TRANSITS and
-  UPCOMING SIGN CHANGES, if present). If asked for something more
-  precise than what's provided — a dasha end date, a divisional chart
+  given to you in the context above or in the sections below (DASHA
+  PERIODS, CURRENT TRANSITS, UPCOMING SIGN CHANGES, if present). If asked
+  for something more precise than what's provided — a dasha period
+  beyond those listed, a divisional chart
   placement not listed, an ingress further out than the next one shown,
   or anything else not explicitly given — say plainly
   "I don't have that specific data available" rather than generating a
@@ -214,7 +216,9 @@ def _build_monthly_context_block(base_chart_id: str) -> str:
                     parts.append(f"{label} ({area}): {text}")
                 lines.append("Predicted Windows: " + " | ".join(parts))
 
-        # v7: pratyantar lord + active yogas from base_chart predictive_signals
+        # v7: active yogas from base_chart predictive_signals. Pratyantar
+        # is NOT read from this month-scoped cache any more -- the live
+        # DASHA PERIODS section (_build_chat_context()) supersedes it.
         try:
             with get_conn() as conn:
                 bc_row = conn.execute(
@@ -224,10 +228,6 @@ def _build_monthly_context_block(base_chart_id: str) -> str:
             if bc_row and bc_row[0]:
                 bc_payload = bc_row[0] if isinstance(bc_row[0], dict) else json.loads(bc_row[0] or "{}")
                 ps = bc_payload.get("predictive_signals", {})
-                dp = ps.get("dasha_precision", {})
-                pt_lord = (dp.get("pratyantar") or {}).get("lord") or dp.get("pt_lord")
-                if pt_lord:
-                    lines.append(f"Pratyantar Lord: {pt_lord}")
                 active_yogas = [
                     y.get("name") or y.get("yoga_name", "")
                     for y in ps.get("active_yogas", [])
@@ -592,6 +592,18 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
             "record gender) -- reason only from the 7th lord and Darakaraka for marriage.\n"
         )
 
+    if context.get("dasha_periods_context"):
+        system_prompt += (
+            "\n\n## DASHA PERIODS (computed live, exact dates)\n"
+            + context["dasha_periods_context"]
+            + "\nThese are real period boundaries from your Vimshottari timeline. When asked "
+            "when a phase changes or what's coming up, state the relevant boundary at "
+            "month-and-year precision (e.g. \"your Saturn sub-period runs until August 2028\"). "
+            "These periods are general -- not computed for any one life area -- so describe "
+            "what the ruling planet brings rather than claiming a period was computed for "
+            "the topic asked about. Never state a period boundary not listed here.\n"
+        )
+
     if reading_as_name:
         system_prompt = f"Reading from {reading_as_name}'s chart.\n\n" + system_prompt
     return system_prompt
@@ -643,16 +655,22 @@ def _build_chat_context(base_chart_id: str) -> dict:
     planets_summary = ", ".join(planet_bits) or "not available"
 
     # Dasha
+    # Resolved live from the natal timeline -- NOT vimshottari["current"],
+    # which is frozen at chart creation (stale for 6/41 charts on
+    # 2026-10-01), and not the month-scoped predictive_signals cache.
     mahadasha = "unknown"
     antardasha = "unknown"
+    dasha_periods_context = ""
     vimshottari = dashas.get("vimshottari", {}) if isinstance(dashas, dict) else {}
-    if isinstance(vimshottari, dict):
-        current = vimshottari.get("current", {})
-        if isinstance(current, dict):
-            mahadasha = current.get("lord", "unknown")
-            antar = current.get("antar", {})
-            if isinstance(antar, dict):
-                antardasha = antar.get("lord", "unknown")
+    try:
+        from app.engines.pratyantar_dasha_engine import compute_dasha_snapshot, format_dasha_snapshot_context
+        dasha_snap = compute_dasha_snapshot(vimshottari) if isinstance(vimshottari, dict) else {}
+        if dasha_snap:
+            mahadasha = dasha_snap["mahadasha"]["lord"]
+            antardasha = dasha_snap["antardasha"]["lord"]
+            dasha_periods_context = format_dasha_snapshot_context(dasha_snap)
+    except Exception as e:
+        logger.warning(f"Live dasha snapshot failed in chat context: {e}")
 
     # Yogas — compute fresh using yoga engine
     yogas_summary = "none notable"
@@ -921,6 +939,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "gochara_context": gochara_context,
         "ingress_context": ingress_context,
         "marriage_health_context": marriage_health_context,
+        "dasha_periods_context": dasha_periods_context,
     }
 
 

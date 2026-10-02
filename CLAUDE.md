@@ -323,6 +323,30 @@ stale" and "confirmed real" looked like in practice):
   same week -- kept only as a record of the fix sequence, not as
   current behavior.
 
+- **`vimshottari["current"]` is frozen at chart creation and goes stale.
+  Found 2026-10-02: 6 of 41 real charts had a stored current Antardasha
+  that no longer matched the live date** (e.g. `130d0025`: stored
+  Rahu›Jupiter, live Rahu›Saturn). Chat fixed (Phase 1, below): it now
+  resolves live via `pratyantar_dasha_engine.compute_dasha_snapshot()`.
+  `family.py` was already live (`resolve_antar_dasha()`).
+  **Still reading the stale field, not fixed**:
+  `app/pdf/canonical_report/data_loader.py` (lines ~271 and ~1046, the
+  birth-chart PDF's current-dasha section, so those 6 users' PDFs show
+  the wrong sub-period), `birth_chart_builder.py:185`
+  (`extract_active_dasha_lords()`, Mahadasha only, so it only goes wrong
+  once a chart crosses an MD boundary), and `prediction_envelope.py:133`
+  (existence check only; the Antardasha there is already resolved live).
+  Same fix shape for all: resolve from `timeline` for today, or rewrite
+  `current` on read.
+
+- **2026-10-02 chat build, Phase 1: live dasha period dates in both chats.**
+  `compute_dasha_snapshot()` gives current + next MD/AD/PD with exact
+  dates (pure arithmetic; cross-checked against `compute_pratyantar()`
+  on all 41 charts, 0 mismatches). `chat.py` renders it as a "DASHA
+  PERIODS" section; `family.py` folds a compact clause into each member
+  line. Chat no longer reads the Pratyantar lord from the month-scoped
+  `predictive_signals` cache.
+
 - **2026-10-01: chat's self-reported data gaps (wealth-timing question)
   checked against the real live prompt. Scoped only; nothing built,
   pending sign-off.** A user-reported answer listed 6 missing items.

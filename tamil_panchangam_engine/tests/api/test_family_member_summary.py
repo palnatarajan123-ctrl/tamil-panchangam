@@ -134,7 +134,13 @@ class TestBuildMemberSummaryExtension(unittest.TestCase):
         row = ("member-1", "husband", "Ravi", "chart-1", payload)
         old = _old_build_member_summary(row)
         new = _build_member_summary(row)
-        self.assertTrue(new.startswith(old), f"{new!r} does not start with {old!r}")
+        # 2026-10-02: the dasha clause now carries live Pratyantar + period
+        # dates ("Dasha Saturn›Venus›<PD> (sub-period to ...)"), so only the
+        # fields up to the MD›AD lords are still a byte-identical prefix.
+        old_prefix, old_sade_sati = old.split(", Sade Sati")
+        self.assertTrue(new.startswith(old_prefix), f"{new!r} does not start with {old_prefix!r}")
+        self.assertIn("Sade Sati" + old_sade_sati, new)
+        self.assertIn("sub-period to ", new)
         self.assertIn("Marriage:", new)
         self.assertIn("Health:", new)
 
