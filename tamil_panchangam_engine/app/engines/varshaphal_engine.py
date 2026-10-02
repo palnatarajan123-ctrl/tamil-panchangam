@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional
 import swisseph as swe
 
 from app.utils.swisseph_utils import compute_planet_longitude_at_jd
+from app.utils.prompt_dates import fmt_date, fmt_month
 
 logger = logging.getLogger(__name__)
 
@@ -282,8 +283,8 @@ def format_varshaphal_context(vp: Dict[str, Any]) -> str:
     if not vp:
         return ""
     return "\n".join([
-        f"- Annual year in force: from the solar return on {vp['solar_return_date']} "
-        f"until the next one (around {vp['next_return_approx']})",
+        f"- Annual year in force: from the solar return on {fmt_date(vp['solar_return_date'])} "
+        f"until the next one (around {fmt_month(vp['next_return_approx'])})",
         f"- Annual Lagna: {vp['lagna_english']} ({vp['lagna']}); its lord: {vp['annual_lagna_lord']}",
         f"- Muntha: {vp['muntha_english']} ({vp['muntha']}) -- "
         f"{_ordinal(vp['muntha_house'])} house from the annual Lagna, "
@@ -297,6 +298,6 @@ def format_varshaphal_compact(vp: Dict[str, Any]) -> str:
     """One-clause rendering for family.py's per-member line."""
     if not vp:
         return ""
-    return (f"Annual chart (from {vp['solar_return_date']}): Lagna {vp['lagna_english']}, "
+    return (f"Annual chart (from {fmt_date(vp['solar_return_date'])}): Lagna {vp['lagna_english']}, "
             f"Muntha {vp['muntha_english']} ({_ordinal(vp['muntha_house'])} "
             f"from annual Lagna)")

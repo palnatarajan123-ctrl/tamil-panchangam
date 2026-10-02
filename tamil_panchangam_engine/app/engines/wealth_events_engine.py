@@ -28,6 +28,7 @@ from typing import Any, Dict, List
 
 from app.engines.children_timing_engine import _find_planet_dashas, _get_house_lord
 from app.engines.porutham_engine import _rasi_index
+from app.utils.prompt_dates import fmt_dasha_windows
 
 logger = logging.getLogger(__name__)
 
@@ -96,12 +97,12 @@ def format_wealth_events_context(signals: Dict[str, Any], label: str = "") -> st
     same = signals["second_lord"] == signals["eleventh_lord"]
     lines = [
         f"{prefix}2nd house (accumulated wealth) lord (from Moon): {signals['second_lord']}",
-        f"{prefix}2nd lord Dasha windows in range: {signals['second_lord_dashas']}",
+        f"{prefix}2nd lord Dasha windows in range: {fmt_dasha_windows(signals['second_lord_dashas'])}",
         f"{prefix}11th house (income/gains) lord (from Moon): {signals['eleventh_lord']}"
         + (" (same planet as the 2nd lord -- its windows are listed above)" if same else ""),
     ]
     if not same:
-        lines.append(f"{prefix}11th lord Dasha windows in range: {signals['eleventh_lord_dashas']}")
+        lines.append(f"{prefix}11th lord Dasha windows in range: {fmt_dasha_windows(signals['eleventh_lord_dashas'])}")
     lines.append(
         f"{prefix}Dhana Yoga (natal): {_dhana_text(signals)}" if signals["dhana_yogas"]
         else f"{prefix}Dhana Yoga (natal): none detected"

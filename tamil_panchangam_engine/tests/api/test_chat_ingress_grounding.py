@@ -11,6 +11,7 @@ per-user, so it's cheap: computed once, cached in
 planet_ingress_events, and looked up -- never a live ephemeris call in
 the chat request path). See CLAUDE.md's 2026-09-13 entry.
 """
+from app.utils.prompt_dates import fmt_date
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
@@ -138,7 +139,7 @@ class TestChatIngressGrounding(unittest.TestCase):
         self.assertIn("## UPCOMING SIGN CHANGES (Peyarchi)", system_prompt)
         self.assertIn("Rahu: next enters", system_prompt)
         rahu_entry = context["ingress_context"]["Rahu"]
-        expected_date = rahu_entry["ingress_date_utc"].strftime("%Y-%m-%d")
+        expected_date = fmt_date(rahu_entry["ingress_date_utc"])  # "5 Dec 2026", never ISO
         self.assertIn(expected_date, system_prompt)
         self.assertIn("use them directly when asked", system_prompt)
 

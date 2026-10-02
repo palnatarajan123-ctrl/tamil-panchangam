@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone, date
 from typing import Any, Dict, List, Optional
 
 from app.utils.swisseph_utils import compute_planet_longitude
+from app.utils.prompt_dates import fmt_date
 
 logger = logging.getLogger(__name__)
 
@@ -185,13 +186,13 @@ def select_chat_transit_hits(
         if not relation:
             continue
         if h["hit_date"] == end:
-            when = f"tightening; becomes exact after {end} (beyond the {window_days}-day scan)"
+            when = f"tightening; becomes exact after {fmt_date(end)} (beyond the {window_days}-day scan)"
         elif h["hit_date"] == start:
-            when = f"was exact before {start} (beyond the {window_days}-day scan), now separating"
+            when = f"was exact before {fmt_date(start)} (beyond the {window_days}-day scan), now separating"
         elif h["hit_date"] < reference_date.isoformat():
-            when = f"exact on {h['hit_date']} (past, now separating)"
+            when = f"exact on {fmt_date(h['hit_date'])} (past, now separating)"
         else:
-            when = f"exact on {h['hit_date']}"
+            when = f"exact on {fmt_date(h['hit_date'])}"
         out.append({
             "transit_planet": h["transit_planet"],
             "natal_planet": h["natal_planet"],

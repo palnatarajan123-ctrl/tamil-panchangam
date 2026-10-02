@@ -23,6 +23,7 @@ from app.engines.shadbala_engine import compute_shadbala
 from app.engines.budget_guard import log_llm_call
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled, get_llm_pause_reason
+from app.utils.prompt_dates import fmt_date, humanize_iso_dates
 
 logger = logging.getLogger(__name__)
 
@@ -556,13 +557,13 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
             entry = ic.get(planet)
             if not entry:
                 continue
-            ingress_date = entry["ingress_date_utc"].strftime("%Y-%m-%d")
+            ingress_date = fmt_date(entry["ingress_date_utc"])
             house_bits = f"house {entry.get('house_from_moon', '?')} from your Moon sign"
             if "house_from_lagna" in entry:
                 house_bits += f", house {entry['house_from_lagna']} from your Ascendant"
             line = f"- {planet}: next enters {entry['to_sign']} on {ingress_date} (will be {house_bits})"
             if entry.get("retrograde_return_date_utc"):
-                retro_date = entry["retrograde_return_date_utc"].strftime("%Y-%m-%d")
+                retro_date = fmt_date(entry["retrograde_return_date_utc"])
                 line += (
                     f"; may retrograde back into its previous sign around {retro_date} "
                     "before finally settling — mention this if asked, don't just say a single date"
@@ -1005,7 +1006,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
 
     return {
         "name": birth.get("name", "the chart holder"),
-        "date": birth.get("date_of_birth", "unknown"),
+        "date": fmt_date(birth.get("date_of_birth")) or "unknown",
         "time": birth.get("time_of_birth", "unknown"),
         "place": birth.get("place_of_birth", "unknown"),
         "lagna_sign": lagna_sign,
@@ -1032,29 +1033,13 @@ def _build_chat_context(base_chart_id: str) -> dict:
     }
 
 
-@router.post("/stream")
-async def chat_stream(
-    req: ChatRequest,
-    user: dict = Depends(get_current_user),
-):
-    """Streaming chat endpoint — returns SSE stream."""
-    user_id = user["id"]
-    user_role = user.get("role", "user")
-
-    # Check question limit
-    limit = CHAT_LIMITS.get(user_role)
-    if limit is not None:
-        count = _get_question_count(user_id, req.base_chart_id)
-        if count >= limit:
-            now = datetime.now(timezone.utc)
-            reset_month = now.month + 1 if now.month < 12 else 1
-            reset_year = now.year if now.month < 12 else now.year + 1
-            raise HTTPException(
-                status_code=429,
-                detail=f"You've used your {limit} questions for this chart this month. "
-                       f"Your questions reset on {reset_year}-{reset_month:02d}-01."
-            )
-
+def _assemble_chat_system_prompt(req: "ChatRequest", user_id: str) -> str:
+    """
+    The complete system prompt chat_stream() sends: chart context, family
+    members, prospects, child context, cached monthly block. Every ISO date
+    left in it is rewritten ("2029-05-22" -> "22 May 2029") on the way out --
+    the model was seen transposing ISO dates (see app/utils/prompt_dates.py).
+    """
     # Build context
     try:
         context = _build_chat_context(req.base_chart_id)
@@ -1192,6 +1177,34 @@ Frame all responses in parent-friendly language.
     v6_block = _build_monthly_context_block(req.base_chart_id)
     if v6_block:
         system_prompt = system_prompt + "\n\n" + v6_block
+
+    return humanize_iso_dates(system_prompt)
+
+
+@router.post("/stream")
+async def chat_stream(
+    req: ChatRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Streaming chat endpoint — returns SSE stream."""
+    user_id = user["id"]
+    user_role = user.get("role", "user")
+
+    # Check question limit
+    limit = CHAT_LIMITS.get(user_role)
+    if limit is not None:
+        count = _get_question_count(user_id, req.base_chart_id)
+        if count >= limit:
+            now = datetime.now(timezone.utc)
+            reset_month = now.month + 1 if now.month < 12 else 1
+            reset_year = now.year if now.month < 12 else now.year + 1
+            raise HTTPException(
+                status_code=429,
+                detail=f"You've used your {limit} questions for this chart this month. "
+                       f"Your questions reset on {reset_year}-{reset_month:02d}-01."
+            )
+
+    system_prompt = _assemble_chat_system_prompt(req, user_id)
 
     # Build messages array (last 6 pairs max)
     history_trimmed = req.history[-12:] if len(req.history) > 12 else req.history

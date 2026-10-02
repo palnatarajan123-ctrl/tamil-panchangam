@@ -470,10 +470,23 @@ stale" and "confirmed real" looked like in practice):
   **Found while verifying, fixed here**: with ISO dates the model restated
   `2029-05-22` as "29 May 2029" in 2/3 live runs (the year's "29" bleeding
   into the day, plausibly pulled by "Saturn return at 29"). This section
-  now renders "22 May 2029", which gave 3/3 correct. **Not done, same
-  risk**: the other chat sections (DASHA PERIODS, peyarchi, transit hits,
-  marriage/health/wealth window dicts) still use ISO dates. No misread
-  was observed there, but this one was only caught by repeated sampling.
+  now renders "22 May 2029", which gave 3/3 correct.
+  **Swept 2026-10-02 (both chats)**: `app/utils/prompt_dates.py`
+  (`fmt_date`/`fmt_month`/`fmt_dasha_windows`/`humanize_iso_dates`) is
+  now the one date renderer. Fixed at source: Born line, DASHA PERIODS,
+  Varshaphal (both formatters), peyarchi (chat.py + family.py),
+  transit hits (both formatters), marriage/health/wealth windows (were
+  raw dict reprs; `child_prediction_engine.py` shares these two
+  formatters so it's covered too). Each chat's full prompt is now built
+  by `_assemble_chat_system_prompt()` / `_assemble_family_chat_system_prompt()`,
+  which apply `humanize_iso_dates()` as a safety net. Real prompts for all
+  41 charts + 4 family groups: 0 ISO dates even with the net off.
+  `tests/api/test_prompt_iso_dates.py` guards the pattern (mutation-checked).
+  Live: Saturn return 3/3 "22 May 2029", Jupiter-to-Moon aspect 3/3
+  "6 November 2026". **Not covered (not chat)**: the monthly/yearly LLM
+  payload (`payload_builder.py`, e.g. `solar_return_date`, event-window
+  dates) and `family_prediction_engine.py` ("Date of Birth",
+  "Antardasha ends") still send ISO dates to their own LLM calls.
 
 - **2026-10-01: chat's self-reported data gaps (wealth-timing question)
   checked against the real live prompt. Scoped only; nothing built,

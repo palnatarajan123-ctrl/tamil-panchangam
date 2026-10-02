@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional
 
 from app.engines.children_timing_engine import RASI_LORDS, _get_house_lord, _find_planet_dashas
 from app.engines.porutham_engine import _rasi_index
+from app.utils.prompt_dates import fmt_dasha_windows
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ def format_health_events_context(signals: Dict[str, Any], label: str = "") -> st
     lines = []
     for key, house_label in (("sixth", "6th house (disease/daily struggle)"), ("eighth", "8th house (longevity/chronic)")):
         lines.append(f"{prefix}{house_label} lord (from Moon): {signals[f'{key}_lord']}")
-        lines.append(f"{prefix}{house_label} lord Dasha windows in range: {signals[f'{key}_lord_dashas']}")
+        lines.append(f"{prefix}{house_label} lord Dasha windows in range: {fmt_dasha_windows(signals[f'{key}_lord_dashas'])}")
         if signals[f"{key}_house_afflicted"]:
             lines.append(
                 f"{prefix}{house_label} is natally occupied by a natural malefic "

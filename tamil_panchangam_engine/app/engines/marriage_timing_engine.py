@@ -39,6 +39,7 @@ from typing import Any, Dict, List, Optional
 
 from app.engines.children_timing_engine import RASI_LORDS, _get_house_lord, _find_planet_dashas
 from app.engines.porutham_engine import _rasi_index
+from app.utils.prompt_dates import fmt_dasha_windows
 
 logger = logging.getLogger(__name__)
 
@@ -132,13 +133,13 @@ def format_marriage_timing_context(signals: Dict[str, Any], label: str = "") -> 
     prefix = f"{label} " if label else ""
     lines = [
         f"{prefix}7th house lord (from Moon): {signals['seventh_lord']}",
-        f"{prefix}7th lord Dasha windows in range: {signals['seventh_lord_dashas']}",
+        f"{prefix}7th lord Dasha windows in range: {fmt_dasha_windows(signals['seventh_lord_dashas'])}",
         f"{prefix}Darakaraka (Jaimini, lowest-degree graha): {signals['darakaraka']}",
-        f"{prefix}Darakaraka Dasha windows in range: {signals['darakaraka_dashas']}",
+        f"{prefix}Darakaraka Dasha windows in range: {fmt_dasha_windows(signals['darakaraka_dashas'])}",
     ]
     if signals["gender_known"]:
         lines.append(f"{prefix}Kalatra Karaka: {signals['kalatra_karaka']}")
-        lines.append(f"{prefix}Kalatra Karaka Dasha windows in range: {signals['kalatra_karaka_dashas']}")
+        lines.append(f"{prefix}Kalatra Karaka Dasha windows in range: {fmt_dasha_windows(signals['kalatra_karaka_dashas'])}")
     else:
         lines.append(
             f"{prefix}Kalatra Karaka: not available (gender not recorded for this chart)"

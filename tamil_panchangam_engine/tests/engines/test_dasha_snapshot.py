@@ -81,8 +81,8 @@ def test_uncovered_date_returns_empty():
 def test_formatters():
     snap = compute_dasha_snapshot(_vim(), date(2026, 10, 1))
     verbose = format_dasha_snapshot_context(snap)
-    assert "Current Antardasha (sub-period): Saturn, 2025-10-03 to 2028-08-08" in verbose
-    assert "Next Antardasha: Mercury, 2028-08-08 to 2031-02-25" in verbose
+    assert "Current Antardasha (sub-period): Saturn, 3 Oct 2025 to 8 Aug 2028" in verbose
+    assert "Next Antardasha: Mercury, 8 Aug 2028 to 25 Feb 2031" in verbose
     compact = format_dasha_snapshot_compact(snap)
     assert compact == (
         "Dasha Rahu›Saturn›Ketu (Saturn sub-period Oct 2025–Aug 2028; "

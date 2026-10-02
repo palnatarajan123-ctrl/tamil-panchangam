@@ -8,6 +8,7 @@ for a given date, using the existing Vimshottari Mahadasha/Antardasha timeline.
 import logging
 from datetime import datetime, timedelta, timezone, date
 from typing import Any, Dict, List, Optional, Tuple
+from app.utils.prompt_dates import fmt_date
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +229,7 @@ def format_dasha_snapshot_context(snap: Dict[str, Any]) -> str:
     ):
         p = snap.get(key)
         if p:
-            lines.append(f"- {label}: {p['lord']}, {p['start']} to {p['end']}")
+            lines.append(f"- {label}: {p['lord']}, {fmt_date(p['start'])} to {fmt_date(p['end'])}")
     return "\n".join(lines)
 
 

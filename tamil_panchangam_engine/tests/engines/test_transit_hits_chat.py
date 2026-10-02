@@ -68,13 +68,13 @@ def test_window_edge_hits_are_not_presented_as_exact():
     start_edge = _hit("Mars", "Sun", 108.5, 288.4, "opposition", hit_date="2026-08-18")
     past = _hit("Jupiter", "Sun", 108.4, 288.4, "opposition", hit_date="2026-08-26")
     sel = {s["transit_planet"] + s["hit_date"]: s["when"] for s in select_chat_transit_hits([end_edge, start_edge, past], REF)}
-    assert sel["Rahu2026-11-16"].startswith("tightening; becomes exact after 2026-11-16")
-    assert sel["Mars2026-08-18"].startswith("was exact before 2026-08-18")
-    assert sel["Jupiter2026-08-26"] == "exact on 2026-08-26 (past, now separating)"
+    assert sel["Rahu2026-11-16"].startswith("tightening; becomes exact after 16 Nov 2026")
+    assert sel["Mars2026-08-18"].startswith("was exact before 18 Aug 2026")
+    assert sel["Jupiter2026-08-26"] == "exact on 26 Aug 2026 (past, now separating)"
 
 
 def test_compact_limits_to_nearest():
     hits = [_hit("Mars", "Sun", 108.5, 288.4, "opposition", hit_date=d)
             for d in ("2026-09-01", "2026-10-03", "2026-10-10", "2026-11-10")]
     text = format_chat_transit_hits_compact(select_chat_transit_hits(hits, REF), REF, limit=2)
-    assert "2026-10-03" in text and "2026-10-10" in text and "2026-11-10" not in text
+    assert "3 Oct 2026" in text and "10 Oct 2026" in text and "10 Nov 2026" not in text

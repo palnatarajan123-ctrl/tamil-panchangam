@@ -28,6 +28,7 @@ from pydantic import BaseModel
 from app.api.chat import DOMAIN_WINDOW_RULE
 from app.core.auth import get_current_user
 from app.db.postgres import get_conn
+from app.utils.prompt_dates import fmt_date, humanize_iso_dates
 from app.repositories.base_chart_repo import get_base_chart_by_id
 from app.llm.payload_builder import (
     _extract_nak_rasi, _get_or_compute_porutham, _format_porutham_lines,
@@ -1407,13 +1408,13 @@ def _build_family_ingress_block(rows: list) -> str:
                     entry = _get_ingress(conn, planet, node_type)
                     if not entry:
                         continue
-                    ingress_date = entry["ingress_date_utc"].strftime("%Y-%m-%d")
+                    ingress_date = fmt_date(entry["ingress_date_utc"])
                     house_bits = f"house {house_from_sign(entry['to_sign'], moon_rasi_en)} from {name}'s Moon sign"
                     if lagna_rasi_en:
                         house_bits += f", house {house_from_sign(entry['to_sign'], lagna_rasi_en)} from {name}'s Ascendant"
                     line = f"- {name}: {planet} next enters {entry['to_sign']} on {ingress_date} ({house_bits})"
                     if entry.get("retrograde_return_date_utc"):
-                        retro_date = entry["retrograde_return_date_utc"].strftime("%Y-%m-%d")
+                        retro_date = fmt_date(entry["retrograde_return_date_utc"])
                         line += (
                             f"; may retrograde back into its previous sign around {retro_date} "
                             "before finally settling -- mention this if asked, don't just say a single date"
@@ -1580,33 +1581,12 @@ def _build_prospect_chat_block(user_id: str, base_chart_id: str) -> str:
         return ""
 
 
-@router.post("/groups/{group_id}/chat/stream")
-async def family_group_chat_stream(
-    group_id: str,
-    req: _FamilyChatRequest,
-    user: dict = Depends(get_current_user),
-):
-    """Streaming family chat — all member charts included in LLM context."""
-    user_id = user["id"]
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="LLM not configured")
-
-    with get_conn() as conn:
-        group = _assert_group_owner(conn, group_id, user_id)
-
-        rows = conn.execute("""
-            SELECT fm.id, fm.role, fm.display_name, fm.chart_id, bc.payload
-            FROM family_members fm
-            JOIN base_charts bc ON bc.id = fm.chart_id
-            WHERE fm.group_id = %s
-            ORDER BY fm.role, fm.birth_order
-        """, (group_id,)).fetchall()
-
-    if not rows:
-        raise HTTPException(status_code=400, detail="No members in this family group")
-
+def _assemble_family_chat_system_prompt(group, rows, group_id: str, user_id: str, base_chart_id) -> str:
+    """
+    The complete system prompt family_group_chat_stream() sends. Every ISO
+    date left in it is rewritten ("2029-05-22" -> "22 May 2029") on the way
+    out -- see app/utils/prompt_dates.py.
+    """
     member_lines = "\n".join(f"- {_build_member_summary(r)}" for r in rows)
 
     system_prompt = _FAMILY_CHAT_SYSTEM_PROMPT.format(
@@ -1640,9 +1620,41 @@ async def family_group_chat_stream(
     if children_timing_block:
         system_prompt += children_timing_block
 
-    prospect_block = _build_prospect_chat_block(user_id, req.base_chart_id)
+    prospect_block = _build_prospect_chat_block(user_id, base_chart_id)
     if prospect_block:
         system_prompt += prospect_block
+
+    return humanize_iso_dates(system_prompt)
+
+
+@router.post("/groups/{group_id}/chat/stream")
+async def family_group_chat_stream(
+    group_id: str,
+    req: _FamilyChatRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Streaming family chat — all member charts included in LLM context."""
+    user_id = user["id"]
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="LLM not configured")
+
+    with get_conn() as conn:
+        group = _assert_group_owner(conn, group_id, user_id)
+
+        rows = conn.execute("""
+            SELECT fm.id, fm.role, fm.display_name, fm.chart_id, bc.payload
+            FROM family_members fm
+            JOIN base_charts bc ON bc.id = fm.chart_id
+            WHERE fm.group_id = %s
+            ORDER BY fm.role, fm.birth_order
+        """, (group_id,)).fetchall()
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="No members in this family group")
+
+    system_prompt = _assemble_family_chat_system_prompt(group, rows, group_id, user_id, req.base_chart_id)
 
     history_trimmed = req.history[-12:]
     messages = [{"role": m.role, "content": m.content} for m in history_trimmed]
