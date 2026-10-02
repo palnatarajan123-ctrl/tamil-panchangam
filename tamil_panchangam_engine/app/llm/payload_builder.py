@@ -1293,8 +1293,9 @@ def extract_payload_inputs(
                     vp = ps["varshaphal"]
                     predictive_signals_context["varshaphal"] = {
                         "year": vp.get("year"),
+                        "solar_return_date": vp.get("solar_return_date"),
                         "lagna": vp.get("lagna"),
-                        "varshesha": vp.get("varshesha"),
+                        "annual_lagna_lord": vp.get("annual_lagna_lord"),
                         "strength": vp.get("strength"),
                         "muntha": vp.get("muntha"),
                     }

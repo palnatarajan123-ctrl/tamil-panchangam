@@ -222,7 +222,7 @@ class TestPayloadBuilderPredictiveSignals(unittest.TestCase):
                 "active_yogas": [
                     {"yoga_name": "Gaja Kesari Yoga", "activation_level": "peak", "life_area": "career"},
                 ],
-                "varshaphal": {"year": 2026, "lagna": "Mesham", "varshesha": "Mars", "strength": "strong"},
+                "varshaphal": {"year": 2026, "lagna": "Mesham", "annual_lagna_lord": "Mars", "strength": "strong"},
             }
         }
         inputs = extract_payload_inputs(

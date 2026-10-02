@@ -99,13 +99,10 @@ def compute_predictive_signals(
 
     # ── 5. Varshaphal ─────────────────────────────────────────────────────────
     try:
-        from app.engines.varshaphal_engine import compute_varshaphal
-        signals["varshaphal"] = compute_varshaphal(
-            ephemeris=ephemeris,
-            birth_details=birth_details,
-            year=year,
-            ayanamsa=ayanamsa,
-        )
+        # The annual chart in force at this month's anchor date -- not the
+        # calendar year's return, which may not have happened yet.
+        from app.engines.varshaphal_engine import get_varshaphal_in_force
+        signals["varshaphal"] = get_varshaphal_in_force(chart_id, payload, reference_date)
     except Exception as e:
         logger.warning("varshaphal failed chart=%s: %s", chart_id, e)
         signals["varshaphal"] = {}

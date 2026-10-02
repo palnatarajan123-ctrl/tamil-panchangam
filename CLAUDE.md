@@ -357,22 +357,38 @@ stale" and "confirmed real" looked like in practice):
   `_CACHE_VERSION` to invalidate). It picks the return IN FORCE today (the
   most recent on or before today), not the calendar year's return.
   Muntha checked on all 41 charts (natal Lagna + age).
-  **Found, not fixed, in `compute_varshaphal()` itself** (still used
-  as-is by `predictive_signals_engine.py` → monthly report payload):
-  1. Its `year` is the CALENDAR year, so for anyone whose birthday is
-     later in the year (8/41 charts on 2026-10-02) the monthly report gets
-     a solar return that hasn't happened yet.
-  2. `varshesha` is just the annual Lagna's lord, not the classical
-     Tajika Varsheshwara (chosen from five office-bearers by strength).
-  3. `varshesha_house` is the house of the first sign that planet OWNS,
-     not where it is placed. Meaningless.
-  4. `muntha_house` is counted from the NATAL Lagna, so it's always
-     (age % 12) + 1. Tajika judges Muntha from the annual Lagna.
-  5. `strength` is just a count of natural benefics in annual kendras,
-     a heuristic.
-  Chat avoids 2-4 (it shows "lord of the annual Lagna", Muntha from
-  both Lagnas, and no house for the lord) and states the benefic count
-  as a count.
+  **Fixed 2026-10-02 at the single source, both consumers consolidated**:
+  `get_varshaphal_in_force(chart_id, payload, on_date)` (renamed from
+  `get_current_varshaphal`) is now the only entry point: chat/family
+  (today) and `predictive_signals_engine.py` (the monthly report's
+  15th-of-month anchor). `compute_varshaphal()` output: `varshesha` →
+  `annual_lagna_lord`, meaningless `varshesha_house` dropped,
+  `muntha_house` now from the ANNUAL Lagna (`muntha_house_from_natal_lagna`
+  kept). `_CACHE_VERSION` → 2. Consumers updated:
+  `event_window_engine.py` Signal 4 label, `payload_builder.py`
+  (`annual_lagna_lord` + `solar_return_date`), v7 prompt (no "year-lord";
+  `strength` is a benefics-in-kendra count, not the lord's own strength
+  -- the old themes said "Venus in a minimal-strength position");
+  `prediction.py` recomputes a cached `predictive_signals` still holding
+  the old `varshesha` key.
+  **Real scope was larger than "8/41 charts"** (that was today's
+  snapshot): monthly rows anchor on each month's 15th, so 35 cached
+  monthly rows / 13 charts used a not-yet-happened return. 19 of them
+  (7 charts) had LLM-written `annual_theme` text built from it; the
+  other 16 have a null `annual_theme`. **Regenerated exactly those 19**,
+  LLM step only: reusing each row's stored envelope/synthesis (no
+  envelope rebuild, so the held Gochara-dispositor backfill did NOT leak
+  in), recomputing that month's predictive_signals, bypassing
+  `_check_cache` in-process (old `prediction_llm_interpretation` rows
+  kept as history). 19/19 real, 0 fallbacks, 302,157 tokens (~$1.66).
+  Smoke: `2e7e056f` Oct 2026 report now says "from December 2025 …
+  Jupiter", matching chat (SR 2025-12-05, Lagna Pisces, lord Jupiter).
+  **Still open**: `strength` is still the benefic-count heuristic
+  (item 5), and `solar_return_date` reaches the monthly LLM payload as
+  ISO (one regenerated theme, `b1a35180` 2026-08, said "from late August
+  2026" for the Aug 2025 return, though the next return does fall in
+  that month). Also: `varshaphal_engine.py`'s own `RASI_NAMES` uses the
+  variant Tamil spellings (Midhunam/Kadagam/Simham), not the payload's.
   **Also seen in verification**: `family.py` has no CURRENT-transit data
   (already known, see the Gochara entry below), and in one run it read
   "Rahu enters Capricorn (10th) on Dec 5" as Rahu being in the 10th now.

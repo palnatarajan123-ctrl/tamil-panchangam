@@ -324,7 +324,7 @@ def detect_confluence(
         pratyantar: output of compute_pratyantar.
         transit_hits: output of compute_transit_hits.
         active_yogas: output of compute_yoga_activation.
-        varshaphal: output of compute_varshaphal.
+        varshaphal: output of get_varshaphal_in_force.
         refined_av: output of compute_refined_av.
         reference_date: center date; defaults to today.
         num_months: half-range in months (total range = 2 × num_months months).
@@ -350,10 +350,10 @@ def detect_confluence(
     pt_is_benefic = pt_lord in _BENEFIC_PLANETS if pt_lord else False
     pt_is_malefic = pt_lord in _MALEFIC_PLANETS if pt_lord else False
 
-    # Varshesha
-    varshesha = varshaphal.get("varshesha", "")
-    varshesha_benefic = varshesha in _BENEFIC_PLANETS
-    varshesha_malefic = varshesha in _MALEFIC_PLANETS
+    # Annual Lagna lord (not the classical Tajika year-lord)
+    annual_lord = varshaphal.get("annual_lagna_lord", "")
+    annual_lord_benefic = annual_lord in _BENEFIC_PLANETS
+    annual_lord_malefic = annual_lord in _MALEFIC_PLANETS
 
     # Refined AV — flag signs with high scores (>= 5 in sarvashtakavarga)
     sarva = refined_av.get("sarvashtakavarga_refined", {})
@@ -412,15 +412,15 @@ def detect_confluence(
             pos_counts[y_area] += 1
             pos_signals[y_area].append(label)
 
-        # Signal 4: varshaphal varshesha
-        if varshesha_benefic:
-            for area in _PLANET_POSITIVE_AREAS.get(varshesha, []):
+        # Signal 4: varshaphal annual Lagna lord
+        if annual_lord_benefic:
+            for area in _PLANET_POSITIVE_AREAS.get(annual_lord, []):
                 pos_counts[area] += 1
-                pos_signals[area].append(f"Varshaphal: {varshesha} varshesha supports {area}")
-        elif varshesha_malefic:
-            for area in _PLANET_POSITIVE_AREAS.get(varshesha, []):
+                pos_signals[area].append(f"Varshaphal: annual Lagna lord {annual_lord} supports {area}")
+        elif annual_lord_malefic:
+            for area in _PLANET_POSITIVE_AREAS.get(annual_lord, []):
                 neg_counts[area] += 1
-                neg_signals[area].append(f"Varshaphal: {varshesha} varshesha challenges {area}")
+                neg_signals[area].append(f"Varshaphal: annual Lagna lord {annual_lord} challenges {area}")
 
         # Signal 5: refined AV — if transit planet's sign has high score
         for hit in window_hits:

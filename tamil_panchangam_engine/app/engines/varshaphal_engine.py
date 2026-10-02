@@ -87,16 +87,23 @@ def compute_varshaphal(
     ayanamsa: str = "lahiri",
 ) -> Dict[str, Any]:
     """
-    Compute the Varshaphal (Solar Return) chart for `year`.
+    Compute the Varshaphal (Solar Return) chart for the solar return that
+    falls in CALENDAR year `year`. That return may still be in the future
+    relative to a given date (birthday later in the year) -- callers wanting
+    the annual chart in force on a date must use get_varshaphal_in_force().
 
     Args:
         ephemeris: payload['ephemeris'].
         birth_details: payload['birth_details'].
-        year: target year (defaults to current year UTC).
+        year: calendar year of the solar return (defaults to current year UTC).
         ayanamsa: ayanamsa name.
 
     Returns:
-        Varshaphal dict.
+        Varshaphal dict. `annual_lagna_lord` is only the annual Lagna's lord,
+        not the classical Tajika Varsheshwara (chosen among five
+        office-bearers by strength), so it must not be called the year-lord.
+        `muntha_house` is counted from the ANNUAL Lagna (how Tajika judges
+        Muntha); `muntha_house_from_natal_lagna` is always age % 12 + 1.
     """
     if year is None:
         year = datetime.now(timezone.utc).year
@@ -142,19 +149,13 @@ def compute_varshaphal(
 
     sr_lagna_idx = _sign_idx(sr_lagna_lon)
     sr_lagna = RASI_NAMES[sr_lagna_idx]
-    varshesha = _RASI_LORDS[sr_lagna_idx]
-
-    # House of varshesha from natal lagna (use first owned sign)
-    vh = next(
-        ((i - natal_lagna_idx) % 12 + 1
-         for i, lord in enumerate(_RASI_LORDS) if lord == varshesha),
-        1,
-    )
+    annual_lagna_lord = _RASI_LORDS[sr_lagna_idx]
 
     # ── Muntha ────────────────────────────────────────────────────────────────
     years_elapsed = year - birth_year
     muntha_idx = (natal_lagna_idx + years_elapsed) % 12
-    muntha_house = (muntha_idx - natal_lagna_idx) % 12 + 1
+    muntha_house = (muntha_idx - sr_lagna_idx) % 12 + 1
+    muntha_house_from_natal_lagna = (muntha_idx - natal_lagna_idx) % 12 + 1
 
     # ── Benefics in kendras of SR chart ──────────────────────────────────────
     kendras = {1, 4, 7, 10}
@@ -181,16 +182,16 @@ def compute_varshaphal(
         "year": year,
         "solar_return_date": sr_date,
         "lagna": sr_lagna,
-        "varshesha": varshesha,
-        "varshesha_house": vh,
+        "annual_lagna_lord": annual_lagna_lord,
         "muntha": RASI_NAMES[muntha_idx],
         "muntha_house": muntha_house,
+        "muntha_house_from_natal_lagna": muntha_house_from_natal_lagna,
         "strength": strength,
         "benefics_in_kendra": benefics_in_kendra,
     }
 
 
-# ── Chat-facing: current annual chart, cached per chart per solar-return year ──
+# ── Annual chart in force on a date, cached per chart per solar-return year ──
 
 _ENGLISH_RASI = [
     "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -198,7 +199,9 @@ _ENGLISH_RASI = [
 ]
 _CACHE_KEY = "varshaphal_by_year"
 # Bump to invalidate cached entries if compute_varshaphal()'s semantics change.
-_CACHE_VERSION = 1
+# 2: varshesha -> annual_lagna_lord, varshesha_house dropped, muntha_house
+#    now from the annual Lagna.
+_CACHE_VERSION = 2
 
 
 def _cached_or_compute(chart_id: Optional[str], payload: Dict[str, Any], year: int) -> Dict[str, Any]:
@@ -233,34 +236,30 @@ def _cached_or_compute(chart_id: Optional[str], payload: Dict[str, Any], year: i
     return result
 
 
-def get_current_varshaphal(
+def get_varshaphal_in_force(
     chart_id: Optional[str],
     payload: Dict[str, Any],
-    today: Optional["date"] = None,
+    on_date: Optional["date"] = None,
 ) -> Dict[str, Any]:
     """
-    The annual chart in force on `today`: the most recent solar return on or
-    before today -- NOT simply compute_varshaphal(this calendar year), whose
-    return may still be in the future (birthday later in the year).
+    The annual chart in force on `on_date` (default today UTC): the most
+    recent solar return on or before that date -- NOT simply
+    compute_varshaphal(on_date.year), whose return may still be in the
+    future (birthday later in the year). The single entry point for every
+    consumer: chat/family (today) and monthly predictive signals (the
+    prediction month's anchor date).
 
-    Adds chat-safe fields on top of compute_varshaphal()'s output:
-      muntha_house_from_annual_lagna -- classical Tajika judges Muntha from
-          the annual Lagna; compute_varshaphal()'s muntha_house is counted
-          from the NATAL Lagna (always age % 12 + 1).
-      annual_lagna_lord -- what compute_varshaphal() calls "varshesha". It
-          is only the annual Lagna's lord, not the classical Tajika
-          Varsheshwara (chosen among five office-bearers), so chat must not
-          call it the year-lord.
+    Adds display fields on top of compute_varshaphal()'s output.
     Returns {} if the computation fails.
     """
     from datetime import date as _date
-    today = today or datetime.now(timezone.utc).date()
+    on_date = on_date or datetime.now(timezone.utc).date()
     try:
-        vp = _cached_or_compute(chart_id, payload, today.year)
-        if _date.fromisoformat(vp["solar_return_date"]) > today:
-            vp = _cached_or_compute(chart_id, payload, today.year - 1)
+        vp = _cached_or_compute(chart_id, payload, on_date.year)
+        if _date.fromisoformat(vp["solar_return_date"]) > on_date:
+            vp = _cached_or_compute(chart_id, payload, on_date.year - 1)
     except Exception as e:
-        logger.warning("Current varshaphal failed chart=%s: %s", chart_id, e)
+        logger.warning("Varshaphal in force failed chart=%s: %s", chart_id, e)
         return {}
 
     lagna_idx = RASI_NAMES.index(vp["lagna"])
@@ -268,10 +267,8 @@ def get_current_varshaphal(
     sr = _date.fromisoformat(vp["solar_return_date"])
     return {
         **vp,
-        "annual_lagna_lord": vp["varshesha"],
         "lagna_english": _ENGLISH_RASI[lagna_idx],
         "muntha_english": _ENGLISH_RASI[muntha_idx],
-        "muntha_house_from_annual_lagna": (muntha_idx - lagna_idx) % 12 + 1,
         "next_return_approx": f"{sr.year + 1}-{sr.month:02d}",
     }
 
@@ -289,8 +286,8 @@ def format_varshaphal_context(vp: Dict[str, Any]) -> str:
         f"until the next one (around {vp['next_return_approx']})",
         f"- Annual Lagna: {vp['lagna_english']} ({vp['lagna']}); its lord: {vp['annual_lagna_lord']}",
         f"- Muntha: {vp['muntha_english']} ({vp['muntha']}) -- "
-        f"{_ordinal(vp['muntha_house_from_annual_lagna'])} house from the annual Lagna, "
-        f"{_ordinal(vp['muntha_house'])} from the natal Lagna",
+        f"{_ordinal(vp['muntha_house'])} house from the annual Lagna, "
+        f"{_ordinal(vp['muntha_house_from_natal_lagna'])} from the natal Lagna",
         f"- Natural benefics (Moon, Mercury, Jupiter, Venus) in kendras (1/4/7/10) of the "
         f"annual chart: {vp['benefics_in_kendra']} of 4",
     ])
@@ -301,5 +298,5 @@ def format_varshaphal_compact(vp: Dict[str, Any]) -> str:
     if not vp:
         return ""
     return (f"Annual chart (from {vp['solar_return_date']}): Lagna {vp['lagna_english']}, "
-            f"Muntha {vp['muntha_english']} ({_ordinal(vp['muntha_house_from_annual_lagna'])} "
+            f"Muntha {vp['muntha_english']} ({_ordinal(vp['muntha_house'])} "
             f"from annual Lagna)")

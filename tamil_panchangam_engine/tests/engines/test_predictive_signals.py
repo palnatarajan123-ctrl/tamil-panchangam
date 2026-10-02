@@ -321,11 +321,11 @@ class TestVarshaphal:
         month = int(sr.split("-")[1])
         assert 9 <= month <= 12, f"Unexpected SR month {month} for Scorpio sun"
 
-    def test_varshesha_is_valid_planet(self):
+    def test_annual_lagna_lord_is_valid_planet(self):
         from app.engines.varshaphal_engine import compute_varshaphal
         valid = {"Mars", "Venus", "Mercury", "Moon", "Sun", "Jupiter", "Saturn"}
         result = compute_varshaphal(self._ephemeris(), self._birth_details(), year=2026)
-        assert result["varshesha"] in valid
+        assert result["annual_lagna_lord"] in valid
 
     def test_muntha_formula(self):
         """Muntha = (natal_lagna_sign + years_elapsed) % 12."""
@@ -339,8 +339,8 @@ class TestVarshaphal:
     def test_result_shape(self):
         from app.engines.varshaphal_engine import compute_varshaphal
         result = compute_varshaphal(self._ephemeris(), self._birth_details(), year=2026)
-        for key in ("year", "solar_return_date", "lagna", "varshesha",
-                    "varshesha_house", "muntha", "muntha_house",
+        for key in ("year", "solar_return_date", "lagna", "annual_lagna_lord",
+                    "muntha", "muntha_house", "muntha_house_from_natal_lagna",
                     "strength", "benefics_in_kendra"):
             assert key in result, f"Missing key: {key}"
         assert result["year"] == 2026
@@ -382,7 +382,7 @@ class TestConfluence:
             pratyantar=self._mock_pratyantar("Jupiter"),
             transit_hits=hits,
             active_yogas=[],
-            varshaphal={"varshesha": "Jupiter", "year": 2026, "muntha_house": 10},
+            varshaphal={"annual_lagna_lord": "Jupiter", "year": 2026, "muntha_house": 10},
             refined_av={},
             reference_date=date(2026, 7, 15),
             num_months=1,
@@ -409,7 +409,7 @@ class TestConfluence:
             pratyantar=self._mock_pratyantar("Saturn"),
             transit_hits=hits,
             active_yogas=[],
-            varshaphal={"varshesha": "Saturn", "year": 2026},
+            varshaphal={"annual_lagna_lord": "Saturn", "year": 2026},
             refined_av={},
             reference_date=date(2026, 7, 15),
             num_months=1,
@@ -424,7 +424,7 @@ class TestConfluence:
             pratyantar=self._mock_pratyantar("Jupiter"),
             transit_hits=hits,
             active_yogas=[],
-            varshaphal={"varshesha": "Jupiter"},
+            varshaphal={"annual_lagna_lord": "Jupiter"},
             refined_av={},
             reference_date=date(2026, 7, 15),
             num_months=1,
@@ -441,7 +441,7 @@ class TestConfluence:
             pratyantar=self._mock_pratyantar("Mars"),  # malefic → no positive for career
             transit_hits=hits,
             active_yogas=[],
-            varshaphal={"varshesha": "Mars"},
+            varshaphal={"annual_lagna_lord": "Mars"},
             refined_av={},
             reference_date=date(2026, 7, 15),
             num_months=1,
@@ -457,7 +457,7 @@ class TestConfluence:
             pratyantar=self._mock_pratyantar("Jupiter"),
             transit_hits=hits,
             active_yogas=[],
-            varshaphal={"varshesha": "Jupiter"},
+            varshaphal={"annual_lagna_lord": "Jupiter"},
             refined_av={},
             reference_date=date(2026, 7, 15),
             num_months=2,

@@ -305,10 +305,15 @@ ACTIVE YOGAS (active_yogas field):
   yoga_activation_summary to null.
 
 ANNUAL BACKDROP (varshaphal field):
-- Use varshesha (lord of the annual chart) and strength to set the
-  annual_theme.
+- Use annual_lagna_lord (lord of the annual chart's Lagna -- not a
+  "year-lord" or "ruler of the year") and strength to set the
+  annual_theme. The annual year runs from solar_return_date to the next
+  solar return, not January to December.
+- strength is a count of natural benefics in the annual chart's kendras,
+  not a measure of the annual Lagna lord's own strength -- do not describe
+  that planet as weak or strong because of it.
 - If strength is "strong": note the year has a generally supportive
-  annual backdrop for the varshesha's life areas.
+  annual backdrop for the annual Lagna lord's life areas.
 - If strength is "moderate": note mixed annual backdrop.
 - If strength is "weak" or "minimal": temper expectations for the year.
 - Do not use the word "Varshaphal" or "Varshesha" — say "annual chart"
@@ -395,7 +400,7 @@ overall_context: period_type, period_label, lagna, moon_rasi,
       (only high/very high confidence windows included)
     active_yogas: [{name, activation_level, life_area}]
       (only peak/strong activations included)
-    varshaphal: {year, lagna, varshesha, varshesha_house, strength, muntha}
+    varshaphal: {year, solar_return_date, lagna, annual_lagna_lord, strength, muntha}
 
 life_areas: each has name, score, strength, signals with
   summary, rationale, interpretive_hint, planet, house,

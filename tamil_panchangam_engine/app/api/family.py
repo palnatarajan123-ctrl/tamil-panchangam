@@ -1269,8 +1269,8 @@ def _build_member_summary(row: tuple) -> str:
 
     varshaphal_bit = ""
     try:
-        from app.engines.varshaphal_engine import get_current_varshaphal, format_varshaphal_compact
-        vp_text = format_varshaphal_compact(get_current_varshaphal(_chart_id, payload))
+        from app.engines.varshaphal_engine import get_varshaphal_in_force, format_varshaphal_compact
+        vp_text = format_varshaphal_compact(get_varshaphal_in_force(_chart_id, payload))
         varshaphal_bit = f", {vp_text}" if vp_text else ""
     except Exception as e:
         logger.warning(f"Varshaphal failed for family member {display_name}: {e}")

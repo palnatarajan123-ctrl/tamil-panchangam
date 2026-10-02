@@ -720,8 +720,8 @@ def _build_chat_context(base_chart_id: str) -> dict:
 
     # Annual chart in force today -- cached per chart per solar-return year
     # in the payload (computed at most once a year per chart).
-    from app.engines.varshaphal_engine import get_current_varshaphal, format_varshaphal_context
-    varshaphal_context = format_varshaphal_context(get_current_varshaphal(base_chart_id, payload))
+    from app.engines.varshaphal_engine import get_varshaphal_in_force, format_varshaphal_context
+    varshaphal_context = format_varshaphal_context(get_varshaphal_in_force(base_chart_id, payload))
 
     # Exact-degree transits to natal planets, +/-45 days, live (~0.01s).
     transit_hits_context = ""
