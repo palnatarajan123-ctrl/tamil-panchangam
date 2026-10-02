@@ -870,7 +870,8 @@ stale" and "confirmed real" looked like in practice):
   orchestrator, natal and KP (replacing two inline INSERT copies); live KP
   call raised the token counter by 4,741 = its `llm_calls` row.
   **Two ledgers, remember**: `log_llm_call()` → `llm_calls` ($ budget);
-Natal truncation FIXED 2026-10-02: the provider
+  `record_token_usage()` → `llm_token_usage` (`LLM_MONTHLY_TOKEN_BUDGET`).
+  **Natal truncation FIXED 2026-10-02**: the provider
   (`anthropic_provider.call_llm`) now reports `usage_info["truncated"]`
   (stop_reason == "max_tokens") and `["json_repaired"]`; natal and KP
   store a truncated reply as `fallback_reason="truncated"` (content kept,
