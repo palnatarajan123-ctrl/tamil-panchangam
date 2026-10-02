@@ -36,6 +36,14 @@ def record_token_usage(db, feature_name: str, prompt_version: str, total_tokens:
         """, [str(uuid.uuid4()), feature_name, prompt_version, total_tokens])
 
 
+def reply_truncated(response) -> bool:
+    """True if an Anthropic reply (or a stream's final message) stopped at
+    max_tokens, i.e. the text is cut off. For the free-text call sites that
+    call the API directly (chat, family chat, dasha summary, daily guidance,
+    porutham commentary): flag it, don't store it as a complete reply."""
+    return getattr(response, "stop_reason", None) == "max_tokens"
+
+
 def partial_stream_usage(stream, streamed_text: str) -> tuple:
     """(input_tokens, output_tokens) for a streamed reply that failed or was
     interrupted before get_final_message(). Input is exact (known from the

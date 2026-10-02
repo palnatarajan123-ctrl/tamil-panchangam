@@ -48,7 +48,7 @@ from app.llm.payload_builder import (
 )
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.dasha_resolver import resolve_antar_dasha
-from app.engines.budget_guard import log_llm_call, partial_stream_usage
+from app.engines.budget_guard import log_llm_call, partial_stream_usage, reply_truncated
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled, get_llm_pause_reason
 from app.engines.family_prediction_engine import run_family_prediction
 from app.engines.children_timing_engine import run_children_timing, _safe_json_list
@@ -825,8 +825,13 @@ def generate_timeline_summary(
     from_year: int,
     to_year: int,
     db,
+    meta: Optional[dict] = None,
 ) -> Optional[str]:
-    """Generate an LLM summary of the family's collective dasha landscape."""
+    """Generate an LLM summary of the family's collective dasha landscape.
+    If `meta` is given, meta["truncated"] says whether the summary was cut
+    off at max_tokens (2026-10-02 -- flagged, not hidden)."""
+    meta = meta if meta is not None else {}
+    meta["truncated"] = False
     group_id = group["id"]
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -841,11 +846,12 @@ def generate_timeline_summary(
     # Cache check
     try:
         row = db.execute(
-            "SELECT summary FROM family_timeline_cache WHERE group_id = %s "
+            "SELECT summary, COALESCE(summary_truncated, FALSE) FROM family_timeline_cache WHERE group_id = %s "
             "AND from_year = %s AND to_year = %s AND summary IS NOT NULL",
             [group_id, from_year, to_year]
         ).fetchone()
         if row:
+            meta["truncated"] = bool(row[1])
             return row[0]
     except Exception as e:
         logger.warning(f"Timeline summary cache read failed: {e}")
@@ -900,6 +906,7 @@ def generate_timeline_summary(
         input_tokens = response.usage.input_tokens
         output_tokens = response.usage.output_tokens
         summary = response.content[0].text.strip()
+        meta["truncated"] = reply_truncated(response)
     except Exception as e:
         logger.error(f"Timeline summary LLM call failed: {e}")
         try:
@@ -927,6 +934,7 @@ def generate_timeline_summary(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             status="success",
+            fallback_reason="truncated" if meta["truncated"] else None,
         )
     except Exception as e:
         logger.warning(f"log_llm_call failed: {e}")
@@ -934,9 +942,9 @@ def generate_timeline_summary(
     # Cache write
     try:
         db.execute(
-            "UPDATE family_timeline_cache SET summary = %s "
+            "UPDATE family_timeline_cache SET summary = %s, summary_truncated = %s "
             "WHERE group_id = %s AND from_year = %s AND to_year = %s",
-            [summary, group_id, from_year, to_year]
+            [summary, meta["truncated"], group_id, from_year, to_year]
         )
     except Exception as e:
         logger.warning(f"Timeline summary cache write failed: {e}")
@@ -969,14 +977,17 @@ def get_family_timeline(
             db=conn,
         )
         try:
+            summary_meta: dict = {}
             summary = generate_timeline_summary(
                 group={"id": group_id, "name": group["name"]},
                 members_with_charts=members_with_charts,
                 from_year=from_year,
                 to_year=to_year,
                 db=conn,
+                meta=summary_meta,
             )
             result["summary"] = summary
+            result["summary_truncated"] = summary_meta.get("truncated", False)
         except Exception as e:
             logger.error(f"Timeline summary generation failed: {e}")
             result["summary"] = None
@@ -1720,6 +1731,7 @@ async def family_group_chat_stream(
                 final_msg = stream.get_final_message()
                 input_tokens = final_msg.usage.input_tokens
                 output_tokens = final_msg.usage.output_tokens
+                truncated = reply_truncated(final_msg)
 
             with get_conn() as db:
                 log_llm_call(
@@ -1730,9 +1742,10 @@ async def family_group_chat_stream(
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     status="success",
+                    fallback_reason="truncated" if truncated else None,
                 )
 
-            yield f"data: {json.dumps({'done': True})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'truncated': truncated})}\n\n"
 
         except GeneratorExit:
             # Client went away mid-reply (closed the tab): not an Exception,

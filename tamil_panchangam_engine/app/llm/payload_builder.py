@@ -827,7 +827,7 @@ def _build_porutham_commentary_input(
 
 def _generate_porutham_commentary(
     porutham: dict, person_a_name: str, person_b_name: str, tone: str,
-    db=None, log_chart_id: Optional[str] = None,
+    db=None, log_chart_id: Optional[str] = None, meta: Optional[dict] = None,
 ) -> Optional[str]:
     """
     Generate a short (3-5 sentence) explanatory commentary for a Porutham
@@ -869,6 +869,12 @@ def _generate_porutham_commentary(
             messages=[{"role": "user", "content": user_message}],
         )
         commentary = response.content[0].text.strip()
+        # Flag (don't hide) a commentary cut off at max_tokens (2026-10-02);
+        # callers store it next to the commentary as "commentary_truncated".
+        from app.engines.budget_guard import reply_truncated
+        truncated = reply_truncated(response)
+        if meta is not None:
+            meta["truncated"] = truncated
 
         if db is not None and log_chart_id is not None:
             try:
@@ -880,6 +886,7 @@ def _generate_porutham_commentary(
                     period="once",
                     input_tokens=response.usage.input_tokens,
                     output_tokens=response.usage.output_tokens,
+                    fallback_reason="truncated" if truncated else None,
                 )
             except Exception as log_err:
                 logger.warning(f"porutham_commentary log_llm_call failed: {log_err}")
@@ -947,15 +954,17 @@ def _get_or_compute_full_family_porutham(
             boy_nakshatra=husband_nak, boy_rasi=husband_rasi,
             girl_nakshatra=wife_nak, girl_rasi=wife_rasi,
         )
+        commentary_meta: dict = {}
         commentary = _generate_porutham_commentary(
             porutham_result, husband_name, wife_name, tone="family",
-            db=db, log_chart_id=group_id,
+            db=db, log_chart_id=group_id, meta=commentary_meta,
         )
         full_result = {
             "husband": {"name": husband_name, "nakshatra": husband_nak, "rasi": husband_rasi},
             "wife": {"name": wife_name, "nakshatra": wife_nak, "rasi": wife_rasi},
             "porutham": porutham_result,
             "commentary": commentary,
+            "commentary_truncated": commentary_meta.get("truncated", False),
         }
         db.execute("""
             INSERT INTO family_porutham_cache (group_id, member_id_1, member_id_2, result_json)

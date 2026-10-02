@@ -20,7 +20,7 @@ from app.db.postgres import get_conn
 from app.engines.yoga_engine import compute_yogas
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.shadbala_engine import compute_shadbala
-from app.engines.budget_guard import log_llm_call, partial_stream_usage
+from app.engines.budget_guard import log_llm_call, partial_stream_usage, reply_truncated
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled, get_llm_pause_reason
 from app.utils.prompt_dates import fmt_date, humanize_iso_dates
@@ -337,14 +337,16 @@ def _increment_question_count(user_id: str, base_chart_id: str) -> None:
             """, [str(uuid.uuid4()), user_id, base_chart_id, month_key])
 
 
-def _save_chat_message(user_id: str, base_chart_id: str, session_id: str, role: str, content: str) -> None:
-    """Persist a single chat message."""
+def _save_chat_message(user_id: str, base_chart_id: str, session_id: str, role: str, content: str,
+                       truncated: bool = False) -> None:
+    """Persist a single chat message. truncated=True marks an assistant reply
+    that was cut off at max_tokens (2026-10-02)."""
     with get_conn() as conn:
         conn.execute("""
-            INSERT INTO chat_messages (id, user_id, base_chart_id, session_id, role, content, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO chat_messages (id, user_id, base_chart_id, session_id, role, content, created_at, truncated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, [str(uuid.uuid4()), user_id, base_chart_id, session_id, role, content,
-              datetime.now(timezone.utc).isoformat()])
+              datetime.now(timezone.utc).isoformat(), bool(truncated)])
 
 
 def _build_family_member_context(member_payloads: list, porutham: Optional[dict] = None) -> str:
@@ -1283,11 +1285,12 @@ async def chat_stream(
                 final_msg = stream.get_final_message()
                 input_tokens = final_msg.usage.input_tokens
                 output_tokens = final_msg.usage.output_tokens
+                truncated = reply_truncated(final_msg)
 
             # Save assistant response
             _save_chat_message(
                 user_id, req.base_chart_id, session_id,
-                "assistant", "".join(full_response)
+                "assistant", "".join(full_response), truncated=truncated,
             )
 
             # Log to llm_calls and check budget
@@ -1300,9 +1303,10 @@ async def chat_stream(
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     status="success",
+                    fallback_reason="truncated" if truncated else None,
                 )
 
-            yield f"data: {json.dumps({'done': True})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'truncated': truncated})}\n\n"
 
         except GeneratorExit:
             # Client went away mid-reply (closed the tab): not an Exception,
@@ -1361,11 +1365,11 @@ def get_chat_history(
     user_id = user["id"]
     with get_conn() as conn:
         rows = conn.execute("""
-            SELECT role, content, created_at FROM chat_messages
+            SELECT role, content, created_at, COALESCE(truncated, FALSE) FROM chat_messages
             WHERE user_id = ? AND base_chart_id = ?
             ORDER BY created_at DESC LIMIT ?
         """, [user_id, base_chart_id, limit]).fetchall()
-    messages = [{"role": r[0], "content": r[1], "created_at": r[2]} for r in reversed(rows)]
+    messages = [{"role": r[0], "content": r[1], "created_at": r[2], "truncated": bool(r[3])} for r in reversed(rows)]
     return {"messages": messages}
 
 

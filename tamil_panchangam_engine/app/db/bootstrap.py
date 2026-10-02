@@ -227,8 +227,11 @@ def bootstrap():
         # yet updated to pass it -- exactly the "no backfill, cap applies
         # going forward" scope agreed for this feature.
         conn.execute("""
-        ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS user_id TEXT
-        """)
+        ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS user_id TEXT""")
+
+        # 2026-10-02: free-text LLM replies cut off at max_tokens are flagged,
+        # not stored indistinguishably from complete ones.
+        conn.execute("""ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS truncated BOOLEAN DEFAULT FALSE""")
         conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_llm_calls_user_created
             ON llm_calls(user_id, created_at)
@@ -352,6 +355,8 @@ def bootstrap():
             UNIQUE(group_id, from_year, to_year)
         )
         """)
+        # 2026-10-02: dasha summary cut off at max_tokens is flagged.
+        conn.execute("""ALTER TABLE family_timeline_cache ADD COLUMN IF NOT EXISTS summary_truncated BOOLEAN DEFAULT FALSE""")
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS family_child_predictions (

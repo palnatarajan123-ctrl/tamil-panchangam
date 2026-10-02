@@ -69,3 +69,37 @@ def test_orchestrator_stores_truncated_reply_as_truncated_not_success():
     assert out["llm_interpretation"]["_truncated"] is True and "executive_summary" in out["llm_interpretation"]
     args = persist.call_args[0]
     assert args[11] == "truncated" and args[9] == 18000   # fallback_reason, total_tokens (counts for cooldown)
+
+
+# ── Free-text sites (2026-10-02): flag only, no retry ────────────────────────
+
+def test_reply_truncated():
+    from app.engines.budget_guard import reply_truncated
+    assert reply_truncated(SimpleNamespace(stop_reason="max_tokens")) is True
+    assert reply_truncated(SimpleNamespace(stop_reason="end_turn")) is False
+    assert reply_truncated(SimpleNamespace()) is False
+
+
+def test_free_text_sites_flag_truncation():
+    """Chat (stored row + stream done event), family chat (done event), dasha
+    summary (cache column + response), daily guidance (response field),
+    porutham commentary (stored next to the commentary) -- and each flags the
+    llm_calls row. Live smoke: real 20-token chat and 12-token daily replies
+    came back flagged."""
+    from app.api import chat, daily, family, prospects
+    from app.llm import payload_builder
+    checks = {
+        chat.chat_stream: ["reply_truncated(final_msg)", "truncated=truncated", "'truncated': truncated", '"truncated" if truncated'],
+        family.family_group_chat_stream: ["reply_truncated(final_msg)", "'truncated': truncated", '"truncated" if truncated'],
+        family.generate_timeline_summary: ["reply_truncated(response)", "summary_truncated", 'meta["truncated"]'],
+        daily._generate_daily_llm_guidance: ["reply_truncated(response)", '"truncated" if truncated'],
+        payload_builder._generate_porutham_commentary: ["reply_truncated(response)", '"truncated" if truncated'],
+        chat._save_chat_message: ["truncated"],
+    }
+    for fn, needles in checks.items():
+        src = inspect.getsource(fn)
+        for n in needles:
+            assert n in src, (fn.__name__, n)
+    assert inspect.getsource(prospects).count('"commentary_truncated"') == 2
+    assert '"commentary_truncated"' in inspect.getsource(payload_builder)
+    assert '"llm_guidance_truncated"' in inspect.getsource(daily.get_daily_prediction)

@@ -18,6 +18,7 @@ from app.core.auth import get_current_user
 from app.core.limiter import limiter
 from app.engines.dinaphalam_engine import compute_dinaphalam
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled
+from app.engines.budget_guard import reply_truncated
 from app.utils.time_utils import get_timezone_from_coordinates
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ def _get_base_chart_payload(base_chart_id: str) -> dict:
 
 def _generate_daily_llm_guidance(
     result: dict, chart_name: str, base_chart_id: str, user_id: Optional[str] = None,
+    meta: Optional[dict] = None,
 ) -> tuple[Optional[str], bool, bool]:
     """2-3 sentence personalized daily guidance. Low token usage.
 
@@ -133,6 +135,10 @@ def _generate_daily_llm_guidance(
         )
 
         guidance = response.content[0].text.strip()
+        # 150-token cap: flag a cut-off reply rather than pass it off as whole.
+        truncated = reply_truncated(response)
+        if meta is not None:
+            meta["truncated"] = truncated
 
         try:
             from app.engines.budget_guard import log_llm_call
@@ -145,6 +151,7 @@ def _generate_daily_llm_guidance(
                     input_tokens=response.usage.input_tokens,
                     output_tokens=response.usage.output_tokens,
                     user_id=user_id,
+                    fallback_reason="truncated" if truncated else None,
                 )
         except Exception as log_err:
             logger.warning(f"daily_guidance log_llm_call failed: {log_err}")
@@ -230,17 +237,20 @@ def get_daily_prediction(
         ayanamsa=ayanamsa,
     )
 
+    guidance_meta: dict = {}
     llm_guidance, llm_capped, llm_paused = _generate_daily_llm_guidance(
         result=result,
         chart_name=birth_details.get("name", ""),
         base_chart_id=base_chart_id,
         user_id=user["id"],
+        meta=guidance_meta,
     )
 
     return {
         "base_chart_id": base_chart_id,
         **result,
         "llm_guidance": llm_guidance,
+        "llm_guidance_truncated": guidance_meta.get("truncated", False),
         "llm_capped": llm_capped,
         "llm_paused": llm_paused,
     }

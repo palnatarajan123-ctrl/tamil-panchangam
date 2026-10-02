@@ -108,15 +108,17 @@ def _get_or_compute_prospect_porutham(conn, prospect_row: tuple) -> Optional[dic
         boy_nakshatra=boy_nak, boy_rasi=boy_rasi,
         girl_nakshatra=girl_nak, girl_rasi=girl_rasi,
     )
+    commentary_meta: dict = {}
     commentary = _generate_porutham_commentary(
         porutham_result, boy_name, girl_name, tone="prospect",
-        db=conn, log_chart_id=boy_id,
+        db=conn, log_chart_id=boy_id, meta=commentary_meta,
     )
     full_result = {
         "boy": {"chart_id": boy_id, "name": boy_name, "nakshatra": boy_nak, "rasi": boy_rasi},
         "girl": {"chart_id": girl_id, "name": girl_name, "nakshatra": girl_nak, "rasi": girl_rasi},
         "porutham": porutham_result,
         "commentary": commentary,
+        "commentary_truncated": commentary_meta.get("truncated", False),
     }
     try:
         conn.execute(
@@ -357,15 +359,17 @@ def convert_prospect_to_family(prospect_id: str, user: dict = Depends(get_curren
         # is now a formed family group, which needs "family" (softer,
         # already-married) tone per Phase H1's design. Same underlying
         # score, freshly-generated explanation for the new context.
+        family_commentary_meta: dict = {}
         family_commentary = _generate_porutham_commentary(
             result["porutham"], boy_name, girl_name, tone="family",
-            db=conn, log_chart_id=group_id,
+            db=conn, log_chart_id=group_id, meta=family_commentary_meta,
         )
         family_cache_result = {
             "husband": {"name": boy["name"], "nakshatra": boy["nakshatra"], "rasi": boy["rasi"]},
             "wife": {"name": girl["name"], "nakshatra": girl["nakshatra"], "rasi": girl["rasi"]},
             "porutham": result["porutham"],
             "commentary": family_commentary,
+            "commentary_truncated": family_commentary_meta.get("truncated", False),
         }
         conn.execute("""
             INSERT INTO family_porutham_cache (group_id, member_id_1, member_id_2, result_json)
