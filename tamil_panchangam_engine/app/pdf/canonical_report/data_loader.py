@@ -9,7 +9,7 @@ Fails gracefully if required data is missing.
 import json
 import hashlib
 from typing import Dict, Any, Optional, Tuple, List
-from datetime import datetime
+from datetime import date, datetime, timezone
 import logging
 
 from app.db.postgres import get_conn
@@ -268,7 +268,6 @@ def _extract_birth_reference(payload: Dict[str, Any]) -> BirthReference:
     
     dashas = payload.get("dashas", {})
     vimshottari = dashas.get("vimshottari", {})
-    current_dasha = vimshottari.get("current", {})
     
     nakshatra_lords = {
         "Ashwini": "Ketu", "Bharani": "Venus", "Krittika": "Sun",
@@ -1039,22 +1038,40 @@ def load_natal_interpretation(base_chart_id: str) -> Optional[Dict[str, Any]]:
     )
 
 
-def _extract_dasha_context_from_payload(payload: Dict[str, Any]) -> DashaContext:
-    """Extract current dasha context directly from chart payload (no prediction envelope needed)."""
+def _extract_dasha_context_from_payload(
+    payload: Dict[str, Any], reference_date: Optional[date] = None,
+) -> DashaContext:
+    """
+    Extract current dasha context directly from chart payload (no prediction
+    envelope needed). Resolved live from the Vimshottari timeline for today,
+    the same way chat does -- vimshottari["current"] is frozen at chart
+    creation and goes stale once the native crosses a period boundary.
+    """
+    from app.engines.pratyantar_dasha_engine import compute_dasha_snapshot
+
     dashas = payload.get("dashas", {})
-    vimshottari = dashas.get("vimshottari", {})
-    current = vimshottari.get("current", {}) or {}
+    vimshottari = dashas.get("vimshottari", {}) or {}
+    snap = compute_dasha_snapshot(vimshottari, reference_date)
 
-    maha_lord = current.get("lord", "Unknown")
-    antar = current.get("antar", {}) or {}
-    antar_lord = antar.get("lord", "Unknown")
+    if snap:
+        maha_lord = snap["mahadasha"]["lord"]
+        antar_lord = snap["antardasha"]["lord"]
+        maha_end = snap["mahadasha"]["end"]
+    else:
+        # Date outside the timeline (or no timeline): fall back to the
+        # creation-time field rather than showing nothing.
+        current = vimshottari.get("current", {}) or {}
+        maha_lord = current.get("lord", "Unknown")
+        antar_lord = (current.get("antar", {}) or {}).get("lord", "Unknown")
+        maha_end = current.get("end", "")
 
-    maha_end = current.get("end", "")
     balance = "Unknown"
     if maha_end:
         try:
             end_dt = datetime.fromisoformat(maha_end.replace("Z", "+00:00"))
-            years_left = (end_dt - datetime.now(end_dt.tzinfo)).days / 365.25
+            if end_dt.tzinfo is None:
+                end_dt = end_dt.replace(tzinfo=timezone.utc)
+            years_left = (end_dt - datetime.now(timezone.utc)).days / 365.25
             balance = f"{years_left:.1f} years remaining"
         except Exception:
             pass

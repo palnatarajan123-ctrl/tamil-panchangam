@@ -329,10 +329,14 @@ stale" and "confirmed real" looked like in practice):
   Rahu›Jupiter, live Rahu›Saturn). Chat fixed (Phase 1, below): it now
   resolves live via `pratyantar_dasha_engine.compute_dasha_snapshot()`.
   `family.py` was already live (`resolve_antar_dasha()`).
-  **Still reading the stale field, not fixed**:
-  `app/pdf/canonical_report/data_loader.py` (lines ~271 and ~1046, the
-  birth-chart PDF's current-dasha section, so those 6 users' PDFs show
-  the wrong sub-period), `birth_chart_builder.py:185`
+  **PDF fixed 2026-10-01**: `data_loader.py`'s
+  `_extract_dasha_context_from_payload()` now uses the same
+  `compute_dasha_snapshot()` (falls back to the stored field only if
+  today is outside the timeline); the unused stale read at ~271 was
+  removed. PDFs are built fresh per download, so no backfill. Verified
+  on `130d0025`: PDF Antardasha went Jupiter → Saturn, matching chat;
+  0/41 mismatches after. **Still reading the stale field, not fixed**:
+  `birth_chart_builder.py:185`
   (`extract_active_dasha_lords()`, Mahadasha only, so it only goes wrong
   once a chart crosses an MD boundary), and `prediction_envelope.py:133`
   (existence check only; the Antardasha there is already resolved live).
