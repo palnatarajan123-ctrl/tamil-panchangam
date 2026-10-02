@@ -374,6 +374,35 @@ stale" and "confirmed real" looked like in practice):
   "Rahu enters Capricorn (10th) on Dec 5" as Rahu being in the 10th now.
   Closing that gap would fix it.
 
+- **2026-10-02 chat build, Phase 3: exact-degree transit-to-natal contacts
+  in both chats**, via `transit_hits_engine.select_chat_transit_hits()`
+  over live `compute_transit_hits()` (±45 days, ~0.01s, using the chart's
+  own ayanamsa/node_type; KP vs Lahiri shifts dates by about a day).
+  **Framing decision**: chat is classical-Vedic and trine/square are
+  Western aspects.
+  - Surfaced: conjunction ("transiting over your natal X"), opposition
+    (the 7th-house aspect), and trines/squares that coincide EXACTLY with
+    the transiting planet's own special drishti counted forward (Jupiter
+    5th ~120°/9th ~240°, Mars 4th ~90°, Saturn 10th ~270°), named as that
+    drishti.
+  - Every other trine/square is dropped, not relabelled: a "nearest
+    classical name" would misstate what was computed.
+  - `house`/`life_area_hint` are never surfaced: `_house_of()` is Equal
+    House (see that backlog item), and `life_area_hint` is the same number
+    as a topic.
+  - Unrelated to `drishti_engine.py`'s Ketu fix: that is natal
+    whole-sign house drishti, while this is degree contacts, with nodes
+    conj/opp only.
+
+  **Found, not fixed: window-edge artifact in `compute_transit_hits()`.**
+  It keeps the closest day WITHIN the window, so a contact still closing
+  at the last day (or separating at the first) is reported with the edge
+  day as its "hit_date". On 2026-10-02, 6 of chart `7c6e34be`'s 17 hits
+  were edge-day dates (Rahu/Ketu nodal return, Saturn–Mars). Chat flags
+  these ("becomes exact after ..."), but `predictive_signals` →
+  `event_window_engine.py` (monthly reports) still consumes the raw
+  edge dates as if exact.
+
 - **2026-10-01: chat's self-reported data gaps (wealth-timing question)
   checked against the real live prompt. Scoped only; nothing built,
   pending sign-off.** A user-reported answer listed 6 missing items.

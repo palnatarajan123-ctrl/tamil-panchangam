@@ -614,6 +614,18 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
             "placements are NOT computed -- do not name or describe them.\n"
         )
 
+    if context.get("transit_hits_context"):
+        system_prompt += (
+            "\n\n## EXACT-DEGREE TRANSITS TO YOUR NATAL PLANETS (computed live, +/-45 days)\n"
+            + context["transit_hits_context"]
+            + "\nThese are degree-exact (within 2 degrees) contacts between a transiting planet "
+            "and a natal planet. Cite them by planet and date when asked what a planet is "
+            "doing for the user. Do not attach a house number or life area to these contacts "
+            "-- none was computed for them; describe the natal planet's own significations "
+            "instead. If a planet/natal pair isn't listed, no exact contact was found in this "
+            "window -- say so rather than inventing one.\n"
+        )
+
     if reading_as_name:
         system_prompt = f"Reading from {reading_as_name}'s chart.\n\n" + system_prompt
     return system_prompt
@@ -686,6 +698,24 @@ def _build_chat_context(base_chart_id: str) -> dict:
     # in the payload (computed at most once a year per chart).
     from app.engines.varshaphal_engine import get_current_varshaphal, format_varshaphal_context
     varshaphal_context = format_varshaphal_context(get_current_varshaphal(base_chart_id, payload))
+
+    # Exact-degree transits to natal planets, +/-45 days, live (~0.01s).
+    transit_hits_context = ""
+    try:
+        from app.engines.transit_hits_engine import (
+            compute_transit_hits, select_chat_transit_hits, format_chat_transit_hits,
+        )
+        _meta = payload.get("chart_metadata") or {}
+        _today = datetime.now(timezone.utc).date()
+        transit_hits_context = format_chat_transit_hits(select_chat_transit_hits(
+            compute_transit_hits(
+                payload.get("ephemeris", {}), reference_date=_today,
+                ayanamsa=_meta.get("ayanamsa", "lahiri"), node_type=_meta.get("node_type", "mean"),
+            ),
+            _today,
+        ))
+    except Exception as e:
+        logger.warning(f"Transit hits failed in chat context: {e}")
 
     # Yogas — compute fresh using yoga engine
     yogas_summary = "none notable"
@@ -956,6 +986,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "marriage_health_context": marriage_health_context,
         "dasha_periods_context": dasha_periods_context,
         "varshaphal_context": varshaphal_context,
+        "transit_hits_context": transit_hits_context,
     }
 
 

@@ -1220,6 +1220,12 @@ GROUNDING — NEVER STATE AN UNGROUNDED FACT:
   solar return): its year runs from the date shown, not from January.
   Only the annual Lagna and Muntha are given — do not name a Tajika
   year-lord (Varsheshwara) or other annual-chart placements.
+- "Exact-degree transits" on a member's line are degree-exact contacts
+  between a transiting planet and that member's natal planet (the 3
+  nearest to today). Cite them by planet and date; do not attach a house
+  number or life area to them — none was computed. Only the nearest 3 are
+  shown, so if a contact isn't listed say you don't have it — never
+  claim it doesn't exist, and never invent one.
 """ + DOMAIN_WINDOW_RULE
 
 
@@ -1261,6 +1267,24 @@ def _build_member_summary(row: tuple) -> str:
         varshaphal_bit = f", {vp_text}" if vp_text else ""
     except Exception as e:
         logger.warning(f"Varshaphal failed for family member {display_name}: {e}")
+
+    transit_hits_bit = ""
+    try:
+        from app.engines.transit_hits_engine import (
+            compute_transit_hits, select_chat_transit_hits, format_chat_transit_hits_compact,
+        )
+        _meta = payload.get("chart_metadata") or {}
+        _today = datetime.now(timezone.utc).date()
+        th_text = format_chat_transit_hits_compact(select_chat_transit_hits(
+            compute_transit_hits(
+                eph, reference_date=_today,
+                ayanamsa=_meta.get("ayanamsa", "lahiri"), node_type=_meta.get("node_type", "mean"),
+            ),
+            _today,
+        ), _today)
+        transit_hits_bit = f", {th_text}" if th_text else ""
+    except Exception as e:
+        logger.warning(f"Transit hits failed for family member {display_name}: {e}")
 
     ss = compute_sade_sati(payload)
     ss_data = ss.get("sade_sati", {}) if ss else {}
@@ -1312,6 +1336,7 @@ def _build_member_summary(row: tuple) -> str:
         f"{ss_suffix}"
         f"{yoga_upagraha_suffix}"
         f"{timing_suffix}"
+        f"{transit_hits_bit}"
         # Last: anything after it (e.g. natal "Yogas:") was being read as
         # belonging to the annual chart.
         f"{varshaphal_bit}"

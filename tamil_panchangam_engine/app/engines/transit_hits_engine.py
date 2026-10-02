@@ -131,3 +131,88 @@ def compute_transit_hits(
 
     hits = sorted(best_hit.values(), key=lambda h: h["hit_date"])
     return hits
+
+
+# ── Chat-facing selection (2026-10-02) ───────────────────────────────────────
+#
+# Framing decision: chat speaks classical Vedic, and trine/square are
+# Western aspects. Only relationships with an EXACT classical counterpart
+# are surfaced, named in Vedic terms:
+#   conjunction -> transiting over the natal planet
+#   opposition  -> 7th-house aspect (the full aspect every planet casts)
+#   trine/square only where they coincide with that planet's own special
+#   drishti, counted forward from the transiting planet: Jupiter 5th
+#   (~120) / 9th (~240), Mars 4th (~90), Saturn 10th (~270).
+# All other trines/squares are dropped rather than relabelled -- a
+# "nearest classical name" would misstate what was computed. The `house`/
+# `life_area_hint` fields are never surfaced: _house_of() is Equal House,
+# not the whole-sign system used everywhere else (open backlog item).
+
+_SPECIAL_DRISHTI = {
+    "Jupiter": {120: "5th", 240: "9th"},
+    "Mars": {90: "4th"},
+    "Saturn": {270: "10th"},
+}
+
+
+def _vedic_relation(hit: Dict[str, Any]) -> Optional[str]:
+    tp, aspect = hit["transit_planet"], hit["aspect_type"]
+    if aspect == "conjunction":
+        return f"transiting over your natal {hit['natal_planet']}"
+    if aspect == "opposition":
+        return f"exactly opposite your natal {hit['natal_planet']} (its 7th-house aspect)"
+    forward = (hit["natal_degree"] - hit["transit_degree"]) % 360.0
+    for angle, nth in _SPECIAL_DRISHTI.get(tp, {}).items():
+        if abs(forward - angle) <= ORB + 0.5:
+            return f"casting its special {nth}-house aspect exactly onto your natal {hit['natal_planet']}"
+    return None
+
+
+def select_chat_transit_hits(
+    hits: List[Dict[str, Any]],
+    reference_date: date,
+    window_days: int = 45,
+) -> List[Dict[str, Any]]:
+    """Filter compute_transit_hits() output to Vedic-meaningful relations and
+    mark window-edge hits: compute_transit_hits() keeps the closest day
+    WITHIN the window, so a hit on the first/last day is still approaching
+    (or already separating) beyond the scan -- that day is not the exact date."""
+    start = (reference_date - timedelta(days=window_days)).isoformat()
+    end = (reference_date + timedelta(days=window_days)).isoformat()
+    out = []
+    for h in hits:
+        relation = _vedic_relation(h)
+        if not relation:
+            continue
+        if h["hit_date"] == end:
+            when = f"tightening; becomes exact after {end} (beyond the {window_days}-day scan)"
+        elif h["hit_date"] == start:
+            when = f"was exact before {start} (beyond the {window_days}-day scan), now separating"
+        elif h["hit_date"] < reference_date.isoformat():
+            when = f"exact on {h['hit_date']} (past, now separating)"
+        else:
+            when = f"exact on {h['hit_date']}"
+        out.append({
+            "transit_planet": h["transit_planet"],
+            "natal_planet": h["natal_planet"],
+            "relation": relation,
+            "when": when,
+            "hit_date": h["hit_date"],
+            "orb": h["orb"],
+        })
+    return out
+
+
+def format_chat_transit_hits(selected: List[Dict[str, Any]]) -> str:
+    """Verbose rendering for chat.py."""
+    return "\n".join(f"- Transiting {s['transit_planet']} {s['relation']}: {s['when']}" for s in selected)
+
+
+def format_chat_transit_hits_compact(selected: List[Dict[str, Any]], reference_date: date, limit: int = 3) -> str:
+    """The `limit` hits nearest to reference_date, one clause, for family.py."""
+    if not selected:
+        return ""
+    nearest = sorted(selected, key=lambda s: abs((date.fromisoformat(s["hit_date"]) - reference_date).days))[:limit]
+    return "Exact-degree transits: " + "; ".join(
+        f"{s['transit_planet']} {s['relation'].replace('your natal', 'natal')} ({s['when']})" for s in nearest
+    )
