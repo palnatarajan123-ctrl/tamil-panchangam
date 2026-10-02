@@ -64,3 +64,22 @@ def test_no_consumer_uses_the_old_engine_for_transit_strength():
         assert "bav_transit_strength" in inspect.getsource(mod), mod.__name__
     src = inspect.getsource(data_loader._extract_transit_context)
     assert 'envelope.get("ashtakavarga"' not in src
+
+
+def test_with_av_transit_strength_returns_a_copy_with_corrected_values():
+    """Serve-time attach for the web view (2026-10-02): the monthly badge
+    used to read envelope["ashtakavarga"] (old 57-total heuristic) from the
+    cached envelope; it now reads av_transit_strength, never persisted."""
+    from app.engines.bhinnashtakavarga_engine import with_av_transit_strength
+    env = {"gochara": _GOCHARA, "ashtakavarga": {"jupiter": {"bindus": 9}}}
+    out = with_av_transit_strength(env, {"ephemeris": _EPH})
+    assert "av_transit_strength" not in env  # input untouched
+    assert out["av_transit_strength"] == bav_transit_strength(_bav(), gochara_transit_longitudes(_GOCHARA))
+    assert out["ashtakavarga"] is env["ashtakavarga"]
+
+
+def test_web_view_reads_corrected_strength_not_old_engine():
+    from pathlib import Path
+    tsx = (Path(__file__).parents[3] / "client/src/components/prediction/MonthlyPredictionView.tsx").read_text()
+    assert "envelope.av_transit_strength" in tsx
+    assert "envelope.ashtakavarga" not in tsx.replace("not envelope.ashtakavarga", "")

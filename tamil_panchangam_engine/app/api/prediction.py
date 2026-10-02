@@ -14,6 +14,7 @@ def _safe_json(val):
     return json.loads(val)
 
 import logging
+from app.engines.bhinnashtakavarga_engine import with_av_transit_strength
 from app.core.limiter import limiter
 
 logger = logging.getLogger(__name__)
@@ -587,7 +588,7 @@ def generate_monthly_prediction(
         status="ok",
         summary="Monthly prediction computed.",
         details={
-            "envelope": envelope,
+            "envelope": with_av_transit_strength(envelope, base_chart_payload),
             "synthesis": synthesis,
             "interpretation": interpretation,
         },

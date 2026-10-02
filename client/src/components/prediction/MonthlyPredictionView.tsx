@@ -60,13 +60,6 @@ function Paragraphs({ text, className }: { text: string; className?: string }) {
 
 type PredictionPeriod = "weekly" | "monthly" | "yearly";
 
-function binduLabel(n: number): string {
-  if (n >= 7) return "Very Strong";
-  if (n >= 5) return "Strong";
-  if (n >= 3) return "Moderate";
-  return "Very Weak";
-}
-
 function getDrishtiNote(engine: string, envelope: any): string | null {
   if (!envelope) return null;
   let bonus: number | undefined;
@@ -772,14 +765,17 @@ export function MonthlyPredictionView({
             <div className="grid grid-cols-2 gap-4 text-sm">
               {(() => {
                 const jup = envelope.gochara.jupiter;
-                const bindus = envelope.ashtakavarga?.jupiter?.bindus;
+                // Corrected Ashtakavarga (planet's own bindus in the transited
+                // sign), attached at response time -- not envelope.ashtakavarga,
+                // the old 57-total heuristic stored in cached envelopes.
+                const av = envelope.av_transit_strength?.jupiter;
                 return (
                   <div className="space-y-1" data-testid="transit-jupiter">
                     <span className="font-medium">Jupiter in {jup?.transit_rasi}</span>
-                    {bindus != null && (
+                    {av?.bindus != null && (
                       <div>
                         <Badge variant="outline" className="text-xs">
-                          {bindus}/8 bindus · {binduLabel(bindus)}
+                          {av.bindus}/8 · {av.label}
                         </Badge>
                       </div>
                     )}
@@ -788,14 +784,17 @@ export function MonthlyPredictionView({
               })()}
               {(() => {
                 const sat = envelope.gochara.saturn;
-                const bindus = envelope.ashtakavarga?.saturn?.bindus;
+                // Corrected Ashtakavarga (planet's own bindus in the transited
+                // sign), attached at response time -- not envelope.ashtakavarga,
+                // the old 57-total heuristic stored in cached envelopes.
+                const av = envelope.av_transit_strength?.saturn;
                 return (
                   <div className="space-y-1" data-testid="transit-saturn">
                     <span className="font-medium">Saturn in {sat?.transit_rasi}</span>
-                    {bindus != null && (
+                    {av?.bindus != null && (
                       <div>
                         <Badge variant="outline" className="text-xs">
-                          {bindus}/8 bindus · {binduLabel(bindus)}
+                          {av.bindus}/8 · {av.label}
                         </Badge>
                       </div>
                     )}

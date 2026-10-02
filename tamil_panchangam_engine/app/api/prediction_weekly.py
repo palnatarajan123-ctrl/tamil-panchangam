@@ -16,6 +16,7 @@ from app.db.session import get_db
 from app.core.auth import get_current_user
 from app.repositories.base_chart_repo import get_base_chart_by_id, user_owns_chart
 from app.repositories.prediction_repo import get_monthly_prediction
+from app.engines.bhinnashtakavarga_engine import with_av_transit_strength
 
 from app.engines.prediction_envelope import build_monthly_prediction_envelope
 from app.engines.synthesis_engine import synthesize_from_envelope
@@ -48,6 +49,15 @@ def _normalize_confidence(synthesis: Dict[str, Any]) -> Dict[str, Any]:
         }
     return synthesis
 
+
+
+def _chart_payload(db, base_chart_id: str) -> dict:
+    """Chart payload for the cached path (which returns before loading it)."""
+    record = get_base_chart_by_id(db, base_chart_id)
+    if not record:
+        return {}
+    raw = record["payload"] if isinstance(record, dict) else record.payload
+    return json.loads(raw) if isinstance(raw, str) else (raw or {})
 
 @router.post("/weekly")
 def generate_weekly_prediction(payload: dict, db=Depends(get_db), user: dict = Depends(get_current_user)):
@@ -119,7 +129,7 @@ def generate_weekly_prediction(payload: dict, db=Depends(get_db), user: dict = D
             "summary": None,
             "cache_hit": True,
             "details": {
-                "envelope": envelope,
+                "envelope": with_av_transit_strength(envelope, _chart_payload(db, base_chart_id)),
                 "synthesis": synthesis,
                 "interpretation": interpretation,
             },
@@ -202,7 +212,7 @@ def generate_weekly_prediction(payload: dict, db=Depends(get_db), user: dict = D
         "summary": summary,
         "cache_hit": False,
         "details": {
-            "envelope": envelope,
+            "envelope": with_av_transit_strength(envelope, base_chart_payload),
             "synthesis": synthesis,
             "interpretation": interpretation,
         },

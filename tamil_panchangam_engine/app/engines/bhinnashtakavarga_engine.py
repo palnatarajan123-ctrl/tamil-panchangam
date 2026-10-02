@@ -258,6 +258,22 @@ def bav_transit_strength(bav: dict, transit_longitudes: Dict[str, float]) -> Dic
     return out
 
 
+def with_av_transit_strength(envelope: dict, chart_payload: dict) -> dict:
+    """A COPY of a prediction envelope with "av_transit_strength" attached
+    ({"saturn"|"jupiter": bav_transit_strength() entry}) for the envelope's
+    own transits -- for API responses only, never persisted. The web view
+    reads this instead of envelope["ashtakavarga"] (the old 57-total
+    heuristic, still stored in every cached envelope)."""
+    try:
+        strength = bav_transit_strength(
+            bav_for_payload(chart_payload), gochara_transit_longitudes((envelope or {}).get("gochara", {}))
+        )
+    except Exception as e:
+        logger.warning(f"av_transit_strength failed: {e}")
+        strength = {}
+    return {**(envelope or {}), "av_transit_strength": strength}
+
+
 def format_bav_transit_line(entry: dict) -> str:
     """"Jupiter in Cancer: 5/8, above threshold" """
     return f"{entry['planet']} in {entry['sign']}: {entry['bindus']}/8, {entry['label']}"

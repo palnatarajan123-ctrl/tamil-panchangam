@@ -21,6 +21,7 @@ from app.db.session import get_db
 from app.repositories.base_chart_repo import get_base_chart_by_id, user_owns_chart
 from app.repositories.yearly_prediction_repo import save_yearly_prediction, get_yearly_prediction
 from app.db.postgres import get_conn
+from app.engines.bhinnashtakavarga_engine import with_av_transit_strength
 
 from app.engines.yearly_prediction_envelope import build_yearly_prediction_envelope
 from app.engines.synthesis_engine import synthesize_from_envelope
@@ -202,7 +203,7 @@ def generate_yearly_prediction(request: Request, payload: dict, db=Depends(get_d
         "status": "success",
         "summary": summary,
         "details": {
-            "envelope": envelope,
+            "envelope": with_av_transit_strength(envelope, base_chart_payload),
             "synthesis": synthesis,
             "interpretation": interpretation,
         },
