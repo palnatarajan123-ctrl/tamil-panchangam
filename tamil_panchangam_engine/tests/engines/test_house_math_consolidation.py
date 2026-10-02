@@ -38,10 +38,9 @@ def test_house_from_sign_number_matches_original_formula_1indexed():
 
 
 def test_house_from_sign_number_works_for_0indexed_inputs_too():
-    """ashtakavarga_engine.py's fallback branch uses 0-indexed sign
-    values (from RASI_TO_INDEX), unlike sade_sati_engine.py's 1-indexed
-    ones -- confirm the formula is base-agnostic (only the difference
-    between the two inputs matters)."""
+    """0-indexed sign values (as the since-deleted ashtakavarga_engine.py
+    used) vs sade_sati_engine.py's 1-indexed ones -- confirm the formula is
+    base-agnostic (only the difference between the two inputs matters)."""
     for a in range(0, 12):
         for b in range(0, 12):
             assert house_from_sign_number(a, b) == ((a - b) % 12) + 1

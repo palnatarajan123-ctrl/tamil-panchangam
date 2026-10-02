@@ -1292,7 +1292,7 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
     elements.append(Spacer(1, 0.3*inch))
 
     # The Sarvashtakavarga "Strength Map" table was removed 2026-10-02: it
-    # showed ashtakavarga_engine.py's 57-total heuristic. Transit strength
+    # showed the (since deleted) ashtakavarga_engine.py's 57-total heuristic. Transit strength
     # (corrected tables) is now on the Jupiter/Saturn rows above.
 
     # Use KeepTogether to prevent heading/table separation

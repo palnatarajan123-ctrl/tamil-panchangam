@@ -855,8 +855,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         logger.warning(f"Gochara computation failed in chat context: {e}")
 
     # Ashtakavarga transit strength for those same transits -- the shared
-    # path every surface uses (bhinnashtakavarga_engine), never
-    # ashtakavarga_engine.py.
+    # path every surface uses (bhinnashtakavarga_engine).
     av_transit_lines: list = []
     try:
         from app.engines.bhinnashtakavarga_engine import (

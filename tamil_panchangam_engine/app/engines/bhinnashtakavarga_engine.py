@@ -200,7 +200,6 @@ def compute_bav_transit_scores(bav: dict, transit_longitudes: Dict[str, float]) 
 #    monthly/yearly generation (2026-10-02). Every surface calls
 #    bav_transit_strength() + format_bav_transit_line(), so the same chart,
 #    planet and date always shows the same bindu count and label.
-#    ashtakavarga_engine.py (the old 57-bindu heuristic) is NOT used here.
 
 # Classical reading: a transit through a sign with 4+ bindus in the
 # planet's own BAV is supported; fewer than 4 is not.
@@ -274,7 +273,7 @@ def compute_av_transit_validation(bav: dict, gochara: dict) -> dict:
     """
     The envelope's "ashtakavarga" block (read by synthesis_engine's
     ASHTAKAVARGA_* signal and remedy_engine), from the corrected tables --
-    replaces ashtakavarga_engine.compute_ashtakavarga_validation() (a 57-total
+    replaces the deleted ashtakavarga_engine.compute_ashtakavarga_validation() (a 57-total
     Sarvashtakavarga heuristic) since 2026-10-02. Same output shape.
 
     overall_support uses the AVERAGE of Saturn's and Jupiter's own bindus

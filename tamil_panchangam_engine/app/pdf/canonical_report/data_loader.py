@@ -338,7 +338,7 @@ def _av_transit_strength(payload: Dict[str, Any], gochara: Dict[str, Any]) -> Di
     """Saturn/Jupiter transit strength via the shared Ashtakavarga path
     (bhinnashtakavarga_engine -- same numbers as chat and generation).
     The PDF used to show envelope["ashtakavarga"] bindus, which come from
-    the old ashtakavarga_engine.py heuristic."""
+    the old ashtakavarga_engine.py heuristic (deleted 2026-10-02)."""
     from app.engines.bhinnashtakavarga_engine import (
         bav_for_payload, bav_transit_strength, gochara_transit_longitudes,
     )

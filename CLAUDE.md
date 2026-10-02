@@ -824,7 +824,29 @@ stale" and "confirmed real" looked like in practice):
   coarser" signal) was removed in the same commit -- no longer true.
   Pre-switch audit (option A, old vs new on cached envelopes): 145/410
   life-area scores move (mean |delta| ~1, max 6), 30 label crossings,
-  remedies change on most. Historical record of the decision follows:
+  remedies change on most.
+  **Regenerated the 20 Oct-2026-onward reports** (8 monthly + 12 yearly):
+  kept each STORED envelope and swapped only the ashtakavarga block +
+  remedies (so the held Gochara-dispositor change did NOT leak into the
+  17 pre-09-17 envelopes), re-ran synthesis/interpretation, fresh LLM
+  call. 20/20 real after one fix (below); 342,317 recorded tokens.
+  Backup: `scripts/backfill_backups/ashtakavarga_switch_regen_20.json`.
+  **Found and fixed on the way -- yearly completion cap was truncating
+  (`aff2c43`)**: `MAX_COMPLETION_TOKENS["yearly"]` 4000 cut `966f5254`'s
+  yearly reply (~4,900 tokens) mid-string → `json_parse_error` →
+  fallback; another (`f5da25da` yearly) hit exactly 4000 and was silently
+  "repaired". Raised to 6000 (total 9500); real yearly outputs: median
+  3421, p90 3527, now up to 4098.
+  **Found, not fixed**: (1) on `json_parse_error` the orchestrator logs
+  0 tokens even though the provider returns real usage -- failed calls
+  are invisible to `LLM_MONTHLY_TOKEN_BUDGET` (~3 such calls here, ~50k
+  unrecorded), and the yearly route re-calls the LLM on every view after
+  a fallback, so a persistently failing report burns tokens unseen.
+  (2) `data_loader.load_cached_llm_interpretation()` (PDF) takes the latest
+  `prediction_llm_interpretation` row even if it's a fallback, so one
+  failed retry replaces a good report's PDF content with deterministic
+  text. `ashtakavarga_engine.py` deleted in the cleanup commit.
+  Historical record of the decision follows:
 - **(historical) NEXT UP (per 2026-10-02 decision) — Ashtakavarga pipeline switch.**
   Three flagged workarounds in two rounds came from the wrong-engine /
   corrected-engine split (PDF bindus, the Strength Map, prediction score
@@ -857,7 +879,8 @@ stale" and "confirmed real" looked like in practice):
   2500 → 3000 (2026-10-02)** after this left it 294 tokens of headroom --
   see the `MAX_PROMPT_TOKENS` entry below.
 
-- **PRIORITY — `ashtakavarga_engine.py`'s "classical" Sarvashtakavarga
+- **(RESOLVED 2026-10-02: switched to the corrected pipeline and deleted --
+  see the "pipeline switch DONE" entry above.) `ashtakavarga_engine.py`'s "classical" Sarvashtakavarga
   is not a real classical calculation, and it's used for LIVE Saturn/
   Jupiter transit validation** (investigated 2026-09-13, not fixed —
   needs a decision, not a unilateral patch). `_compute_sarvashtakavarga()`

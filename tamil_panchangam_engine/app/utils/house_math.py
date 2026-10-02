@@ -6,7 +6,7 @@ whole-sign house number of `target_lon` counted from whichever sign
 `reference_lon` (Lagna, natal Moon, etc.) falls in. This exact formula
 used to be hand-copied independently in ~9 engine files (yoga_engine.py,
 house_strength_engine.py, shadbala_engine.py, sade_sati_engine.py,
-ashtakavarga_engine.py, drishti_engine.py, transit_hits_engine.py,
+ashtakavarga_engine.py (deleted 2026-10-02), drishti_engine.py, transit_hits_engine.py,
 functional_role_engine.py, varshaphal_engine.py) -- all verified
 formula-equivalent before this consolidation, so this was a real "N
 independent copies, currently in sync" risk rather than an active bug.

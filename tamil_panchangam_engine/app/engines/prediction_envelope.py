@@ -340,7 +340,7 @@ def build_monthly_prediction_envelope(
     # 10. ASHTAKAVARGA VALIDATION - EPIC Signal Expansion
     # -------------------------------------------------
     # Corrected tables (bhinnashtakavarga_engine), same numbers chat/PDF/
-    # generation show; replaced ashtakavarga_engine.py's heuristic 2026-10-02.
+    # generation show; replaced the deleted ashtakavarga_engine.py 2026-10-02.
     ashtakavarga = compute_av_transit_validation(bav_for_payload(base_chart), gochara)
 
     # -------------------------------------------------
