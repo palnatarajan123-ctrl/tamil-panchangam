@@ -262,6 +262,8 @@ def compute_event_windows(
 from datetime import date as _date
 from typing import Any as _Any, Dict as _Dict, List as _List, Optional as _Optional
 
+from app.utils.rasi_utils import TAMIL_RASI_ORDER
+
 from app.utils.planet_lists import NATURAL_MALEFICS as _MALEFIC_PLANETS
 
 _BENEFIC_PLANETS = {"Jupiter", "Venus", "Moon", "Mercury"}
@@ -425,12 +427,11 @@ def detect_confluence(
         # Signal 5: refined AV — if transit planet's sign has high score
         for hit in window_hits:
             # Use the hit sign from transit degree
+            # Same sign-name list compute_refined_av() keys strong_signs by
+            # (rasi_utils.TAMIL_RASI_ORDER) -- was a local copy that had to
+            # be kept in lockstep with refined_av_engine.py by hand.
             transit_sign_idx = int(hit["transit_degree"] / 30.0) % 12
-            transit_sign_names = [
-                "Mesham", "Rishabam", "Midhunam", "Kadagam", "Simham", "Kanni",
-                "Thulam", "Vrischikam", "Dhanusu", "Makaram", "Kumbham", "Meenam",
-            ]
-            transit_rasi = transit_sign_names[transit_sign_idx]
+            transit_rasi = TAMIL_RASI_ORDER[transit_sign_idx]
             if transit_rasi in strong_signs:
                 area = hit.get("life_area_hint", "self")
                 pos_counts[area] += 1

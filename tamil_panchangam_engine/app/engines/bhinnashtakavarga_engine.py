@@ -9,6 +9,8 @@ Each planet's BAV sums contributions from 8 contributors
 import logging
 from typing import Dict
 
+from app.utils.rasi_utils import to_english_rasi
+
 logger = logging.getLogger(__name__)
 
 # ──────────────────────────────────────────────────────────────
@@ -184,7 +186,10 @@ def compute_bhinnashtakavarga(ephemeris: dict) -> dict:
                 continue
             lon = pdata.get("longitude_deg")
             if lon is None:
-                rasi = pdata.get("rasi", "")
+                # Payload rasi is Tamil ("Kadakam"); SIGN_INDEX is English.
+                # Without the conversion this fallback never matched and the
+                # planet was silently dropped as a contributor.
+                rasi = to_english_rasi(pdata.get("rasi", ""))
                 if rasi in SIGN_INDEX:
                     idx = SIGN_INDEX[rasi]
                 else:

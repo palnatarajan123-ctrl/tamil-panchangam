@@ -87,3 +87,49 @@ def test_ashtakavarga_fallback_branch_matches_for_tamil_and_english_input():
     assert tamil_result["source"] == english_result["source"] == "estimated"
     assert tamil_result["saturn"]["bindus"] == english_result["saturn"]["bindus"]
     assert tamil_result["jupiter"]["bindus"] == english_result["jupiter"]["bindus"]
+
+
+# ── 2026-10-02: Ashtakavarga sign-name consolidation ─────────────────────────
+
+def test_variant_spellings_normalize():
+    from app.utils.rasi_utils import to_english_rasi, to_payload_rasi
+    assert to_english_rasi("Kadagam") == "Cancer" and to_english_rasi("Kadakam") == "Cancer"
+    assert to_english_rasi("Midhunam") == "Gemini" and to_english_rasi("Simham") == "Leo"
+    assert to_payload_rasi("Kadagam") == "Kadakam" and to_payload_rasi("Leo") == "Simmam"
+    assert to_payload_rasi("nonsense") == "nonsense" and to_payload_rasi(None) is None
+
+
+def test_refined_av_keys_match_payload_rasi_spelling():
+    """refined_av_engine used "Midhunam/Kadagam/Simham" while every chart
+    payload (ephemeris.get_rasi) says "Mithunam/Kadakam/Simmam": a lookup by
+    a transiting planet's payload rasi silently returned None for those
+    three signs (real chart 7c6e34be, Oct 2026: Jupiter in Kadakam, Ketu in
+    Simmam both missed)."""
+    from app.engines.ephemeris import RASI_NAMES as PAYLOAD_RASI_NAMES, get_rasi
+    from app.engines.refined_av_engine import compute_refined_av, refined_score_for_rasi
+    bav = {p: {"bindus_per_sign": [5] * 12} for p in
+           ("sun", "moon", "mars", "mercury", "jupiter", "venus", "saturn")}
+    sav = compute_refined_av(bav)["sarvashtakavarga_refined"]
+    assert list(sav) == PAYLOAD_RASI_NAMES
+    for lon in (75.0, 100.0, 130.0):  # Gemini, Cancer, Leo
+        assert sav.get(get_rasi(lon)) is not None
+    assert refined_score_for_rasi(sav, "Kadagam") == sav["Kadakam"] == refined_score_for_rasi(sav, "Cancer")
+
+
+def test_event_window_signal5_uses_same_sign_list_as_refined_av():
+    import inspect
+    from app.engines import event_window_engine, refined_av_engine
+    assert refined_av_engine.RASI_NAMES is event_window_engine.TAMIL_RASI_ORDER
+    assert "Kadagam" not in inspect.getsource(event_window_engine)
+
+
+def test_bav_rasi_fallback_accepts_payload_tamil_spelling():
+    """A planet with only a (Tamil) rasi and no longitude used to be dropped:
+    the fallback checked the Tamil string against an English SIGN_INDEX."""
+    from app.engines.bhinnashtakavarga_engine import compute_bhinnashtakavarga
+    eph = {"lagna": {"longitude_deg": 15.0}, "planets": {
+        p: {"longitude_deg": 15.0} for p in ("Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus")}}
+    eph["planets"]["Saturn"] = {"rasi": "Kadakam"}
+    full = compute_bhinnashtakavarga(eph)
+    assert full["transit_scores"]["saturn"]["current_sign_index"] == 3
+    assert full["saturn"]["total"] == 39

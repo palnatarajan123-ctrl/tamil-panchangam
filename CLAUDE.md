@@ -719,6 +719,23 @@ stale" and "confirmed real" looked like in practice):
   `to_english_rasi()`, and consolidate onto the one shared utility the
   way the Lagna/Gulika-segment/Tithi consolidations already did for
   their respective duplications.
+  **(4) fixed 2026-10-02**: `rasi_utils.py` now holds the ordered
+  `ENGLISH_RASI_ORDER`/`TAMIL_RASI_ORDER` (payload spelling),
+  `to_payload_rasi()`, and recognizes the in-codebase variants
+  (Midhunam/Kadagam/Simham) in `to_english_rasi()` -- they used to pass
+  through unchanged. `refined_av_engine.py` keys its output by
+  `TAMIL_RASI_ORDER` (+ `refined_score_for_rasi()` for any spelling);
+  `event_window_engine.py` Signal 5 uses the same list instead of its own
+  hand-synced copy. Verified on `7c6e34be`: transiting Jupiter (Kadakam)
+  and Ketu (Simmam) looked up in the refined SAV returned None before,
+  15.0 after; monthly event windows identical apart from label spelling
+  (that consumer was internally consistent, so no live behavior change).
+  Also fixed: `bhinnashtakavarga_engine.py`'s no-longitude fallback
+  checked the payload's Tamil rasi against an English `SIGN_INDEX`, so it
+  silently dropped that planet. **Still using the variant list** (not
+  touched, outside this pass): `varshaphal_engine.py` and
+  `special_lagnas_engine.py` `RASI_NAMES`, and `payload_builder.py:127`
+  (mixes "Kadagam" with "Simmam").
 - **RECOMMENDATION (2026-09-14) — include family predictions in
   whatever periodic narrative-grounding spot-check practice gets
   established.** `family_prediction_engine.py` was checked (B1) for the

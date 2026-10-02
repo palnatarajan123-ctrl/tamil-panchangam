@@ -7,26 +7,30 @@ Applies classical purification to Bhinnashtakavarga scores for more accurate pre
 import logging
 from typing import Any, Dict, List, Optional, Set
 
+from app.utils.rasi_utils import TAMIL_RASI_ORDER, to_payload_rasi
+
 logger = logging.getLogger(__name__)
 
-RASI_NAMES = [
-    "Mesham", "Rishabam", "Midhunam", "Kadagam", "Simham", "Kanni",
-    "Thulam", "Vrischikam", "Dhanusu", "Makaram", "Kumbham", "Meenam",
-]
+# Output keys use the chart payload's own spelling (via rasi_utils), so a
+# rasi read off a chart (e.g. a transit's get_rasi()) can be looked up
+# directly. Was a local list spelling Gemini/Cancer/Leo "Midhunam",
+# "Kadagam", "Simham" against the payload's "Mithunam", "Kadakam",
+# "Simmam" -- a lookup by payload rasi silently missed those three signs.
+RASI_NAMES = TAMIL_RASI_ORDER
 
 # Trikona groups (0-indexed sign indices)
 _TRIKONA_GROUPS: List[List[int]] = [
-    [0, 4, 8],   # Mesham, Simham, Dhanusu
-    [1, 5, 9],   # Rishabam, Kanni, Makaram
-    [2, 6, 10],  # Midhunam, Thulam, Kumbham
-    [3, 7, 11],  # Kadagam, Vrischikam, Meenam
+    [0, 4, 8],   # Aries, Leo, Sagittarius
+    [1, 5, 9],   # Taurus, Virgo, Capricorn
+    [2, 6, 10],  # Gemini, Libra, Aquarius
+    [3, 7, 11],  # Cancer, Scorpio, Pisces
 ]
 
 # Ekadhipatya pairs — both signs owned by same planet (0-indexed)
 _EKADHIPATYA_PAIRS: List[tuple] = [
-    (2, 5),   # Mercury: Midhunam, Kanni
-    (1, 6),   # Venus: Rishabam, Thulam
-    (9, 10),  # Saturn: Makaram, Kumbham
+    (2, 5),   # Mercury: Gemini, Virgo
+    (1, 6),   # Venus: Taurus, Libra
+    (9, 10),  # Saturn: Capricorn, Aquarius
 ]
 
 # Bhinnashtakavarga planet keys as they appear in payload (lowercase)
@@ -95,16 +99,8 @@ def compute_refined_av(
         natal_planets: payload['ephemeris']['planets'], keyed by
             capitalized planet name with a 'longitude_deg' field --
             used to determine real sign OCCUPANCY for Ekadhipatya
-            Shodhana (see _ekadhipatya_shodhana()'s docstring). Deriving
-            occupancy from longitude_deg // 30 rather than matching the
-            natal 'rasi' string against this file's own RASI_NAMES list
-            sidesteps a separate, independently-found spelling mismatch
-            between this file's RASI_NAMES ("Midhunam", "Kadagam",
-            "Simham") and ephemeris.py's ("Mithunam", "Kadakam",
-            "Simmam") for Gemini/Cancer/Leo -- the same silent
-            Tamil-name-mismatch bug class already fixed elsewhere in
-            this codebase (see CLAUDE.md's rasi-name-mismatch entries),
-            not yet fixed in this file's own constant. If omitted,
+            Shodhana (see _ekadhipatya_shodhana()'s docstring), derived
+            from longitude_deg // 30 rather than a rasi string. If omitted,
             Ekadhipatya Shodhana is skipped entirely (Trikona Shodhana
             still applies) rather than guessing occupancy -- a wrong
             sub-case reduction is worse than none at this stage. Only
@@ -117,6 +113,8 @@ def compute_refined_av(
             "refined_scores": {"Sun": {"Mesham": 4.0, ...}, ...},
             "sarvashtakavarga_refined": {"Mesham": 28.0, ...}
         }
+        keyed by the payload's rasi spelling (rasi_utils.TAMIL_RASI_ORDER).
+        Use refined_score_for_rasi() to look up by any spelling.
     """
     if not bhinnashtakavarga:
         return {"refined_scores": {}, "sarvashtakavarga_refined": {}}
@@ -157,3 +155,10 @@ def compute_refined_av(
         "refined_scores": refined_scores,
         "sarvashtakavarga_refined": sarvashtakavarga,
     }
+
+
+def refined_score_for_rasi(scores: Dict[str, float], rasi: Optional[str]) -> Optional[float]:
+    """Look up a compute_refined_av() score dict ("sarvashtakavarga_refined"
+    or one planet's "refined_scores" entry) by a rasi in ANY spelling --
+    English, payload Tamil, or a known variant. None if unrecognized."""
+    return scores.get(to_payload_rasi(rasi)) if rasi else None
