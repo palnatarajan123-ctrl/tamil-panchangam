@@ -11,7 +11,7 @@ from app.services.birth_chart_builder import build_birth_chart_view_model
 from app.engines.gochara_engine import compute_gochara, _longitude_to_rasi
 from app.engines.moon_transit_engine import compute_chandra_gati
 from app.engines.nakshatra_engine import compute_nakshatra_context
-from app.engines.ashtakavarga_engine import compute_ashtakavarga_validation
+from app.engines.bhinnashtakavarga_engine import bav_for_payload, compute_av_transit_validation
 from app.engines.remedy_engine import compute_remedies
 from app.engines.drishti_engine import compute_drishti
 from app.engines.house_strength_engine import compute_all_house_strength
@@ -339,14 +339,9 @@ def build_monthly_prediction_envelope(
     # -------------------------------------------------
     # 10. ASHTAKAVARGA VALIDATION - EPIC Signal Expansion
     # -------------------------------------------------
-    logger.debug("DEBUG: Computing Ashtakavarga validation")
-    ashtakavarga = compute_ashtakavarga_validation(
-        saturn_transit_rasi=gochara.get("saturn", {}).get("transit_rasi", "Aries"),
-        jupiter_transit_rasi=gochara.get("jupiter", {}).get("transit_rasi", "Aries"),
-        birth_moon_rasi=natal_moon_rasi,
-        natal_positions=ephemeris,
-        lagna_longitude=natal_lagna_longitude,
-    )
+    # Corrected tables (bhinnashtakavarga_engine), same numbers chat/PDF/
+    # generation show; replaced ashtakavarga_engine.py's heuristic 2026-10-02.
+    ashtakavarga = compute_av_transit_validation(bav_for_payload(base_chart), gochara)
 
     # -------------------------------------------------
     # 11. REMEDY ENGINE - EPIC Signal Expansion

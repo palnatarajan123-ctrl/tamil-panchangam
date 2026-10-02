@@ -811,7 +811,21 @@ stale" and "confirmed real" looked like in practice):
   `auth-navigation-race.test.tsx` fails 2/2 on the baseline too
   (`localStorage.clear` undefined in the test env).
 
-- **NEXT UP (per 2026-10-02 decision) — Ashtakavarga pipeline switch.**
+- **Ashtakavarga pipeline switch DONE 2026-10-02 (was "NEXT UP").**
+  `prediction_envelope.py` now builds `envelope["ashtakavarga"]` with
+  `bhinnashtakavarga_engine.compute_av_transit_validation()` (Option A:
+  each planet's own 0-8 bindus in the transited sign; same shape, so
+  synthesis/remedies read it unchanged). Combination = AVERAGE of Saturn
+  and Jupiter (>=5 strong, >=4 partial, <3 needs_remedies, else balanced =
+  no signal), chosen over "either weak" which would have fired
+  needs_remedies on 62/82 reports. Real distribution over the 82 cached
+  envelopes: 20 needs_remedies / 22 balanced / 30 partial / 10 strong.
+  The v6/v7 prompt guardrail (corrected values override the "older,
+  coarser" signal) was removed in the same commit -- no longer true.
+  Pre-switch audit (option A, old vs new on cached envelopes): 145/410
+  life-area scores move (mean |delta| ~1, max 6), 30 label crossings,
+  remedies change on most. Historical record of the decision follows:
+- **(historical) NEXT UP (per 2026-10-02 decision) — Ashtakavarga pipeline switch.**
   Three flagged workarounds in two rounds came from the wrong-engine /
   corrected-engine split (PDF bindus, the Strength Map, prediction score
   signals). What still reads `ashtakavarga_engine.py`

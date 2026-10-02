@@ -83,3 +83,41 @@ def test_web_view_reads_corrected_strength_not_old_engine():
     tsx = (Path(__file__).parents[3] / "client/src/components/prediction/MonthlyPredictionView.tsx").read_text()
     assert "envelope.av_transit_strength" in tsx
     assert "envelope.ashtakavarga" not in tsx.replace("not envelope.ashtakavarga", "")
+
+
+# ── Pipeline switch (2026-10-02): the envelope's "ashtakavarga" block ─────────
+
+def _validation_for(sat_bindus, jup_bindus):
+    from unittest.mock import patch
+    from app.engines.bhinnashtakavarga_engine import compute_av_transit_validation
+    fake = {"saturn": {"planet": "Saturn", "sign": "Pisces", "bindus": sat_bindus},
+            "jupiter": {"planet": "Jupiter", "sign": "Cancer", "bindus": jup_bindus}}
+    with patch.object(be, "bav_transit_strength", return_value=fake):
+        return compute_av_transit_validation({}, {})
+
+
+def test_overall_support_averages_the_two_planets():
+    assert _validation_for(6, 5)["overall_support"] == "strong_support"   # mean 5.5
+    assert _validation_for(2, 7)["overall_support"] == "partial_support"  # mean 4.5: weak Saturn is not a veto
+    assert _validation_for(3, 4)["overall_support"] == "balanced"         # mean 3.5 -> no signal
+    assert _validation_for(2, 3)["overall_support"] == "needs_remedies"   # mean 2.5
+
+
+def test_four_bindus_is_never_resistance():
+    v = _validation_for(4, 3)
+    assert v["saturn"]["strength"] == "low_support" and v["jupiter"]["strength"] == "resistance"
+    assert v["source"] == "bhinnashtakavarga"
+
+
+def test_envelope_uses_corrected_pipeline():
+    import json
+    from pathlib import Path
+    from app.engines.prediction_envelope import build_monthly_prediction_envelope
+    p = json.loads((Path(__file__).parent / "fixtures_base_chart_high_score.json").read_text())
+    p = p.get("payload", p)
+    p["bhinnashtakavarga"] = compute_bhinnashtakavarga(p["ephemeris"])
+    env = build_monthly_prediction_envelope(base_chart=p, year=2026, month=10)
+    av = env["ashtakavarga"]
+    s = bav_transit_strength(p["bhinnashtakavarga"], gochara_transit_longitudes(env["gochara"]))
+    assert av["source"] == "bhinnashtakavarga"
+    assert av["saturn"]["bindus"] == s["saturn"]["bindus"] and av["jupiter"]["bindus"] == s["jupiter"]["bindus"]

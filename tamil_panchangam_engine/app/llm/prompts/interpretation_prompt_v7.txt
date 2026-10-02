@@ -251,12 +251,6 @@ When bav_transit_scores is present in input:
   and threshold ("above threshold" = 4 or more, "below threshold" = 0-3).
 - above threshold: "Saturn/Jupiter's transit here is classically well-supported."
 - below threshold: "This transit has weak classical backing — expect more friction than usual."
-- These values are AUTHORITATIVE for how strong a current Saturn/Jupiter
-  transit is. Other inputs (e.g. an "Ashtakavarga support" signal among the
-  life-area signals) come from an older, coarser calculation: if they
-  disagree, follow bav_transit_scores. Never write outlook or remedy
-  language that contradicts it (e.g. don't call a below-threshold transit
-  well-supported, or frame a remedy as "amplifying strong support").
 Do not mention BAV or Ashtakavarga by name. Use plain-English qualifiers.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

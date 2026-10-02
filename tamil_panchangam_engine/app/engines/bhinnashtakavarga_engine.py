@@ -7,7 +7,7 @@ Each planet's BAV sums contributions from 8 contributors
 """
 
 import logging
-from typing import Dict
+from typing import Any, Dict
 
 from app.utils.rasi_utils import to_english_rasi
 
@@ -255,6 +255,51 @@ def bav_transit_strength(bav: dict, transit_longitudes: Dict[str, float]) -> Dic
             "above_threshold": above,
             "label": "above threshold" if above else "below threshold",
         }
+    return out
+
+
+def _support_class(bindus: int) -> str:
+    """Per-planet class on the planet's own 0-8 BAV. 4+ is above the
+    classical threshold, so never "resistance"."""
+    if bindus >= 6:
+        return "high_support"
+    if bindus >= 5:
+        return "moderate_support"
+    if bindus >= AV_TRANSIT_THRESHOLD:
+        return "low_support"
+    return "resistance"
+
+
+def compute_av_transit_validation(bav: dict, gochara: dict) -> dict:
+    """
+    The envelope's "ashtakavarga" block (read by synthesis_engine's
+    ASHTAKAVARGA_* signal and remedy_engine), from the corrected tables --
+    replaces ashtakavarga_engine.compute_ashtakavarga_validation() (a 57-total
+    Sarvashtakavarga heuristic) since 2026-10-02. Same output shape.
+
+    overall_support uses the AVERAGE of Saturn's and Jupiter's own bindus
+    (>=5 strong_support, >=4 partial_support, <3 needs_remedies, otherwise
+    balanced = no signal). Decided 2026-10-02 over the old "either planet
+    weak => needs_remedies" rule: Saturn averages 3.25 bindus/sign, so that
+    rule fired on 62 of 82 real reports -- a signal on three-quarters of
+    reports stops meaning anything. Saturn is one input, not a veto.
+    """
+    strength = bav_transit_strength(bav, gochara_transit_longitudes(gochara))
+    if len(strength) < 2:
+        return {"overall_support": "balanced", "source": "bhinnashtakavarga", "error": "transit strength unavailable"}
+    out: Dict[str, Any] = {"source": "bhinnashtakavarga", "threshold": AV_TRANSIT_THRESHOLD}
+    for planet in _TRANSIT_STRENGTH_PLANETS:
+        e = strength[planet]
+        out[planet] = {"transit_rasi": e["sign"], "bindus": e["bindus"], "strength": _support_class(e["bindus"])}
+    mean = (strength["saturn"]["bindus"] + strength["jupiter"]["bindus"]) / 2
+    if mean >= 5:
+        out["overall_support"] = "strong_support"
+    elif mean >= AV_TRANSIT_THRESHOLD:
+        out["overall_support"] = "partial_support"
+    elif mean < 3:
+        out["overall_support"] = "needs_remedies"
+    else:
+        out["overall_support"] = "balanced"
     return out
 
 
