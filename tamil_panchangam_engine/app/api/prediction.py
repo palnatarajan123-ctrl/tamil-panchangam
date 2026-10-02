@@ -38,6 +38,7 @@ from app.engines.llm_interpretation_orchestrator import (
     generate_llm_interpretation,
     is_llm_enabled,
     PROMPT_VERSION_BY_WINDOW,
+    retry_cooldown_status,
 )
 from app.engines.corner_case_detector import assess_calculation_confidence
 
@@ -385,7 +386,14 @@ def generate_monthly_prediction(
         # synthesis portions are still served from cache immediately,
         # same as the already-merged case -- only the LLM retry is new.
         existing_fallback_reason = (interpretation or {}).get("llm_metadata", {}).get("fallback_reason")
-        if existing_fallback_reason and is_llm_enabled():
+        # In retry cooldown (repeated real failures), don't schedule a
+        # retry -- it would be skipped anyway, and "pending" would leave the
+        # view on a spinner. Serve what's stored.
+        _in_cooldown = bool(existing_fallback_reason) and bool(retry_cooldown_status(
+            payload.base_chart_id, "monthly", f"{payload.year}-{payload.month:02d}",
+            prompt_version=PROMPT_VERSION_BY_WINDOW.get("monthly", "v7"),
+        ))
+        if existing_fallback_reason and is_llm_enabled() and not _in_cooldown:
             logger.info(
                 f"Stale fallback cache entry detected ({existing_fallback_reason}) for "
                 f"{payload.base_chart_id}/monthly/{payload.year}-{payload.month:02d} -- "

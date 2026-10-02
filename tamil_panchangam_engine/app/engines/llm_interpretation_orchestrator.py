@@ -20,7 +20,7 @@ import uuid
 import logging
 import json
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Literal
 
 from app.db.postgres import get_conn
@@ -227,6 +227,57 @@ def load_stored_interpretation(
         return None
     content = json.loads(row[0]) if isinstance(row[0], str) else row[0]
     return {"content": content, "fallback_reason": row[1], "reflection_text": row[2]}
+
+
+# Retry cooldown (2026-10-02). A report that has never succeeded is retried
+# on every view (monthly stale-fallback retry, yearly calls this on every
+# request) -- up to ~170k tokens/hour/viewer for one persistently failing
+# report. After RETRY_COOLDOWN_FAILURES real failed calls (ones that spent
+# tokens) within RETRY_COOLDOWN_HOURS, stop calling until the oldest of them
+# ages out. A success ends retries anyway (the shared reader serves it).
+# To retry sooner after fixing the cause, use the admin rerun-llm endpoint:
+# it deletes the report's attempt rows, which clears the cooldown.
+RETRY_COOLDOWN_FAILURES = 3
+RETRY_COOLDOWN_HOURS = 24
+
+
+def retry_cooldown_status(
+    base_chart_id: str,
+    period_type: str,
+    period_key: str,
+    feature_name: str = "prediction",
+    prompt_version: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """{"failures": n, "retry_after": datetime} if this report is in retry
+    cooldown, else None. Counts only failed attempts that reached the model
+    (total_tokens > 0) since the report's last success, within the window,
+    for this prompt_version when given (a prompt change gets fresh tries).
+    Shared by monthly/yearly/weekly generation and natal/KP-natal."""
+    sql = """
+        SELECT COUNT(*) AS n, MIN(created_at) AS oldest FROM prediction_llm_interpretation
+        WHERE base_chart_id = ? AND period_type = ? AND period_key = ? AND feature_name = ?
+          AND fallback_reason IS NOT NULL AND COALESCE(total_tokens, 0) > 0
+          AND created_at > NOW() - make_interval(hours => ?)
+          AND created_at > COALESCE((
+              SELECT MAX(created_at) FROM prediction_llm_interpretation
+              WHERE base_chart_id = ? AND period_type = ? AND period_key = ? AND feature_name = ?
+                AND fallback_reason IS NULL), '-infinity'::timestamp)
+    """
+    args: list = [base_chart_id, period_type, period_key, feature_name, RETRY_COOLDOWN_HOURS,
+                  base_chart_id, period_type, period_key, feature_name]
+    if prompt_version is not None:
+        sql += " AND prompt_version = ?"
+        args.append(prompt_version)
+    try:
+        with get_conn() as conn:
+            row = conn.execute(sql, args).fetchone()
+    except Exception as e:
+        logger.warning(f"Retry cooldown lookup failed (not blocking): {e}")
+        return None
+    n, oldest = (row[0] or 0), row[1]
+    if n < RETRY_COOLDOWN_FAILURES:
+        return None
+    return {"failures": n, "retry_after": oldest + timedelta(hours=RETRY_COOLDOWN_HOURS) if oldest else None}
 
 
 def _check_cache(
@@ -676,6 +727,18 @@ def generate_llm_interpretation(
         result["llm_metadata"]["fallback_reason"] = None
         return result
     
+    cooldown = retry_cooldown_status(base_chart_id, period_type, period_key, feature_name, effective_prompt_version)
+    if cooldown:
+        # No call, no stored row: display is decided by
+        # load_stored_interpretation(), and nothing was spent.
+        logger.warning(
+            f"LLM retry cooldown: {base_chart_id}/{period_type}/{period_key} had "
+            f"{cooldown['failures']} failed calls in {RETRY_COOLDOWN_HOURS}h; next try after {cooldown['retry_after']}"
+        )
+        result["llm_interpretation"] = deterministic_interpretation
+        result["llm_metadata"]["fallback_reason"] = "retry_cooldown"
+        return result
+
     usage = get_monthly_token_usage()
     if usage["remaining"] <= 0:
         logger.warning("Monthly token budget exceeded")

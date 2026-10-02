@@ -798,6 +798,20 @@ stale" and "confirmed real" looked like in practice):
   "cleared" just because this one specific bug class doesn't apply to
   it.
 
+- **Retry cooldown (2026-10-02).** `llm_interpretation_orchestrator.retry_cooldown_status()`
+  (shared; natal too): a report with >= 3 failed calls that reached the
+  model (`total_tokens > 0`) since its last success, within 24h (per
+  prompt_version), gets no new LLM call -- the orchestrator returns the
+  deterministic fallback with `retry_cooldown` and stores nothing; the
+  monthly route doesn't schedule a retry (no endless "pending" spinner).
+  Display is untouched (`load_stored_interpretation()` decides it).
+  **Reset**: rolling window + success, NOT "immediately after a fix" --
+  the admin `rerun-llm` endpoint deletes the report's attempt rows, which
+  clears the cooldown, so whoever ships a fix retries deliberately.
+  Smoke (real calls, `fd79efb3` monthly 2027-03): 3 real failures (+12,961
+  tokens each), 4th view 0 calls / +0, simulated window expiry → real
+  success (+16,506), then cache hit. `tests/engines/test_retry_cooldown.py`.
+
 - **Failed LLM calls now count against the budget (fixed 2026-10-02).**
   Three gaps, all in the monthly/yearly/weekly orchestrator path (the one
   `LLM_MONTHLY_TOKEN_BUDGET` covers; the family/children/child/chat/natal
@@ -809,7 +823,8 @@ stale" and "confirmed real" looked like in practice):
   counter by 12,878 (was 0 before). **All budget percentages quoted before
   this date under-count failures** (~50k known on 2026-10-02).
   `tests/engines/test_failed_call_budget_accounting.py`.
-  **Retry-on-view, investigated, NOT capped (follow-up)**: after the
+  **Retry cooldown ADDED 2026-10-02 (see next entry). Original finding:**
+  after the
   failed-attempt fix, monthly (stale-fallback background retry) and yearly
   (calls the orchestrator every request) re-call the LLM per view ONLY
   while a report has never succeeded; weekly never calls the LLM; natal
