@@ -50,7 +50,9 @@ def log_llm_call(db, chart_id: str, call_type: str, period: str,
     """, [str(uuid.uuid4()), chart_id, call_type, period, input_tokens, output_tokens,
           total_tokens, cost_usd, status, fallback_reason, user_id])
 
-    if status == "success":
+    # Failed calls cost money too; re-check the auto-pause after any call
+    # that spent something (was success-only until 2026-10-02).
+    if cost_usd > 0:
         _check_budget(db)
 
     return cost_usd

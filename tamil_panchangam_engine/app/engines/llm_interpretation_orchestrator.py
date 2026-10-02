@@ -312,7 +312,10 @@ def _persist_interpretation(
                 fallback_reason, reflection_text, explainability_mode
             ])
             
-            if total_tokens > 0 and not fallback_reason:
+            # Every call that consumed tokens counts against the monthly
+            # budget, success or failure (failures were excluded until
+            # 2026-10-02).
+            if total_tokens > 0:
                 usage_id = str(uuid.uuid4())
                 conn.execute("""
                     INSERT INTO llm_token_usage (
@@ -768,9 +771,15 @@ def generate_llm_interpretation(
         logger.warning(f"Anthropic call failed: {error}")
         result["llm_interpretation"] = deterministic_interpretation
         result["llm_metadata"]["fallback_reason"] = error
+        # Record what the failed call really cost: a truncated or malformed
+        # reply (json_parse_error) still used ~16k tokens. This used to log
+        # 0/0/0, so failures never counted against LLM_MONTHLY_TOKEN_BUDGET.
         _persist_interpretation(
             base_chart_id, period_type, period_key, feature_name,
-            effective_prompt_version, "anthropic", "claude-opus-4-6", 0, 0, 0,
+            effective_prompt_version, "anthropic", usage_info.get("model"),
+            usage_info.get("prompt_tokens", 0),
+            usage_info.get("completion_tokens", 0),
+            usage_info.get("total_tokens", 0),
             deterministic_interpretation, error, explainability_mode
         )
         return result

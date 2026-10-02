@@ -798,6 +798,28 @@ stale" and "confirmed real" looked like in practice):
   "cleared" just because this one specific bug class doesn't apply to
   it.
 
+- **Failed LLM calls now count against the budget (fixed 2026-10-02).**
+  Three gaps, all in the monthly/yearly/weekly orchestrator path (the one
+  `LLM_MONTHLY_TOKEN_BUDGET` covers; the family/children/child/chat/natal
+  engines already logged real tokens on failure): the provider-error
+  branch persisted 0/0/0 (and a stale model name) despite real usage;
+  `_persist_interpretation` excluded every fallback from `llm_token_usage`;
+  `log_llm_call` re-checked the $ auto-pause only after successes. Now real
+  usage is recorded for every call. Smoke: a forced real failure raised the
+  counter by 12,878 (was 0 before). **All budget percentages quoted before
+  this date under-count failures** (~50k known on 2026-10-02).
+  `tests/engines/test_failed_call_budget_accounting.py`.
+  **Retry-on-view, investigated, NOT capped (follow-up)**: after the
+  failed-attempt fix, monthly (stale-fallback background retry) and yearly
+  (calls the orchestrator every request) re-call the LLM per view ONLY
+  while a report has never succeeded; weekly never calls the LLM; natal
+  never retries (opposite problem, see below). Both routes are limited to
+  10/hour per client, so a persistently failing report can still cost up
+  to ~10 x 17k ≈ 170k tokens/hour per viewer. Suggested design: in the
+  orchestrator, before calling, count that key's failed attempts with
+  tokens > 0 in the last 24h; at >= 3, return the deterministic fallback
+  without calling (fallback_reason "retry_cooldown", not persisted).
+
 - **Failed attempt never hides a good result (fixed 2026-10-02).**
   `prediction_llm_interpretation` is append-only -- every attempt inserts a
   row -- and every reader took the newest row, so a failed retry buried a
@@ -861,11 +883,8 @@ stale" and "confirmed real" looked like in practice):
   fallback; another (`f5da25da` yearly) hit exactly 4000 and was silently
   "repaired". Raised to 6000 (total 9500); real yearly outputs: median
   3421, p90 3527, now up to 4098.
-  **Found, not fixed**: (1) on `json_parse_error` the orchestrator logs
-  0 tokens even though the provider returns real usage -- failed calls
-  are invisible to `LLM_MONTHLY_TOKEN_BUDGET` (~3 such calls here, ~50k
-  unrecorded), and the yearly route re-calls the LLM on every view after
-  a fallback, so a persistently failing report burns tokens unseen.
+  **Found, then fixed same day**: (1) failed calls weren't counted --
+  see "failed LLM calls now count against the budget".
   (2) FIXED 2026-10-02 -- see "failed attempt never hides a good result". `ashtakavarga_engine.py` deleted in the cleanup commit.
   Historical record of the decision follows:
 - **(historical) NEXT UP (per 2026-10-02 decision) — Ashtakavarga pipeline switch.**
