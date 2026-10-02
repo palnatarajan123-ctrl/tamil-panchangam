@@ -6,7 +6,11 @@
 `curl https://tamil-panchangam-api.onrender.com/api/version` returns
 `git_sha` from Render's own `RENDER_GIT_COMMIT` (`app/main.py`). Render
 **auto-deploys on push to `main`**: observed 2026-10-01, `d781ef1` was
-pushed and live roughly 2 minutes later, with no manual step. The
+pushed and live roughly 2 minutes later, with no manual step. Exception
+(seen 2026-10-02): a commit touching nothing under
+`tamil_panchangam_engine/` (the service's `rootDir`; e.g. CLAUDE.md or
+scripts/ only) is not deployed, so `/api/version` keeps showing the last
+engine commit -- expected, not a failed deploy. The
 2026-09-15/09-19 entries below said this environment "has no access to
 the deployment." That was wrong: this endpoint existed the whole time.
 Kept below as history only.
