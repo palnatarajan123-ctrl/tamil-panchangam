@@ -49,7 +49,35 @@ MAX_PROMPT_TOKENS = {
     # once already, via incremental bumps (900->1000->1200->1800->2000)
     # that each chased the last failure instead of budgeting real margin.
     "monthly": 2600,
-    "yearly": 2500
+    # ┌──────────────────────────────────────────────────────────────────┐
+    # │ RE-MEASURE BEFORE ADDING ANYTHING TO THE MONTHLY/YEARLY PAYLOAD.  │
+    # │ This margin has gone stale silently TWICE (monthly 2026-09-11,   │
+    # │ yearly 2026-10-02). Over the cap = the LLM is never called and   │
+    # │ the user gets deterministic fallback text, with no visible error.│
+    # └──────────────────────────────────────────────────────────────────┘
+    # Raised 2500 -> 3000 on 2026-10-02. Measured that day across all 12
+    # real cached yearly payloads (see PAYLOAD_SIZE_MEASURED): max 2206
+    # estimated (2802 by the real tokenizer -- estimate_tokens() undercounts
+    # ~27%, but this cap is compared against the estimate), median 1960.
+    # 2500 had left 294 (12%). 3000 leaves ~800 estimated (~36%) for
+    # near-term additions and stays 1000 under yearly's implied ceiling
+    # (MAX_TOTAL_TOKENS 8000 - MAX_COMPLETION_TOKENS 4000 = 4000).
+    # How to re-measure: rebuild payloads from cached rows via
+    # extract_payload_inputs() + build_generation_payload() (steps in
+    # CLAUDE.md, "re-measurement of real generation payloads"), then update
+    # PAYLOAD_SIZE_MEASURED -- tests/llm/test_payload_size_validation.py
+    # fails if the cap has under 30% headroom over the recorded measurement.
+    "yearly": 3000
+}
+
+# Largest real payload (estimate_tokens units) per period at the last
+# measurement. Update this whenever you re-measure; the tests check the cap
+# against it. NOTE monthly: 2600 cap over 2206 is only ~18% headroom, and its
+# implied ceiling is 3000 -- see CLAUDE.md (raising it needs MAX_TOTAL too).
+PAYLOAD_SIZE_MEASURED = {
+    "date": "2026-10-02",
+    "monthly": 2206,
+    "yearly": 2206,
 }
 
 MAX_COMPLETION_TOKENS = {

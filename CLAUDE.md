@@ -826,9 +826,9 @@ stale" and "confirmed real" looked like in practice):
   chat, both PDFs, and the Oct 2026 generation payload all show Saturn in
   Pisces 2/8 and Jupiter in Cancer 2/8, below threshold. Live chat with
   the guardrail answered "weakly supported, 2 out of 8" 2/2.
-  `tests/engines/test_av_transit_strength.py`. **Watch**: largest real
-  generation payload is now ~2,206 estimated tokens vs. yearly's 2,500
-  `MAX_PROMPT_TOKENS` (294 headroom) -- re-measure before adding more.
+  `tests/engines/test_av_transit_strength.py`. **Yearly cap raised
+  2500 → 3000 (2026-10-02)** after this left it 294 tokens of headroom --
+  see the `MAX_PROMPT_TOKENS` entry below.
 
 - **PRIORITY — `ashtakavarga_engine.py`'s "classical" Sarvashtakavarga
   is not a real classical calculation, and it's used for LIVE Saturn/
@@ -1141,6 +1141,21 @@ stale" and "confirmed real" looked like in practice):
   still unfixed as of this correction — don't assume any of them are
   done without re-checking the file directly, the way this one's claim
   turned out not to hold.
+- **2026-10-02 re-measurement of real generation payloads (yearly fixed,
+  monthly NOT).** All 12 cached yearly + 70 monthly payloads rebuilt with
+  the current builder: max 2,206 `estimate_tokens()` units for both
+  (median ~1,960-1,974). The real tokenizer (Anthropic count_tokens) says
+  2,802 -- the len//4 estimate undercounts by up to ~28%, but the caps are
+  compared against the estimate, so caps are effectively in estimate units.
+  Yearly: 2500 → 3000 (~36% headroom; implied ceiling 8000-4000 = 4000, so
+  1000 under it), with a dated `PAYLOAD_SIZE_MEASURED` constant beside the
+  caps and tests that fail under 30% headroom. **Monthly is NOT fixed and
+  equally thin**: 2,600 cap over 2,206 (~18%), and its implied ceiling is
+  only 3,000 (8000-5000), so a real raise also needs `MAX_TOTAL_TOKENS`
+  monthly raised -- logged for a decision. To re-measure: rebuild payloads
+  from cached rows via `extract_payload_inputs()` +
+  `llm_interpretation_orchestrator.build_generation_payload()`, take
+  `estimate_tokens(json.dumps(payload))`, update `PAYLOAD_SIZE_MEASURED`.
 - **Weekly/yearly prompt-token margins weren't re-verified after the
   Issue 2 fix** (2026-09-11, `payload_builder.py`'s `MAX_PROMPT_TOKENS`).
   Monthly was confirmed stale (0 real margin against a real chart) and

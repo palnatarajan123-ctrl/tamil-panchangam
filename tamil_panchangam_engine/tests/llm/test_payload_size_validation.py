@@ -47,6 +47,7 @@ from app.llm.payload_builder import (
     MAX_PROMPT_TOKENS,
     MAX_COMPLETION_TOKENS,
     MAX_TOTAL_TOKENS,
+    PAYLOAD_SIZE_MEASURED,
     build_llm_payload,
     validate_payload_size,
 )
@@ -107,3 +108,33 @@ class TestMonthlyPayloadSizeThreshold(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestYearlyPayloadSizeThreshold(unittest.TestCase):
+    """2026-10-02: yearly's cap (2500) had drifted to 294 estimated tokens
+    over the largest real yearly payload (2206) -- the same silent-fallback
+    shape as the monthly Issue 2 bug. Raised to 3000."""
+
+    def test_yearly_cap_has_30pct_headroom_over_last_measurement(self):
+        measured = PAYLOAD_SIZE_MEASURED["yearly"]
+        self.assertGreaterEqual(
+            MAX_PROMPT_TOKENS["yearly"], int(measured * 1.3),
+            f"MAX_PROMPT_TOKENS['yearly'] ({MAX_PROMPT_TOKENS['yearly']}) has under 30% headroom over the "
+            f"last measured real yearly payload ({measured}, {PAYLOAD_SIZE_MEASURED['date']}). Re-measure "
+            f"real payloads and raise the cap with real margin -- don't just nudge it past this test.",
+        )
+
+    def test_yearly_cap_stays_under_implied_ceiling(self):
+        ceiling = MAX_TOTAL_TOKENS["yearly"] - MAX_COMPLETION_TOKENS["yearly"]
+        self.assertLessEqual(MAX_PROMPT_TOKENS["yearly"], ceiling - 500)
+
+    def test_realistic_payload_built_as_yearly_fits_with_margin(self):
+        inputs = dict(_real_monthly_payload_inputs(), period_type="yearly")
+        payload = build_llm_payload(explainability_mode="full", **inputs)
+        is_valid, reason, estimated = validate_payload_size(payload, "yearly")
+        self.assertTrue(is_valid, reason)
+        self.assertLessEqual(
+            estimated, MAX_PROMPT_TOKENS["yearly"] * 0.8,
+            f"A realistic yearly payload is now {estimated} estimated tokens -- within 20% of the cap. "
+            f"Re-measure real payloads before this becomes a silent prompt_too_large fallback.",
+        )
