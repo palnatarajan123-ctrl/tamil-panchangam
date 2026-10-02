@@ -430,12 +430,22 @@ stale" and "confirmed real" looked like in practice):
   **Framing decision**: chat is classical-Vedic and trine/square are
   Western aspects.
   - Surfaced: conjunction ("transiting over your natal X"), opposition
-    (the 7th-house aspect), and trines/squares that coincide EXACTLY with
-    the transiting planet's own special drishti counted forward (Jupiter
-    5th ~120°/9th ~240°, Mars 4th ~90°, Saturn 10th ~270°), named as that
-    drishti.
-  - Every other trine/square is dropped, not relabelled: a "nearest
-    classical name" would misstate what was computed.
+    (the 7th-house aspect), and each planet's special drishti counted
+    forward (Jupiter 5th/9th, Mars 4th/8th, Saturn 3rd/10th), named as that
+    drishti. **Corrected 2026-10-02 (`543e10d`)**: this used to relabel
+    matching Western trines/squares, but `_angular_diff` is one-sided
+    (transit − natal against one angle), so only forward 240/270 were ever
+    computed and Jupiter 5th, Mars 4th/8th and Saturn 3rd never surfaced.
+    The chats now call `compute_transit_hits(vedic_drishti=True)`, which
+    checks those by forward angle. Across 41 charts: 326 → 454 contacts,
+    none lost.
+  - Trine/square hits are dropped, not relabelled: a "nearest classical
+    name" would misstate what was computed.
+  - **Found, not fixed**: the monthly-report path (`predictive_signals_engine`
+    → `event_window_engine`) still uses the default Western set with the
+    same one-sided bands, so its "trine"/"square" only ever means forward
+    240°/270°, never 120°/90°. Fixing it changes report scoring, so it is a
+    product decision.
   - `house`/`life_area_hint` are never surfaced: `_house_of()` is Equal
     House (see that backlog item), and `life_area_hint` is the same number
     as a topic.
@@ -818,6 +828,29 @@ stale" and "confirmed real" looked like in practice):
   the scan covered every planet, so the model can't tell "no contact" from
   "not computed"; (3) RETURNS already lists Jupiter's aspects to natal
   Jupiter (5th/7th/9th) but the model said it only had the return date.
+
+  **Round 3 (same day), both changes tried, one kept.** (1) Special
+  drishti by forward angle shipped (`543e10d`, see the Phase 3 entry).
+  The claim above that Jupiter 5th and Mars 4th were covered was WRONG:
+  neither was ever computed. (2) A "the scan covered every pairing, so
+  missing means no contact" footer sentence was shipped and then
+  **reverted (`f186fd8`)**. The A/B used the exact 21:51 question plus the
+  real 12-turn history, Sonnet 4.6, 20 samples per arm. Jupiter AV 2/8
+  cited: old prompt 5-7/20; new hit lines only 7/20 (neutral); new footer
+  only 1/20; shipped 0/20; two shorter wordings 2/20 and 4/20. No wording
+  ever got the Saturn item answered as "no exact contact" (0/20 each).
+  **Correction to the "one-off sampling miss" finding above**: that 9/9
+  was 3 samples per condition. With the real history, the old prompt
+  files Jupiter AV under "don't have" in about 13-15 of 20 replies, so
+  the 21:51 miss is the TYPICAL outcome with that history, not a one-off.
+  Without the history it's cited reliably. Likely cause: the earlier
+  turns established a have/don't-have list that the model re-copies.
+  Not fixed; any fix needs the same 20-sample A/B, because prompt
+  wording here moves the result a lot.
+  The fix changes today's reply in one way: chart `fd79efb3`'s prompt now
+  also lists Jupiter's 5th aspect tightening onto natal Venus (2nd lord,
+  exact after 16 Nov 2026), plus two past Mars 8th contacts. Replies cite
+  it.
 
 - **LLM call-site sweep + four decisions (2026-10-02) -- every LLM call site,
   current status.** Rule of thumb for any NEW call site: log through
