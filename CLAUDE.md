@@ -823,8 +823,18 @@ stale" and "confirmed real" looked like in practice):
   the cooldown, fixed; (3) the token budget reflects ALL real spend:
   `log_llm_call()` writes both ledgers, separate writers removed
   (`3f2ea80`); October true spend at that point 867,580 (57.8%) vs counter
-  805,763 -- the 61,817 gap is pre-fix spend at previously uncounted
-  sites, NOT back-filled into the counter (offered, pending decision);
+  805,763 -- the 61,817 gap was pre-fix spend at previously uncounted
+  sites. **Reconciled 2026-10-02 with ONE one-time catch-up row** in
+  `llm_token_usage` (id `catchup-2026-10-pre-fix-spend`, feature_name
+  `one_time_catchup_pre_fix_spend`, 61,817 tokens), applied only after
+  confirming the gap was still exactly 61,817 (i.e. every post-fix call
+  was already in both ledgers). Counter then read 872,987 / 58.2% =
+  `llm_calls` total exactly (5,407 more than 867,580 because of later
+  smoke-test calls, counted normally). **NOT a recurring adjustment**:
+  since `3f2ea80` every call writes both ledgers, so the two should stay
+  equal; if they ever diverge, find the call site that bypasses
+  `log_llm_call()` instead of adding another catch-up row. It rolls off
+  with October's month window like any other row;
   (4) free-text sites flag truncation only, no retry (`4356509`).
   **Still known**: stream output on interruption is an estimate (~4
   chars/token); KP's first live call today (4,657 tokens) predates its
