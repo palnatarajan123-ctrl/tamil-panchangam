@@ -46,3 +46,20 @@ def test_auto_pause_rechecked_after_a_failed_call_that_cost_money():
     with patch.object(bg, "_check_budget") as check:
         bg.log_llm_call(db, "c", "prediction", "yearly/2026", 12900, 4000, status="error", fallback_reason="json_parse_error")
     check.assert_called_once()
+
+
+def test_record_token_usage_is_the_single_writer_and_kp_uses_it():
+    """KP-natal never wrote llm_token_usage (only the $ ledger), so KP calls
+    never counted toward LLM_MONTHLY_TOKEN_BUDGET (fixed 2026-10-02; live
+    smoke: +4,741 tokens, equal to the llm_calls row)."""
+    import inspect
+    from app.api import natal_interpretation as nat
+    db = MagicMock()
+    bg.record_token_usage(db, "kp_natal", "kp-v1.0", 4741)
+    assert "INSERT INTO llm_token_usage" in db.execute.call_args[0][0]
+    db.reset_mock()
+    bg.record_token_usage(db, "kp_natal", "kp-v1.0", 0)
+    db.execute.assert_not_called()
+    for fn in (nat._save_cache, nat._save_kp_cache, orch._persist_interpretation):
+        src = inspect.getsource(fn)
+        assert "record_token_usage(" in src and "INSERT INTO llm_token_usage" not in src, fn.__name__

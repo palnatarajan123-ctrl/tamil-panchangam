@@ -23,6 +23,19 @@ def compute_cost(input_tokens: int, output_tokens: int) -> float:
     return (input_tokens * COST_PER_INPUT_TOKEN) + (output_tokens * COST_PER_OUTPUT_TOKEN)
 
 
+def record_token_usage(db, feature_name: str, prompt_version: str, total_tokens: int) -> None:
+    """Count a call against LLM_MONTHLY_TOKEN_BUDGET (which reads
+    llm_token_usage -- a separate ledger from log_llm_call()'s llm_calls,
+    the $ budget). Call for EVERY call that spent tokens, success or failure.
+    Single writer since 2026-10-02: the orchestrator and natal each had an
+    inline copy, and KP-natal had none, so KP calls never counted."""
+    if total_tokens and total_tokens > 0:
+        db.execute("""
+            INSERT INTO llm_token_usage (id, feature_name, prompt_version, total_tokens, created_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, [str(uuid.uuid4()), feature_name, prompt_version, total_tokens])
+
+
 def log_llm_call(db, chart_id: str, call_type: str, period: str,
                  input_tokens: int, output_tokens: int,
                  status: str = "success", fallback_reason: str = None,

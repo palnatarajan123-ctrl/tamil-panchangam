@@ -864,10 +864,13 @@ stale" and "confirmed real" looked like in practice):
   nothing regenerated. Smoke (same chart): failures retried, cooldown at 3
   failures, real success after simulated expiry, then cache hit. Also:
   natal's `_save_cache` excluded failures from `llm_token_usage` (same gap
-  as the orchestrator) -- fixed. **Found, not fixed**: KP-natal
-  (`_save_kp_cache`) never writes `llm_token_usage` at all, success or
-  failure, so KP calls don't count toward `LLM_MONTHLY_TOKEN_BUDGET`
-  (they are in `llm_calls`, i.e. the $ budget). Natal also caches a
+  as the orchestrator) -- fixed. KP-natal never wrote `llm_token_usage`
+  at all (only `llm_calls`, the $ ledger): fixed 2026-10-02 via a single
+  writer, `budget_guard.record_token_usage()`, now used by the
+  orchestrator, natal and KP (replacing two inline INSERT copies); live KP
+  call raised the token counter by 4,741 = its `llm_calls` row.
+  **Two ledgers, remember**: `log_llm_call()` → `llm_calls` ($ budget);
+  `record_token_usage()` → `llm_token_usage` (`LLM_MONTHLY_TOKEN_BUDGET`). Natal also caches a
   truncated-then-JSON-repaired reply as a success (it only back-fills
   missing keys), the same silent-truncation shape the yearly cap had.
 
