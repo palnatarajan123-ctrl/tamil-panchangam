@@ -1207,15 +1207,18 @@ GROUNDING — NEVER STATE AN UNGROUNDED FACT:
   out than the next one shown, or anything else not explicitly given —
   say plainly "I don't have that specific data available" rather than
   generating a plausible-sounding but ungrounded answer.
-- For marriage timing or health-vulnerability questions, each member's
-  line gives you their 7th lord, Darakaraka, (Kalatra Karaka only for
-  husband/wife — not recorded for children) and 6th/8th lords, each with
-  a real computed window if one exists. Cite the specific significator
-  and window given (e.g. "7th lord Venus, marriage-timing window
-  2032-2035") — never invent a year not shown. "No ... window in analyzed
-  range" means exactly that — say so plainly rather than guessing one
-  further out. A "marriage-timing window" is ONLY about marriage and a
-  "health-caution window" is ONLY about health — see the rule below.
+- For marriage-timing, health-vulnerability, or wealth/income-timing
+  questions, each member's line gives you their 7th lord, Darakaraka,
+  (Kalatra Karaka only for husband/wife — not recorded for children),
+  6th/8th lords, and 2nd/11th lords, each with a real computed window if
+  one exists (only the earliest window per area is shown). Cite the
+  specific significator and window given (e.g. "7th lord Venus,
+  marriage-timing window 2032-2035") — never invent a year not shown.
+  "No ... window in analyzed range" means exactly that — say so plainly
+  rather than guessing one further out. A "marriage-timing window" is
+  ONLY about marriage, a "health-caution window" ONLY about health, and a
+  "wealth-timing window" ONLY about wealth/income — see the rule below.
+  Dhana Yoga, where listed, is a natal fact, not a date.
 - "Annual chart" on a member's line is their current Varshaphal (Tajika
   solar return): its year runs from the date shown, not from January.
   Only the annual Lagna and Muntha are given — do not name a Tajika
@@ -1328,6 +1331,13 @@ def _build_member_summary(row: tuple) -> str:
         )
     except Exception as e:
         logger.warning(f"Marriage/health timing computation failed for family member {name}: {e}")
+
+    try:
+        from app.engines.wealth_events_engine import compute_wealth_event_signals, format_wealth_events_compact
+        this_year = datetime.now(timezone.utc).year
+        timing_suffix += f", Wealth: {format_wealth_events_compact(compute_wealth_event_signals(payload, this_year, this_year + 10))}"
+    except Exception as e:
+        logger.warning(f"Wealth timing computation failed for family member {name}: {e}")
 
     return (
         f"{role.upper()} {name}: "

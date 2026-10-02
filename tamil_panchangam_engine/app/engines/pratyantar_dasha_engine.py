@@ -236,14 +236,16 @@ def format_dasha_snapshot_compact(snap: Dict[str, Any]) -> str:
     """One-clause rendering for family.py's per-member line."""
     if not snap:
         return ""
+    # Every period named with an explicit "Mon YYYY–Mon YYYY" range: terser
+    # "then X to Y" phrasing was misread by the model as X STARTING at Y,
+    # and omitting the next Pratyantar led it to invent one.
     md, ad, pt = snap["mahadasha"], snap["antardasha"], snap["pratyantar"]
-    out = (f"Dasha {md['lord']}›{ad['lord']}›{pt['lord']} "
-           f"(sub-period to {_ym(ad['end'])}, sub-sub-period to {_ym(pt['end'])}")
-    npt = snap.get("next_pratyantar")
-    if npt:
-        # Without this the model was observed inventing the next one.
-        out += f" then {npt['lord']}"
+    parts = [f"{ad['lord']} sub-period {_ym(ad['start'])}–{_ym(ad['end'])}"]
     nad = snap.get("next_antardasha")
     if nad:
-        out += f"; next sub-period {nad['lord']} from {_ym(nad['start'])}"
-    return out + ")"
+        parts.append(f"next sub-period {nad['lord']} {_ym(nad['start'])}–{_ym(nad['end'])}")
+    parts.append(f"{pt['lord']} sub-sub-period {_ym(pt['start'])}–{_ym(pt['end'])}")
+    npt = snap.get("next_pratyantar")
+    if npt:
+        parts.append(f"next sub-sub-period {npt['lord']} {_ym(npt['start'])}–{_ym(npt['end'])}")
+    return f"Dasha {md['lord']}›{ad['lord']}›{pt['lord']} ({'; '.join(parts)})"

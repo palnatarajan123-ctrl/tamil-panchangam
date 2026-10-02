@@ -40,10 +40,10 @@ DATED WINDOWS ARE DOMAIN-SPECIFIC — NEVER BORROW ONE ACROSS LIFE AREAS:
 - Every dasha window listed under a life area (e.g. "7th lord ...
   marriage", "6th/8th lord ... health", children) was computed for that ONE
   life area. Cite it only as evidence for the life area it was computed for.
-- If asked about a life area (wealth, career, etc.) that has no window of
-  its own here, say plainly that you don't have a computed timing window
-  for that area. Do NOT re-present a marriage, health, or children window
-  as if it indicated wealth or career timing, and do not argue a planet's
+- If asked about a life area (e.g. career) that has no window of its own
+  here, say plainly that you don't have a computed timing window for that
+  area. Do NOT re-present a marriage, health, wealth, or children window
+  as if it indicated another area's timing, and do not argue a planet's
   general significations to stretch one across (e.g. "Venus also signifies
   wealth, so the 7th-lord Venus window is a financial window" is NOT
   allowed).
@@ -592,6 +592,18 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
             "record gender) -- reason only from the 7th lord and Darakaraka for marriage.\n"
         )
 
+    if context.get("wealth_context"):
+        system_prompt += (
+            "\n\n## WEALTH TIMING SIGNALS (computed live)\n"
+            + context["wealth_context"]
+            + "\nThese are the ONLY real dasha-window facts you have for wealth/income timing. "
+            "When asked about financial timing, cite the specific significator and window "
+            "(e.g. \"11th lord Saturn Antardasha, to Aug 2028\"). Only the 2nd/11th lords' "
+            "windows are dated -- Dhana Yoga and KP significators are natal facts you may "
+            "cite as support, but do not derive a date from them. If no window falls near what "
+            "is asked, say you don't have a grounded wealth window for that period.\n"
+        )
+
     if context.get("dasha_periods_context"):
         system_prompt += (
             "\n\n## DASHA PERIODS (computed live, exact dates)\n"
@@ -963,6 +975,17 @@ def _build_chat_context(base_chart_id: str) -> dict:
     except Exception as e:
         logger.warning(f"Marriage/health timing computation failed in chat context: {e}")
 
+    wealth_context = ""
+    try:
+        from app.engines.wealth_events_engine import compute_wealth_event_signals, format_wealth_events_context
+        this_year = datetime.now(timezone.utc).year
+        wealth_context = (
+            f"Wealth timing signals ({this_year}-{this_year + 10}):\n"
+            + format_wealth_events_context(compute_wealth_event_signals(payload, this_year, this_year + 10))
+        )
+    except Exception as e:
+        logger.warning(f"Wealth timing computation failed in chat context: {e}")
+
     return {
         "name": birth.get("name", "the chart holder"),
         "date": birth.get("date_of_birth", "unknown"),
@@ -987,6 +1010,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "dasha_periods_context": dasha_periods_context,
         "varshaphal_context": varshaphal_context,
         "transit_hits_context": transit_hits_context,
+        "wealth_context": wealth_context,
     }
 
 

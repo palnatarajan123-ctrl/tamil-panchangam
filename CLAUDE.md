@@ -403,6 +403,32 @@ stale" and "confirmed real" looked like in practice):
   `event_window_engine.py` (monthly reports) still consumes the raw
   edge dates as if exact.
 
+- **2026-10-02 chat build, Phase 4: `wealth_events_engine.py` (new)**,
+  closing the "Part 3 wealth events" scope item below. It gives 2nd/11th
+  lords from Moon with real dasha windows, the reused Dhana Yoga
+  (`yoga_engine.check_dhana_yoga()`, LAGNA-based and labelled so), and KP
+  2nd/11th cuspal significators (38/41 charts have KP data). Wired into
+  `chat.py` (WEALTH TIMING SIGNALS) and `family.py` (compact `Wealth:`
+  clause, window labelled "wealth-timing window").
+  - **Not wired into `child_prediction_engine.py`, by decision**: its
+    report has no wealth field (adding one is a new report feature, not
+    a fabrication fix), and child questions in chat already go through
+    `family.py`. In real chat history (`chat_messages`, `chat.py` only;
+    `family.py` doesn't persist messages), 30/182 user questions were
+    finance/career, and only 2 mentioned a child (both career, not money).
+  - **Found, not fixed**: `family_prediction_engine.py`'s KP note does
+    `cuspal.get("2", []) or cuspal.get("11", [])`, which silently drops
+    every 11th-cusp significator whenever the 2nd cusp has any. The new
+    engine reports both separately.
+  - **Live-verification caveat**: in one `chat.py` run the model said
+    Venus was a KP significator of "both the 2nd and 11th cusps". The
+    clearly labelled data has Venus for the 2nd cusp only. This is
+    instruction/sampling error, not missing data.
+  - Also fixed during this phase's verification: `family.py`'s compact
+    dasha clause was rewritten to explicit "Lord period Mon YYYY–Mon YYYY"
+    ranges. The terser "then Venus to Apr 2027" was read as Venus
+    STARTING in April 2027.
+
 - **2026-10-01: chat's self-reported data gaps (wealth-timing question)
   checked against the real live prompt. Scoped only; nothing built,
   pending sign-off.** A user-reported answer listed 6 missing items.
