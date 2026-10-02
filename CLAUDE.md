@@ -972,13 +972,24 @@ stale" and "confirmed real" looked like in practice):
     (the report's reference date). E.g. `f5da25da` Sep 2026: Jupiter
     (transiting Cancer) was sent as 6/strong, really 2/weak.
     `tests/engines/test_bav_transit_scores.py`.
-    **Cached content, NOT regenerated (needs sign-off)**: 69 of 82 cached
-    monthly/yearly reports (27 charts) carry a `bav_qualifier` sentence
-    whose class (strong/moderate/weak) differs from the real transit
-    sign's. ~69 x 15.8k ≈ 1.1M tokens -- about all of October's remaining
-    `LLM_MONTHLY_TOKEN_BUDGET` (~1.13M left on 2026-10-02), so it would
-    repeat the Sept 15 budget incident unless the budget is raised or it
-    waits for November. Also inert but stale: the 28 stored payloads still
+    **Cached content fixed 2026-10-02 by targeted rewrite** (not full
+    regeneration): `scripts/rewrite_transit_backing_sentences.py` (dry run
+    by default; clause-accurate classifier; rewrites only the
+    contradicting sentence(s) with a small LLM call, re-checks before
+    writing, updates BOTH stored copies -- latest
+    `prediction_llm_interpretation.content_json` and
+    `*_predictions.interpretation.llm_interpretation`; backups in
+    `scripts/backfill_backups/`). "Contradicting" = well-supported at <4/8,
+    weak at >=4/8, or "moderate" at <=2/8. The earlier "69"/"45" counts
+    came from a keyword classifier whose clauses leaked across
+    "while/but"; by-eye review gave 34 of the 45 + 4 it missed = 38
+    reports, plus 1 life-area `astrological_basis` sentence (not 6). All
+    rewritten: 39 calls, 15,294 tokens, ~$0.08; 0 contradictions remain.
+    One sentence needed a second pass after a human spot-check
+    (`f5da25da` Oct 2026 career basis said weak backing "tempers" an 84
+    score). **Still true**: those reports' life-area SCORES carry the old
+    engine's ASHTAKAVARGA_* signal -- only the pipeline switch (+ a full
+    regeneration after it) fixes that. Also inert but stale: the 28 stored payloads still
     hold the old `transit_scores` key (nothing reads it);
     `scripts/backfill_bav_classical_tables.py --apply` would strip it.
 - **`transit_hits_engine.py`'s `_house_of()` uses a different house
