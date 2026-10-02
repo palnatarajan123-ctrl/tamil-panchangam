@@ -83,13 +83,22 @@ PAYLOAD_SIZE_MEASURED = {
 MAX_COMPLETION_TOKENS = {
     "weekly": 1500,
     "monthly": 5000,  # v7 adds event_predictions + annual_theme + yoga_summary; 3000 truncates
-    "yearly": 4000
+    # Raised 4000 -> 6000 on 2026-10-02: a real yearly reply (966f5254, 2026)
+    # ran ~4,900 tokens and was cut off mid-string -> json_parse_error ->
+    # deterministic fallback, retried (and re-truncated) on every view.
+    # Measured over 23 successful yearly outputs: median 3421, p90 3527, max
+    # exactly 4000 (i.e. also truncated). Monthly for comparison: median
+    # 3264, max 3487 under its 5000.
+    "yearly": 6000
 }
 
 MAX_TOTAL_TOKENS = {
     "weekly": 3500,
     "monthly": 8000,  # raised to accommodate v7 completion headroom
-    "yearly": 8000
+    # 9500 = yearly prompt cap 3000 + completion 6000 + 500 margin; at 8000
+    # the 6000 completion would fail every yearly prompt over 2000 estimated
+    # tokens as token_budget_exceeded.
+    "yearly": 9500
 }
 
 RASI_LORDS = {
