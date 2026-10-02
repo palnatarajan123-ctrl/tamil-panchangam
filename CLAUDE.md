@@ -798,6 +798,38 @@ stale" and "confirmed real" looked like in practice):
   "cleared" just because this one specific bug class doesn't apply to
   it.
 
+- **LLM call-site sweep + four decisions (2026-10-02) -- every LLM call site,
+  current status.** Rule of thumb for any NEW call site: log through
+  `budget_guard.log_llm_call()` (writes BOTH ledgers: `llm_calls` $ and
+  `llm_token_usage` tokens), log "success" only after the reply parses,
+  check a retry cooldown before calling, and act on truncation
+  (`stop_reason == "max_tokens"` / provider `usage_info["truncated"]`).
+
+  | Call site | Failure cost logged | Token budget | Truncation | Retry cooldown |
+  |---|---|---|---|---|
+  | Monthly/yearly/weekly (orchestrator) | yes | yes | stored "truncated", shown with banner, retried | `retry_cooldown_status()` |
+  | Natal / KP-natal | yes | yes | stored "truncated", retried | `retry_cooldown_status()` |
+  | Family prediction / children timing / child prediction | yes (success logged after parse) | yes | can't pass as success (no JSON repair) | `llm_call_cooldown()` (from `llm_calls`) |
+  | Chat / family group chat (streams) | yes incl. partial stream + client disconnect (input exact, output estimated) | yes | flagged: `chat_messages.truncated`, done event | n/a (user-initiated) |
+  | Family dasha summary | yes | yes | flagged: `family_timeline_cache.summary_truncated` + response | n/a |
+  | Daily guidance (150-token cap) | yes | yes | flagged: `llm_guidance_truncated` | n/a |
+  | Porutham commentary | yes | yes | flagged: `commentary_truncated` beside the commentary | n/a |
+  | `scripts/rewrite_transit_backing_sentences.py` | via `log_llm_call` | yes | n/a | n/a |
+
+  Decisions: (1) monthly/yearly act on the truncation flag like natal
+  (`6c82344`); (2) cooldown extended to the three family engines, counted
+  from `llm_calls`, no schema change (`714e62b`) -- found that they logged
+  "success" before parsing, double-counting parse failures and resetting
+  the cooldown, fixed; (3) the token budget reflects ALL real spend:
+  `log_llm_call()` writes both ledgers, separate writers removed
+  (`3f2ea80`); October true spend at that point 867,580 (57.8%) vs counter
+  805,763 -- the 61,817 gap is pre-fix spend at previously uncounted
+  sites, NOT back-filled into the counter (offered, pending decision);
+  (4) free-text sites flag truncation only, no retry (`4356509`).
+  **Still known**: stream output on interruption is an estimate (~4
+  chars/token); KP's first live call today (4,657 tokens) predates its
+  token-ledger fix.
+
 - **Retry cooldown (2026-10-02).** `llm_interpretation_orchestrator.retry_cooldown_status()`
   (shared; natal too): a report with >= 3 failed calls that reached the
   model (`total_tokens > 0`) since its last success, within 24h (per
