@@ -341,10 +341,11 @@ class TestVarshaphal:
         result = compute_varshaphal(self._ephemeris(), self._birth_details(), year=2026)
         for key in ("year", "solar_return_date", "lagna", "annual_lagna_lord",
                     "muntha", "muntha_house", "muntha_house_from_natal_lagna",
-                    "strength", "benefics_in_kendra"):
+                    "benefics_in_kendra", "benefics_in_kendra_band"):
             assert key in result, f"Missing key: {key}"
         assert result["year"] == 2026
-        assert result["strength"] in ("strong", "moderate", "weak", "minimal")
+        assert result["benefics_in_kendra_band"] in ("strong", "moderate", "weak", "minimal")
+        assert "strength" not in result  # a rough proxy, not a strength measure
 
 
 # ── Confluence Detector ───────────────────────────────────────────────────────

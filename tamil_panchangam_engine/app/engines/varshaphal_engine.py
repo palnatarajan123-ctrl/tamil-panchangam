@@ -170,14 +170,19 @@ def compute_varshaphal(
         except Exception:
             pass
 
+    # A rough proxy, named as one: how many of the 4 natural benefics sit in
+    # the annual chart's kendras. Was returned as "strength", which read as a
+    # classical strength measure. Tajika's own annual strengths (Panchavargiya
+    # / Harsha Bala) aren't implemented, and Shadbala is a natal Parashari
+    # measure, so nothing here computes a real strength.
     if benefics_in_kendra >= 3:
-        strength = "strong"
+        band = "strong"
     elif benefics_in_kendra == 2:
-        strength = "moderate"
+        band = "moderate"
     elif benefics_in_kendra == 1:
-        strength = "weak"
+        band = "weak"
     else:
-        strength = "minimal"
+        band = "minimal"
 
     return {
         "year": year,
@@ -187,8 +192,8 @@ def compute_varshaphal(
         "muntha": RASI_NAMES[muntha_idx],
         "muntha_house": muntha_house,
         "muntha_house_from_natal_lagna": muntha_house_from_natal_lagna,
-        "strength": strength,
         "benefics_in_kendra": benefics_in_kendra,
+        "benefics_in_kendra_band": band,
     }
 
 
@@ -202,7 +207,8 @@ _CACHE_KEY = "varshaphal_by_year"
 # Bump to invalidate cached entries if compute_varshaphal()'s semantics change.
 # 2: varshesha -> annual_lagna_lord, varshesha_house dropped, muntha_house
 #    now from the annual Lagna.
-_CACHE_VERSION = 2
+# 3: "strength" -> "benefics_in_kendra_band" (a rough proxy, not a strength).
+_CACHE_VERSION = 3
 
 
 def _cached_or_compute(chart_id: Optional[str], payload: Dict[str, Any], year: int) -> Dict[str, Any]:

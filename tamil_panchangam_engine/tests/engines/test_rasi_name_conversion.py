@@ -130,6 +130,7 @@ def test_bav_rasi_fallback_accepts_payload_tamil_spelling():
     eph = {"lagna": {"longitude_deg": 15.0}, "planets": {
         p: {"longitude_deg": 15.0} for p in ("Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus")}}
     eph["planets"]["Saturn"] = {"rasi": "Kadakam"}
-    full = compute_bhinnashtakavarga(eph)
-    assert full["transit_scores"]["saturn"]["current_sign_index"] == 3
-    assert full["saturn"]["total"] == 39
+    by_rasi = compute_bhinnashtakavarga(eph)
+    eph["planets"]["Saturn"] = {"longitude_deg": 100.0}  # Cancer
+    assert by_rasi == compute_bhinnashtakavarga(eph)
+    assert by_rasi["saturn"]["total"] == 39

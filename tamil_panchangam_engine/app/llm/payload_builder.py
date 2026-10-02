@@ -1047,10 +1047,23 @@ def _build_family_yoga_upagraha_suffix(payload: dict) -> str:
 
 
 def _build_bav_context(bav: dict, gochara: dict) -> dict:
-    """BAV transit scores for current Saturn/Jupiter/Rahu transits."""
-    if not bav or bav.get("error"):
+    """BAV transit scores for the signs Saturn/Jupiter/Rahu are transiting
+    (from the envelope's gochara, i.e. the report's reference date).
+
+    Until 2026-10-02 this ignored `gochara` and read the stored
+    bav["transit_scores"], which scored each planet's NATAL sign -- 69 of
+    82 cached reports' "transit backing" sentence had the wrong class."""
+    if not bav or bav.get("error") or not gochara:
         return {}
-    transit_scores = bav.get("transit_scores", {})
+    from app.engines.bhinnashtakavarga_engine import compute_bav_transit_scores
+    from app.utils.rasi_utils import ENGLISH_RASI_ORDER, to_english_rasi
+
+    longitudes = {p: (gochara.get(p) or {}).get("longitude") for p in ("saturn", "jupiter")}
+    rk = gochara.get("rahu_ketu") or {}
+    rahu_sign = to_english_rasi(rk.get("rahu_rasi"))
+    if rahu_sign in ENGLISH_RASI_ORDER:
+        longitudes["rahu"] = ENGLISH_RASI_ORDER.index(rahu_sign) * 30.0 + float(rk.get("rahu_degree_in_sign") or 0.0)
+    transit_scores = compute_bav_transit_scores(bav, {k: v for k, v in longitudes.items() if v is not None})
     if not transit_scores:
         return {}
 
@@ -1300,7 +1313,8 @@ def extract_payload_inputs(
                         "solar_return_date": fmt_date(vp.get("solar_return_date")),
                         "lagna": vp.get("lagna"),
                         "annual_lagna_lord": vp.get("annual_lagna_lord"),
-                        "strength": vp.get("strength"),
+                        "benefics_in_kendra": vp.get("benefics_in_kendra"),
+                        "benefics_in_kendra_band": vp.get("benefics_in_kendra_band"),
                         "muntha": vp.get("muntha"),
                     }
 

@@ -401,8 +401,15 @@ stale" and "confirmed real" looked like in practice):
   kept as history). 19/19 real, 0 fallbacks, 302,157 tokens (~$1.66).
   Smoke: `2e7e056f` Oct 2026 report now says "from December 2025 …
   Jupiter", matching chat (SR 2025-12-05, Lagna Pisces, lord Jupiter).
-  **Still open**: `strength` is still the benefic-count heuristic
-  (item 5), and `solar_return_date` reaches the monthly LLM payload as
+  **Relabelled 2026-10-02 (item 5)**: `strength` is now
+  `benefics_in_kendra_band` (same values) next to the raw
+  `benefics_in_kendra` count, and the v7 prompt calls it a rough proxy.
+  Chosen over computing a real strength: Tajika's annual-chart strengths
+  (Panchavargiya/Harsha Bala) aren't implemented, and Shadbala is a natal
+  Parashari measure -- applying it to the annual chart would be an
+  invented hybrid. A real Panchavargiya Bala is new methodology (sign-off).
+  `_CACHE_VERSION` 3; `prediction.py` recomputes cached signals holding
+  the old key. **Still open**: and `solar_return_date` reaches the monthly LLM payload as
   ISO (one regenerated theme, `b1a35180` 2026-08, said "from late August
   2026" for the Aug 2025 return, though the next return does fall in
   that month). Also: `varshaphal_engine.py`'s own `RASI_NAMES` uses the
@@ -917,8 +924,27 @@ stale" and "confirmed real" looked like in practice):
     `tests/engines/test_bav_tables_classical.py` (replaces the Jupiter-only
     test). Real charts: Jupiter/Saturn identical on all 41; Sun, Moon,
     Mars, Mercury, Venus change on all 41 (304/41/246/82/82 sign-cells).
-  - Also seen: `transit_scores.*.current_sign_index` is the NATAL sign
-    (it reads natal planet positions), not a transit -- mislabelled.
+  - **Fixed 2026-10-02: BAV "transit scores" scored the NATAL sign, and
+    that reached the LLM.** `compute_bhinnashtakavarga()` built
+    `transit_scores` from natal positions; `payload_builder._build_bav_context()`
+    was handed the envelope's gochara but ignored it, sending those natal
+    values as "BAV bindu scores for current Saturn/Jupiter/Rahu transits"
+    -- the source of every v6/v7 report's `bav_qualifier` sentence. Now:
+    the engine no longer emits `transit_scores`;
+    `compute_bav_transit_scores(bav, transit_longitudes)` scores the signs
+    actually transited, and `_build_bav_context()` calls it with gochara
+    (the report's reference date). E.g. `f5da25da` Sep 2026: Jupiter
+    (transiting Cancer) was sent as 6/strong, really 2/weak.
+    `tests/engines/test_bav_transit_scores.py`.
+    **Cached content, NOT regenerated (needs sign-off)**: 69 of 82 cached
+    monthly/yearly reports (27 charts) carry a `bav_qualifier` sentence
+    whose class (strong/moderate/weak) differs from the real transit
+    sign's. ~69 x 15.8k ≈ 1.1M tokens -- about all of October's remaining
+    `LLM_MONTHLY_TOKEN_BUDGET` (~1.13M left on 2026-10-02), so it would
+    repeat the Sept 15 budget incident unless the budget is raised or it
+    waits for November. Also inert but stale: the 28 stored payloads still
+    hold the old `transit_scores` key (nothing reads it);
+    `scripts/backfill_bav_classical_tables.py --apply` would strip it.
 - **`transit_hits_engine.py`'s `_house_of()` uses a different house
   SYSTEM than the rest of the app, not just a differently-styled
   formula** — found 2026-09-13 while consolidating the whole-sign

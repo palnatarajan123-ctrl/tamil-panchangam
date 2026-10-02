@@ -50,7 +50,7 @@ def main(apply: bool) -> None:
         print(f"{str(chart_id)[:8]} totals {totals}")
         for planet in ("saturn", "jupiter", "rahu"):
             a = stored.get("transit_scores", {}).get(planet) or {}
-            b = new["transit_scores"].get(planet) or {}
+            b = (new.get("transit_scores") or {}).get(planet) or {}
             label = "strength" if planet == "rahu" else "combined_strength"
             if a != b:
                 print(f"    {planet:7s} BAV {a.get('bav_score')}->{b.get('bav_score')} "

@@ -157,6 +157,45 @@ def _combined_strength(bav_score: int) -> str:
     return "weak"
 
 
+def compute_bav_transit_scores(bav: dict, transit_longitudes: Dict[str, float]) -> dict:
+    """
+    BAV/SAV support for the signs Saturn, Jupiter and Rahu are TRANSITING
+    (transit_longitudes: sidereal longitude per lowercase planet name, e.g.
+    from the envelope's gochara for the report's reference date), read from
+    a chart's natal BAV tables.
+
+    Returns {"saturn": {"transit_sign_index", "bav_score", "sav_score",
+    "combined_strength"}, "jupiter": {...}, "rahu": {"transit_sign_index",
+    "sav_score", "strength"}} for whichever planets have a longitude.
+    Rahu has no BAV of its own -- SAV only.
+    """
+    if not bav or bav.get("error"):
+        return {}
+    sav = bav.get("sarvashtakavarga") or []
+    out: Dict[str, dict] = {}
+    for planet in ("saturn", "jupiter"):
+        lon = transit_longitudes.get(planet)
+        bindus = (bav.get(planet) or {}).get("bindus_per_sign") or []
+        if lon is None or len(bindus) != 12 or len(sav) != 12:
+            continue
+        idx = _longitude_to_sign_index(float(lon))
+        out[planet] = {
+            "transit_sign_index": idx,
+            "bav_score": bindus[idx],
+            "sav_score": sav[idx],
+            "combined_strength": _combined_strength(bindus[idx]),
+        }
+    lon = transit_longitudes.get("rahu")
+    if lon is not None and len(sav) == 12:
+        idx = _longitude_to_sign_index(float(lon))
+        out["rahu"] = {
+            "transit_sign_index": idx,
+            "sav_score": sav[idx],
+            "strength": _combined_strength(sav[idx] // 7 if sav[idx] else 0),
+        }
+    return out
+
+
 def compute_bhinnashtakavarga(ephemeris: dict) -> dict:
     """
     Compute per-planet Bhinnashtakavarga (BAV) tables using Parashari method.
@@ -167,13 +206,12 @@ def compute_bhinnashtakavarga(ephemeris: dict) -> dict:
       "moon": {...}, "mars": {...}, "mercury": {...},
       "jupiter": {...}, "venus": {...}, "saturn": {...},
       "sarvashtakavarga": [int × 12],  # sum across all 7 planets
-      "transit_scores": {
-          "saturn": {"current_sign_index": int, "bav_score": int,
-                     "sav_score": int, "combined_strength": str},
-          "jupiter": {...},
-          "rahu": {"current_sign_index": int, "sav_score": int, "strength": str}
-      }
     }
+
+    Natal-only, stored at chart creation. Until 2026-10-02 this also
+    returned "transit_scores", which actually scored each planet's NATAL
+    sign; transit scores depend on the date, so they're computed where
+    used: compute_bav_transit_scores().
     """
     try:
         planets_raw = ephemeris.get("planets", {})
@@ -223,44 +261,6 @@ def compute_bhinnashtakavarga(ephemeris: dict) -> dict:
 
         result["sarvashtakavarga"] = sav
 
-        # Transit scores for Saturn, Jupiter, Rahu
-        transit_scores = {}
-
-        # Saturn
-        saturn_idx = planet_sign_indices.get("saturn")
-        if saturn_idx is not None:
-            sat_bav = result["saturn"]["bindus_per_sign"][saturn_idx]
-            sat_sav = sav[saturn_idx]
-            transit_scores["saturn"] = {
-                "current_sign_index": saturn_idx,
-                "bav_score": sat_bav,
-                "sav_score": sat_sav,
-                "combined_strength": _combined_strength(sat_bav),
-            }
-
-        # Jupiter
-        jupiter_idx = planet_sign_indices.get("jupiter")
-        if jupiter_idx is not None:
-            jup_bav = result["jupiter"]["bindus_per_sign"][jupiter_idx]
-            jup_sav = sav[jupiter_idx]
-            transit_scores["jupiter"] = {
-                "current_sign_index": jupiter_idx,
-                "bav_score": jup_bav,
-                "sav_score": jup_sav,
-                "combined_strength": _combined_strength(jup_bav),
-            }
-
-        # Rahu (no BAV of its own — only SAV)
-        rahu_idx = planet_sign_indices.get("rahu")
-        if rahu_idx is not None:
-            rahu_sav = sav[rahu_idx]
-            transit_scores["rahu"] = {
-                "current_sign_index": rahu_idx,
-                "sav_score": rahu_sav,
-                "strength": _combined_strength(rahu_sav // 7 if rahu_sav else 0),
-            }
-
-        result["transit_scores"] = transit_scores
         return result
 
     except Exception as e:

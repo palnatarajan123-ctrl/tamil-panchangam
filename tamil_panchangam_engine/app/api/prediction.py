@@ -252,9 +252,11 @@ def generate_monthly_prediction(
     # -------------------------------------------------
     _current_period = f"{payload.year}-{payload.month:02d}"
     _cached_signals = base_chart_payload.get("predictive_signals", {})
-    # Pre-2026-10-01 caches hold the calendar-year (possibly future)
-    # Varshaphal under the old "varshesha" key -- recompute those too.
-    _stale_varshaphal = "varshesha" in (_cached_signals.get("varshaphal") or {})
+    # Caches from before 2026-10-02 hold an older Varshaphal shape (the
+    # calendar-year return under "varshesha", or "strength" instead of
+    # "benefics_in_kendra_band") -- recompute those too.
+    _vp = _cached_signals.get("varshaphal") or {}
+    _stale_varshaphal = bool(_vp) and ("varshesha" in _vp or "benefics_in_kendra_band" not in _vp)
     if not _cached_signals or _cached_signals.get("computed_for") != _current_period or _stale_varshaphal:
         try:
             from app.engines.predictive_signals_engine import compute_predictive_signals
