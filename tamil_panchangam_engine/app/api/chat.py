@@ -638,6 +638,18 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
             "window -- say so rather than inventing one.\n"
         )
 
+    if context.get("self_transits_context"):
+        system_prompt += (
+            "\n\n## PLANETARY RETURNS & SELF-ASPECTS (exact dates beyond the next 45 days)\n"
+            + context["self_transits_context"]
+            + "\nThese are real computed dates when each transiting planet returns to, opposes, "
+            "or casts its own classical aspect onto its OWN natal degree (e.g. Saturn return). "
+            "Contacts within the next/last 45 days are in the EXACT-DEGREE TRANSITS section "
+            "instead. Cite these dates as given; if retrograde motion makes an event exact "
+            "several times, mention that. Do not attach house numbers or life areas, and do not "
+            "state a return/aspect date that isn't listed here.\n"
+        )
+
     if reading_as_name:
         system_prompt = f"Reading from {reading_as_name}'s chart.\n\n" + system_prompt
     return system_prompt
@@ -728,6 +740,11 @@ def _build_chat_context(base_chart_id: str) -> dict:
         ))
     except Exception as e:
         logger.warning(f"Transit hits failed in chat context: {e}")
+
+    # Next/last returns and self-aspects to each planet's own natal degree,
+    # beyond the +/-45-day transit-hits window. Cached in the payload.
+    from app.engines.self_transit_engine import get_self_transits, format_self_transits_context
+    self_transits_context = format_self_transits_context(get_self_transits(base_chart_id, payload))
 
     # Yogas — compute fresh using yoga engine
     yogas_summary = "none notable"
@@ -1011,6 +1028,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "varshaphal_context": varshaphal_context,
         "transit_hits_context": transit_hits_context,
         "wealth_context": wealth_context,
+        "self_transits_context": self_transits_context,
     }
 
 

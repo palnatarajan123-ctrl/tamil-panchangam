@@ -429,6 +429,32 @@ stale" and "confirmed real" looked like in practice):
     ranges. The terser "then Venus to Apr 2027" was read as Venus
     STARTING in April 2027.
 
+- **2026-10-02 chat build, Phase 5: `self_transit_engine.py` (new)** gives
+  the next (beyond today+45d) exact date each planet returns to, opposes,
+  or casts its own classical aspect onto its OWN natal degree, plus the
+  last past return.
+  - Planets: Jupiter 5th/9th, Saturn 3rd/10th, Mars 4th/8th, and Rahu/Ketu
+    nodal return/half-return.
+  - Search: one coarse sweep per planet + bisection (the
+    `ingress_engine.find_next_ingress()` shape, retargeted from a sign
+    boundary to a degree). Retrograde passes (up to 3 crossings) are
+    grouped into one event.
+  - Cached in `payload["self_transits"]` until the earliest cached date
+    enters the ±45-day window. ~0.3s/chart uncached.
+  - Every reported date was independently checked against real
+    ephemeris positions (24/24 within 1° for chart `7c6e34be`).
+  - Complements Phase 3 rather than duplicating it: Phase 3 flagged the
+    nodal return as "exact after 2026-11-16" (window edge), and this
+    gives the exact date, 2026-11-19.
+
+  **Found while verifying, fixed here**: with ISO dates the model restated
+  `2029-05-22` as "29 May 2029" in 2/3 live runs (the year's "29" bleeding
+  into the day, plausibly pulled by "Saturn return at 29"). This section
+  now renders "22 May 2029", which gave 3/3 correct. **Not done, same
+  risk**: the other chat sections (DASHA PERIODS, peyarchi, transit hits,
+  marriage/health/wealth window dicts) still use ISO dates. No misread
+  was observed there, but this one was only caught by repeated sampling.
+
 - **2026-10-01: chat's self-reported data gaps (wealth-timing question)
   checked against the real live prompt. Scoped only; nothing built,
   pending sign-off.** A user-reported answer listed 6 missing items.

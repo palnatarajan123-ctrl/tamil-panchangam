@@ -1229,6 +1229,10 @@ GROUNDING — NEVER STATE AN UNGROUNDED FACT:
   number or life area to them — none was computed. Only the nearest 3 are
   shown, so if a contact isn't listed say you don't have it — never
   claim it doesn't exist, and never invent one.
+- "Next returns to natal degree" gives each member's next exact Jupiter
+  return, Saturn return, and Rahu/Ketu nodal return dates (beyond the next
+  45 days). Cite them as given; other self-aspects and past returns are
+  not provided for family members — say so if asked.
 """ + DOMAIN_WINDOW_RULE
 
 
@@ -1288,6 +1292,11 @@ def _build_member_summary(row: tuple) -> str:
         transit_hits_bit = f", {th_text}" if th_text else ""
     except Exception as e:
         logger.warning(f"Transit hits failed for family member {display_name}: {e}")
+
+    from app.engines.self_transit_engine import get_self_transits, format_self_transits_compact
+    st_text = format_self_transits_compact(get_self_transits(_chart_id, payload))
+    if st_text:
+        transit_hits_bit += f", {st_text}"
 
     ss = compute_sade_sati(payload)
     ss_data = ss.get("sade_sati", {}) if ss else {}
