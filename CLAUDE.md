@@ -798,6 +798,27 @@ stale" and "confirmed real" looked like in practice):
   "cleared" just because this one specific bug class doesn't apply to
   it.
 
+- **Chat self-reported gaps, round 2 (2026-10-02, chart `fd79efb3`, 21:51
+  UTC wealth-timing follow-up) -- verified against the real prompt; nothing
+  changed yet, pending decision.** Real assembled prompt (18,299 chars):
+  Jupiter Ashtakavarga PRESENT ("Jupiter in Cancer: 2/8, below
+  threshold"); Venus AV absent BY DESIGN (Saturn/Jupiter only); no Saturn
+  exact-degree contact with this chart's wealth planets (2nd lord Venus,
+  11th lord Saturn) because none exists in the +/-45d window (Saturn
+  ~15 deg from its 10th aspect on natal Venus; the only raw Saturn hit, a
+  trine to Mars, is dropped by design). Live re-runs (Sonnet 4.6, real
+  prompt): 9/9 acknowledged the Jupiter value (8/9 quoting 2/8), with the
+  real 12-turn history, without it, and asked directly -- the 21:51 "don't
+  have Jupiter AV" was a one-off sampling miss on a bundled "Jupiter AND
+  Venus" item, not over-broad grounding, history anchoring, or the
+  wealth-window guardrail. **Found, not fixed**: (1) `transit_hits_engine`
+  computes only 0/90/120/180 deg, so Saturn's 3rd-house drishti (~60) and
+  Mars's 8th (~210) can NEVER surface in chat (Saturn 10th / Mars 4th /
+  Jupiter 5th-9th are covered); (2) the EXACT-DEGREE section doesn't say
+  the scan covered every planet, so the model can't tell "no contact" from
+  "not computed"; (3) RETURNS already lists Jupiter's aspects to natal
+  Jupiter (5th/7th/9th) but the model said it only had the return date.
+
 - **LLM call-site sweep + four decisions (2026-10-02) -- every LLM call site,
   current status.** Rule of thumb for any NEW call site: log through
   `budget_guard.log_llm_call()` (writes BOTH ledgers: `llm_calls` $ and
