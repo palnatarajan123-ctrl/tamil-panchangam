@@ -1,10 +1,28 @@
 # TamilPanchangam Astrology App
 
-## ⚠️ ACTION ITEMS — HUMAN REQUIRED, OUTSIDE THIS REPO'S REACH (2026-09-15, #3 added 2026-09-19)
+## ✅ ACTION ITEMS — ALL THREE CLOSED 2026-10-01 (verified, not assumed)
 
-These items cannot be completed by working in this codebase alone —
-each needs a human to act on infrastructure/scheduling outside this
-environment. Read this section first.
+**How to check what's actually deployed (use this, don't guess):**
+`curl https://tamil-panchangam-api.onrender.com/api/version` returns
+`git_sha` from Render's own `RENDER_GIT_COMMIT` (`app/main.py`). Render
+**auto-deploys on push to `main`**: observed 2026-10-01, `d781ef1` was
+pushed and live roughly 2 minutes later, with no manual step. The
+2026-09-15/09-19 entries below said this environment "has no access to
+the deployment." That was wrong: this endpoint existed the whole time.
+Kept below as history only.
+
+- #1 (budget raise `d2661c7`) and #3 (`194cf66` fabrication fix): both
+  confirmed live. Production was serving `9b5678d` (which contains both)
+  before the Oct 1 change.
+- #2 applied 2026-10-01: `LLM_MONTHLY_TOKEN_BUDGET = 1_500_000` (commit
+  `d781ef1`), confirmed live via `/api/version`. Applied only after
+  confirming the October counter had rolled over. It's computed via
+  `DATE_TRUNC('month', CURRENT_DATE)` (DB clock is UTC), so there's
+  nothing to reset by hand. Sept closed at 2,618,318 tokens, and Oct
+  stood at 22,815 when the change was made. The constant is read once
+  at import, so any future change needs a deploy (automatic on push).
+
+Original items (historical):
 
 1. **URGENT — redeploy the live production server now.** Commit
    `d2661c7` raised `LLM_MONTHLY_TOKEN_BUDGET` from 1,000,000 to
@@ -304,6 +322,65 @@ stale" and "confirmed real" looked like in practice):
   to `child-prediction-screen.tsx`. Superseded by the real fix above the
   same week -- kept only as a record of the fix sequence, not as
   current behavior.
+
+- **2026-10-01: chat's self-reported data gaps (wealth-timing question)
+  checked against the real live prompt. Scoped only; nothing built,
+  pending sign-off.** A user-reported answer listed 6 missing items.
+  Checked each against `chat.py`'s fully assembled prompt for chart
+  `7c6e34be` (`_build_system_prompt(_build_chat_context())` +
+  `_build_monthly_context_block()`, same as `chat_stream()`):
+  - All 6 are genuinely absent from the chat prompt. The Sept 18 D2 fix
+    IS live: D2 Jupiter/Venus appear, so "nothing beyond Jupiter/Venus"
+    was accurate. One exception: "Jupiter relative to natal
+    Jupiter/Venus" was overstated. Natal Jupiter (Scorpio), natal Venus
+    (Sagittarius) and transit Jupiter (Cancer) are all in the prompt, so
+    the sign-level relationship can be derived. Only degree-level data
+    is missing.
+  - **Key finding: 4 of the 6 are already computed and cached** in
+    `base_charts.payload.predictive_signals` (`predictive_signals_engine.py`,
+    filled lazily by `prediction.py` when a monthly prediction is
+    generated, keyed by `computed_for` month). It holds
+    `dasha_precision` (pratyantar + sookshma with exact start/end
+    dates), `transit_hits` (degree-level transit-to-natal aspects with
+    orbs), `varshaphal`, and `refined_av_scores`. Chat uses only the
+    pratyantar LORD NAME, and only via `_build_monthly_context_block()`,
+    which returns "" unless the CURRENT month's v6/v7 monthly prediction
+    is cached. On Oct 1, chart `7c6e34be` had none, so even the lord
+    name was missing. Cached signals also go stale: this chart's
+    `computed_for` was 2026-09, and its sookshma ended 2026-09-22.
+  - The premise that self-relative transits exist "nowhere except Sade
+    Sati" is wrong. `transit_hits_engine.py` already checks
+    Jupiter/Saturn/Mars/Rahu/Ketu transiting over every natal planet,
+    including their own natal degree (a conjunction is a return), with
+    a 2° orb within ±45 days. `gochara_engine.py` also computes
+    conjunction strength against the natal Moon.
+  - `family.py` exposes far less: no divisional charts, no natal
+    placements, no current transits, no pratyantar. Live test, same
+    question to both (Sonnet 4.6, real prompts): both self-reports were
+    accurate for their own context. The lists differ because the
+    contexts differ, not because one is stale; the model regenerates
+    the list each response.
+  - **New grounding issue found, not fixed**: with no wealth-specific
+    dated windows, both chats reused the only dated windows they have.
+    `chat.py` cited the 7th-lord (marriage) Venus window 2032-2035 as a
+    financial window. `family.py` presented the 6th-lord (HEALTH)
+    Mercury window 2028-2031 as the financial-breakthrough window. The
+    date is grounded but the meaning isn't. This is a side effect of the
+    Sept 18 marriage/health windows being the only citable dates.
+    Candidate fixes: a one-line prompt rule ("a window is only valid for
+    the domain it was computed for") and/or the already-scoped
+    wealth-events engine (2nd/11th lord windows, see Part 3 above).
+  - Design notes per gap (effort, caveats, proposed order) are in the
+    2026-10-01 session report. Short version: pratyantar dates (small,
+    compute live; pure date arithmetic) → Varshaphal (small, cache per
+    solar-return year) → transit hits (small wiring, but needs a
+    methodology call first: Western conj/opp/trine/square set vs.
+    Parashari drishti, and `_house_of()` is Equal House, see backlog) →
+    Ashtakavarga (gated: Jupiter's BAV row is one of the 3 known
+    `bhinnashtakavarga_engine.py` discrepancies, plus the
+    `refined_av_engine.py` rasi-spelling mismatch) → general
+    "next return/aspect date" search (medium; reuse `ingress_engine.py`'s
+    adaptive-step + bisection).
 
 - **IMPLEMENTED 2026-09-17, backfill held pending sign-off — Gochara
   dispositor analysis** (closes the methodology gap found 2026-09-15:
