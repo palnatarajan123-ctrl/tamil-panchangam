@@ -647,12 +647,8 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
             "and a natal planet. Cite them by planet and date when asked what a planet is "
             "doing for the user. Do not attach a house number or life area to these contacts "
             "-- none was computed for them; describe the natal planet's own significations "
-            "instead. The scan checked EVERY pairing of transiting Jupiter, Saturn, Mars, Rahu "
-            "and Ketu against EVERY natal planet, for conjunction, opposition (7th aspect) and "
-            "each planet's special aspects (Jupiter 5th/9th, Mars 4th/8th, Saturn 3rd/10th). "
-            "So a pairing missing from this list means there is NO exact contact in this "
-            "window -- it is not missing data. Say so plainly rather than inventing one or "
-            "describing it as a gap in your information.\n"
+            "instead. If a planet/natal pair isn't listed, no exact contact was found in this "
+            "window -- say so rather than inventing one.\n"
         )
 
     if context.get("self_transits_context"):
