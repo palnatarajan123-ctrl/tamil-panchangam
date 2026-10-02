@@ -44,3 +44,28 @@ def test_natal_and_kp_never_cache_a_truncated_reply_as_success():
         src = inspect.getsource(fn)
         i = src.index('.get("truncated")')
         assert '"truncated"' in src[i:i + 600] and saver in src[i:i + 600]
+
+
+def test_orchestrator_stores_truncated_reply_as_truncated_not_success():
+    """Monthly/yearly/weekly (2026-10-02): a truncated reply that still passes
+    validation was stored as a clean success (the f5da25da yearly case).
+    Reproduced on the old code; now fallback_reason="truncated", content
+    kept, and it counts toward the retry cooldown like any failed call."""
+    import app.engines.llm_interpretation_orchestrator as orch
+    usage = {"prompt_tokens": 13000, "completion_tokens": 5000, "total_tokens": 18000, "model": "m", "truncated": True}
+    with patch.object(orch, "is_llm_enabled", return_value=True), \
+         patch.object(orch, "_check_cache", return_value=None), \
+         patch.object(orch, "retry_cooldown_status", return_value=None), \
+         patch.object(orch, "get_monthly_token_usage", return_value={"remaining": 10**6, "used": 0, "budget": 10**6, "percent_used": 0}), \
+         patch.object(orch.openai_provider, "is_available", return_value=True), \
+         patch.object(orch, "extract_payload_inputs", return_value={}), \
+         patch.object(orch, "build_generation_payload", return_value={"x": 1}), \
+         patch.object(orch, "validate_payload_size", return_value=(True, "ok", 10)), \
+         patch.object(orch, "_validate_llm_output", return_value=True), \
+         patch.object(orch.openai_provider, "call_openai", return_value=({"executive_summary": {}}, usage, None)), \
+         patch.object(orch, "_persist_interpretation") as persist:
+        out = orch.generate_llm_interpretation("c", {}, {}, {"det": 1}, 2026, "yearly", "2026")
+    assert out["llm_metadata"]["fallback_reason"] == "truncated"
+    assert out["llm_interpretation"]["_truncated"] is True and "executive_summary" in out["llm_interpretation"]
+    args = persist.call_args[0]
+    assert args[11] == "truncated" and args[9] == 18000   # fallback_reason, total_tokens (counts for cooldown)

@@ -254,6 +254,7 @@ export default function PredictionScreen() {
     dasha_payload_leak: "an internal data-safety check blocked the AI request",
     missing_interpretive_hint: "some required chart data wasn't ready yet",
     invalid_payload_none_leak: "an internal data-safety check blocked the AI request",
+    truncated: "the AI's reply was cut off before it finished, so some sections may be incomplete",
   };
   const isPausedReason = !!fallbackReason && PAUSED_REASONS.has(fallbackReason);
   const pausedMessage = isPausedReason ? PAUSED_REASON_LABELS[fallbackReason!] : null;

@@ -861,6 +861,27 @@ def generate_llm_interpretation(
     result["llm_metadata"]["model"] = usage_info.get("model")
     result["llm_metadata"]["tokens_used"] = usage_info.get("total_tokens", 0)
 
+    # Truncated reply (hit max_tokens, then JSON-repaired) that still passed
+    # validation: incomplete, so never a clean success (2026-10-02; the
+    # f5da25da yearly 2026 reply hit exactly 4000 and was stored as one).
+    # Same handling as natal/KP: stored as fallback_reason="truncated" with
+    # its content kept -- shown, flagged by the "simplified response"
+    # banner -- and retried on the next view. It spent real tokens, so it
+    # counts toward retry_cooldown_status() like any failed call.
+    if usage_info.get("truncated"):
+        logger.warning(f"LLM reply truncated at max_tokens: {base_chart_id}/{period_type}/{period_key}")
+        llm_response["_truncated"] = True
+        result["llm_metadata"]["fallback_reason"] = "truncated"
+        _persist_interpretation(
+            base_chart_id, period_type, period_key, feature_name,
+            effective_prompt_version, "anthropic", usage_info.get("model"),
+            usage_info.get("prompt_tokens", 0),
+            usage_info.get("completion_tokens", 0),
+            usage_info.get("total_tokens", 0),
+            llm_response, "truncated", explainability_mode
+        )
+        return result
+
     _persist_interpretation(
         base_chart_id, period_type, period_key, feature_name,
         effective_prompt_version, "anthropic", usage_info.get("model"),
