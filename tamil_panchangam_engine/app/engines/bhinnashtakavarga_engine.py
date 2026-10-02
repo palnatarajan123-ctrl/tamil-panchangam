@@ -17,26 +17,35 @@ logger = logging.getLogger(__name__)
 # Classical Parashari BAV tables
 # For each ASSESSED planet, for each CONTRIBUTOR, these are the
 # houses (counted from the contributor's position) that receive
-# a benefic bindu in that planet's BAV.
+# a benefic bindu in that planet's BAV. Totals: Sun 48, Moon 49,
+# Mars 39, Mercury 54, Jupiter 56, Venus 52, Saturn 39 (SAV 337).
+#
+# Corrected 2026-10-02 (10 rows were wrong across 6 planets; only
+# Saturn's table was right). Source: B.V. Raman's tables (as given by
+# vedastro.org "Mastering Ashtakavarga Part 2"), cross-checked against
+# BPHS Ch. 66 vv. 43-60 (Santhanam tr.) and two published worked
+# examples -- see tests/engines/test_bav_tables_classical.py. Where that
+# BPHS translation differs (7 cells, e.g. Venus from Mars 3,4,... vs
+# 3,5,...), Raman's reading is the one both worked examples reproduce.
 # ──────────────────────────────────────────────────────────────
 
 BAV_TABLES: Dict[str, Dict[str, list]] = {
     "sun": {
         "sun":     [1, 2, 4, 7, 8, 9, 10, 11],
         "moon":    [3, 6, 10, 11],
-        "mars":    [1, 2, 4, 7, 8, 10, 11],
-        "mercury": [5, 6, 9, 11, 12],
+        "mars":    [1, 2, 4, 7, 8, 9, 10, 11],
+        "mercury": [3, 5, 6, 9, 10, 11, 12],
         "jupiter": [5, 6, 9, 11],
-        "venus":   [5, 8, 9, 10, 11],
-        "saturn":  [1, 2, 4, 7, 8, 10, 11],
-        "lagna":   [1, 2, 4, 7, 8, 9, 10, 11],
+        "venus":   [6, 7, 12],
+        "saturn":  [1, 2, 4, 7, 8, 9, 10, 11],
+        "lagna":   [3, 4, 6, 10, 11, 12],
     },
     "moon": {
         "sun":     [3, 6, 7, 8, 10, 11],
         "moon":    [1, 3, 6, 7, 10, 11],
         "mars":    [2, 3, 5, 6, 9, 10, 11],
         "mercury": [1, 3, 4, 5, 7, 8, 10, 11],
-        "jupiter": [1, 4, 7, 8, 10, 11],
+        "jupiter": [1, 4, 7, 8, 10, 11, 12],
         "venus":   [3, 4, 5, 7, 9, 10, 11],
         "saturn":  [3, 5, 6, 11],
         "lagna":   [3, 6, 10, 11],
@@ -49,7 +58,7 @@ BAV_TABLES: Dict[str, Dict[str, list]] = {
         "jupiter": [6, 10, 11, 12],
         "venus":   [6, 8, 11, 12],
         "saturn":  [1, 4, 7, 8, 9, 10, 11],
-        "lagna":   [1, 2, 4, 7, 8, 10, 11],
+        "lagna":   [1, 3, 6, 10, 11],
     },
     "mercury": {
         "sun":     [5, 6, 9, 11, 12],
@@ -59,7 +68,7 @@ BAV_TABLES: Dict[str, Dict[str, list]] = {
         "jupiter": [6, 8, 11, 12],
         "venus":   [1, 2, 3, 4, 5, 8, 9, 11],
         "saturn":  [1, 2, 4, 7, 8, 9, 10, 11],
-        "lagna":   [1, 2, 4, 7, 8, 10, 11],
+        "lagna":   [1, 2, 4, 6, 8, 10, 11],
     },
     "jupiter": {
         "sun":     [1, 2, 3, 4, 7, 8, 9, 10, 11],
@@ -68,15 +77,13 @@ BAV_TABLES: Dict[str, Dict[str, list]] = {
         "mercury": [1, 2, 4, 5, 6, 9, 10, 11],
         "jupiter": [1, 2, 3, 4, 7, 8, 10, 11],
         "venus":   [2, 5, 6, 9, 10, 11],
-        # Saturn: [3, 5, 6, 12] (BPHS / B.V. Raman). Was [3, 5, 6, 11, 12],
-        # which made Jupiter's BAV total 57 instead of the classical 56.
         "saturn":  [3, 5, 6, 12],
         "lagna":   [1, 2, 4, 5, 6, 7, 9, 10, 11],
     },
     "venus": {
         "sun":     [8, 11, 12],
         "moon":    [1, 2, 3, 4, 5, 8, 9, 11, 12],
-        "mars":    [3, 4, 6, 9, 11, 12],
+        "mars":    [3, 5, 6, 9, 11, 12],
         "mercury": [3, 5, 6, 9, 11],
         "jupiter": [5, 8, 9, 10, 11],
         "venus":   [1, 2, 3, 4, 5, 8, 9, 10, 11],

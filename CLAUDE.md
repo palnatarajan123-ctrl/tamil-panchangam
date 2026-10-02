@@ -877,9 +877,19 @@ stale" and "confirmed real" looked like in practice):
     chart creation; the LLM payload, PDF and predictive_signals read the
     stored copy). The 13 charts without one compute it lazily and get the
     fix. Until the 28 are recomputed, they still carry Jupiter = 57.
-  - **NOT fixed, still blocks the Ashtakavarga→chat wiring**: the other 9
-    rows above. Recommend fixing all at once against the same table (the
-    1989 SAV match is a ready-made regression test), then one recompute.
+  - **Fixed 2026-10-02 (code)**: the other 9 rows. Sources per row: BPHS
+    Ch. 66 vv. 43-60 (Santhanam tr., parsed mechanically), Raman's tables
+    (vedastro), Raman's published per-sign BAVs for Moon/Mars/Mercury/
+    Jupiter, and the 1989 published SAV. BPHS text + Raman agree on the
+    Sun x5, Mars-Lagna and Mercury-Lagna rows. The translation differs
+    from Raman on 7 cells (Moon from Moon/Mars/Jupiter, Mercury from
+    Sun/Saturn, Jupiter from Jupiter, Venus from Mars); its readings fail
+    4 of the 5 worked-example checks, Raman's pass all 5, so Raman's are
+    used (code had the translation's reading for Venus-from-Mars). Code
+    now equals Raman on every row, totals 337.
+    `tests/engines/test_bav_tables_classical.py` (replaces the Jupiter-only
+    test). Real charts: Jupiter/Saturn identical on all 41; Sun, Moon,
+    Mars, Mercury, Venus change on all 41 (304/41/246/82/82 sign-cells).
   - Also seen: `transit_scores.*.current_sign_index` is the NATAL sign
     (it reads natal planet positions), not a transit -- mislabelled.
 - **`transit_hits_engine.py`'s `_house_of()` uses a different house
