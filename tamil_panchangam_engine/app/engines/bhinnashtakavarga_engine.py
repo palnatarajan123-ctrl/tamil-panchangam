@@ -196,6 +196,73 @@ def compute_bav_transit_scores(bav: dict, transit_longitudes: Dict[str, float]) 
     return out
 
 
+# ── Transit strength: the ONE shared path for chat, family chat, PDFs and
+#    monthly/yearly generation (2026-10-02). Every surface calls
+#    bav_transit_strength() + format_bav_transit_line(), so the same chart,
+#    planet and date always shows the same bindu count and label.
+#    ashtakavarga_engine.py (the old 57-bindu heuristic) is NOT used here.
+
+# Classical reading: a transit through a sign with 4+ bindus in the
+# planet's own BAV is supported; fewer than 4 is not.
+AV_TRANSIT_THRESHOLD = 4
+_TRANSIT_STRENGTH_PLANETS = ("saturn", "jupiter")  # Rahu has no BAV table
+_SIGNS_EN = [
+    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+]
+
+
+def bav_for_payload(payload: dict) -> dict:
+    """The chart's stored BAV, or computed from its ephemeris if absent
+    (charts created before BAV was stored). Not persisted."""
+    bav = (payload or {}).get("bhinnashtakavarga") or {}
+    if bav and not bav.get("error"):
+        return bav
+    eph = (payload or {}).get("ephemeris")
+    return compute_bhinnashtakavarga(eph) if eph else {}
+
+
+def gochara_transit_longitudes(gochara: dict) -> Dict[str, float]:
+    """Saturn/Jupiter sidereal longitudes from a compute_gochara() result."""
+    out = {}
+    for planet in _TRANSIT_STRENGTH_PLANETS:
+        lon = ((gochara or {}).get(planet) or {}).get("longitude")
+        if lon is not None:
+            out[planet] = float(lon)
+    return out
+
+
+def bav_transit_strength(bav: dict, transit_longitudes: Dict[str, float]) -> Dict[str, dict]:
+    """
+    {"jupiter": {"planet": "Jupiter", "sign": "Cancer", "bindus": 5,
+                 "above_threshold": True, "label": "above threshold"}, "saturn": ...}
+    -- the transiting planet's bindus (0-8, its own BAV) in the sign it is
+    transiting, with the classical 4-bindu threshold.
+    """
+    scores = compute_bav_transit_scores(
+        bav, {p: v for p, v in transit_longitudes.items() if p in _TRANSIT_STRENGTH_PLANETS}
+    )
+    out: Dict[str, dict] = {}
+    for planet in _TRANSIT_STRENGTH_PLANETS:
+        ts = scores.get(planet)
+        if not ts:
+            continue
+        above = ts["bav_score"] >= AV_TRANSIT_THRESHOLD
+        out[planet] = {
+            "planet": planet.capitalize(),
+            "sign": _SIGNS_EN[ts["transit_sign_index"]],
+            "bindus": ts["bav_score"],
+            "above_threshold": above,
+            "label": "above threshold" if above else "below threshold",
+        }
+    return out
+
+
+def format_bav_transit_line(entry: dict) -> str:
+    """"Jupiter in Cancer: 5/8, above threshold" """
+    return f"{entry['planet']} in {entry['sign']}: {entry['bindus']}/8, {entry['label']}"
+
+
 def compute_bhinnashtakavarga(ephemeris: dict) -> dict:
     """
     Compute per-planet Bhinnashtakavarga (BAV) tables using Parashari method.

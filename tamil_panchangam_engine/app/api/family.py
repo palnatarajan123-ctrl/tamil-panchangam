@@ -26,6 +26,18 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from app.api.chat import DOMAIN_WINDOW_RULE
+
+# Family-chat wording of chat.py's AV_TRANSIT_STRENGTH_RULE (the numbers are
+# per member, inline, so there's no shared lines block here).
+FAMILY_AV_TRANSIT_RULE = """
+TRANSIT STRENGTH: each member's "Transit strength" clause gives the
+Ashtakavarga bindus (out of 8) in the sign Saturn/Jupiter are transiting
+today, from that member's own chart; 4 or more is above the classical
+threshold. If asked how supported a member's current Saturn/Jupiter
+transit is, these are authoritative -- do not phrase outlook or remedy
+language that contradicts them, and don't say "Ashtakavarga" or "bindus"
+unless the user does.
+"""
 from app.core.auth import get_current_user
 from app.db.postgres import get_conn
 from app.utils.prompt_dates import fmt_date, humanize_iso_dates
@@ -1234,7 +1246,7 @@ GROUNDING — NEVER STATE AN UNGROUNDED FACT:
   return, Saturn return, and Rahu/Ketu nodal return dates (beyond the next
   45 days). Cite them as given; other self-aspects and past returns are
   not provided for family members — say so if asked.
-""" + DOMAIN_WINDOW_RULE
+""" + DOMAIN_WINDOW_RULE + FAMILY_AV_TRANSIT_RULE
 
 
 def _build_member_summary(row: tuple) -> str:
@@ -1293,6 +1305,24 @@ def _build_member_summary(row: tuple) -> str:
         transit_hits_bit = f", {th_text}" if th_text else ""
     except Exception as e:
         logger.warning(f"Transit hits failed for family member {display_name}: {e}")
+
+    # Ashtakavarga strength of today's Saturn/Jupiter transits -- same shared
+    # path as chat.py and the PDFs (bhinnashtakavarga_engine).
+    try:
+        from app.engines.bhinnashtakavarga_engine import (
+            bav_for_payload, bav_transit_strength, format_bav_transit_line,
+        )
+        from app.utils.swisseph_utils import compute_planet_longitude
+        _ayan = (payload.get("chart_metadata") or {}).get("ayanamsa") or eph.get("ayanamsa", "lahiri")
+        _now = datetime.now(timezone.utc)
+        av_lines = [format_bav_transit_line(e) for e in bav_transit_strength(
+            bav_for_payload(payload),
+            {p: compute_planet_longitude(p.capitalize(), _now, ayanamsa=_ayan) for p in ("saturn", "jupiter")},
+        ).values()]
+        if av_lines:
+            transit_hits_bit += ", Transit strength: " + "; ".join(av_lines)
+    except Exception as e:
+        logger.warning(f"Ashtakavarga transit strength failed for family member {display_name}: {e}")
 
     from app.engines.self_transit_engine import get_self_transits, format_self_transits_compact
     st_text = format_self_transits_compact(get_self_transits(_chart_id, payload))

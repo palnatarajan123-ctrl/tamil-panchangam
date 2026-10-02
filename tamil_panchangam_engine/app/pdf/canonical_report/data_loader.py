@@ -334,21 +334,31 @@ def _extract_dasha_context(envelope: Dict[str, Any]) -> DashaContext:
     )
 
 
-def _bindu_label(bindus: int) -> str:
-    """Human-readable bindu strength label."""
-    if bindus >= 7:
-        return "Very Strong"
-    if bindus >= 5:
-        return "Strong"
-    if bindus >= 3:
-        return "Moderate"
-    return "Very Weak"
+def _av_transit_strength(payload: Dict[str, Any], gochara: Dict[str, Any]) -> Dict[str, dict]:
+    """Saturn/Jupiter transit strength via the shared Ashtakavarga path
+    (bhinnashtakavarga_engine -- same numbers as chat and generation).
+    The PDF used to show envelope["ashtakavarga"] bindus, which come from
+    the old ashtakavarga_engine.py heuristic."""
+    from app.engines.bhinnashtakavarga_engine import (
+        bav_for_payload, bav_transit_strength, gochara_transit_longitudes,
+    )
+    try:
+        return bav_transit_strength(bav_for_payload(payload), gochara_transit_longitudes(gochara))
+    except Exception as e:
+        logger.warning(f"Ashtakavarga transit strength failed for PDF: {e}")
+        return {}
 
 
-def _extract_transit_context(envelope: Dict[str, Any]) -> TransitContext:
+def _av_suffix(entry: Optional[dict]) -> str:
+    if not entry:
+        return ""
+    return f" — {entry['bindus']}/8, {entry['label']}"
+
+
+def _extract_transit_context(envelope: Dict[str, Any], payload: Optional[Dict[str, Any]] = None) -> TransitContext:
     """Extract transit context from prediction envelope (gochara)."""
     gochara = envelope.get("gochara", {})
-    ashtakavarga = envelope.get("ashtakavarga", {})
+    av = _av_transit_strength(payload or {}, gochara)
 
     jupiter = gochara.get("jupiter", {})
     saturn = gochara.get("saturn", {})
@@ -359,10 +369,8 @@ def _extract_transit_context(envelope: Dict[str, Any]) -> TransitContext:
     rahu_sign = rahu_ketu.get("rahu_rasi", "Unknown")
     ketu_sign = rahu_ketu.get("ketu_rasi", "Unknown")
 
-    jup_av = ashtakavarga.get("jupiter", {})
-    sat_av = ashtakavarga.get("saturn", {})
-    jup_bindus = jup_av.get("bindus") if jup_av.get("bindus") is not None else jup_av.get("bindu")
-    sat_bindus = sat_av.get("bindus") if sat_av.get("bindus") is not None else sat_av.get("bindu")
+    jup_bindus = (av.get("jupiter") or {}).get("bindus")
+    sat_bindus = (av.get("saturn") or {}).get("bindus")
     jup_drishti_bonus = jupiter.get("drishti_aspect_bonus")
     sat_drishti_bonus = saturn.get("drishti_aspect_bonus")
 
@@ -378,14 +386,9 @@ def _extract_transit_context(envelope: Dict[str, Any]) -> TransitContext:
             suffix += " [R]"
         return suffix
 
-    def _bindu_suffix(bindus) -> str:
-        if bindus is None:
-            return ""
-        return f" — {bindus}/8 bindus ({_bindu_label(bindus)})"
-
     return TransitContext(
-        jupiter_transit=f"Jupiter in {jupiter_sign}{_phase_label(jupiter)}{_bindu_suffix(jup_bindus)}",
-        saturn_transit=f"Saturn in {saturn_sign}{_phase_label(saturn, 'transit_phase')}{_bindu_suffix(sat_bindus)}",
+        jupiter_transit=f"Jupiter in {jupiter_sign}{_phase_label(jupiter)}{_av_suffix(av.get('jupiter'))}",
+        saturn_transit=f"Saturn in {saturn_sign}{_phase_label(saturn, 'transit_phase')}{_av_suffix(av.get('saturn'))}",
         rahu_ketu_axis=f"Rahu in {rahu_sign}{_phase_label(rahu_ketu, 'rahu_phase')}, Ketu in {ketu_sign}{_phase_label(rahu_ketu, 'ketu_phase')}",
         jupiter_rasi=jupiter_sign,
         saturn_rasi=saturn_sign,
@@ -872,8 +875,6 @@ def build_report_data(
                 encouragement=closing_v3_data.get("encouragement")
             )
     
-    av_raw = envelope.get("ashtakavarga", {})
-    sarvashtakavarga: Optional[Dict[str, int]] = av_raw.get("sarvashtakavarga") if isinstance(av_raw, dict) else None
 
     # Yogas — from prediction envelope (computed at prediction time)
     yogas_raw = envelope.get("yogas")
@@ -975,7 +976,7 @@ def build_report_data(
         core_life_themes=interpretation.get("core_themes", []),
         
         dasha_context=_extract_dasha_context(envelope),
-        transit_context=_extract_transit_context(envelope),
+        transit_context=_extract_transit_context(envelope, payload),
         nakshatra_timing=_extract_nakshatra_timing(envelope),
         pakshi_rhythm=_extract_pakshi_rhythm(envelope),
         
@@ -1020,7 +1021,6 @@ def build_report_data(
         v7_yoga_activation_summary=v7_yoga_activation_summary,
 
         methodology=methodology,
-        sarvashtakavarga=sarvashtakavarga,
         yogas_data=yogas_data,
         sade_sati_data=sade_sati_data,
         shadbala_data=shadbala_data,
@@ -1216,8 +1216,9 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
         jup = gochara.get("jupiter", {})
         sat = gochara.get("saturn", {})
         rahu_ketu = gochara.get("rahu_ketu", {})
-        jupiter_transit = f"{jup.get('transit_rasi', '')} (H{jup.get('from_moon_house', '')} from Moon) - {jup.get('effect', '')}"
-        saturn_transit = f"{sat.get('transit_rasi', '')} (H{sat.get('from_moon_house', '')} from Moon)"
+        av = _av_transit_strength(payload, gochara)
+        jupiter_transit = f"{jup.get('transit_rasi', '')} (H{jup.get('from_moon_house', '')} from Moon) - {jup.get('effect', '')}{_av_suffix(av.get('jupiter'))}"
+        saturn_transit = f"{sat.get('transit_rasi', '')} (H{sat.get('from_moon_house', '')} from Moon){_av_suffix(av.get('saturn'))}"
         rahu_ketu_axis_str = f"Rahu H{rahu_ketu.get('rahu_from_moon_house', '')} / Ketu H{rahu_ketu.get('ketu_from_moon_house', '')} (from Moon)"
         live_transit_context = TransitContext(
             jupiter_transit=jupiter_transit,
@@ -1225,6 +1226,8 @@ def build_birth_chart_report_data(base_chart_id: str) -> CanonicalReportData:
             rahu_ketu_axis=rahu_ketu_axis_str,
             jupiter_rasi=jup.get("transit_rasi", ""),
             saturn_rasi=sat.get("transit_rasi", ""),
+            jupiter_bindus=(av.get("jupiter") or {}).get("bindus"),
+            saturn_bindus=(av.get("saturn") or {}).get("bindus"),
         )
     except Exception as e:
         logger.warning(f"Failed to compute gochara for natal PDF: {e}")

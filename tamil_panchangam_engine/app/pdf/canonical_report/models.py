@@ -324,7 +324,6 @@ class CanonicalReportData(BaseModel):
     is_v3: bool = False
     
     methodology: Optional[MethodologyInfo] = None
-    sarvashtakavarga: Optional[Dict[str, int]] = None
     yogas_data: Optional[Dict[str, Any]] = None
     sade_sati_data: Optional[Dict[str, Any]] = None
     shadbala_data: Optional[Dict[str, Any]] = None

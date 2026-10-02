@@ -1047,39 +1047,34 @@ def _build_family_yoga_upagraha_suffix(payload: dict) -> str:
 
 
 def _build_bav_context(bav: dict, gochara: dict) -> dict:
-    """BAV transit scores for the signs Saturn/Jupiter/Rahu are transiting
-    (from the envelope's gochara, i.e. the report's reference date).
+    """Ashtakavarga strength of the Saturn/Jupiter transits in the envelope's
+    gochara (the report's reference date), via the shared path chat and the
+    PDFs use (bhinnashtakavarga_engine.bav_transit_strength).
 
-    Until 2026-10-02 this ignored `gochara` and read the stored
-    bav["transit_scores"], which scored each planet's NATAL sign -- 69 of
-    82 cached reports' "transit backing" sentence had the wrong class."""
+    Until 2026-10-02 this read the stored bav["transit_scores"], which
+    scored each planet's NATAL sign -- 69 of 82 cached reports' "transit
+    backing" sentence had the wrong class."""
+    from app.engines.bhinnashtakavarga_engine import (
+        AV_TRANSIT_THRESHOLD, bav_transit_strength, format_bav_transit_line, gochara_transit_longitudes,
+    )
     if not bav or bav.get("error") or not gochara:
         return {}
-    from app.engines.bhinnashtakavarga_engine import compute_bav_transit_scores
-    from app.utils.rasi_utils import ENGLISH_RASI_ORDER, to_english_rasi
-
-    longitudes = {p: (gochara.get(p) or {}).get("longitude") for p in ("saturn", "jupiter")}
-    rk = gochara.get("rahu_ketu") or {}
-    rahu_sign = to_english_rasi(rk.get("rahu_rasi"))
-    if rahu_sign in ENGLISH_RASI_ORDER:
-        longitudes["rahu"] = ENGLISH_RASI_ORDER.index(rahu_sign) * 30.0 + float(rk.get("rahu_degree_in_sign") or 0.0)
-    transit_scores = compute_bav_transit_scores(bav, {k: v for k, v in longitudes.items() if v is not None})
-    if not transit_scores:
+    strength = bav_transit_strength(bav, gochara_transit_longitudes(gochara))
+    if not strength:
         return {}
-
-    result = {}
-    for planet in ["saturn", "jupiter", "rahu"]:
-        ts = transit_scores.get(planet, {})
-        if ts:
-            result[planet] = {
-                "bav_score": ts.get("bav_score"),
-                "strength": ts.get("combined_strength") or ts.get("strength"),
-            }
-
-    if result:
-        result["note"] = (
-            "BAV score: 5+ = strong transit, 3-4 = moderate, 1-2 = weak/friction."
-        )
+    result: Dict[str, Any] = {
+        planet: {
+            "sign": e["sign"],
+            "bav_score": e["bindus"],
+            "threshold": e["label"],
+            "line": format_bav_transit_line(e),
+        }
+        for planet, e in strength.items()
+    }
+    result["note"] = (
+        f"Bindus (0-8) in the transited sign; {AV_TRANSIT_THRESHOLD}+ is above the classical "
+        "threshold (supported), below it is weakly supported. Authoritative for transit strength."
+    )
     return result
 
 
@@ -1236,8 +1231,8 @@ def extract_payload_inputs(
         elif envelope_shadbala and not envelope_shadbala.get("error"):
             shadbala_detail = _build_shadbala_detail(envelope_shadbala)
 
-        bav = base_chart_payload.get("bhinnashtakavarga", {})
-        bav_context = _build_bav_context(bav, gochara)
+        from app.engines.bhinnashtakavarga_engine import bav_for_payload
+        bav_context = _build_bav_context(bav_for_payload(base_chart_payload), gochara)
 
         # Lazy backfill: compute upagrahas for older charts that were created before v1.10
         if not base_chart_payload.get("upagrahas"):

@@ -1291,8 +1291,9 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
 
     elements.append(Spacer(1, 0.3*inch))
 
-    # ENHANCEMENT C: Sarvashtakavarga table
-    elements.extend(_build_ashtakavarga_table(data, styles))
+    # The Sarvashtakavarga "Strength Map" table was removed 2026-10-02: it
+    # showed ashtakavarga_engine.py's 57-total heuristic. Transit strength
+    # (corrected tables) is now on the Jupiter/Saturn rows above.
 
     # Use KeepTogether to prevent heading/table separation
     pakshi_elements = []
@@ -1312,92 +1313,6 @@ def _build_astrological_context(data: CanonicalReportData, styles) -> List:
     
     elements.append(PageBreak())
     
-    return elements
-
-
-_RASI_ENGLISH = [
-    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
-]
-_RASI_TAMIL = [
-    "Mesham", "Rishabam", "Mithunam", "Kadakam", "Simmam", "Kanni",
-    "Thulam", "Vrischikam", "Dhanusu", "Makaram", "Kumbham", "Meenam",
-]
-
-
-def _bindu_strength_label(n: int) -> str:
-    if n >= 7: return "Very Strong"
-    if n >= 5: return "Strong"
-    if n >= 3: return "Moderate"
-    return "Very Weak"
-
-
-def _build_ashtakavarga_table(data: CanonicalReportData, styles) -> List:
-    """Build Sarvashtakavarga sign-by-sign bindu table (Enhancement C)."""
-    if not data.sarvashtakavarga:
-        return []
-
-    elements = []
-    sat_rasi = data.transit_context.saturn_rasi
-    jup_rasi = data.transit_context.jupiter_rasi
-
-    av_elements = []
-    av_elements.append(Paragraph(
-        "Ashtakavarga — Planetary Strength Map",
-        styles['SubsectionTitle']
-    ))
-    av_elements.append(Paragraph(
-        "Bindu scores show cumulative planetary support per zodiac sign (total = 57). "
-        "Highlighted rows mark current Saturn (S) and Jupiter (J) transit signs.",
-        styles['BodyText']
-    ))
-
-    table_data = [["Sign", "Bindus", "Strength"]]
-    highlight_rows = []
-
-    for i, (eng, tamil) in enumerate(zip(_RASI_ENGLISH, _RASI_TAMIL)):
-        bindus = data.sarvashtakavarga.get(eng, 0)
-        filled = min(8, bindus)
-        bar = "|" * filled + "." * (8 - filled)
-        label = _bindu_strength_label(bindus)
-
-        tag = ""
-        if eng == sat_rasi and eng == jup_rasi:
-            tag = " [S+J]"
-        elif eng == sat_rasi:
-            tag = " [S]"
-        elif eng == jup_rasi:
-            tag = " [J]"
-
-        if tag:
-            highlight_rows.append(i + 1)  # +1 for header row
-
-        table_data.append([f"{tamil}{tag}", str(bindus), f"{bar}  {label}"])
-
-    col_widths = [1.8 * inch, 0.7 * inch, 3.2 * inch]
-    table = Table(table_data, colWidths=col_widths)
-
-    style_cmds = [
-        ("BACKGROUND", (0, 0), (-1, 0), colors.Color(*COLORS["primary"])),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-        ("ALIGN", (1, 0), (1, -1), "CENTER"),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.Color(*COLORS["muted"])),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("FONTNAME", (2, 1), (2, -1), "Courier"),
-    ]
-    for row_idx in highlight_rows:
-        style_cmds.append(
-            ("BACKGROUND", (0, row_idx), (-1, row_idx), colors.Color(0.96, 0.93, 0.78))
-        )
-
-    table.setStyle(TableStyle(style_cmds))
-    av_elements.append(table)
-    elements.append(KeepTogether(av_elements))
-    elements.append(Spacer(1, 0.3 * inch))
     return elements
 
 

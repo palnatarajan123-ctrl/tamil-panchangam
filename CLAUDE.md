@@ -798,6 +798,38 @@ stale" and "confirmed real" looked like in practice):
   "cleared" just because this one specific bug class doesn't apply to
   it.
 
+- **NEXT UP (per 2026-10-02 decision) — Ashtakavarga pipeline switch.**
+  Three flagged workarounds in two rounds came from the wrong-engine /
+  corrected-engine split (PDF bindus, the Strength Map, prediction score
+  signals). What still reads `ashtakavarga_engine.py`
+  (`compute_ashtakavarga_validation()`, via `envelope["ashtakavarga"]`):
+  `synthesis_engine.py`'s ASHTAKAVARGA_* life-area signal (→ scores →
+  top_signals → LLM) and `remedy_engine.py`'s Saturn/Jupiter strength.
+  Its preconditions below are now met except the label-change audit and
+  threshold re-derivation. Until then the v6/v7 prompts carry a
+  prompt-level guardrail (corrected `bav_transit_scores` are authoritative;
+  no outlook/remedy wording may contradict them) -- a stopgap, not a fix.
+
+- **Ashtakavarga transit strength wired into every surface (2026-10-02),
+  one shared path**: `bhinnashtakavarga_engine.bav_for_payload()` +
+  `bav_transit_strength()` + `format_bav_transit_line()` → "Jupiter in
+  Cancer: 2/8, below threshold" (Saturn/Jupiter only; 4+ = above the
+  classical threshold). Consumers: `chat.py` (in CURRENT TRANSITS, with
+  `AV_TRANSIT_STRENGTH_RULE`), `family.py` (per-member clause, live
+  longitudes in that chart's ayanamsa, `FAMILY_AV_TRANSIT_RULE`), the
+  monthly/yearly PDF transit rows (replacing `ashtakavarga_engine.py`'s
+  bindus -- e.g. `fd79efb3` Oct 2026 Jupiter 3/8 → 2/8), the birth-chart
+  PDF transit rows (had none), and `payload_builder._build_bav_context()`.
+  Removed: the PDF "Ashtakavarga — Planetary Strength Map (total = 57)"
+  table (old heuristic, no honest relabel on the 337 scale). Family PDF
+  skipped: no transit section exists. Smoke (`fd79efb3`): chat, family
+  chat, both PDFs, and the Oct 2026 generation payload all show Saturn in
+  Pisces 2/8 and Jupiter in Cancer 2/8, below threshold. Live chat with
+  the guardrail answered "weakly supported, 2 out of 8" 2/2.
+  `tests/engines/test_av_transit_strength.py`. **Watch**: largest real
+  generation payload is now ~2,206 estimated tokens vs. yearly's 2,500
+  `MAX_PROMPT_TOKENS` (294 headroom) -- re-measure before adding more.
+
 - **PRIORITY — `ashtakavarga_engine.py`'s "classical" Sarvashtakavarga
   is not a real classical calculation, and it's used for LIVE Saturn/
   Jupiter transit validation** (investigated 2026-09-13, not fixed —

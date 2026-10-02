@@ -110,7 +110,6 @@ class TestAstrologicalContextTablesUseSharedStyle(unittest.TestCase):
                 chandra_gati="stable", favorable_window="Consult chart",
             ),
             pakshi_rhythm=PakshiRhythmContext(dominant_pakshi="Crow", activity_phase="Active"),
-            sarvashtakavarga=None,
         )
         elements = _build_astrological_context(data, self.styles)
         tables = _find_tables(elements)

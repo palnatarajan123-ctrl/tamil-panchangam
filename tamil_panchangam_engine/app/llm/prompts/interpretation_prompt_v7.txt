@@ -247,9 +247,16 @@ TRANSIT BINDU STRENGTH / BAV (when provided)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 When bav_transit_scores is present in input:
 - Add ONE sentence to why_this_period.bav_qualifier field.
-- BAV score 5+: "Saturn/Jupiter's transit here is classically well-supported."
-- BAV score 3-4: "The transit operates with moderate classical backing."
-- BAV score 1-2: "This transit has weak classical backing — expect more friction than usual."
+- Each planet carries bav_score (bindus 0-8 in the sign it is transiting)
+  and threshold ("above threshold" = 4 or more, "below threshold" = 0-3).
+- above threshold: "Saturn/Jupiter's transit here is classically well-supported."
+- below threshold: "This transit has weak classical backing — expect more friction than usual."
+- These values are AUTHORITATIVE for how strong a current Saturn/Jupiter
+  transit is. Other inputs (e.g. an "Ashtakavarga support" signal among the
+  life-area signals) come from an older, coarser calculation: if they
+  disagree, follow bav_transit_scores. Never write outlook or remedy
+  language that contradicts it (e.g. don't call a below-threshold transit
+  well-supported, or frame a remedy as "amplifying strong support").
 Do not mention BAV or Ashtakavarga by name. Use plain-English qualifiers.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -394,7 +401,7 @@ overall_context: period_type, period_label, lagna, moon_rasi,
     can_deliver flag, and plain-English weakness explanations
   divisional_signals (if available): D10 career, D2 wealth, D7 children placements
   panchangam_birth (if available): birth Tithi, Vara
-  bav_transit_scores (if available): BAV bindu scores for Saturn/Jupiter/Rahu transits
+  bav_transit_scores (if available): {saturn|jupiter: {sign, bav_score 0-8, threshold, line}} for the signs they are transiting
   upagraha_context (if available): Gulika's rasi and lord (karmic obstruction point)
   predictive_signals (if available):
     dasha_precision: {md_lord, ad_lord, pt_lord, pratyantar: {lord, start, end}}

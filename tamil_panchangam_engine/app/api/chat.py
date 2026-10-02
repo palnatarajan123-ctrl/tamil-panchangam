@@ -36,6 +36,19 @@ CHAT_LIMITS = {
 # Shared by family.py's _FAMILY_CHAT_SYSTEM_PROMPT -- one copy, so the two
 # chat implementations can't drift. No braces: concatenated into templates
 # that are later .format()-ed.
+# Shared with family.py. The transit-strength numbers come from the
+# corrected Ashtakavarga tables; nothing else in the prompt overrides them.
+AV_TRANSIT_STRENGTH_RULE = (
+    "\nTRANSIT STRENGTH (Ashtakavarga bindus in the transited sign, out of 8; "
+    "4 or more is above the classical threshold):\n{lines}\n"
+    "If asked how strong or supported a current Saturn/Jupiter transit is, these "
+    "bindu counts and threshold labels are authoritative. Do not phrase outlook or "
+    "remedy language in a way that contradicts them (e.g. don't call a below-threshold "
+    "transit well-supported). Don't mention 'Ashtakavarga' or 'bindus' unless the user "
+    "uses those terms; say 'classically well-supported' or 'weakly supported'.\n"
+)
+
+
 DOMAIN_WINDOW_RULE = """
 DATED WINDOWS ARE DOMAIN-SPECIFIC — NEVER BORROW ONE ACROSS LIFE AREAS:
 - Every dasha window listed under a life area (e.g. "7th lord ...
@@ -549,6 +562,10 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
                 "For a future sign change or exact ingress/peyarchi date, check the UPCOMING "
                 "SIGN CHANGES section below before saying you don't have that data.\n"
             )
+        if context.get("av_transit_lines"):
+            system_prompt += AV_TRANSIT_STRENGTH_RULE.format(
+                lines="\n".join(f"- {l}" for l in context["av_transit_lines"])
+            )
 
     if context.get("ingress_context"):
         ic = context["ingress_context"]
@@ -837,6 +854,22 @@ def _build_chat_context(base_chart_id: str) -> dict:
     except Exception as e:
         logger.warning(f"Gochara computation failed in chat context: {e}")
 
+    # Ashtakavarga transit strength for those same transits -- the shared
+    # path every surface uses (bhinnashtakavarga_engine), never
+    # ashtakavarga_engine.py.
+    av_transit_lines: list = []
+    try:
+        from app.engines.bhinnashtakavarga_engine import (
+            bav_for_payload, bav_transit_strength, format_bav_transit_line, gochara_transit_longitudes,
+        )
+        av_transit_lines = [
+            format_bav_transit_line(e) for e in bav_transit_strength(
+                bav_for_payload(payload), gochara_transit_longitudes(gochara_context)
+            ).values()
+        ]
+    except Exception as e:
+        logger.warning(f"Ashtakavarga transit strength failed in chat context: {e}")
+
     # Upcoming Peyarchi (sign-change) dates -- a global astronomical
     # fact, not per-user, so this is a cheap cached lookup
     # (ingress_engine.get_upcoming_ingresses()), never a live ephemeris
@@ -1023,6 +1056,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
         "divisional_summary": divisional_summary,
         "upagraha_context": upagraha_context,
         "gochara_context": gochara_context,
+        "av_transit_lines": av_transit_lines,
         "ingress_context": ingress_context,
         "marriage_health_context": marriage_health_context,
         "dasha_periods_context": dasha_periods_context,
