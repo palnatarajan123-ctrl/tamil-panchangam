@@ -798,6 +798,19 @@ stale" and "confirmed real" looked like in practice):
   "cleared" just because this one specific bug class doesn't apply to
   it.
 
+- **Web-view transit badge fixed 2026-10-02 (`de633b6`)**:
+  `MonthlyPredictionView.tsx` showed `envelope.ashtakavarga.*.bindus` --
+  the old engine's value, read from the CACHED envelope (so a code switch
+  alone wouldn't have fixed existing reports). Monthly/yearly/weekly
+  responses now attach `envelope.av_transit_strength` at serve time
+  (`bhinnashtakavarga_engine.with_av_transit_strength()`, never persisted)
+  and the badge shows "2/8 · below threshold" from it -- all 82 cached
+  reports fixed with no regeneration (`fd79efb3` Oct: web was 3/8, now
+  2/8, matching chat/PDF). Frontend deploys via Vercel (`vercel.json`),
+  not visible on `/api/version`. **Pre-existing, unrelated**: frontend
+  `auth-navigation-race.test.tsx` fails 2/2 on the baseline too
+  (`localStorage.clear` undefined in the test env).
+
 - **NEXT UP (per 2026-10-02 decision) — Ashtakavarga pipeline switch.**
   Three flagged workarounds in two rounds came from the wrong-engine /
   corrected-engine split (PDF bindus, the Strength Map, prediction score
