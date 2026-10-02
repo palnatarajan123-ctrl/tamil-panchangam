@@ -37,6 +37,14 @@ _PLANET_ASPECTS = {
 
 ORB = 2.0  # degrees
 
+# Classical special drishti, as the FORWARD angle from the transiting planet
+# to the natal point (natal - transit). Used only with vedic_drishti=True.
+_SPECIAL_DRISHTI = {
+    "Jupiter": {120: "5th", 240: "9th"},
+    "Mars": {90: "4th", 210: "8th"},
+    "Saturn": {60: "3rd", 270: "10th"},
+}
+
 HOUSE_LIFE_AREA = {
     1: "self", 2: "wealth", 3: "communication", 4: "home",
     5: "creativity", 6: "health", 7: "relationships", 8: "transformation",
@@ -50,6 +58,14 @@ def _angular_diff(transit_lon: float, natal_lon: float, aspect_angle: float) -> 
     return min(abs(raw - aspect_angle), abs(raw - aspect_angle + 360.0), abs(raw - aspect_angle - 360.0))
 
 
+def _forward_orb(transit_lon: float, natal_lon: float, forward_angle: float) -> float:
+    """Distance of (natal - transit) from forward_angle. Directional, unlike
+    _angular_diff: a drishti is cast forward only."""
+    fwd = (natal_lon - transit_lon) % 360.0
+    d = abs(fwd - forward_angle) % 360.0
+    return min(d, 360.0 - d)
+
+
 def _house_of(natal_planet_lon: float, lagna_lon: float) -> int:
     return int((natal_planet_lon - lagna_lon) % 360.0 / 30.0) % 12 + 1
 
@@ -60,6 +76,7 @@ def compute_transit_hits(
     ayanamsa: str = "lahiri",
     window_days: int = 45,
     node_type: str = "mean",
+    vedic_drishti: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Detect transit hits of slow planets over natal positions within
@@ -73,6 +90,13 @@ def compute_transit_hits(
         node_type: "mean" (traditional Tamil astrology, default) or "true"
             (astronomical) -- only affects Rahu/Ketu hits; pass the chart's
             own chart_metadata.node_type.
+        vedic_drishti: False (default, the monthly-report path) checks the
+            Western set above. True (the chats) checks conjunction,
+            opposition and each planet's classical special drishti by
+            forward angle (aspect_type "drishti_5th" etc.) instead of
+            trine/square. Note the Western trine/square bands are one-sided
+            (_angular_diff measures transit - natal against ONE angle), so
+            they only catch forward 240/270, never 120/90.
 
     Returns:
         List of transit hit dicts sorted by hit_date.
@@ -92,7 +116,13 @@ def compute_transit_hits(
     best_hit: Dict[tuple, Dict[str, Any]] = {}
 
     for transit_planet in TRANSIT_PLANETS:
-        aspects = _PLANET_ASPECTS[transit_planet]
+        if vedic_drishti:
+            aspects = [(a, ang, _angular_diff) for a, ang in _NODE_ASPECTS] + [
+                (f"drishti_{nth}", float(ang), _forward_orb)
+                for ang, nth in _SPECIAL_DRISHTI.get(transit_planet, {}).items()
+            ]
+        else:
+            aspects = [(a, ang, _angular_diff) for a, ang in _PLANET_ASPECTS[transit_planet]]
         day = start_day
         while day <= end_day:
             dt = datetime(day.year, day.month, day.day, 12, 0, tzinfo=timezone.utc)
@@ -108,8 +138,8 @@ def compute_transit_hits(
                 if natal_lon is None:
                     continue
 
-                for aspect_name, aspect_angle in aspects:
-                    orb = _angular_diff(transit_lon, natal_lon, aspect_angle)
+                for aspect_name, aspect_angle, measure in aspects:
+                    orb = measure(transit_lon, natal_lon, aspect_angle)
                     if orb > ORB:
                         continue
 
@@ -137,35 +167,30 @@ def compute_transit_hits(
 # ── Chat-facing selection (2026-10-02) ───────────────────────────────────────
 #
 # Framing decision: chat speaks classical Vedic, and trine/square are
-# Western aspects. Only relationships with an EXACT classical counterpart
-# are surfaced, named in Vedic terms:
+# Western aspects. The chats call compute_transit_hits(vedic_drishti=True),
+# which computes only relationships with a classical name:
 #   conjunction -> transiting over the natal planet
 #   opposition  -> 7th-house aspect (the full aspect every planet casts)
-#   trine/square only where they coincide with that planet's own special
-#   drishti, counted forward from the transiting planet: Jupiter 5th
-#   (~120) / 9th (~240), Mars 4th (~90), Saturn 10th (~270).
-# All other trines/squares are dropped rather than relabelled -- a
-# "nearest classical name" would misstate what was computed. The `house`/
-# `life_area_hint` fields are never surfaced: _house_of() is Equal House,
-# not the whole-sign system used everywhere else (open backlog item).
-
-_SPECIAL_DRISHTI = {
-    "Jupiter": {120: "5th", 240: "9th"},
-    "Mars": {90: "4th"},
-    "Saturn": {270: "10th"},
-}
+#   drishti_*   -> the planet's own special drishti, counted forward from
+#                  the transiting planet: Jupiter 5th/9th, Mars 4th/8th,
+#                  Saturn 3rd/10th (_SPECIAL_DRISHTI above).
+# Trine/square hits (the Western set) are dropped, not relabelled. Until
+# 2026-10-02 the chats relabelled matching trines/squares instead, which
+# silently missed Jupiter 5th, Mars 4th/8th and Saturn 3rd (see
+# compute_transit_hits' docstring). The `house`/`life_area_hint` fields are
+# never surfaced: _house_of() is Equal House, not the whole-sign system used
+# everywhere else (open backlog item).
 
 
 def _vedic_relation(hit: Dict[str, Any]) -> Optional[str]:
-    tp, aspect = hit["transit_planet"], hit["aspect_type"]
+    aspect = hit["aspect_type"]
     if aspect == "conjunction":
         return f"transiting over your natal {hit['natal_planet']}"
     if aspect == "opposition":
         return f"exactly opposite your natal {hit['natal_planet']} (its 7th-house aspect)"
-    forward = (hit["natal_degree"] - hit["transit_degree"]) % 360.0
-    for angle, nth in _SPECIAL_DRISHTI.get(tp, {}).items():
-        if abs(forward - angle) <= ORB + 0.5:
-            return f"casting its special {nth}-house aspect exactly onto your natal {hit['natal_planet']}"
+    if aspect.startswith("drishti_"):
+        nth = aspect[len("drishti_"):]
+        return f"casting its special {nth}-house aspect exactly onto your natal {hit['natal_planet']}"
     return None
 
 

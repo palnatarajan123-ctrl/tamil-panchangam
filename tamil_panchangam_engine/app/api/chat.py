@@ -647,8 +647,12 @@ def _build_system_prompt(context: dict, reading_as_name: Optional[str] = None) -
             "and a natal planet. Cite them by planet and date when asked what a planet is "
             "doing for the user. Do not attach a house number or life area to these contacts "
             "-- none was computed for them; describe the natal planet's own significations "
-            "instead. If a planet/natal pair isn't listed, no exact contact was found in this "
-            "window -- say so rather than inventing one.\n"
+            "instead. The scan checked EVERY pairing of transiting Jupiter, Saturn, Mars, Rahu "
+            "and Ketu against EVERY natal planet, for conjunction, opposition (7th aspect) and "
+            "each planet's special aspects (Jupiter 5th/9th, Mars 4th/8th, Saturn 3rd/10th). "
+            "So a pairing missing from this list means there is NO exact contact in this "
+            "window -- it is not missing data. Say so plainly rather than inventing one or "
+            "describing it as a gap in your information.\n"
         )
 
     if context.get("self_transits_context"):
@@ -748,6 +752,7 @@ def _build_chat_context(base_chart_id: str) -> dict:
             compute_transit_hits(
                 payload.get("ephemeris", {}), reference_date=_today,
                 ayanamsa=_meta.get("ayanamsa", "lahiri"), node_type=_meta.get("node_type", "mean"),
+                vedic_drishti=True,
             ),
             _today,
         ))

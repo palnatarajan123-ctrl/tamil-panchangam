@@ -2,10 +2,10 @@
 """
 select_chat_transit_hits() (transit_hits_engine.py, 2026-10-02): chat-facing
 filter over compute_transit_hits(). Only Vedic-meaningful relations are
-surfaced (conjunction, opposition = 7th aspect, and trine/square ONLY where
-they coincide with Jupiter 5th/9th, Mars 4th, Saturn 10th special drishti);
-house/life_area_hint are never surfaced (Equal House); hits on the scan's
-edge day are flagged as not-yet/no-longer exact.
+surfaced (conjunction, opposition = 7th aspect, and the special drishti
+computed by compute_transit_hits(vedic_drishti=True): Jupiter 5th/9th, Mars
+4th/8th, Saturn 3rd/10th, by FORWARD angle); house/life_area_hint are never
+surfaced (Equal House); hits on the scan's edge day are flagged as not-yet/no-longer exact.
 """
 from datetime import date
 
@@ -34,26 +34,58 @@ def test_conjunction_and_opposition_kept_in_vedic_terms():
     ]
 
 
-def test_trine_kept_only_as_jupiter_special_drishti():
-    jup_9th = _hit("Jupiter", "Moon", 120.8, 0.8, "trine")       # Moon 240 deg ahead -> 9th
-    mars_trine = _hit("Mars", "Moon", 121.0, 0.8, "trine")       # no Mars 5th/9th drishti
-    saturn_trine = _hit("Saturn", "Mars", 344.3, 222.4, "trine")  # no Saturn 5th/9th drishti
-    sel = select_chat_transit_hits([jup_9th, mars_trine, saturn_trine], REF)
-    assert len(sel) == 1
-    assert "special 9th-house aspect" in sel[0]["relation"]
-
-
-def test_square_kept_only_for_mars_4th_and_saturn_10th():
-    mars_4th = _hit("Mars", "Venus", 100.0, 190.0, "square")       # 90 ahead -> 4th
-    mars_10th = _hit("Mars", "Moon", 90.7, 0.8, "square")          # 270 ahead -> no Mars drishti
-    saturn_10th = _hit("Saturn", "Sun", 100.0, 10.0, "square")     # 270 ahead -> 10th
-    jupiter_sq = _hit("Jupiter", "Saturn", 112.5, 22.5, "square")  # Jupiter has no square drishti
-    sel = select_chat_transit_hits([mars_4th, mars_10th, saturn_10th, jupiter_sq], REF)
-    rel = [s["relation"] for s in sel]
-    assert rel == [
-        "casting its special 4th-house aspect exactly onto your natal Venus",
-        "casting its special 10th-house aspect exactly onto your natal Sun",
+def test_drishti_hits_named_and_western_trine_square_dropped():
+    sel = select_chat_transit_hits([
+        _hit("Saturn", "Venus", 0.0, 60.0, "drishti_3rd"),
+        _hit("Mars", "Moon", 0.0, 210.0, "drishti_8th"),
+        _hit("Jupiter", "Moon", 120.8, 0.8, "trine"),   # Western band: never relabelled now
+        _hit("Saturn", "Sun", 100.0, 10.0, "square"),
+    ], REF)
+    assert [s["relation"] for s in sel] == [
+        "casting its special 3rd-house aspect exactly onto your natal Venus",
+        "casting its special 8th-house aspect exactly onto your natal Moon",
     ]
+
+
+def _fixed_sky(monkeypatch, lons):
+    from app.engines import transit_hits_engine
+    monkeypatch.setattr(transit_hits_engine, "compute_planet_longitude",
+                        lambda planet, dt, ayanamsa, node_type="mean": lons[planet])
+
+
+def _natal(**lons):
+    return {"lagna": {"longitude_deg": 0.0},
+            "planets": {n: {"longitude_deg": v} for n, v in lons.items()}}
+
+
+def test_vedic_drishti_covers_every_special_aspect_by_forward_angle(monkeypatch):
+    """Until 2026-10-02 the chats relabelled the Western trine/square bands,
+    which are one-sided (transit - natal against one angle) and so only ever
+    caught forward 240/270: Jupiter 5th, Mars 4th/8th and Saturn 3rd were
+    never computed."""
+    from app.engines.transit_hits_engine import compute_transit_hits
+    # Rahu/Ketu parked where they touch nothing.
+    _fixed_sky(monkeypatch, {"Jupiter": 20.0, "Saturn": 100.0, "Mars": 200.0, "Rahu": 345.0, "Ketu": 165.0})
+    eph = _natal(J5=140.0, J9=260.0, S3=160.0, S10=10.0, M4=290.0, M8=50.0)
+    hits = compute_transit_hits(eph, reference_date=REF, window_days=0, vedic_drishti=True)
+    got = {(h["transit_planet"], h["natal_planet"], h["aspect_type"]) for h in hits}
+    assert got == {
+        ("Jupiter", "J5", "drishti_5th"), ("Jupiter", "J9", "drishti_9th"),
+        ("Saturn", "S3", "drishti_3rd"), ("Saturn", "S10", "drishti_10th"),
+        ("Mars", "M4", "drishti_4th"), ("Mars", "M8", "drishti_8th"),
+    }
+    # Direction matters: natal 90 deg BEHIND Mars is forward 270, not its 4th.
+    _fixed_sky(monkeypatch, {"Jupiter": 300.0, "Saturn": 300.0, "Mars": 100.0, "Rahu": 300.0, "Ketu": 120.0})
+    hits = compute_transit_hits(_natal(X=10.0), reference_date=REF, window_days=0, vedic_drishti=True)
+    assert hits == []
+
+
+def test_default_path_unchanged_for_monthly_reports(monkeypatch):
+    """predictive_signals_engine (monthly reports) keeps the Western set."""
+    from app.engines.transit_hits_engine import compute_transit_hits
+    _fixed_sky(monkeypatch, {"Jupiter": 130.0, "Saturn": 300.0, "Mars": 300.0, "Rahu": 300.0, "Ketu": 120.0})
+    hits = compute_transit_hits(_natal(X=10.0), reference_date=REF, window_days=0)
+    assert {(h["transit_planet"], h["aspect_type"]) for h in hits} == {("Jupiter", "trine")}
 
 
 def test_house_and_life_area_never_surfaced():
