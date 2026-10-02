@@ -230,12 +230,9 @@ def apply(targets):
 def _log_tokens(t, i_tok, o_tok):
     from app.engines.budget_guard import log_llm_call
     with get_conn() as conn:
-        conn.execute(
-            "INSERT INTO llm_token_usage (id, feature_name, prompt_version, total_tokens, created_at) "
-            "VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)",
-            (str(uuid.uuid4()), "transit_backing_rewrite", "rewrite_v1", i_tok + o_tok),
-        )
-        log_llm_call(conn, t["chart_id"], "transit_backing_rewrite", f"{t['kind']}/{t['period_key']}", i_tok, o_tok)
+        # log_llm_call() writes both the $ ledger and the token ledger.
+        log_llm_call(conn, t["chart_id"], "transit_backing_rewrite", f"{t['kind']}/{t['period_key']}", i_tok, o_tok,
+                     prompt_version="rewrite_v1")
 
 
 def _write(t, new_text: dict, backup: list):

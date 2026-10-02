@@ -48,7 +48,7 @@ from app.llm.payload_builder import (
 )
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.dasha_resolver import resolve_antar_dasha
-from app.engines.budget_guard import log_llm_call
+from app.engines.budget_guard import log_llm_call, partial_stream_usage
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled, get_llm_pause_reason
 from app.engines.family_prediction_engine import run_family_prediction
 from app.engines.children_timing_engine import run_children_timing, _safe_json_list
@@ -1704,6 +1704,7 @@ async def family_group_chat_stream(
         full_response: list[str] = []
         input_tokens = 0
         output_tokens = 0
+        stream_ref = None
         try:
             client = anthropic.Anthropic(api_key=api_key)
             with client.messages.stream(
@@ -1712,6 +1713,7 @@ async def family_group_chat_stream(
                 system=system_prompt,
                 messages=messages,
             ) as stream:
+                stream_ref = stream
                 for text in stream.text_stream:
                     full_response.append(text)
                     yield f"data: {json.dumps({'text': text})}\n\n"
@@ -1732,7 +1734,32 @@ async def family_group_chat_stream(
 
             yield f"data: {json.dumps({'done': True})}\n\n"
 
+        except GeneratorExit:
+            # Client went away mid-reply (closed the tab): not an Exception,
+            # so neither branch below ran and the call was never logged.
+            # Log what it cost so far, then let the generator close.
+            try:
+                if stream_ref is not None and not (input_tokens or output_tokens):
+                    input_tokens, output_tokens = partial_stream_usage(stream_ref, "".join(full_response))
+                with get_conn() as db:
+                    log_llm_call(
+                        db=db,
+                        chart_id=req.base_chart_id,
+                        call_type="family_chat",
+                        period="chat",
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        status="error",
+                        fallback_reason="client_disconnected",
+                    )
+            except Exception:
+                pass
+            raise
         except Exception as e:
+            # Interrupted/failed stream: log what it actually cost so far
+            # (was 0 -- usage was only read at the end).
+            if stream_ref is not None and not (input_tokens or output_tokens):
+                input_tokens, output_tokens = partial_stream_usage(stream_ref, "".join(full_response))
             logger.error(f"Family group chat stream error: {e}")
             try:
                 with get_conn() as db:

@@ -23,7 +23,7 @@ from app.repositories.base_chart_repo import get_base_chart_by_id, user_owns_cha
 from app.engines.llm_interpretation_orchestrator import (
     is_llm_enabled, load_stored_interpretation, retry_cooldown_status,
 )
-from app.engines.budget_guard import log_llm_call, check_user_llm_cap, record_token_usage
+from app.engines.budget_guard import log_llm_call, check_user_llm_cap
 from app.llm.providers import anthropic_provider
 
 logger = logging.getLogger(__name__)
@@ -256,8 +256,6 @@ def _save_cache(
                 prompt_tokens, completion_tokens, total_tokens,
                 json.dumps(content_json), fallback_reason,
             ])
-            # Failed calls cost tokens too (same fix as the orchestrator, 2026-10-02).
-            record_token_usage(conn, FEATURE_NAME, PROMPT_VERSION, total_tokens)
             # log_llm_call (Task 3/backlog #1, 2026-09-10): this route
             # previously never logged to llm_calls at all -- unlike its KP
             # sibling (_save_kp_cache below), which already does. Added
@@ -277,6 +275,7 @@ def _save_cache(
                     status="success" if not fallback_reason else "fallback",
                     fallback_reason=fallback_reason,
                     user_id=user_id,
+                    prompt_version=PROMPT_VERSION,
                 )
             except Exception as _lg_err:
                 logger.warning(f"log_llm_call failed for natal: {_lg_err}")
@@ -608,9 +607,6 @@ def _save_kp_cache(
                 prompt_tokens, completion_tokens, total_tokens,
                 json.dumps(content_json), fallback_reason,
             ])
-            # Token budget too -- KP calls were only in the $ ledger until
-            # 2026-10-02 (success and failure alike).
-            record_token_usage(conn, KP_FEATURE_NAME, KP_PROMPT_VERSION, total_tokens)
             try:
                 log_llm_call(
                     db=conn,
@@ -622,6 +618,7 @@ def _save_kp_cache(
                     status="success" if not fallback_reason else "fallback",
                     fallback_reason=fallback_reason,
                     user_id=user_id,
+                    prompt_version=KP_PROMPT_VERSION,
                 )
             except Exception as _lg_err:
                 logger.warning(f"log_llm_call failed for KP: {_lg_err}")

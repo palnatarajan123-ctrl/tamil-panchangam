@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Literal
 
 from app.db.postgres import get_conn
-from app.engines.budget_guard import log_llm_call, record_token_usage
+from app.engines.budget_guard import log_llm_call
 from app.llm.token_estimator import check_token_limits, get_max_completion_tokens
 from app.llm.providers import anthropic_provider as openai_provider  # openai_provider alias kept for internal references
 from app.utils.prompt_dates import humanize_iso_dates
@@ -364,9 +364,8 @@ def _persist_interpretation(
             ])
             
             # Every call that consumed tokens counts against the monthly
-            # budget, success or failure (failures were excluded until
-            # 2026-10-02).
-            record_token_usage(conn, feature_name, prompt_version, total_tokens)
+            # budget, success or failure -- log_llm_call() writes both the $
+            # ledger and the token ledger.
 
             # Log to unified llm_calls table for budget tracking
             log_llm_call(
@@ -378,6 +377,7 @@ def _persist_interpretation(
                 output_tokens=completion_tokens,
                 status="error" if fallback_reason else "success",
                 fallback_reason=fallback_reason,
+                prompt_version=prompt_version,
             )
                 
     except Exception as e:

@@ -36,6 +36,23 @@ def record_token_usage(db, feature_name: str, prompt_version: str, total_tokens:
         """, [str(uuid.uuid4()), feature_name, prompt_version, total_tokens])
 
 
+def partial_stream_usage(stream, streamed_text: str) -> tuple:
+    """(input_tokens, output_tokens) for a streamed reply that failed or was
+    interrupted before get_final_message(). Input is exact (known from the
+    first stream event); output usage only arrives at the end, so it's
+    estimated from the text already streamed (~4 chars/token) -- far closer
+    to the real cost than the 0 these streams used to log."""
+    in_tok = out_tok = 0
+    try:
+        usage = stream.current_message_snapshot.usage
+        in_tok, out_tok = usage.input_tokens or 0, usage.output_tokens or 0
+    except Exception:
+        pass
+    if not out_tok and streamed_text:
+        out_tok = max(1, len(streamed_text) // 4)
+    return in_tok, out_tok
+
+
 def llm_call_cooldown(db, chart_id: str, call_type: str, period: str):
     """
     Retry cooldown for LLM features that don't store failed attempts as
@@ -71,7 +88,7 @@ def llm_call_cooldown(db, chart_id: str, call_type: str, period: str):
 def log_llm_call(db, chart_id: str, call_type: str, period: str,
                  input_tokens: int, output_tokens: int,
                  status: str = "success", fallback_reason: str = None,
-                 user_id: str = None) -> float:
+                 user_id: str = None, prompt_version: str = None) -> float:
     """
     Unified logger for all LLM calls (prediction + chat).
     Returns cost_usd logged.
@@ -94,6 +111,12 @@ def log_llm_call(db, chart_id: str, call_type: str, period: str,
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     """, [str(uuid.uuid4()), chart_id, call_type, period, input_tokens, output_tokens,
           total_tokens, cost_usd, status, fallback_reason, user_id])
+
+    # And the token ledger (LLM_MONTHLY_TOKEN_BUDGET), for every call that
+    # spent tokens, whatever the feature or outcome (2026-10-02 decision:
+    # the token budget reflects total real spend). One call, both ledgers,
+    # so no call site can log spend to one and forget the other again.
+    record_token_usage(db, call_type, prompt_version or "n/a", total_tokens)
 
     # Failed calls cost money too; re-check the auto-pause after any call
     # that spent something (was success-only until 2026-10-02).
