@@ -13,7 +13,7 @@ import uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from app.engines.budget_guard import log_llm_call
+from app.engines.budget_guard import log_llm_call, llm_call_cooldown
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.porutham_engine import _rasi_index
 from app.engines.sade_sati_engine import compute_sade_sati
@@ -238,6 +238,14 @@ def run_children_timing(
     if not is_llm_enabled():
         return {"error": f"LLM paused: {get_llm_pause_reason() or 'budget'}", "cached": False}
 
+    # Retry cooldown: repeated failed calls -> no new call (same rule as
+    # monthly/yearly/natal; failures are already in llm_calls).
+    _cool = llm_call_cooldown(db, group_id, "children_timing", f"children_timing/{year_from}-{year_to}")
+    if _cool:
+        logger.warning(f"children_timing retry cooldown for {group_id} (children_timing/{year_from}-{year_to}): {_cool['failures']} failures; next try after {_cool['retry_after']}")
+        return {"error": "Generation is paused for this item after repeated failures; it will retry automatically later.",
+                "cached": False, "retry_cooldown": True}
+
     context = _build_children_timing_context(husband_payload, wife_payload, year_from, year_to)
     user_message = (
         f"Analyze this couple's Santana Bhagya for {year_from}-{year_to}:\n\n{context}\n\n"
@@ -268,14 +276,6 @@ def run_children_timing(
             pass
         return {"error": f"LLM call failed: {str(e)[:200]}", "cached": False}
 
-    try:
-        log_llm_call(db=db, chart_id=group_id, call_type="children_timing",
-                     period=f"children_timing/{year_from}-{year_to}",
-                     input_tokens=input_tokens, output_tokens=output_tokens,
-                     status="success")
-    except Exception as e:
-        logger.warning(f"log_llm_call failed: {e}")
-
     clean = raw_text.strip()
     if clean.startswith("```"):
         parts = clean.split("```")
@@ -297,6 +297,19 @@ def run_children_timing(
         except Exception:
             pass
         return {"error": "Failed to parse LLM response", "cached": False}
+
+    # Logged only once the reply parses (2026-10-02). It used to be logged
+    # right after the API call, so a parse failure produced a "success"
+    # row AND an "error" row: its tokens counted twice in the $ ledger, and
+    # the fake success reset llm_call_cooldown() so it could never engage.
+    try:
+        log_llm_call(db=db, chart_id=group_id, call_type="children_timing",
+                     period=f"children_timing/{year_from}-{year_to}",
+                     input_tokens=input_tokens, output_tokens=output_tokens,
+                     status="success")
+    except Exception as e:
+        logger.warning(f"log_llm_call failed: {e}")
+
 
     prediction_id = str(uuid.uuid4())
     try:

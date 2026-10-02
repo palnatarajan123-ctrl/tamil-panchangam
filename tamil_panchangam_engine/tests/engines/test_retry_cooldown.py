@@ -53,3 +53,36 @@ def test_monthly_route_does_not_schedule_a_retry_in_cooldown():
     from app.api import prediction
     src = inspect.getsource(prediction.generate_monthly_prediction)
     assert "retry_cooldown_status(" in src and "and not _in_cooldown" in src
+
+
+# ── Family prediction / children timing / child prediction (2026-10-02) ──────
+# These don't store failed attempts as report rows, but already log every
+# failed call (with real tokens) to llm_calls -- the cooldown counts there.
+
+ENGINES = (
+    ("app.engines.family_prediction_engine", "run_family_prediction"),
+    ("app.engines.children_timing_engine", "run_children_timing"),
+    ("app.engines.child_prediction_engine", "run_child_prediction"),
+)
+
+
+def test_llm_call_cooldown_counts_real_failures_since_last_success():
+    import app.engines.budget_guard as bg
+    db = MagicMock()
+    db.execute.return_value.fetchone.return_value = (3, None)
+    assert bg.llm_call_cooldown(db, "g", "family_prediction", "family_yearly/2028")["failures"] == 3
+    sql = db.execute.call_args[0][0]
+    assert "status <> 'success' AND COALESCE(total_tokens, 0) > 0" in sql and "status = 'success'" in sql
+    db.execute.return_value.fetchone.return_value = (2, None)
+    assert bg.llm_call_cooldown(db, "g", "family_prediction", "family_yearly/2028") is None
+
+
+def test_engines_check_cooldown_before_calling_and_log_success_only_after_parse():
+    """Logging "success" before parsing gave every parse failure a success
+    row AND an error row -- double-counted in the $ ledger, and the fake
+    success reset the cooldown so it never engaged (found in the live smoke)."""
+    import importlib
+    for mod_name, fn_name in ENGINES:
+        src = inspect.getsource(getattr(importlib.import_module(mod_name), fn_name))
+        assert src.index("llm_call_cooldown(") < src.index("messages.create("), fn_name
+        assert src.index('status="success"') > src.index("json.loads(clean)"), fn_name

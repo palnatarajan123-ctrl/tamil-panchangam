@@ -36,6 +36,38 @@ def record_token_usage(db, feature_name: str, prompt_version: str, total_tokens:
         """, [str(uuid.uuid4()), feature_name, prompt_version, total_tokens])
 
 
+def llm_call_cooldown(db, chart_id: str, call_type: str, period: str):
+    """
+    Retry cooldown for LLM features that don't store failed attempts as
+    report rows (family prediction, children timing, child prediction): the
+    same rule as llm_interpretation_orchestrator.retry_cooldown_status(), but
+    counted from llm_calls, where these features already log every failed
+    call with its real tokens. Returns {"failures", "retry_after"} when
+    there have been >= RETRY_COOLDOWN_FAILURES failed calls that spent
+    tokens since the last success within RETRY_COOLDOWN_HOURS, else None.
+    """
+    from datetime import timedelta
+    from app.engines.llm_interpretation_orchestrator import RETRY_COOLDOWN_FAILURES, RETRY_COOLDOWN_HOURS
+    try:
+        row = db.execute("""
+            SELECT COUNT(*) AS n, MIN(created_at) AS oldest FROM llm_calls
+            WHERE chart_id = ? AND call_type = ? AND period = ?
+              AND status <> 'success' AND COALESCE(total_tokens, 0) > 0
+              AND created_at > NOW() - make_interval(hours => ?)
+              AND created_at > COALESCE((
+                  SELECT MAX(created_at) FROM llm_calls
+                  WHERE chart_id = ? AND call_type = ? AND period = ? AND status = 'success'
+              ), '-infinity'::timestamp)
+        """, [chart_id, call_type, period, RETRY_COOLDOWN_HOURS, chart_id, call_type, period]).fetchone()
+    except Exception as e:
+        logger.warning(f"llm_call_cooldown lookup failed (not blocking): {e}")
+        return None
+    n, oldest = (row[0] or 0), row[1]
+    if n < RETRY_COOLDOWN_FAILURES:
+        return None
+    return {"failures": n, "retry_after": oldest + timedelta(hours=RETRY_COOLDOWN_HOURS) if oldest else None}
+
+
 def log_llm_call(db, chart_id: str, call_type: str, period: str,
                  input_tokens: int, output_tokens: int,
                  status: str = "success", fallback_reason: str = None,

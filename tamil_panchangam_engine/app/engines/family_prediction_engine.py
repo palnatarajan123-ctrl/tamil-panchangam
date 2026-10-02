@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from app.engines.budget_guard import log_llm_call
+from app.engines.budget_guard import log_llm_call, llm_call_cooldown
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.sade_sati_engine import compute_sade_sati
 from app.engines.llm_interpretation_orchestrator import is_llm_enabled, get_llm_pause_reason
@@ -315,6 +315,14 @@ def run_family_prediction(
             "cached": False,
         }
 
+    # Retry cooldown: repeated failed calls -> no new call (same rule as
+    # monthly/yearly/natal; failures are already in llm_calls).
+    _cool = llm_call_cooldown(db, group_id, "family_prediction", f"family_yearly/{year}")
+    if _cool:
+        logger.warning(f"family_prediction retry cooldown for {group_id} (family_yearly/{year}): {_cool['failures']} failures; next try after {_cool['retry_after']}")
+        return {"error": "Generation is paused for this item after repeated failures; it will retry automatically later.",
+                "cached": False, "retry_cooldown": True}
+
     # ── Build context ─────────────────────────────────────────────────────────
     context = _build_family_context(group, members_with_charts, year, db)
     user_message = build_family_user_message(context, year)
@@ -352,19 +360,6 @@ def run_family_prediction(
         return {"error": f"LLM call failed: {str(e)[:200]}", "cached": False}
 
     # ── Log success ───────────────────────────────────────────────────────────
-    try:
-        log_llm_call(
-            db=db,
-            chart_id=group_id,
-            call_type="family_prediction",
-            period=f"family_yearly/{year}",
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            status="success",
-        )
-    except Exception as e:
-        logger.warning(f"log_llm_call failed: {e}")
-
     # ── Parse response (defensive markdown strip) ─────────────────────────────
     clean = raw_text.strip()
     if clean.startswith("```"):
@@ -393,6 +388,24 @@ def run_family_prediction(
         except Exception:
             pass
         return {"error": "Failed to parse LLM response", "cached": False}
+
+    # Logged only once the reply parses (2026-10-02). It used to be logged
+    # right after the API call, so a parse failure produced a "success"
+    # row AND an "error" row: its tokens counted twice in the $ ledger, and
+    # the fake success reset llm_call_cooldown() so it could never engage.
+    try:
+        log_llm_call(
+            db=db,
+            chart_id=group_id,
+            call_type="family_prediction",
+            period=f"family_yearly/{year}",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            status="success",
+        )
+    except Exception as e:
+        logger.warning(f"log_llm_call failed: {e}")
+
 
     # ── Persist to cache (INSERT ... ON CONFLICT DO UPDATE — PostgreSQL) ──────
     # UNIQUE constraint stays (group_id, year) -- deliberately not widened to

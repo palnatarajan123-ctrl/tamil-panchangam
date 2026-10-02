@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.engines.budget_guard import log_llm_call
+from app.engines.budget_guard import log_llm_call, llm_call_cooldown
 from app.engines.dasha_resolver import resolve_antar_dasha
 from app.engines.children_timing_engine import RASI_LORDS
 from app.engines.porutham_engine import _rasi_index
@@ -164,6 +164,14 @@ def run_child_prediction(
     if not is_llm_enabled():
         return {"error": f"LLM paused: {get_llm_pause_reason() or 'budget'}", "cached": False}
 
+    # Retry cooldown: repeated failed calls -> no new call (same rule as
+    # monthly/yearly/natal; failures are already in llm_calls).
+    _cool = llm_call_cooldown(db, member_id, "child_prediction", f"child_yearly/{year}")
+    if _cool:
+        logger.warning(f"child_prediction retry cooldown for {member_id} (child_yearly/{year}): {_cool['failures']} failures; next try after {_cool['retry_after']}")
+        return {"error": "Generation is paused for this item after repeated failures; it will retry automatically later.",
+                "cached": False, "retry_cooldown": True}
+
     context = _build_child_context(chart_payload, year)
     user_message = (
         f"Analyze this child's chart for {year}:\n\n{context}\n\n"
@@ -194,14 +202,6 @@ def run_child_prediction(
             pass
         return {"error": f"LLM call failed: {str(e)[:200]}", "cached": False}
 
-    try:
-        log_llm_call(db=db, chart_id=member_id, call_type="child_prediction",
-                     period=f"child_yearly/{year}",
-                     input_tokens=input_tokens, output_tokens=output_tokens,
-                     status="success")
-    except Exception as e:
-        logger.warning(f"log_llm_call failed: {e}")
-
     clean = raw_text.strip()
     if clean.startswith("```"):
         parts = clean.split("```")
@@ -223,6 +223,19 @@ def run_child_prediction(
         except Exception:
             pass
         return {"error": "Failed to parse LLM response", "cached": False}
+
+    # Logged only once the reply parses (2026-10-02). It used to be logged
+    # right after the API call, so a parse failure produced a "success"
+    # row AND an "error" row: its tokens counted twice in the $ ledger, and
+    # the fake success reset llm_call_cooldown() so it could never engage.
+    try:
+        log_llm_call(db=db, chart_id=member_id, call_type="child_prediction",
+                     period=f"child_yearly/{year}",
+                     input_tokens=input_tokens, output_tokens=output_tokens,
+                     status="success")
+    except Exception as e:
+        logger.warning(f"log_llm_call failed: {e}")
+
 
     pred_id = str(uuid.uuid4())
     try:
