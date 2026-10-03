@@ -678,6 +678,56 @@ stale" and "confirmed real" looked like in practice):
   today would repeat the exact same budget-exhaustion incident. Needs
   either the emergency ceiling raised further or to wait until closer
   to the October reset.
+- **INCIDENT 2026-10-03 (LIVE at time of writing) -- Anthropic account out
+  of credit; production LLM features down. Caused by local A/B testing.**
+  - **What happened**: the 2026-10-02/03 chat A/B rounds called Anthropic
+    directly from scratchpad scripts with the local `.env` key: ~1,000
+    Sonnet 4.6 calls (6-9k input tokens each) + ~700 Haiku grader calls,
+    ~9M tokens, against an account balance of about $13. The last
+    successful test batch finished 05:52:21 UTC Oct 3; the next request got,
+    verbatim: `anthropic.BadRequestError: Error code: 400 - {'type':
+    'error', 'error': {'type': 'invalid_request_error', 'message': 'Your
+    credit balance is too low to access the Anthropic API. Please go to
+    Plans & Billing to upgrade or purchase credits.'}, 'request_id':
+    'req_011CfenNS7C7KEpxNNFDTbL3'}`. A billing error (HTTP 400
+    `invalid_request_error`), NOT a rate limit (that would be HTTP 429
+    `rate_limit_error`). The SDK silently retries 429s twice, so any
+    rate-limit hits during the tests were absorbed and never surfaced; none
+    caused a failure.
+  - **Production shares the billing account** (confirmed, not assumed): a
+    real chat at 06:05:06 UTC (admin account, user message saved) failed at
+    06:05:09 with the same 400 credit error in `llm_calls` (`status='error'`).
+    Whether Render uses the identical key or just the same organization
+    wasn't checked (local key ends `_QAA`; compare in the Console).
+  - **User impact**: window 05:52 UTC → credit restored. Before that
+    window, the quiet stretch after the last logged call (21:51 UTC) was
+    just no traffic: no chat messages, no `llm_calls` rows of any status, no
+    report attempts. Within it, through 06:05 UTC: one failed chat (above),
+    nothing else. A failed chat is always visible (user message saved before
+    the call, `log_llm_call(status='error')` on the error path); a failed
+    monthly/yearly would append a `prediction_llm_interpretation` fallback row.
+    Chat shows the raw error string to the user (`yield {'error': str(e)}`):
+    it leaks the provider message, not fixed.
+  - **Top-up**: the user reported topping up, but a minimal call with the
+    local key at ~06:05 UTC still returned the same 400, and so did
+    production at 06:05:09 -- either not yet propagated, or credited to a
+    different org/workspace. Verify recovery with a fresh call (and a real
+    chat) before calling this closed.
+  - **Root cause**: no separation between test and production spend.
+    Scratchpad A/B scripts used the production-billing account, outside the
+    app's own `llm_calls`/`llm_token_usage` ledgers (so
+    `LLM_MONTHLY_TOKEN_BUDGET` never saw it), with no cost estimate up
+    front, no pre-flight balance check, and no spend cap.
+  - **Recommendation (console action, not done from here)**: give local
+    testing its own API key in a separate Console workspace with a monthly
+    spend limit well below the production balance, so a test run can
+    exhaust only its own cap. Keep production's key only in Render. Turn
+    on low-balance email alerts / auto-reload for the production org.
+  - **Test-script gaps found, not fixed (pending confirmation)**: no cost
+    estimate or confirmation before a batch; no balance pre-check (a 1-token
+    call would do); one failed request in the `ThreadPoolExecutor` aborts
+    the whole batch and discards finished replies; 10 parallel workers, no
+    stop-on-billing-error. These are scratchpad scripts, not repo code.
 - **RESOLVED 2026-09-15 (was URGENT/LIVE) — the app's shared, site-wide
   `LLM_MONTHLY_TOKEN_BUDGET` was exhausted mid-backfill, affecting real
   users; raised, both blocked backfills completed, and a permanent
