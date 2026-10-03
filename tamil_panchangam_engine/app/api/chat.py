@@ -748,7 +748,6 @@ def _build_chat_context(base_chart_id: str) -> dict:
             compute_transit_hits(
                 payload.get("ephemeris", {}), reference_date=_today,
                 ayanamsa=_meta.get("ayanamsa", "lahiri"), node_type=_meta.get("node_type", "mean"),
-                vedic_drishti=True,
             ),
             _today,
         ))

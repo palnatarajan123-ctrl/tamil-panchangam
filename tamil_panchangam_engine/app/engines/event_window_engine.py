@@ -268,10 +268,6 @@ from app.utils.planet_lists import NATURAL_MALEFICS as _MALEFIC_PLANETS
 
 _BENEFIC_PLANETS = {"Jupiter", "Venus", "Moon", "Mercury"}
 
-# Positive/negative aspects for confluence scoring
-_POSITIVE_ASPECTS = {"conjunction", "trine"}
-_NEGATIVE_ASPECTS = {"opposition", "square"}
-
 # Planet → life areas it naturally supports (positive signal)
 _PLANET_POSITIVE_AREAS: _Dict[str, _List[str]] = {
     "Jupiter": ["career", "fortune", "wealth", "spirituality", "self"],
@@ -307,6 +303,8 @@ def _signal_label(transit_hit: _Dict[str, _Any]) -> str:
     np_ = transit_hit["natal_planet"]
     asp = transit_hit["aspect_type"]
     h = transit_hit["house"]
+    if asp.startswith("drishti_"):
+        asp = f"{asp[len('drishti_'):]}-house aspect on"
     return f"{tp} {asp} natal {np_} (house {h})"
 
 
@@ -384,18 +382,14 @@ def detect_confluence(
             tp = hit["transit_planet"]
             area = hit.get("life_area_hint", "self")
             label = _signal_label(hit)
-            asp = hit["aspect_type"]
+            # Direction comes from the transiting planet, whatever the aspect
+            # (a malefic's conjunction is still challenging).
             if tp in _BENEFIC_PLANETS:
                 pos_counts[area] += 1
                 pos_signals[area].append(label)
             elif tp in _MALEFIC_PLANETS:
-                if asp in _NEGATIVE_ASPECTS:
-                    neg_counts[area] += 1
-                    neg_signals[area].append(label)
-                else:
-                    # Malefic conjunction/trine — still challenging
-                    neg_counts[area] += 1
-                    neg_signals[area].append(label)
+                neg_counts[area] += 1
+                neg_signals[area].append(label)
 
         # Signal 2: PT lord
         if pt_is_benefic and pt_lord:

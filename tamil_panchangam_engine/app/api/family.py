@@ -1310,7 +1310,6 @@ def _build_member_summary(row: tuple) -> str:
             compute_transit_hits(
                 eph, reference_date=_today,
                 ayanamsa=_meta.get("ayanamsa", "lahiri"), node_type=_meta.get("node_type", "mean"),
-                vedic_drishti=True,
             ),
             _today,
         ), _today)

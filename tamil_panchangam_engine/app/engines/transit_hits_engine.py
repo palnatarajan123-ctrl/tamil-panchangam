@@ -1,8 +1,16 @@
 """
 Transit Hits Engine — degree-level transits of slow planets over natal positions.
 
-Checks Jupiter, Saturn, Rahu, Ketu, Mars for conjunction, opposition, trine, square
-(nodes: conjunction and opposition only) within a configurable day window.
+Checks Jupiter, Saturn, Rahu, Ketu, Mars for conjunction, opposition (the 7th
+aspect every planet casts) and each planet's classical special drishti by
+forward angle (Jupiter 5th/9th, Mars 4th/8th, Saturn 3rd/10th; nodes:
+conjunction and opposition only) within a configurable day window.
+
+Until 2026-10-02 it checked the Western set (conjunction/opposition/trine/
+square) with a ONE-SIDED orb (transit - natal against one angle), so trine
+and square only ever matched forward 240/270 and Jupiter 5th, Mars 4th/8th
+and Saturn 3rd were never computed -- in chat (fixed 543e10d) and in the
+monthly report's event windows (fixed here).
 """
 
 import logging
@@ -16,29 +24,15 @@ logger = logging.getLogger(__name__)
 
 TRANSIT_PLANETS = ["Jupiter", "Saturn", "Rahu", "Ketu", "Mars"]
 
-_FULL_ASPECTS = [
-    ("conjunction", 0.0),
-    ("opposition", 180.0),
-    ("trine", 120.0),
-    ("square", 90.0),
-]
 _NODE_ASPECTS = [
     ("conjunction", 0.0),
     ("opposition", 180.0),
 ]
 
-_PLANET_ASPECTS = {
-    "Jupiter": _FULL_ASPECTS,
-    "Saturn": _FULL_ASPECTS,
-    "Mars": _FULL_ASPECTS,
-    "Rahu": _NODE_ASPECTS,
-    "Ketu": _NODE_ASPECTS,
-}
-
 ORB = 2.0  # degrees
 
 # Classical special drishti, as the FORWARD angle from the transiting planet
-# to the natal point (natal - transit). Used only with vedic_drishti=True.
+# to the natal point (natal - transit). aspect_type "drishti_5th" etc.
 _SPECIAL_DRISHTI = {
     "Jupiter": {120: "5th", 240: "9th"},
     "Mars": {90: "4th", 210: "8th"},
@@ -53,7 +47,8 @@ HOUSE_LIFE_AREA = {
 
 
 def _angular_diff(transit_lon: float, natal_lon: float, aspect_angle: float) -> float:
-    """Smallest angular distance between transit-natal and the target aspect."""
+    """Smallest angular distance between transit-natal and the target aspect.
+    Symmetric, so only right for 0/180 (conjunction/opposition)."""
     raw = (transit_lon - natal_lon) % 360.0
     return min(abs(raw - aspect_angle), abs(raw - aspect_angle + 360.0), abs(raw - aspect_angle - 360.0))
 
@@ -76,7 +71,6 @@ def compute_transit_hits(
     ayanamsa: str = "lahiri",
     window_days: int = 45,
     node_type: str = "mean",
-    vedic_drishti: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Detect transit hits of slow planets over natal positions within
@@ -90,13 +84,6 @@ def compute_transit_hits(
         node_type: "mean" (traditional Tamil astrology, default) or "true"
             (astronomical) -- only affects Rahu/Ketu hits; pass the chart's
             own chart_metadata.node_type.
-        vedic_drishti: False (default, the monthly-report path) checks the
-            Western set above. True (the chats) checks conjunction,
-            opposition and each planet's classical special drishti by
-            forward angle (aspect_type "drishti_5th" etc.) instead of
-            trine/square. Note the Western trine/square bands are one-sided
-            (_angular_diff measures transit - natal against ONE angle), so
-            they only catch forward 240/270, never 120/90.
 
     Returns:
         List of transit hit dicts sorted by hit_date.
@@ -116,13 +103,10 @@ def compute_transit_hits(
     best_hit: Dict[tuple, Dict[str, Any]] = {}
 
     for transit_planet in TRANSIT_PLANETS:
-        if vedic_drishti:
-            aspects = [(a, ang, _angular_diff) for a, ang in _NODE_ASPECTS] + [
-                (f"drishti_{nth}", float(ang), _forward_orb)
-                for ang, nth in _SPECIAL_DRISHTI.get(transit_planet, {}).items()
-            ]
-        else:
-            aspects = [(a, ang, _angular_diff) for a, ang in _PLANET_ASPECTS[transit_planet]]
+        aspects = [(a, ang, _angular_diff) for a, ang in _NODE_ASPECTS] + [
+            (f"drishti_{nth}", float(ang), _forward_orb)
+            for ang, nth in _SPECIAL_DRISHTI.get(transit_planet, {}).items()
+        ]
         day = start_day
         while day <= end_day:
             dt = datetime(day.year, day.month, day.day, 12, 0, tzinfo=timezone.utc)
@@ -167,17 +151,14 @@ def compute_transit_hits(
 # ── Chat-facing selection (2026-10-02) ───────────────────────────────────────
 #
 # Framing decision: chat speaks classical Vedic, and trine/square are
-# Western aspects. The chats call compute_transit_hits(vedic_drishti=True),
-# which computes only relationships with a classical name:
+# Western aspects. compute_transit_hits() computes only relationships with a
+# classical name:
 #   conjunction -> transiting over the natal planet
 #   opposition  -> 7th-house aspect (the full aspect every planet casts)
 #   drishti_*   -> the planet's own special drishti, counted forward from
 #                  the transiting planet: Jupiter 5th/9th, Mars 4th/8th,
 #                  Saturn 3rd/10th (_SPECIAL_DRISHTI above).
-# Trine/square hits (the Western set) are dropped, not relabelled. Until
-# 2026-10-02 the chats relabelled matching trines/squares instead, which
-# silently missed Jupiter 5th, Mars 4th/8th and Saturn 3rd (see
-# compute_transit_hits' docstring). The `house`/`life_area_hint` fields are
+# Any other aspect_type is dropped (none is produced today). The `house`/`life_area_hint` fields are
 # never surfaced: _house_of() is Equal House, not the whole-sign system used
 # everywhere else (open backlog item).
 
