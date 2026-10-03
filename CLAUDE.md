@@ -852,6 +852,38 @@ stale" and "confirmed real" looked like in practice):
   exact after 16 Nov 2026), plus two past Mars 8th contacts. Replies cite
   it.
 
+  **History-anchoring fix attempt (same day): tested, NOTHING SHIPPED.**
+  Same chart, exact 21:51 question, Sonnet 4.6, 20 replies per arm, the
+  production prompt; metric = reply cites Jupiter's Ashtakavarga 2/8.
+  | Arm | Cited |
+  |---|---|
+  | Baseline, real 12-message history | 10/20 |
+  | A: freshness note beside every live data section ("recomputed for this message; an earlier 'not available' is out of date") | 0/20 |
+  | B: history sanitizer, stale claims replaced by a placeholder | 0/20 |
+  | B: same, stale claims deleted | 6/20 |
+  | Diagnostic: per-turn note when the question names Ashtakavarga (available Saturn/Jupiter, not Venus) | 11/20 |
+  | Diagnostic: drop the flagged exchanges entirely (8 of 12 messages left) | 4/20 |
+  | Diagnostic: only the first 2 exchanges (unrelated) | 16/20 |
+  | Diagnostic: only the last 2 exchanges | 15/20 |
+  | No history | 19/20 |
+  Conclusions: (1) the anchoring is NOT carried by the stale "I'd need X"
+  sentences -- removing them, or the whole exchanges, doesn't recover it;
+  the rate tracks the amount of conversation. (2) The trigger is the
+  question bundling "Jupiter AND Venus": Venus is genuinely not computed,
+  and the model files the whole bundled item under "don't have". Every
+  intervention that talks about availability pushes it harder into a
+  have/don't-have checklist (the placeholder arm wrote "❌ Ashtakavarga").
+  Sanitizer precision notes, for anyone retrying B: the real stale claim
+  was an "I'd need:" lead-in + list items, not "I don't have" wording; a
+  lead-in only covers a list if it ends with ":", and a sub-heading like
+  "What I can say with grounding:" must reset it, or positive list items
+  get stripped (a first version stripped "Venus Antardasha 2032-2035 is
+  your next wealth window"); "D2 all placements" must be kept (still
+  absent). Untested candidates: a shorter resent-history window (the
+  2026-08-14 "history cap" closure was about token cost, not this), or
+  answering bundled items per planet. Control questions (Venus AV, full
+  D2, Sookshma) not run since nothing shipped.
+
 - **LLM call-site sweep + four decisions (2026-10-02) -- every LLM call site,
   current status.** Rule of thumb for any NEW call site: log through
   `budget_guard.log_llm_call()` (writes BOTH ledgers: `llm_calls` $ and
