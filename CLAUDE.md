@@ -896,6 +896,69 @@ stale" and "confirmed real" looked like in practice):
   answering bundled items per planet. Control questions (Venus AV, full
   D2, Sookshma) not run since nothing shipped.
 
+  **Round 2 (same day): history length and per-item handling. Tested,
+  NOTHING SHIPPED.** Sonnet 4.6, 20 replies per arm, production prompts.
+  **Metric fixed**: a reply counts if one sentence names Jupiter with a
+  strength value (`N/8`, well/weakly supported, above/below threshold).
+  The old "2/8" regex missed the label-only phrasing ("classically
+  well-supported"), which made chart `b1a35180` look like 1/20 with no
+  history when it was really 20/20. An LLM grader (Haiku) was tried and
+  dropped: it said NO to replies that plainly gave "Jupiter in Cancer
+  (2/8)" inside a "don't have" list. Re-scored fd79 numbers barely move
+  (3 of ~400 replies changed).
+  Units: the resent history is capped at 12 MESSAGES (client sends
+  `messages.slice(-12)`, server `req.history[-12:]`), i.e. 6 exchanges, so
+  "N exchanges" above 6 isn't testable; lengths below are messages.
+  - `fd79efb3`, real history (pooled across runs): 0 msgs 39/40; last 2
+    31/40; first 2 18/20; last 4 39/60; first 4 33/40; last 6 4/20; last 8
+    8/20; last 10 3/20; all 12 28/60. Not a smooth length curve: the drop
+    at 6 is exactly where the 05:24 "I'd need: ... Ashtakavarga ..." turn
+    (which the user's question copies verbatim) enters the window.
+    Run-to-run spread at the same arm is up to 4/20.
+  - Per-item instruction ("split bundled items, check each separately,
+    name only the missing part"): alone 9/20 (same-batch baseline 11/20);
+    with last 2 messages 19/20; with first 2 messages 20/20. No effect by
+    itself; the gains come from the shorter history.
+  - Replication. `b1a35180` (real history, 3 old "don't have Porutham
+    breakdown" turns) with a bundled Jupiter+Venus AV question: 19-20/20 at
+    EVERY length incl. all 12; per-item 20/20. `6ffd91fb`: 20/20 for 0, 2,
+    12, and per-item. So the failure does NOT appear without a stale turn
+    about the same data. Grafting fd79's real 05:24 exchange onto
+    b1a35180's history as its newest exchange: all 12 = 16/20, last 2 (the
+    grafted exchange alone) = 20/20, last 4 = 20/20, per-item 19/20,
+    per-item + last 2 20/20. A mild version of the effect, and a cap that
+    still includes the stale exchange didn't hurt there.
+  - **Decision: nothing shipped.** The only arm that clearly beats baseline
+    is a 2-message cap (1 prior exchange), helping one real conversation
+    and mildly one grafted case, neutral elsewhere. Its cost (losing
+    multi-turn continuity) was NOT measured: the spot-check of real
+    multi-turn conversations was blocked when the local API key's credit
+    ran out mid-test (below). Also not run: fd79 with ONLY the stale
+    exchange as history. **Token backlog interaction**: the history cap
+    was closed on cost grounds 2026-08-14 (median session 2 messages), so
+    a cap here would be for this bug, not cost; 6 messages (3 exchanges)
+    is the cost-backlog number and scored 4/20 on fd79 -- the right number
+    for this bug (2) and for cost (6) differ.
+  - **API credit exhausted by these tests (2026-10-02)**: these A/B runs
+    call Anthropic directly with the local `.env` key -- roughly 1,000
+    Sonnet + ~700 Haiku calls across the three rounds today, ~9M tokens,
+    none of it in `llm_calls`/`llm_token_usage`. The account returned
+    "credit balance is too low" at the end. Whether production (Render)
+    uses the same account was not checked from here; the app's last
+    logged call was 21:51 UTC, before exhaustion. Future 20-sample A/Bs:
+    budget ~$0.03-0.05 per reply, and check the balance first.
+
+  **Monthly drishti fix -- backfill cost (2026-10-02, not run)**: the 12
+  cached monthly reports whose LLM-payload event windows change under
+  `72226ce` (118f439f 2026-09, 1b74c4d0 2026-05, 2e7e056f 2026-11, 4d9543d7
+  2026-09, 6ffd91fb 2026-06/07, 7916f261 2026-08/11, 9b7c3ed9 2026-09,
+  c966cc99 2026-08, f1eb7ec4 2026-07, f44f22b6 2026-09) last cost 190,328
+  tokens in total from their own latest successful v7 calls (151,580
+  prompt + 38,748 completion, ~15.9k/row), ~$1.04 at Sonnet 4.6 pricing --
+  31% of the 607,493 tokens left in October's 1,500,000 budget at the
+  time. Life-area scores do not move for any of them (scores read
+  `compute_event_windows()`, not these windows). Held for a decision.
+
 - **LLM call-site sweep + four decisions (2026-10-02) -- every LLM call site,
   current status.** Rule of thumb for any NEW call site: log through
   `budget_guard.log_llm_call()` (writes BOTH ledgers: `llm_calls` $ and
