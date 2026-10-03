@@ -441,11 +441,23 @@ stale" and "confirmed real" looked like in practice):
     none lost.
   - Trine/square hits are dropped, not relabelled: a "nearest classical
     name" would misstate what was computed.
-  - **Found, not fixed**: the monthly-report path (`predictive_signals_engine`
-    → `event_window_engine`) still uses the default Western set with the
-    same one-sided bands, so its "trine"/"square" only ever means forward
-    240°/270°, never 120°/90°. Fixing it changes report scoring, so it is a
-    product decision.
+  - **Monthly path FIXED 2026-10-02 (`72226ce`), no regeneration**:
+    `compute_transit_hits()` now has ONE mode (the classical set above);
+    the Western one-sided trine/square mode is gone, and its last caller,
+    `predictive_signals_engine` → `event_window_engine.detect_confluence()`
+    (monthly event windows), uses the same set as chat. Read-only audit over
+    all 70 cached monthly reports at their mid-month anchors: transit hits
+    729 → 750 (every row changes: Mars 8th +119 / 4th +115, Jupiter 9th +40
+    / 5th +28, Saturn 10th +14 / 3rd +7, replacing Mars square 107 / trine
+    105, Jupiter trine 40 / square 24, Saturn square 14 / trine 12); windows
+    518 → 532 in 36 rows (36 appear, 22 vanish, 12 move signal count, total
+    |delta| 15); high-confidence windows reaching the LLM payload differ in
+    12 rows (25 → 22), family-prediction windows in 9. **Scores: none move**
+    -- life-area scoring reads `envelope["event_windows"]` from
+    `compute_event_windows()` (Moon-transit/Tara-Bala), not these. New
+    reports pick it up when `predictive_signals` is recomputed (each new
+    month). **Backfill of the 12 affected cached reports held for a
+    decision.**
   - `house`/`life_area_hint` are never surfaced: `_house_of()` is Equal
     House (see that backlog item), and `life_area_hint` is the same number
     as a topic.
