@@ -73,6 +73,35 @@ Original items (historical):
    owns deploys/ops should confirm this app's actual Render auto-deploy
    setting and redeploy if it's off.
 
+## RULE — live LLM spend from scripts needs the user's go-ahead first (2026-10-03)
+
+Production and local scripts share ONE Anthropic API key and billing
+account (decided 2026-10-03: no separate test key). An unguarded test run
+drained the balance and took production chat down on 2026-10-03 (see the
+incident entry under Next Priorities). So:
+
+- Any batch of live LLM calls run outside the app -- an A/B test, a
+  backfill, a "quick check" -- with **more than 20 calls OR an estimated
+  cost above $0.50** must have its estimated cost shown to the user and
+  get an explicit go-ahead BEFORE it runs. No exceptions for "just testing".
+- Fire such calls only through `scripts/live_llm_guard.py` (`SpendGuard`):
+  `estimate()` → `approve()` → `preflight()` → `run()`. `approve()` refuses
+  above the threshold unless `LIVE_LLM_APPROVAL` equals that estimate's
+  code (e.g. `120:393` = 120 calls, $3.93); set it only after the user has
+  approved that number. The code is tied to the estimate, and an approval
+  covers one batch only.
+- The guard can't read the remaining balance: Anthropic has no balance
+  endpoint (the Usage & Cost Admin API is historical, needs an admin key,
+  and isn't available to individual accounts). Its 1-token probe only
+  proves the account can be billed right now, so compare the estimate
+  with the Console balance yourself.
+- Not yet wired through the guard (wrap before the next run):
+  `scripts/rewrite_transit_backing_sentences.py`, and any backfill that
+  regenerates reports through app code (those do hit the app's ledgers and
+  `LLM_MONTHLY_TOKEN_BUDGET`, but the approval rule above still applies).
+- Guard tests: `tamil_panchangam_engine/.venv/bin/python -m pytest scripts/tests -q`
+  (not part of the engine suite).
+
 ## Purpose
 A Tamil Panchangam-based astrology application providing daily/monthly
 Panchangam calculations including Tithi, Vara, Nakshatra, Yoga, and Karana.
@@ -678,8 +707,21 @@ stale" and "confirmed real" looked like in practice):
   today would repeat the exact same budget-exhaustion incident. Needs
   either the emergency ceiling raised further or to wait until closer
   to the October reset.
-- **INCIDENT 2026-10-03 (LIVE at time of writing) -- Anthropic account out
-  of credit; production LLM features down. Caused by local A/B testing.**
+- **RESOLVED 2026-10-03 (was LIVE) -- Anthropic account out of credit;
+  production LLM features down ~05:52 to between 06:05:51 and 06:17:21 UTC.
+  Caused by local A/B testing.**
+  - **Recovery confirmed from real traffic (no test message sent)**: the
+    admin's live chat "wealth situation?" (chart `fd79efb3`, user message
+    06:17:21 UTC) succeeded: `llm_calls` row
+    `581c1eff-c454-4f01-a012-df21b810f77f`, 06:17:30 UTC, `chat`,
+    `status='success'`, 6,425 in / 275 out; assistant reply stored. The exact
+    moment credit was restored isn't recorded anywhere -- it falls between
+    the last refused call (06:05:51, local key) and that success (06:17:21).
+    Real requests that failed during the outage: one (06:05:09, row
+    `73d47168-aa5f-41bd-87dd-aeecf085eb61`, same admin).
+  - **Follow-up decision (2026-10-03)**: stay on the single existing key for
+    production and local testing; the guard is in process/code instead --
+    see "Live LLM spend guard" below.
   - **What happened**: the 2026-10-02/03 chat A/B rounds called Anthropic
     directly from scratchpad scripts with the local `.env` key: ~1,000
     Sonnet 4.6 calls (6-9k input tokens each) + ~700 Haiku grader calls,
@@ -708,18 +750,16 @@ stale" and "confirmed real" looked like in practice):
     monthly/yearly would append a `prediction_llm_interpretation` fallback row.
     Chat shows the raw error string to the user (`yield {'error': str(e)}`):
     it leaks the provider message, not fixed.
-  - **Top-up**: the user reported topping up, but a minimal call with the
-    local key at ~06:05 UTC still returned the same 400, and so did
-    production at 06:05:09 -- either not yet propagated, or credited to a
-    different org/workspace. Verify recovery with a fresh call (and a real
-    chat) before calling this closed.
+  - **Top-up**: right after the reported top-up, a minimal call with the
+    local key (~06:05 UTC) and production (06:05:09) still got the 400;
+    it took effect before 06:17:21 (see recovery above).
   - **Root cause**: no separation between test and production spend.
     Scratchpad A/B scripts used the production-billing account, outside the
     app's own `llm_calls`/`llm_token_usage` ledgers (so
     `LLM_MONTHLY_TOKEN_BUDGET` never saw it), with no cost estimate up
     front, no pre-flight balance check, and no spend cap.
-  - **Recommendation (console action, not done from here)**: give local
-    testing its own API key in a separate Console workspace with a monthly
+  - **Recommendation made (console action), NOT adopted -- see the
+    follow-up decision above**: give local testing its own API key in a separate Console workspace with a monthly
     spend limit well below the production balance, so a test run can
     exhaust only its own cap. Keep production's key only in Render. Turn
     on low-balance email alerts / auto-reload for the production org.
